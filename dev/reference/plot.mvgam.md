@@ -29,11 +29,15 @@ plot(
 
   `"residuals"` (default)
 
-  :   Dunn-Smyth residuals of one series against the fitted values,
-      their Q-Q plot, ACF and partial ACF, as
+  :   Randomised quantile (Dunn-Smyth) residuals of one series, defined
+      in
+      [`residuals.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/residuals.mvgam.md).
+      The grid plots them against the fitted values, with their Q-Q
+      plot, ACF and partial ACF, as
       [`pp_check.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/pp_check.mvgam.md)
-      draws them. A series observed at unevenly spaced times shows a
-      semivariogram in place of the ACF and partial ACF. An
+      draws them. For a model that fits, they look like independent
+      standard normal draws. A series observed at unevenly spaced times
+      shows a semivariogram in place of the ACF and partial ACF. An
       [`occ()`](https://nicholasjclark.github.io/mvgam/dev/reference/occ.md)
       or
       [`nmix()`](https://nicholasjclark.github.io/mvgam/dev/reference/nmix.md)
@@ -104,9 +108,7 @@ plot(
   adds `"season"`. `"predictor"` holds the effects of the trend
   formula's covariates. `c("level", "predictor")` gives the level with
   those effects. A factor model projects each component through its
-  loadings, as it projects the trend. The result is an ordinary
-  [mvgam_forecast-class](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam.md)
-  with the components in its `component` slot.
+  loadings, as it projects the trend.
 
 - ...:
 
@@ -144,11 +146,11 @@ Nicholas J Clark
 set.seed(13)
 simdat <- sim_mvgam(family = poisson(), n_series = 1L,
                      n_timepoints = 120L, trend_model = AR())
-mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
+mod <- mvgam(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1),
               data    = simdat$data_train,
               family  = poisson(),
               chains  = 2, silent = 2)
-#> Warning: 9 of 2000 (0.0%) transitions ended with a divergence.
+#> Warning: 5 of 2000 (0.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 
 # Residual diagnostics, the default
@@ -163,7 +165,7 @@ plot(mod, type = "trend")
 
 # The slope of a local linear trend
 mod_llt <- update(mod, trend_formula = ~ LLT())
-#> Warning: 2 of 2000 (0.0%) transitions ended with a divergence.
+#> Warning: 7 of 2000 (0.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 plot(mod_llt, type = "trend", component = "slope")
 

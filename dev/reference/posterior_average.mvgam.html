@@ -134,8 +134,8 @@ parameter a fit lacks.</p></dd>
 
 
 <dt id="arg-model-names">model_names<a class="anchor" aria-label="anchor" href="#arg-model-names"></a></dt>
-<dd><p>Optional character vector of model labels;
-overrides the names inferred from the call.</p></dd>
+<dd><p>Optional character vector of model names, one per
+forecast. It replaces the names taken from the call.</p></dd>
 
 
 <dt id="arg-control">control<a class="anchor" aria-label="anchor" href="#arg-control"></a></dt>
@@ -164,8 +164,7 @@ summarises the averaged predictions with
 
 <dt id="arg-probs">probs<a class="anchor" aria-label="anchor" href="#arg-probs"></a></dt>
 <dd><p>Numeric vector of probabilities for quantile computation.
-Default is <code>c(0.025, 0.975)</code> for 95% credible intervals. Can be a
-single value or multiple values.</p></dd>
+Default is <code>c(0.025, 0.975)</code> for 95% credible intervals.</p></dd>
 
 
 <dt id="arg-robust">robust<a class="anchor" aria-label="anchor" href="#arg-robust"></a></dt>
@@ -188,7 +187,7 @@ of draws taken from each fit.</p>
     <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>
     <div class="dont-index"><p><code><a href="mvgam_loo_extras.html">loo_model_weights.mvgam()</a></code> computes the weights.
 <code><a href="ensemble.mvgam_forecast.html">ensemble()</a></code> averages forecasts. The
-<a href="https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html">forecast evaluation article</a>
+<a href="https://nicholasjclark.github.io/mvgam/dev/articles/forecast_evaluation.html">forecast evaluation article</a>
 weights and combines competing models.</p>
 <p>Other model comparison:
 <code><a href="bridge_sampler.mvgam.html">bridge_sampler.mvgam()</a></code>,
@@ -216,7 +215,7 @@ weights and combines competing models.</p>
 <span class="r-in"><span>                    n_timepoints <span class="op">=</span> <span class="fl">120L</span>, trend_model <span class="op">=</span> <span class="st">"None"</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="va">mod</span> <span class="op">&lt;-</span> <span class="fu"><a href="mvgam.html">mvgam</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="fu">s</span><span class="op">(</span><span class="va">x</span><span class="op">)</span>, data <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span>,</span></span>
 <span class="r-in"><span>             family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson</a></span><span class="op">(</span><span class="op">)</span>, chains <span class="op">=</span> <span class="fl">2</span>, silent <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 2 of 2000 (0.0%) transitions ended with a divergence.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 3 of 2000 (0.0%) transitions ended with a divergence.</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> See https://mc-stan.org/misc/warnings for details.</span>
 <span class="r-in"><span><span class="co"># }</span></span></span>
 <span class="r-in"><span><span class="co"># \dontrun{</span></span></span>
@@ -228,32 +227,32 @@ weights and combines competing models.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Method: stacking</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ------</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>         weight</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> mod     0.898 </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> mod_lin 0.102 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> mod     0.897 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> mod_lin 0.103 </span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># The intercept, averaged over both fits under those weights</span></span></span>
 <span class="r-in"><span><span class="va">pa</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://paulbuerkner.com/brms/reference/posterior_average.brmsfit.html" class="external-link">posterior_average</a></span><span class="op">(</span><span class="va">mod</span>, <span class="va">mod_lin</span>, variable <span class="op">=</span> <span class="st">"b_Intercept"</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/attr.html" class="external-link">attr</a></span><span class="op">(</span><span class="va">pa</span>, <span class="st">"weights"</span><span class="op">)</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>      mod  mod_lin </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 0.897515 0.102485 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>       mod   mod_lin </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 0.8965409 0.1034591 </span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">pa</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   b_Intercept   </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  Min.   :1.496  </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  1st Qu.:1.598  </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  Median :1.632  </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  Min.   :1.459  </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  1st Qu.:1.599  </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  Median :1.633  </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  Mean   :1.632  </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  3rd Qu.:1.667  </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  3rd Qu.:1.666  </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  Max.   :1.805  </span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Averaged expected counts, one row per observation</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="fu"><a href="https://paulbuerkner.com/brms/reference/pp_average.brmsfit.html" class="external-link">pp_average</a></span><span class="op">(</span><span class="va">mod</span>, <span class="va">mod_lin</span>, method <span class="op">=</span> <span class="st">"posterior_epred"</span><span class="op">)</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>       Estimate Est.Error     Q2.5     Q97.5</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1,]  2.895976 0.4848519 2.058548  3.941971</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [2,] 12.971016 2.0798592 7.892636 16.448289</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [3,]  7.127309 0.6490576 5.932693  8.456080</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [4,]  8.690601 1.0261885 6.943644 11.103724</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [5,]  2.769417 0.5250686 1.881987  3.980057</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [6,]  8.318495 1.8816762 5.470898 12.854960</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1,]  2.912185 0.5095547 2.025116  3.962233</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [2,] 12.981826 2.0984110 7.892636 16.206994</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [3,]  7.118987 0.6362446 5.969749  8.410939</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [4,]  8.664794 1.0146162 7.005163 11.093057</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [5,]  2.774361 0.5300401 1.841259  3.902372</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [6,]  8.366062 1.8957861 5.454869 12.855426</span>
 <span class="r-in"><span><span class="co"># }</span></span></span>
 <span class="r-in"><span></span></span>
 </code></pre></div>

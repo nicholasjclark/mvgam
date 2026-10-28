@@ -166,46 +166,46 @@ summary(mod)
 #> == Observation Model ==
 #> Regression Coefficients:
 #>              Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> Intercept        3.52      0.13     3.30     3.78 1.00     1235     1232
-#> p_Intercept      0.57      0.24     0.10     1.02 1.00     1141      278
-#> seriessp_2      -0.92      0.19    -1.31    -0.57 1.00     1463     1879
-#> seriessp_3      -0.37      0.28    -0.86     0.13 1.01      487      213
-#> seriessp_4      -1.16      0.22    -1.56    -0.72 1.00     2295     2313
-#> p_seriessp_2     0.41      0.27    -0.14     0.93 1.00     1861     2232
-#> p_seriessp_3    -0.97      0.30    -1.54    -0.39 1.00     1519     2856
-#> p_seriessp_4    -0.10      0.33    -0.76     0.52 1.00     2595     2540
-#> p_wind          -1.38      0.13    -1.64    -1.15 1.00     3110     3157
+#> Intercept        3.52      0.12     3.30     3.78 1.00     1857     1731
+#> p_Intercept      0.58      0.24     0.10     1.03 1.00     2171     2821
+#> seriessp_2      -0.92      0.19    -1.30    -0.57 1.00     2045     1522
+#> seriessp_3      -0.39      0.23    -0.86     0.01 1.00     1693     1356
+#> seriessp_4      -1.16      0.22    -1.58    -0.71 1.00     1750     2007
+#> p_seriessp_2     0.42      0.27    -0.13     0.93 1.00     2814     2560
+#> p_seriessp_3    -0.98      0.29    -1.53    -0.39 1.00     2157     2753
+#> p_seriessp_4    -0.10      0.34    -0.80     0.53 1.00     2048     1985
+#> p_wind          -1.38      0.12    -1.64    -1.15 1.00     2716     2884
 #> 
 #> == Trend Model ==
 #> Smoothing Spline Hyperparameters:
 #>                        Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS
-#> sds(stempseriessp_1_1)     1.64      1.20     0.09     4.66 1.00     1359
-#> sds(stempseriessp_2_1)     3.91      1.74     1.72     8.27 1.00     2563
-#> sds(stempseriessp_3_1)     0.93      0.92     0.02     3.36 1.00     1774
-#> sds(stempseriessp_4_1)     1.23      1.05     0.06     3.98 1.00     1736
+#> sds(stempseriessp_1_1)     1.74      1.39     0.11     4.89 1.00     1228
+#> sds(stempseriessp_2_1)     3.98      1.74     1.79     8.42 1.00     2417
+#> sds(stempseriessp_3_1)     0.96      0.99     0.03     3.66 1.00     1649
+#> sds(stempseriessp_4_1)     1.22      1.08     0.05     4.13 1.00     1847
 #>                        Tail_ESS
-#> sds(stempseriessp_1_1)     1498
-#> sds(stempseriessp_2_1)     2672
-#> sds(stempseriessp_3_1)     1664
-#> sds(stempseriessp_4_1)     1740
+#> sds(stempseriessp_1_1)     1266
+#> sds(stempseriessp_2_1)     2519
+#> sds(stempseriessp_3_1)     2011
+#> sds(stempseriessp_4_1)     2010
 #> 
 #> Regression Coefficients:
 #>                    Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> stemp:seriessp_1_1     1.02      1.75    -2.55     3.96 1.00      940      383
-#> stemp:seriessp_2_1     2.44      2.76    -2.97     8.00 1.00     2769     2751
-#> stemp:seriessp_3_1    -3.02      1.29    -5.81    -0.37 1.00     2021     1995
-#> stemp:seriessp_4_1    -1.02      1.54    -3.84     2.58 1.00     2352     1844
+#> stemp:seriessp_1_1     0.90      1.79    -2.73     3.94 1.00     1453     2244
+#> stemp:seriessp_2_1     2.40      2.84    -3.17     8.05 1.00     2423     2565
+#> stemp:seriessp_3_1    -3.01      1.38    -6.10    -0.15 1.00     1639     1689
+#> stemp:seriessp_4_1    -1.06      1.53    -3.89     2.49 1.00     2407     2497
 #> 
 #> Trend Specific Parameters:
 #>                   Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> sigma_trend[sp_1]     0.12      0.08     0.00     0.32 1.01      590      276
-#> sigma_trend[sp_2]     0.14      0.10     0.01     0.37 1.00     1129     1155
-#> sigma_trend[sp_3]     0.19      0.11     0.02     0.42 1.00     1130     1226
-#> sigma_trend[sp_4]     0.12      0.09     0.00     0.34 1.00     1817     1928
-#> ar1_trend[sp_1]       0.01      0.42    -0.78     0.84 1.00     2066     1409
-#> ar1_trend[sp_2]       0.12      0.41    -0.70     0.88 1.00     2420     1827
-#> ar1_trend[sp_3]       0.15      0.39    -0.62     0.91 1.01      598      219
-#> ar1_trend[sp_4]       0.03      0.39    -0.73     0.76 1.00     3315     2287
+#> sigma_trend[sp_1]     0.11      0.08     0.01     0.30 1.00      982     1710
+#> sigma_trend[sp_2]     0.14      0.10     0.01     0.37 1.00     1175     1435
+#> sigma_trend[sp_3]     0.19      0.11     0.01     0.43 1.00      874      963
+#> sigma_trend[sp_4]     0.12      0.09     0.00     0.35 1.00     1838     1835
+#> ar1_trend[sp_1]       0.01      0.42    -0.79     0.81 1.00     2387     2329
+#> ar1_trend[sp_2]       0.12      0.41    -0.68     0.88 1.00     2371     1751
+#> ar1_trend[sp_3]       0.13      0.38    -0.63     0.84 1.00     1737     1614
+#> ar1_trend[sp_4]       0.02      0.40    -0.75     0.78 1.00     3724     1953
 #> 
 #> Draws were sampled using sampling(NUTS). For each parameter, Bulk_ESS
 #> and Tail_ESS are effective sample size measures, and Rhat is the potential
@@ -340,11 +340,11 @@ fit_stat
 #>   Statistic:        chi-squared
 #>   Aggregation:      closure unit
 #>   Posterior draws:  500
-#>   Bayesian p-value: 0.452
+#>   Bayesian p-value: 0.394
 ```
 
 A Bayesian p-value near 0 would mean the replicates rarely reach the
-discrepancy of the observed counts. The value here, 0.45, gives no sign
+discrepancy of the observed counts. The value here, 0.39, gives no sign
 of lack of fit.
 [`latent_N_saturation()`](https://nicholasjclark.github.io/mvgam/dev/reference/latent_N_saturation.md)
 reports the posterior probability that $`N`$ reaches the cap in each
@@ -354,11 +354,11 @@ unit:
 
 sat <- latent_N_saturation(mod)
 max(sat$p_saturated)
-#> [1] 0.025
+#> [1] 0.017
 ```
 
 The largest probability any unit gives to reaching the cap of 80 is
-0.025.
+0.017.
 
 ## Other observation processes
 

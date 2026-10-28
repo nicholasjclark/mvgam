@@ -1,4 +1,4 @@
-# Expected Values from the Posterior Distribution
+# Expected values of an mvgam model
 
 Expected values E\[Y \| X\] of an mvgam model, or its linear predictor
 with `scale = "linear"`, at the training observations by default. The
@@ -58,27 +58,33 @@ fitted(
 - components:
 
   Character; one of `"response"` (default), `"latent_state"`, or
-  `"detection"`. Selects which posterior component to return.
+  `"detection"`. The quantity to return:
 
-  - `"response"` keeps the brms-default behaviour: marginal expected
-    values at the per-row grain, scaled via `scale`.
+  - `"response"`: the expected value of each row of the data, on the
+    scale `scale` sets.
 
-  - `"latent_state"` (closure-unit families only) routes through
-    [`predict.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/predict.mvgam.md)
-    with `type = "latent_state"`, returning the conditional latent state
-    per closure unit (`P(z = 1 | y)` for
-    [`occ()`](https://nicholasjclark.github.io/mvgam/dev/reference/occ.md),
-    posterior `N` for
+  - `"latent_state"`, for
     [`nmix()`](https://nicholasjclark.github.io/mvgam/dev/reference/nmix.md)
-    variants).
-
-  - `"detection"` (closure-unit families only) routes through
+    and
+    [`occ()`](https://nicholasjclark.github.io/mvgam/dev/reference/occ.md)
+    only: the latent state of each closure unit given its detections.
+    That is the abundance `N` for
+    [`nmix()`](https://nicholasjclark.github.io/mvgam/dev/reference/nmix.md)
+    and the probability of occupancy `P(z = 1 | y)` for
+    [`occ()`](https://nicholasjclark.github.io/mvgam/dev/reference/occ.md).
     [`predict.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/predict.mvgam.md)
-    with `type = "detection"`, returning per- visit detection
-    probabilities.
+    returns the same with `type = "latent_state"`.
 
-  Modelled on the `flocker::fitted_flocker(components = ...)` argument
-  so flocker users have a one-call equivalent.
+  - `"detection"`, for
+    [`nmix()`](https://nicholasjclark.github.io/mvgam/dev/reference/nmix.md)
+    and
+    [`occ()`](https://nicholasjclark.github.io/mvgam/dev/reference/occ.md)
+    only: the detection probability of each visit, as
+    `type = "detection"` of
+    [`predict.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/predict.mvgam.md)
+    returns it.
+
+  The argument matches `components` of `flocker::fitted_flocker()`.
 
 - unit_level:
 
@@ -116,26 +122,25 @@ fitted(
 - probs:
 
   Numeric vector of probabilities for quantile computation. Default is
-  `c(0.025, 0.975)` for 95% credible intervals. Can be a single value or
-  multiple values.
+  `c(0.025, 0.975)` for 95% credible intervals.
 
 - process_error:
 
-  Logical; if `TRUE`, the trend adds a sampled innovation to its
-  deterministic submodel. Each posterior draw takes one innovation from
-  the distribution the trend settles into. An autoregressive trend
-  settles into its stationary distribution: an AR(1) draws at
-  \\\sigma^2/(1-\rho^2)\\. The Jensen correction on a log link is
-  \\\sigma^2/(2(1-\rho^2))\\. A random walk lacks a stationary
-  distribution and a
+  Logical. `FALSE`, the default, leaves the trend's innovations out of
+  the prediction. `TRUE` adds a random deviation at each time and
+  series, drawn anew for every posterior draw from the spread the trend
+  shows over the long run. For an AR(1) trend with innovation SD
+  \\\sigma\\ and coefficient \\\rho\\ that spread has variance
+  \\\sigma^2/(1-\rho^2)\\. On a log link the deviations raise the
+  average prediction by the factor \\\exp(\sigma^2/(2(1-\rho^2)))\\. A
+  random walk has no long-run spread. A
   [`ZMVN()`](https://nicholasjclark.github.io/mvgam/dev/reference/ZMVN.md)
-  trend lacks dynamics. Both draw their innovations directly.
+  trend has no dynamics. These two draw from the innovation covariance
+  itself.
   [`CAR()`](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md)
-  uses one stationary covariance at every time of an irregular grid and
-  draws from it. If `FALSE`, the default, the trend contributes its
-  deterministic submodel alone, at its own per-draw values. The argument
-  applies under `incl_autocor = FALSE`. Conditioning on the fitted state
-  already fixes every innovation.
+  draws from one long-run covariance at every time of an irregular grid.
+  The argument applies under `incl_autocor = FALSE`. The fitted state
+  already holds every innovation.
 
   Each call draws new innovations. Two calls on one fit give different
   results. Set a seed to reproduce a result.
@@ -160,8 +165,8 @@ fitted(
 
 - sample_new_levels:
 
-  Character; accepted for brms compatibility and not used, since new
-  levels are refused. See `allow_new_levels`.
+  Character; accepted for brms compatibility. It has no effect, because
+  new levels are refused. See `allow_new_levels`.
 
 - ...:
 
@@ -193,9 +198,10 @@ For the training data the fitted values include the trend state the
 model inferred at each time.
 [`hindcast.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/hindcast.mvgam.md)
 returns the same state. With `newdata`, or under `incl_autocor = FALSE`,
-the fitted values describe the covariate structure. `process_error` then
-sets the trend's part. `FALSE` keeps its deterministic submodel. `TRUE`
-samples a state per draw from the trend's dynamics.
+the fitted values describe the covariate part of the model.
+`process_error` then sets the trend's part. `FALSE` keeps the trend's
+covariate effects. `TRUE` also samples a state per draw from the trend's
+dynamics.
 
 The brms arguments `dpar`, `nlpar` and `sort` are refused.
 [`posterior_linpred.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/posterior_linpred.mvgam.md)
@@ -230,33 +236,33 @@ Other predictions:
 set.seed(13)
 simdat <- sim_mvgam(family = poisson(), n_series = 1L,
                      n_timepoints = 120L, trend_model = AR())
-mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
+mod <- mvgam(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1),
               data    = simdat$data_train,
               family  = poisson(),
               chains  = 2, silent = 2)
-#> Warning: 9 of 2000 (0.0%) transitions ended with a divergence.
+#> Warning: 5 of 2000 (0.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 
 # Expected counts at the training observations: the posterior mean,
 # error and 95% interval of each
 head(fitted(mod))
 #>       Estimate Est.Error      Q2.5     Q97.5
-#> [1,]  1.968095 0.8326505 0.7564453  3.990160
-#> [2,] 13.323024 3.1017601 7.9543207 20.025617
-#> [3,]  5.844418 1.7971733 2.8605365 10.201195
-#> [4,]  4.231734 1.4844296 1.9142345  7.607356
-#> [5,]  3.824684 1.3981040 1.6954879  6.957924
-#> [6,]  5.382676 1.8392005 2.4784256  9.685531
+#> [1,]  2.213963 0.9497584 0.8443745  4.477423
+#> [2,] 12.868985 3.2440969 7.6262390 20.232959
+#> [3,]  6.133415 1.8591295 3.1063965 10.225225
+#> [4,]  4.267246 1.5377098 1.7451359  7.820154
+#> [5,]  3.792407 1.4073015 1.6404318  7.154235
+#> [6,]  5.103720 1.7479758 2.3529934  9.123604
 
 # The covariate effects alone, without the inferred trend state
 head(fitted(mod, incl_autocor = FALSE))
 #>       Estimate Est.Error     Q2.5     Q97.5
-#> [1,]  1.983064 0.4905737 1.167715  3.023842
-#> [2,] 14.446002 3.2741695 9.484913 21.450717
-#> [3,]  7.837157 1.4931008 5.516031 10.913494
-#> [4,]  8.326702 1.7752656 5.625857 12.037871
-#> [5,]  4.850117 1.1292925 3.004808  7.364216
-#> [6,]  7.250155 2.4695363 3.815116 12.638388
+#> [1,]  2.179257 0.4797681 1.370309  3.240618
+#> [2,] 12.501430 2.3923246 8.346400 18.081087
+#> [3,]  8.302232 1.3883129 5.749874 11.304569
+#> [4,]  8.900367 1.6533494 6.174799 12.591126
+#> [5,]  4.558828 1.0862699 2.787153  6.950084
+#> [6,]  6.484566 1.7949456 3.705107 10.530367
 
 # One row per posterior draw and one column per observation
 dim(fitted(mod, summary = FALSE))

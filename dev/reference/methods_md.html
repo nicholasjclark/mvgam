@@ -129,11 +129,11 @@ its references. <code><a href="https://mc-stan.org/rstantools/reference/prior_su
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed</a></span><span class="op">(</span><span class="fl">13</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="va">simdat</span> <span class="op">&lt;-</span> <span class="fu"><a href="sim_mvgam.html">sim_mvgam</a></span><span class="op">(</span>family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson</a></span><span class="op">(</span><span class="op">)</span>, n_series <span class="op">=</span> <span class="fl">1L</span>,</span></span>
 <span class="r-in"><span>                     n_timepoints <span class="op">=</span> <span class="fl">120L</span>, trend_model <span class="op">=</span> <span class="fu"><a href="trend_constructors.html">AR</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="va">mod</span> <span class="op">&lt;-</span> <span class="fu"><a href="mvgam.html">mvgam</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="fu">s</span><span class="op">(</span><span class="va">x</span><span class="op">)</span>, trend_formula <span class="op">=</span> <span class="op">~</span> <span class="fu"><a href="trend_constructors.html">AR</a></span><span class="op">(</span>p <span class="op">=</span> <span class="fl">1</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span><span class="va">mod</span> <span class="op">&lt;-</span> <span class="fu"><a href="mvgam.html">mvgam</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="fu">s</span><span class="op">(</span><span class="va">x</span>, k <span class="op">=</span> <span class="fl">5</span><span class="op">)</span>, trend_formula <span class="op">=</span> <span class="op">~</span> <span class="fu"><a href="trend_constructors.html">AR</a></span><span class="op">(</span>p <span class="op">=</span> <span class="fl">1</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>              data    <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span>,</span></span>
 <span class="r-in"><span>              family  <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>              chains  <span class="op">=</span> <span class="fl">2</span>, silent <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 9 of 2000 (0.0%) transitions ended with a divergence.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 5 of 2000 (0.0%) transitions ended with a divergence.</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> See https://mc-stan.org/misc/warnings for details.</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># The equations, glossary and priors as Markdown</span></span></span>
@@ -167,7 +167,7 @@ its references. <code><a href="https://mc-stan.org/rstantools/reference/prior_su
 <span class="r-out co"><span class="r-pr">#&gt;</span> - $i$ indexes series, $t$ indexes time</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> - $\mu_{i,t}$: conditional mean of $y_{i,t}$</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> - $\alpha$: population intercept</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> - $f_{x}$: thin plate regression spline in $x$, basis size $K_{x}$ (mgcv default), smoothing SD $\sigma^{(s)}_{x}$</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> - $f_{x}$: thin plate regression spline in $x$, basis size $K_{x} = 5$, smoothing SD $\sigma^{(s)}_{x}$</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> - $\eta_{i,t}$: latent state at series $i$ time $t$</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> - $\epsilon^{(\eta)}_{i,t}$: process innovation, SD $\sigma_\eta$</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> - $\phi_{l}$: autoregressive coefficient at lag $l$</span>
@@ -191,7 +191,7 @@ its references. <code><a href="https://mc-stan.org/rstantools/reference/prior_su
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ```</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> mvgam(</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   formula       = y ~ s(x),</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   formula       = y ~ s(x, k = 5),</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   trend_formula = ~AR(p = 1),</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   data          = simdat$data_train,</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   family        = poisson(),</span>
@@ -205,7 +205,7 @@ its references. <code><a href="https://mc-stan.org/rstantools/reference/prior_su
 <span class="r-in"><span><span class="co"># Written to a file, nested under a level-two heading</span></span></span>
 <span class="r-in"><span><span class="fu">methods_md</span><span class="op">(</span><span class="va">mod</span>, file <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempfile</a></span><span class="op">(</span>fileext <span class="op">=</span> <span class="st">".md"</span><span class="op">)</span>, heading_level <span class="op">=</span> <span class="fl">3L</span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
-<span class="r-in"><span><span class="co"># Next, how_to_cite() writes the methods paragraph</span></span></span>
+<span class="r-in"><span><span class="co"># Next, forecast(mod) predicts the times after the training data</span></span></span>
 <span class="r-in"><span><span class="co"># }</span></span></span>
 <span class="r-in"><span></span></span>
 </code></pre></div>

@@ -77,9 +77,8 @@ includes latent factors (<code>n_lv &lt; n_series</code>).</p></dd>
 
 
 <dt id="arg-probs">probs<a class="anchor" aria-label="anchor" href="#arg-probs"></a></dt>
-<dd><p>Numeric vector of probabilities for quantile computation.
-Default is <code>c(0.025, 0.975)</code> for 95% credible intervals. Can be a
-single value or multiple values.</p></dd>
+<dd><p>Two probabilities for the lower and upper bounds of the
+credible interval. Default <code>c(0.025, 0.975)</code>, a 95% interval.</p></dd>
 
 
 <dt id="arg-robust">robust<a class="anchor" aria-label="anchor" href="#arg-robust"></a></dt>
@@ -143,7 +142,7 @@ models. <em>Statistics and Computing</em>, 34:143.
     <div class="dont-index"><p><code><a href="residual_cor.html">residual_cor()</a></code> for the implied correlation matrix,
 <code>cov2cor(Delta)</code>. Under <code><a href="mvn.html">mvn()</a></code> and <code><a href="mvt.html">mvt()</a></code> it adds each series'
 residual variance to the diagonal of <code>Delta</code> first. The
-<a href="https://nicholasjclark.github.io/mvgam/articles/jsdgam.html">joint species distribution article</a>
+<a href="https://nicholasjclark.github.io/mvgam/dev/articles/jsdgam.html">joint species distribution article</a>
 interprets both for a community of species.</p>
 <p>Other latent dynamics:
 <code><a href="active_factors.html">active_factors()</a></code>,
@@ -181,7 +180,7 @@ interprets both for a community of species.</p>
 <span class="r-in"><span>  chains         <span class="op">=</span> <span class="fl">2</span>,</span></span>
 <span class="r-in"><span>  silent         <span class="op">=</span> <span class="fl">2</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 32 of 2000 (2.0%) transitions ended with a divergence.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 49 of 2000 (2.0%) transitions ended with a divergence.</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> See https://mc-stan.org/misc/warnings for details.</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># The species-by-species covariance the two factors induce</span></span></span>
@@ -193,12 +192,12 @@ interprets both for a community of species.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Diagonal (captured variance per series):</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>      Estimate  Q2.5  Q97.5</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> sp_1    2.206 0.013 18.285</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> sp_2    2.841 0.029 19.025</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> sp_3    1.333 0.012  9.884</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> sp_4    1.468 0.014  9.408</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> sp_5    7.476 0.039 63.444</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> sp_6    1.011 0.016  5.837</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sp_1    3.181 0.014 35.988</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sp_2    2.668 0.037 20.761</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sp_3    2.014 0.013 16.764</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sp_4    1.267 0.015  7.893</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sp_5    6.781 0.036 63.237</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sp_6    1.807 0.017  9.492</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> plot() draws the full matrix as a heatmap.</span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">sv</span><span class="op">)</span></span></span>

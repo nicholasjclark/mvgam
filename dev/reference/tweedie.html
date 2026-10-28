@@ -144,14 +144,14 @@ Tweedie exponential dispersion model densities.
 <span class="r-in"><span><span class="va">simdat</span> <span class="op">&lt;-</span> <span class="fu"><a href="sim_mvgam.html">sim_mvgam</a></span><span class="op">(</span>family <span class="op">=</span> <span class="fu">tweedie</span><span class="op">(</span><span class="op">)</span>, n_series <span class="op">=</span> <span class="fl">1L</span>,</span></span>
 <span class="r-in"><span>                    n_timepoints <span class="op">=</span> <span class="fl">120L</span>, trend_model <span class="op">=</span> <span class="fu"><a href="trend_constructors.html">AR</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="va">mod</span> <span class="op">&lt;-</span> <span class="fu"><a href="mvgam.html">mvgam</a></span><span class="op">(</span></span></span>
-<span class="r-in"><span>  <span class="va">y</span> <span class="op">~</span> <span class="fu">s</span><span class="op">(</span><span class="va">x</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>  <span class="va">y</span> <span class="op">~</span> <span class="fu">s</span><span class="op">(</span><span class="va">x</span>, k <span class="op">=</span> <span class="fl">5</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>  trend_formula <span class="op">=</span> <span class="op">~</span> <span class="fu"><a href="trend_constructors.html">AR</a></span><span class="op">(</span>p <span class="op">=</span> <span class="fl">1</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>  data          <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span>,</span></span>
 <span class="r-in"><span>  family        <span class="op">=</span> <span class="fu">tweedie</span><span class="op">(</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>  chains        <span class="op">=</span> <span class="fl">2</span>,</span></span>
 <span class="r-in"><span>  silent        <span class="op">=</span> <span class="fl">2</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 51 of 2000 (3.0%) transitions ended with a divergence.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 32 of 2000 (2.0%) transitions ended with a divergence.</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> See https://mc-stan.org/misc/warnings for details.</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># The dispersion and power</span></span></span>

@@ -203,7 +203,7 @@ counts$y[3L] <- -1
 try(mvgam_data(counts, family = poisson(), plot = FALSE))
 #> Error : 'y' has values outside the support of family 'poisson'.
 #>   Requires: 0 <= 'y' (integers only).
-#>   Observed range: [-1, 26]. 1 of 135 values fall outside, the first at row
+#>   Observed range: [-1, 28]. 1 of 135 values fall outside, the first at row
 #>   3.
 #>   Check the column for missing-data sentinels such as -1 or -999.
 

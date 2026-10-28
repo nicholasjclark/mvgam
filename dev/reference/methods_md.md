@@ -80,11 +80,11 @@ Nicholas J Clark
 set.seed(13)
 simdat <- sim_mvgam(family = poisson(), n_series = 1L,
                      n_timepoints = 120L, trend_model = AR())
-mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
+mod <- mvgam(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1),
               data    = simdat$data_train,
               family  = poisson(),
               chains  = 2, silent = 2)
-#> Warning: 9 of 2000 (0.0%) transitions ended with a divergence.
+#> Warning: 5 of 2000 (0.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 
 # The equations, glossary and priors as Markdown
@@ -118,7 +118,7 @@ md
 #> - $i$ indexes series, $t$ indexes time
 #> - $\mu_{i,t}$: conditional mean of $y_{i,t}$
 #> - $\alpha$: population intercept
-#> - $f_{x}$: thin plate regression spline in $x$, basis size $K_{x}$ (mgcv default), smoothing SD $\sigma^{(s)}_{x}$
+#> - $f_{x}$: thin plate regression spline in $x$, basis size $K_{x} = 5$, smoothing SD $\sigma^{(s)}_{x}$
 #> - $\eta_{i,t}$: latent state at series $i$ time $t$
 #> - $\epsilon^{(\eta)}_{i,t}$: process innovation, SD $\sigma_\eta$
 #> - $\phi_{l}$: autoregressive coefficient at lag $l$
@@ -142,7 +142,7 @@ md
 #> 
 #> ```
 #> mvgam(
-#>   formula       = y ~ s(x),
+#>   formula       = y ~ s(x, k = 5),
 #>   trend_formula = ~AR(p = 1),
 #>   data          = simdat$data_train,
 #>   family        = poisson(),
@@ -156,6 +156,6 @@ md
 # Written to a file, nested under a level-two heading
 methods_md(mod, file = tempfile(fileext = ".md"), heading_level = 3L)
 
-# Next, how_to_cite() writes the methods paragraph
+# Next, forecast(mod) predicts the times after the training data
 # }
 ```

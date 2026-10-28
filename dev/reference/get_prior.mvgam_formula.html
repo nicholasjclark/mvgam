@@ -112,88 +112,10 @@ response of a multivariate model.</p></dd>
 
 
 <dt id="arg-loadings-prior">loadings_prior<a class="anchor" aria-label="anchor" href="#arg-loadings-prior"></a></dt>
-<dd><p>Optional named list specifying a
-structured prior on the unconstrained factor loadings
-matrix following Heaps &amp; Jermyn (2024). The loadings belong
-to a trend with latent factors. The argument requires a
-<code>trend_formula</code>. Supplying it without one is an error. When
-supplied, the
-default iid <code>to_vector(Z) ~ student_t(3, 0, 0.5)</code> prior is
-replaced with a per-column matrix-normal prior of the form
-<code>Z[, i] ~ multi_normal_cholesky(0, L_Phi)</code>, where the
-among-row scale matrix <code>Phi</code> is assembled
-multiplicatively from any combination of:</p><ul><li><p>a per-series feature matrix (<code>features</code>), expanded
-into an ARD exponential kernel via <code>gp_exponential_cov()</code></p></li>
-<li><p>one or more pairwise distance matrices
-(<code>distances</code>), each contributing an <code>exp(-d / theta)</code>
-factor</p></li>
-</ul><p>Accepted fields:</p><ul><li><p><code>features</code>: string lookup into <code>data2</code>, a numeric
-matrix, or a data.frame. Columns are encoded by type
-(numeric/integer/logical: z-score; ordered factor:
-z-score after <code><a href="https://rdrr.io/r/base/numeric.html" class="external-link">as.numeric()</a></code>; unordered factor /
-character: one-hot with all levels retained, following
-Heaps Sect. 6.2). Each encoded column receives its own
-ARD length-scale.</p></li>
-<li><p><code>distances</code>: string name (or character vector of
-names) of pairwise distance matrices in <code>data2</code>, or a
-single matrix / named list of matrices passed inline.
-Each matrix is rescaled to maximum entry one so the
-default length-scale prior is interpretable on a unit
-scale (matching Heaps Supps S4.2.1).</p></li>
-<li><p><code>column_shrinkage</code>: <code>"iid"</code> (default; no shrinkage)
-or <code>"mgp"</code> (multiplicative-gamma-process increasing
-shrinkage of Bhattacharya &amp; Dunson 2011, used in
-Heaps Eq. (9)). <code>"mgp"</code> applies its column scale through
-the shared innovation scale. It is available for <code><a href="trend_constructors.html">AR()</a></code>,
-<code><a href="trend_constructors.html">RW()</a></code> and <code><a href="ZMVN.html">ZMVN()</a></code> trends. <code><a href="trend_constructors.html">VAR()</a></code> builds its own innovation
-covariance and has no shared scale for it; pair a <code><a href="trend_constructors.html">VAR()</a></code>
-factor model with <code>"iid"</code> instead.</p></li>
-<li><p><code>mgp_a1</code>, <code>mgp_a2</code>: numeric MGP hyperparameters,
-only used when <code>column_shrinkage = "mgp"</code>. Default
-<code>(2, 4)</code> lies within the <code>a2 in [3, 5]</code> range
-recommended for moderate-n ecology / community panels
-by Legramanti, Durante and Dunson (2020, JRSS-B) and
-Schiavon, Canale and Dunson (2022, Biometrics 78:995).
-Heaps Sect. 6.3.1 used <code>(2, 3)</code> for the gas-demand
-application; Sect. 6.2.2 used <code>(2, 6)</code> for the
-Finnish-bird JSDM. Lower <code>a2</code> for less shrinkage when
-the data weakly identify the active rank.</p></li>
-</ul><p>Length-scales receive a <code>lognormal(0, 1)</code> prior in the
-model block. This prior is set on the standardised distance
-scale. Pairwise distance matrices are rescaled to
-<code>max(d) = 1</code> inside the normaliser. A length-scale of 1 then
-corresponds to correlation <code>exp(-1)</code> between the two most
-distant series. Heaps' Finnish-birds application (Sect.
-6.2.2) used the wider <code>lognormal(0, sqrt(10))</code> instead;
-override the default by passing a <code><a href="https://paulbuerkner.com/brms/reference/set_prior.html" class="external-link">prior()</a></code> for
-<code>theta_features</code> / <code>theta_dist_&lt;name&gt;</code> if your data weakly
-identify length-scales and you want less regularisation.
-Note: the <code>max(d) = 1</code> rule is the natural generic
-standardisation. Heaps Supps S4.2.1 used "root-to-tip
-distance = 1" for ultrametric phylogenies, which corresponds
-to <code>max(d) = 2</code> (twice the per-leaf depth); pre-standardise
-your distance matrix to match if exact parity matters.
-Identification. The structured prior applies to the sampled
-columns of <code>Z</code>. Where the QR rotation gives the reported
-loadings <code>Z_tilde</code>, each of its columns mixes the sampled
-columns. <code><a href="shared_variation.html">shared_variation()</a></code> and <code><a href="residual_cor.html">residual_cor()</a></code> use
-<code>Z Z'</code>, which is the same before and after the rotation. See
-the Identification section of the trend constructors.</p>
-<p>Compatibility with <code>trend_map</code>:</p><ul><li><p><code>trend_map = NULL</code> (default): compatible. <code>n_lv</code> alone
-triggers the free-Z factor model; <code>loadings_prior</code> applies
-to the sampled <code>Z</code> column-wise.</p></li>
-<li><p><code>trend_map = matrix(NA_real_, n_series, n_lv)</code>
-(all-NA mask, used internally by <code><a href="jsdgam.html">jsdgam()</a></code>): compatible.
-Treated as a free-Z trigger upstream; <code>loadings_prior</code>
-applies as if <code>trend_map</code> were <code>NULL</code>.</p></li>
-<li><p><code>trend_map</code> with a mix of fixed entries and <code>NA</code>s:
-incompatible. Partial-Z parameterises the free entries
-as a vector under an iid <code>student_t(3, 0, 1)</code> prior,
-which would overlap with the matrix-normal structure
-and double-count regularisation.</p></li>
-<li><p>Fully-fixed <code>trend_map</code> (no <code>NA</code>s): incompatible.
-The structured prior has no free parameters to act on.</p></li>
-</ul></dd>
+<dd><p>Optional named list giving a structured prior
+on the loadings of a factor model, such as species traits or a
+phylogeny. Most models leave it <code>NULL</code>. The section 'Structured
+loadings priors' of <code><a href="mvgam.html">mvgam()</a></code> describes its fields.</p></dd>
 
 
 <dt id="arg-data-">data2<a class="anchor" aria-label="anchor" href="#arg-data-"></a></dt>
@@ -214,9 +136,9 @@ process for every series</p></li>
 </ul><p>A factor model without a <code>trend_map</code> samples every loading. It
 identifies <code>Z</code> after sampling by a thin QR rotation (Heaps and
 Jermyn 2024). A <code>trend_map</code> with any fixed entry takes no
-rotation. The argument requires a <code>trend_formula</code>. It is an
-alternative to the <code>trend_map</code> argument of the trend constructor,
-and supplying both is an error. <code>loadings_prior</code> lists the
+rotation. The argument requires a <code>trend_formula</code>. The trend
+constructor takes a <code>trend_map</code> argument too. Supplying both is an
+error. <code>loadings_prior</code> lists the
 <code>trend_map</code> forms a structured loadings prior accepts.</p></dd>
 
 
@@ -250,11 +172,10 @@ link:</p><ul><li><p><code>sigma_trend</code> and <code>sigma_group_trend</code> 
 <code>exponential(2 / s)</code>, with mean \(s / 2\).</p></li>
 <li><p>The factor loadings <code>Z</code> take
 <code>student_t(3, 0, 0.5 s)</code>.</p></li>
-<li><p>The shock scales and starting states of <code><a href="LLT.html">LLT()</a></code>
-scale with the number of time points. Its <code>sigma_trend</code>
-takes one of them. The growth priors of a linear
-<code><a href="piecewise_trends.html">PW()</a></code> also scale with it. Their help pages give the
-forms.</p></li>
+<li><p><code><a href="LLT.html">LLT()</a></code> is the exception. Its shock scales
+(<code>sigma_trend</code> among them) and its starting states also
+scale with the number of time points. So do the growth priors of
+a linear <code><a href="piecewise_trends.html">PW()</a></code>. Their help pages give the forms.</p></li>
 </ul><p>A count model on the log link rarely spreads past 2.5. Its
 defaults keep their link-scale values. Coefficients without
 units keep fixed priors: autoregressive and damping coefficients,
@@ -269,10 +190,17 @@ residual scale has no meaning on the trend side. Those rows take
 trend-side class is refused.</p>
     </div>
     <div class="section level2">
+    <h2 id="references">References<a class="anchor" aria-label="anchor" href="#references"></a></h2>
+    <p>Heaps, S. E. and Jermyn, I. H. (2024). Structured prior
+distributions for the covariance matrix in latent factor models.
+<em>Statistics and Computing</em>, 34, 143.
+<a href="https://doi.org/10.1007/s11222-024-10454-0" class="external-link">doi:10.1007/s11222-024-10454-0</a></p>
+    </div>
+    <div class="section level2">
     <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>
     <div class="dont-index"><p><code><a href="mvgam_formula.html">mvgam_formula()</a></code>, <code><a href="https://paulbuerkner.com/brms/reference/set_prior.html" class="external-link">brms::prior()</a></code> and
 <code><a href="https://paulbuerkner.com/brms/reference/set_prior.html" class="external-link">brms::set_prior()</a></code>. The
-<a href="https://nicholasjclark.github.io/mvgam/articles/hierarchical_var.html">hierarchical VAR article</a>
+<a href="https://nicholasjclark.github.io/mvgam/dev/articles/hierarchical_var.html">hierarchical VAR article</a>
 sets priors on the observation error and the trend correlations.</p>
 <p>Other priors:
 <code><a href="get_prior.mvgam.html">get_prior.mvgam()</a></code></p></div>

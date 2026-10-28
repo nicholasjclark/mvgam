@@ -52,7 +52,7 @@ waic(
   [`log_lik.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/log_lik.mvgam.md).
   `TRUE` scores each observation under the latent trend state the model
   inferred at that time. The ELPD then describes the series that was
-  observed. `FALSE` scores the deterministic submodel alone.
+  observed. `FALSE` scores the covariate part of the model alone.
 
 - incl_dynamics:
 
@@ -84,7 +84,7 @@ and Computing*, 27:1413-1432.
 estimates the same ELPD by PSIS.
 [`lfo_cv.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/lfo_cv.mvgam.md)
 scores forecasts from rolling origins. The [forecast evaluation
-article](https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html)
+article](https://nicholasjclark.github.io/mvgam/dev/articles/forecast_evaluation.html)
 compares models by approximate and exact cross-validation.
 
 Other model comparison:
@@ -109,7 +109,7 @@ simdat <- sim_mvgam(family = poisson(), n_series = 1L,
                     n_timepoints = 120L, trend_model = "None")
 mod <- mvgam(y ~ s(x), data = simdat$data_train,
              family = poisson(), chains = 2, silent = 2)
-#> Warning: 2 of 2000 (0.0%) transitions ended with a divergence.
+#> Warning: 3 of 2000 (0.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 # }
 # \dontrun{
@@ -118,16 +118,16 @@ mod <- mvgam(y ~ s(x), data = simdat$data_train,
 # a warning that recommends loo()
 waic(mod)
 #> Warning: 
-#> 4 (4.4%) p_waic estimates greater than 0.4. We recommend trying loo instead.
+#> 2 (2.2%) p_waic estimates greater than 0.4. We recommend trying loo instead.
 #> 
 #> Computed from 2000 posterior draws and 90 log-likelihood terms.
 #> 
 #>           Estimate   SE
-#> elpd_waic   -208.7  8.5
+#> elpd_waic   -208.7  8.4
 #> p_waic         7.9  1.5
 #> waic         417.5 16.9
 #> 
-#> 4 (4.4%) p_waic estimates greater than 0.4. We recommend trying loo instead. 
+#> 2 (2.2%) p_waic estimates greater than 0.4. We recommend trying loo instead. 
 
 # The PSIS estimate of the same ELPD. Its Pareto k diagnostics mark
 # the observations it estimates poorly
@@ -136,12 +136,12 @@ loo(mod)
 #> Computed from 2000 posterior draws and 90 log-likelihood terms.
 #> 
 #>          Estimate   SE
-#> elpd_loo   -208.8  8.5
-#> p_loo         8.0  1.5
-#> looic       417.7 17.0
+#> elpd_loo   -208.9  8.5
+#> p_loo         8.0  1.6
+#> looic       417.7 16.9
 #> ------
 #> MCSE of elpd_loo is 0.1.
-#> MCSE and ESS estimates assume MCMC draws (r_eff in [0.4, 1.2]).
+#> MCSE and ESS estimates assume MCMC draws (r_eff in [0.6, 1.2]).
 #> 
 #> All Pareto k estimates are good (k < 0.7).
 #> See help('pareto-k-diagnostic') for details.

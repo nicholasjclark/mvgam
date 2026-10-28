@@ -78,7 +78,7 @@ simdat <- sim_mvgam(family = poisson(), n_series = 1L,
                     n_timepoints = 120L, trend_model = "None")
 mod <- mvgam(y ~ s(x), data = simdat$data_train,
              family = poisson(), chains = 2, silent = 2)
-#> Warning: 2 of 2000 (0.0%) transitions ended with a divergence.
+#> Warning: 3 of 2000 (0.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 # }
 # \dontrun{
@@ -94,6 +94,6 @@ glance(mod, looic = TRUE)
 #> # A tibble: 1 × 10
 #>   algorithm   pss  nobs nseries family  link  elpd_loo se_elpd_loo p_loo looic
 #>   <chr>     <int> <int>   <int> <chr>   <chr>    <dbl>       <dbl> <dbl> <dbl>
-#> 1 sampling   2000    90       1 poisson log      -209.        8.48  7.98  418.
+#> 1 sampling   2000    90       1 poisson log      -209.        8.46  8.01  418.
 # }
 ```

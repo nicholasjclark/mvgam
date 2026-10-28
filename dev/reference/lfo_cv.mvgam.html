@@ -6,14 +6,20 @@ importance sampling (PSIS) reweights the posterior to each new
 origin. The model is refitted only where the Pareto k exceeds
 pareto_k_threshold. The algorithm is that of Burkner, Gabry and
 Vehtari (2020), as in the
-loo PSIS-LFO vignette."><meta property="og:description" content="Scores a model on its forecasts. The model is fitted to the times up
+loo PSIS-LFO vignette.
+The ELPD of each fold is higher for the better model. CRPS and the
+other scores of score.mvgam_forecast() are lower for the better
+model. loo.mvgam() explains the ELPD and the Pareto k diagnostic."><meta property="og:description" content="Scores a model on its forecasts. The model is fitted to the times up
 to min_t and scored on the next fc_horizon observed times. The
 origin then steps forward one time at a time. Pareto smoothed
 importance sampling (PSIS) reweights the posterior to each new
 origin. The model is refitted only where the Pareto k exceeds
 pareto_k_threshold. The algorithm is that of Burkner, Gabry and
 Vehtari (2020), as in the
-loo PSIS-LFO vignette."><meta property="og:image" content="https://nicholasjclark.github.io/mvgam/logo.png"><meta name="robots" content="noindex"></head><body>
+loo PSIS-LFO vignette.
+The ELPD of each fold is higher for the better model. CRPS and the
+other scores of score.mvgam_forecast() are lower for the better
+model. loo.mvgam() explains the ELPD and the Pareto k diagnostic."><meta property="og:image" content="https://nicholasjclark.github.io/mvgam/logo.png"><meta name="robots" content="noindex"></head><body>
     <a href="#main" class="visually-hidden-focusable">Skip to contents</a>
 
 
@@ -56,6 +62,9 @@ origin. The model is refitted only where the Pareto k exceeds
 <code>pareto_k_threshold</code>. The algorithm is that of Burkner, Gabry and
 Vehtari (2020), as in the
 <a href="https://mc-stan.org/loo/articles/loo2-lfo.html" class="external-link">loo PSIS-LFO vignette</a>.</p>
+<p>The ELPD of each fold is higher for the better model. CRPS and the
+other scores of <code><a href="score.mvgam_forecast.html">score.mvgam_forecast()</a></code> are lower for the better
+model. <code><a href="loo.mvgam.html">loo.mvgam()</a></code> explains the ELPD and the Pareto k diagnostic.</p>
     </div>
 
     <div class="section level2">
@@ -163,14 +172,14 @@ otherwise <code>NULL</code>.</p></li>
 </ul></div>
     <div class="section level2">
     <h2 id="references">References<a class="anchor" aria-label="anchor" href="#references"></a></h2>
-    <p>Paul-Christian Burkner, Jonah Gabry and Aki Vehtari (2020).
-Approximate leave-future-out cross-validation for Bayesian time
-series models. <em>Journal of Statistical Computation and
-Simulation</em>. 90:14, 2499-2523.
+    <p>Burkner, P.-C., Gabry, J. and Vehtari, A. (2020). Approximate
+leave-future-out cross-validation for Bayesian time series models.
+<em>Journal of Statistical Computation and Simulation</em>,
+90(14):2499-2523.
 <a href="https://doi.org/10.1080/00949655.2020.1783262" class="external-link">doi:10.1080/00949655.2020.1783262</a></p>
-<p>Aki Vehtari, Daniel Simpson, Andrew Gelman, Yuling Yao and
-Jonah Gabry (2024). Pareto smoothed importance sampling.
-<em>Journal of Machine Learning Research</em>. 25(72), 1-58.
+<p>Vehtari, A., Simpson, D., Gelman, A., Yao, Y. and Gabry, J.
+(2024). Pareto smoothed importance sampling. <em>Journal of Machine
+Learning Research</em>, 25(72):1-58.
 <a href="https://jmlr.org/papers/v25/19-556.html" class="external-link">https://jmlr.org/papers/v25/19-556.html</a></p>
     </div>
     <div class="section level2">
@@ -179,7 +188,7 @@ Jonah Gabry (2024). Pareto smoothed importance sampling.
 leave-future-out ELPD. <code><a href="loo_model_weights.mvgam_lfo.html">loo_model_weights.mvgam_lfo()</a></code> weights
 them. <code><a href="loo.mvgam.html">loo.mvgam()</a></code> approximates leave-one-out cross-validation.
 <code><a href="kfold.mvgam.html">kfold.mvgam()</a></code> runs grouped k-fold cross-validation. The
-<a href="https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html">forecast evaluation article</a>
+<a href="https://nicholasjclark.github.io/mvgam/dev/articles/forecast_evaluation.html">forecast evaluation article</a>
 runs <code>lfo_cv()</code> on rodent counts, with its Pareto k refits and
 stacking weights.</p>
 <p>Other forecasting:
@@ -212,27 +221,27 @@ stacking weights.</p>
 <span class="r-in"><span>                     n_timepoints <span class="op">=</span> <span class="fl">120L</span>, trend_model <span class="op">=</span> <span class="fu"><a href="trend_constructors.html">AR</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="va">mod</span> <span class="op">&lt;-</span> <span class="fu"><a href="mvgam.html">mvgam</a></span><span class="op">(</span></span></span>
-<span class="r-in"><span>  <span class="va">y</span> <span class="op">~</span> <span class="fu">s</span><span class="op">(</span><span class="va">x</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>  <span class="va">y</span> <span class="op">~</span> <span class="fu">s</span><span class="op">(</span><span class="va">x</span>, k <span class="op">=</span> <span class="fl">5</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>  trend_formula <span class="op">=</span> <span class="op">~</span> <span class="fu"><a href="trend_constructors.html">AR</a></span><span class="op">(</span>p <span class="op">=</span> <span class="fl">1</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>  data    <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span>,</span></span>
 <span class="r-in"><span>  family  <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>  chains  <span class="op">=</span> <span class="fl">2</span>, silent <span class="op">=</span> <span class="fl">2</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 386 of 2000 (19.0%) transitions ended with a divergence.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 36 of 2000 (2.0%) transitions ended with a divergence.</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> See https://mc-stan.org/misc/warnings for details.</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Forecasts one time step after each origin from t = 60, scored by</span></span></span>
 <span class="r-in"><span><span class="co"># ELPD and CRPS. The model is refitted only where the Pareto k is high.</span></span></span>
 <span class="r-in"><span><span class="va">lfo</span> <span class="op">&lt;-</span> <span class="fu">lfo_cv</span><span class="op">(</span><span class="va">mod</span>, min_t <span class="op">=</span> <span class="fl">60L</span>, score <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"elpd"</span>, <span class="st">"crps"</span><span class="op">)</span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 64 of 2000 (3.0%) transitions ended with a divergence.</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> See https://mc-stan.org/misc/warnings for details.</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 34 of 2000 (2.0%) transitions ended with a divergence.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 38 of 2000 (2.0%) transitions ended with a divergence.</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> See https://mc-stan.org/misc/warnings for details.</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 54 of 2000 (3.0%) transitions ended with a divergence.</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> See https://mc-stan.org/misc/warnings for details.</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 50 of 2000 (2.0%) transitions ended with a divergence.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 22 of 2000 (1.0%) transitions ended with a divergence.</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> See https://mc-stan.org/misc/warnings for details.</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 102 of 2000 (5.0%) transitions ended with a divergence.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 19 of 2000 (1.0%) transitions ended with a divergence.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> See https://mc-stan.org/misc/warnings for details.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 6 of 2000 (0.0%) transitions ended with a divergence.</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> See https://mc-stan.org/misc/warnings for details.</span>
 <span class="r-in"><span><span class="va">lfo</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Approximate leave-future-out cross-validation</span>
@@ -240,8 +249,8 @@ stacking weights.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   pareto_k_threshold : 0.697 (adaptive)</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   evaluation points  : 30</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   refits             : 5</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   ELPD               : sum = -79.17, mean = -2.64</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   crps               : sum = 59.62, mean = 1.99</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   ELPD               : sum = -78.96, mean = -2.63</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   crps               : sum = 57.91, mean = 1.93</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Pareto k, ELPD and CRPS at each origin. Points past the dashed</span></span></span>
 <span class="r-in"><span><span class="co"># line are highlighted</span></span></span>
@@ -253,16 +262,16 @@ stacking weights.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #949494;"># A tibble: 30 × 6</span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>    eval_time refit_here pareto_k n_obs  elpd  crps</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>        <span style="color: #949494; font-style: italic;">&lt;int&gt;</span> <span style="color: #949494; font-style: italic;">&lt;lgl&gt;</span>         <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> <span style="color: #949494; font-style: italic;">&lt;int&gt;</span> <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 1</span>        61 TRUE         <span style="color: #BB0000;">NA</span>         1 -<span style="color: #BB0000;">2.48</span> 1.29 </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 2</span>        62 FALSE        -<span style="color: #BB0000;">1.56</span>      1 -<span style="color: #BB0000;">1.69</span> 0.553</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 3</span>        63 FALSE        -<span style="color: #BB0000;">0.756</span>     1 -<span style="color: #BB0000;">2.54</span> 1.48 </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 4</span>        64 FALSE        -<span style="color: #BB0000;">0.569</span>     1 -<span style="color: #BB0000;">2.41</span> 1.06 </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 5</span>        65 FALSE        -<span style="color: #BB0000;">0.370</span>     1 -<span style="color: #BB0000;">1.60</span> 0.868</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 6</span>        66 FALSE        -<span style="color: #BB0000;">0.155</span>     1 -<span style="color: #BB0000;">2.42</span> 1.54 </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 7</span>        67 FALSE         0.104     1 -<span style="color: #BB0000;">2.79</span> 3.05 </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 8</span>        68 FALSE         0.563     1 -<span style="color: #BB0000;">3.00</span> 2.09 </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 9</span>        69 FALSE         0.616     1 -<span style="color: #BB0000;">2.42</span> 2.50 </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">10</span>        70 TRUE          0.893     1 -<span style="color: #BB0000;">2.97</span> 2.96 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 1</span>        61 TRUE        <span style="color: #BB0000;">NA</span>          1 -<span style="color: #BB0000;">2.55</span> 1.57 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 2</span>        62 FALSE       -<span style="color: #BB0000;">1.63</span>       1 -<span style="color: #BB0000;">1.74</span> 0.677</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 3</span>        63 FALSE       -<span style="color: #BB0000;">0.793</span>      1 -<span style="color: #BB0000;">2.52</span> 1.50 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 4</span>        64 FALSE       -<span style="color: #BB0000;">0.464</span>      1 -<span style="color: #BB0000;">2.46</span> 1.05 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 5</span>        65 FALSE       -<span style="color: #BB0000;">0.227</span>      1 -<span style="color: #BB0000;">1.66</span> 0.877</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 6</span>        66 FALSE       -<span style="color: #BB0000;">0.123</span>      1 -<span style="color: #BB0000;">2.39</span> 1.51 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 7</span>        67 FALSE       -<span style="color: #BB0000;">0.040</span><span style="color: #BB0000; text-decoration: underline;">1</span>     1 -<span style="color: #BB0000;">2.78</span> 3.21 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 8</span>        68 FALSE        0.563      1 -<span style="color: #BB0000;">3.01</span> 2.00 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 9</span>        69 TRUE         0.816      1 -<span style="color: #BB0000;">2.45</span> 2.09 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">10</span>        70 FALSE       -<span style="color: #BB0000;">1.47</span>       1 -<span style="color: #BB0000;">2.89</span> 2.79 </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #949494;"># ℹ 20 more rows</span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Next, rank models by their forecasts with loo_compare()</span></span></span>

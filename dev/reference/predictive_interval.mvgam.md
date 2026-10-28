@@ -63,27 +63,27 @@ Nicholas J Clark
 set.seed(13)
 simdat <- sim_mvgam(family = poisson(), n_series = 1L,
                     n_timepoints = 120L, trend_model = AR())
-mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
+mod <- mvgam(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1),
              data = simdat$data_train, family = poisson(),
              chains = 2, silent = 2)
-#> Warning: 9 of 2000 (0.0%) transitions ended with a divergence.
+#> Warning: 5 of 2000 (0.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 
 # 90 percent intervals, one row per observation
 intervals <- predictive_interval(mod)
 head(intervals)
-#>      5%   95%
-#> [1,]  0  5.00
-#> [2,]  7 23.00
-#> [3,]  3 13.05
-#> [4,]  4 14.00
-#> [5,]  1  9.00
-#> [6,]  2 14.00
+#>      5% 95%
+#> [1,]  0   5
+#> [2,]  6  20
+#> [3,]  3  14
+#> [4,]  4  15
+#> [5,]  1   9
+#> [6,]  2  12
 
 # The share of observed counts the intervals cover
 y <- simdat$data_train$y
 mean(y >= intervals[, 1] & y <= intervals[, 2])
-#> [1] 0.8
+#> [1] 0.7888889
 
 # Next: pp_check() plots the predictive draws against the data
 # }

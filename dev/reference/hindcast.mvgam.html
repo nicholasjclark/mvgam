@@ -94,8 +94,7 @@ Several names give the sum of their components. <code><a href="LLT.html">LLT()</
 step. A seasonal <code><a href="LLT.html">LLT()</a></code> adds <code>"season"</code>. <code>"predictor"</code> holds the
 effects of the trend formula's covariates. <code>c("level", "predictor")</code> gives the level with those effects. A factor model
 projects each component through its loadings, as it projects the
-trend. The result is an ordinary <a href="mvgam.html">mvgam_forecast-class</a>
-with the components in its <code>component</code> slot.</p></dd>
+trend.</p></dd>
 
 
 <dt id="arg-ndraws">ndraws<a class="anchor" aria-label="anchor" href="#arg-ndraws"></a></dt>
@@ -110,19 +109,19 @@ draw indices to use. NULL (default) uses all draws (subject to
 
 
 <dt id="arg-obs-uncertainty">obs_uncertainty<a class="anchor" aria-label="anchor" href="#arg-obs-uncertainty"></a></dt>
-<dd><p>Logical. When <code>FALSE</code>, skips
-observation-family sampling for <code>type = "response"</code>,
-returning the family mean instead.
-Defaults to <code>TRUE</code>.</p></dd>
+<dd><p>Logical, <code>TRUE</code> by default. <code>FALSE</code> returns
+the family's mean under <code>type = "response"</code>, in place of a sampled
+observation.</p></dd>
 
 
 <dt id="arg-process-error">process_error<a class="anchor" aria-label="anchor" href="#arg-process-error"></a></dt>
 <dd><p>Logical. <code>FALSE</code> (the default) takes the
 fitted latent state of each draw. <code>type = "response"</code> then adds
-the observation noise alone. <code>TRUE</code> adds fresh trend innovations
-to the linear predictor, as <code><a href="posterior_epred.mvgam.html">posterior_epred.mvgam()</a></code> does with
-the same argument. A <code>component</code> is a fitted state and needs
-<code>FALSE</code>.</p></dd>
+the observation noise alone. <code>TRUE</code> replaces the fitted states
+with the covariate part plus newly drawn innovations, as
+<code><a href="posterior_epred.mvgam.html">posterior_epred.mvgam()</a></code> gives with the same argument. The
+hindcast then shows what the model predicts without the observed
+history. A <code>component</code> is a fitted state and needs <code>FALSE</code>.</p></dd>
 
 
 <dt id="arg-resp">resp<a class="anchor" aria-label="anchor" href="#arg-resp"></a></dt>
@@ -141,11 +140,11 @@ forecast slots are <code>NULL</code>.</p>
     <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>
     <div class="dont-index"><p><code><a href="forecast.mvgam.html">forecast.mvgam()</a></code> extrapolates the fitted state.
 <code><a href="posterior_predict.mvgam.html">posterior_predict.mvgam()</a></code> and <code><a href="posterior_epred.mvgam.html">posterior_epred.mvgam()</a></code> predict
-by integrating over the trend's dynamics. The
-<a href="https://nicholasjclark.github.io/mvgam/articles/mvbf.html">multivariate article</a> compares
+from the covariate part of the model. The
+<a href="https://nicholasjclark.github.io/mvgam/dev/articles/mvbf.html">multivariate article</a> compares
 <code>type = "trend"</code> hindcasts of one latent state from a joint model
 and from each data source alone. The
-<a href="https://nicholasjclark.github.io/mvgam/articles/nmix.html">N-mixture article</a> summarises
+<a href="https://nicholasjclark.github.io/mvgam/dev/articles/nmix.html">N-mixture article</a> summarises
 <code>type = "latent_state"</code> hindcasts of abundance.</p>
 <p>Other predictions:
 <code><a href="conditional_effects.mvgam.html">conditional_effects.mvgam()</a></code>,
@@ -174,13 +173,13 @@ and from each data source alone. The
 <span class="r-in"><span>                     n_timepoints <span class="op">=</span> <span class="fl">120L</span>, trend_model <span class="op">=</span> <span class="fu"><a href="trend_constructors.html">AR</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="va">mod</span> <span class="op">&lt;-</span> <span class="fu"><a href="mvgam.html">mvgam</a></span><span class="op">(</span></span></span>
-<span class="r-in"><span>  <span class="va">y</span> <span class="op">~</span> <span class="fu">s</span><span class="op">(</span><span class="va">x</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>  <span class="va">y</span> <span class="op">~</span> <span class="fu">s</span><span class="op">(</span><span class="va">x</span>, k <span class="op">=</span> <span class="fl">5</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>  trend_formula <span class="op">=</span> <span class="op">~</span> <span class="fu"><a href="trend_constructors.html">AR</a></span><span class="op">(</span>p <span class="op">=</span> <span class="fl">1</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>  data    <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span>,</span></span>
 <span class="r-in"><span>  family  <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>  chains  <span class="op">=</span> <span class="fl">2</span>, silent <span class="op">=</span> <span class="fl">2</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 386 of 2000 (19.0%) transitions ended with a divergence.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 36 of 2000 (2.0%) transitions ended with a divergence.</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> See https://mc-stan.org/misc/warnings for details.</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># The fitted states track the training counts</span></span></span>
@@ -199,7 +198,7 @@ and from each data source alone. The
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># A local linear trend's slope, the level's growth per step</span></span></span>
 <span class="r-in"><span><span class="va">mod_llt</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/update.html" class="external-link">update</a></span><span class="op">(</span><span class="va">mod</span>, trend_formula <span class="op">=</span> <span class="op">~</span> <span class="fu"><a href="LLT.html">LLT</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 3 of 2000 (0.0%) transitions ended with a divergence.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 2 of 2000 (0.0%) transitions ended with a divergence.</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> See https://mc-stan.org/misc/warnings for details.</span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="fu"><a href="hindcast.html">hindcast</a></span><span class="op">(</span><span class="va">mod_llt</span>, type <span class="op">=</span> <span class="st">"trend"</span>, component <span class="op">=</span> <span class="st">"slope"</span><span class="op">)</span><span class="op">)</span></span></span>
 <span class="r-plt img"><img src="hindcast.mvgam-4.png" alt="" width="700" height="433"></span>

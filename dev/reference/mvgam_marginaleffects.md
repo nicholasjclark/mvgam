@@ -7,9 +7,9 @@ and
 [`marginaleffects::comparisons()`](https://rdrr.io/pkg/marginaleffects/man/comparisons.html)
 take an mvgam fit. `get_predict()` returns the posterior draws in the
 `posterior_draws` attribute. marginaleffects computes every summary from
-those draws. `get_coef()`, `get_vcov()` and `set_coef()` complete the
-methods marginaleffects calls. The draws carry the uncertainty. None of
-the three changes a result.
+those draws. The uncertainty comes from the draws alone. marginaleffects
+also calls `get_coef()`, `get_vcov()` and `set_coef()`. Their output
+leaves every result unchanged.
 
 ## Prediction scale
 
@@ -38,20 +38,20 @@ distribution the median falls below the mean.
 
 ## The latent trend
 
-With `process_error = FALSE`, the default, the trend contributes its
-deterministic submodel. Each draw keeps its own coefficients. The result
-is a covariate effect with the latent process held out. Its credible
-band excludes the uncertainty of the latent state.
+By default (`process_error = FALSE`) each prediction takes the covariate
+part of the trend: the effects in its formula, without its innovations.
+Each posterior draw keeps its own coefficients. The result shows the
+effect of the covariates with the latent process at its mean. Its
+credible band leaves out the uncertainty of the latent state.
 
-A slope or comparison taken this way is biased low against the model's
-own `E[Y]`. Its expectation leaves out the trend's stationary spread.
-Under a log link and an AR(1) trend the factor is \\\exp(\sigma^2 /
-(2(1 - \rho^2)))\\. `process_error = TRUE` gives the unbiased effect.
-Its band is wider because it includes the uncertainty of the latent
-state.
+Under a nonlinear link this falls short of the model's own `E[Y]`.
+Averaging over the innovations of an AR(1) trend raises a log-link
+expectation by the factor \\\exp(\sigma^2 / (2(1 - \rho^2)))\\.
+`process_error = TRUE` adds the innovations. Slopes and comparisons then
+describe `E[Y]`, with wider bands.
 
-When an autoregressive process carries most of the series-level
-variation, a covariate effect shows little under either setting.
+When the trend explains most of the variation in a series, the
+covariates have little left to explain under either setting.
 [`hindcast.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/hindcast.mvgam.md)
 and
 [`forecast.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/forecast.mvgam.md)
@@ -63,3 +63,42 @@ Arel-Bundock, V., Greifer, N. and Heiss, A. (2024). How to interpret
 statistical models using marginaleffects for R and Python. *Journal of
 Statistical Software*, 111(9):1-32.
 [doi:10.18637/jss.v111.i09](https://doi.org/10.18637/jss.v111.i09)
+
+## See also
+
+[`conditional_effects.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/conditional_effects.mvgam.md)
+for quick effect plots,
+[`posterior_epred.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/posterior_epred.mvgam.md)
+for the predictions these methods take.
+
+## Examples
+
+``` r
+# \dontrun{
+library(marginaleffects)
+set.seed(1)
+simdat <- sim_mvgam(n_series = 1L, n_timepoints = 60L,
+                    trend_model = AR())
+mod <- mvgam(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1),
+             data = simdat$data_train, family = poisson(),
+             chains = 2, silent = 2)
+#> Error: 'y' has values outside the support of family 'poisson'.
+#>   Requires: 0 <= 'y' (integers only).
+#>   Observed range: [-2.504, 2.943]. 23 of 45 values fall outside, the first
+#>   at row 1.
+#>   Check the column for missing-data sentinels such as -1 or -999.
+
+# Average change in the expected count per unit of x
+avg_slopes(mod, variables = "x", type = "expected")
+#> Error: object 'mod' not found
+
+# The same slope with the trend's innovations averaged in
+avg_slopes(mod, variables = "x", type = "expected",
+           process_error = TRUE)
+#> Error: object 'mod' not found
+
+# Expected counts across the range of x
+plot_predictions(mod, condition = "x", type = "expected")
+#> Error: object 'mod' not found
+# }
+```

@@ -1,8 +1,11 @@
 # Fit Joint Species Distribution Models in mvgam
 
-Fits a joint species distribution model (JSDM). The residual
-associations among species are modelled at reduced rank with a set of
-latent factors. The observation model takes the smooths, Gaussian
+Fits a joint species distribution model (JSDM) to the presences,
+detections or counts of many species across many sampling units. Species
+often co-occur more or less often than their responses to the measured
+covariates predict. A few latent factors capture that residual
+association. They need far fewer parameters than a full correlation
+matrix among species. The observation model takes the smooths, Gaussian
 processes and random effects of any mvgam model. The factors take their
 own predictors through `factor_formula`. Write
 [`lv_axis()`](https://nicholasjclark.github.io/mvgam/dev/reference/lv_axis.md)
@@ -81,18 +84,14 @@ jsdgam(
 - newdata:
 
   Optional held-out `data.frame`, stored on the fit as
-  `object$test_data`.
+  `object$test_data`. Fitting draws no forecasts.
   [`forecast()`](https://generics.r-lib.org/reference/forecast.html)
-  forecasts to it when called without `newdata`.
-  `plot(fit, type = "series")` overlays it. The fit itself draws no
-  forecasts.
-  [`forecast()`](https://generics.r-lib.org/reference/forecast.html)
-  propagates the fitted latent state forward in time per posterior draw.
-  `posterior_predict(mod, newdata = mod$test_data)` marginalises over
-  the trend's stochastic dynamics at the supplied design points. Use
-  [`forecast()`](https://generics.r-lib.org/reference/forecast.html) for
-  time-series forecasting and `posterior_predict()` for marginal
-  predictive checks.
+  called without `newdata` forecasts these times, carrying the fitted
+  latent state forward. `plot(fit, type = "series")` overlays them.
+  `posterior_predict()` on these data uses the covariate part alone. The
+  section 'Which prediction function?' of
+  [`predict.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/predict.mvgam.md)
+  compares the two.
 
 - family:
 
@@ -223,21 +222,9 @@ jsdgam(
   outweighing the gain. A brms family without a `trend_formula` uses the
   threading brms writes.
 
-  A brms-native family with a `trend_formula` samples serially whatever
-  `threads` says. When it threads, brms moves the `mu` assignment inside
-  `partial_log_lik_lpmf`, where mvgam cannot add the trend to it. The
-  program is then built without threading. This applies to every trend
-  model under a brms-native family:
-  [`RW()`](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md),
-  [`AR()`](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md),
-  [`VAR()`](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md),
-  [`LLT()`](https://nicholasjclark.github.io/mvgam/dev/reference/LLT.md),
-  [`ZMVN()`](https://nicholasjclark.github.io/mvgam/dev/reference/ZMVN.md),
-  [`CAR()`](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md)
-  and
-  [`PW()`](https://nicholasjclark.github.io/mvgam/dev/reference/piecewise_trends.md).
-  Each fit that drops the request warns. A batch script that fits
-  repeatedly shows it every time.
+  A brms family with a `trend_formula` samples each chain on one thread
+  whatever `threads` says. The threaded likelihood brms writes leaves no
+  place to add the trend. Each such fit warns.
 
 - run_model:
 
@@ -329,7 +316,7 @@ gives each factor its own covariate effect.
 drafts a methods paragraph for the fit and
 [`methods_md()`](https://nicholasjclark.github.io/mvgam/dev/reference/methods_md.md)
 writes its equations. The [JSDM
-article](https://nicholasjclark.github.io/mvgam/articles/jsdgam.html)
+article](https://nicholasjclark.github.io/mvgam/dev/articles/jsdgam.html)
 fits a negative binomial model with a trait-informed loadings prior,
 ordination biplots and multiplicative gamma process shrinkage.
 

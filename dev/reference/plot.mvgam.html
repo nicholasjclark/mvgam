@@ -61,9 +61,12 @@
 
 <dt id="arg-type">type<a class="anchor" aria-label="anchor" href="#arg-type"></a></dt>
 <dd><p>The plot to draw:</p><dl><dt><code>"residuals"</code> (default)</dt>
-<dd><p>Dunn-Smyth residuals of one
-series against the fitted values, their Q-Q plot, ACF and
-partial ACF, as <code><a href="pp_check.mvgam.html">pp_check.mvgam()</a></code> draws them. A series
+<dd><p>Randomised quantile (Dunn-Smyth)
+residuals of one series, defined in <code><a href="residuals.mvgam.html">residuals.mvgam()</a></code>. The
+grid plots them against the fitted values, with their Q-Q
+plot, ACF and partial ACF, as <code><a href="pp_check.mvgam.html">pp_check.mvgam()</a></code> draws them.
+For a model that fits, they look like independent standard
+normal draws. A series
 observed at unevenly spaced times shows a semivariogram in
 place of the ACF and partial ACF. An <code><a href="occ.html">occ()</a></code> or
 <code><a href="nmix.html">nmix()</a></code> fit has one residual per closure unit and draws the
@@ -124,8 +127,7 @@ Several names give the sum of their components. <code><a href="LLT.html">LLT()</
 step. A seasonal <code><a href="LLT.html">LLT()</a></code> adds <code>"season"</code>. <code>"predictor"</code> holds the
 effects of the trend formula's covariates. <code>c("level", "predictor")</code> gives the level with those effects. A factor model
 projects each component through its loadings, as it projects the
-trend. The result is an ordinary <a href="mvgam.html">mvgam_forecast-class</a>
-with the components in its <code>component</code> slot.</p></dd>
+trend.</p></dd>
 
 
 <dt id="arg--">...<a class="anchor" aria-label="anchor" href="#arg--"></a></dt>
@@ -158,11 +160,11 @@ such as <code>smooths</code> for <code><a href="conditional_smooths.mvgam.html">
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed</a></span><span class="op">(</span><span class="fl">13</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="va">simdat</span> <span class="op">&lt;-</span> <span class="fu"><a href="sim_mvgam.html">sim_mvgam</a></span><span class="op">(</span>family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson</a></span><span class="op">(</span><span class="op">)</span>, n_series <span class="op">=</span> <span class="fl">1L</span>,</span></span>
 <span class="r-in"><span>                     n_timepoints <span class="op">=</span> <span class="fl">120L</span>, trend_model <span class="op">=</span> <span class="fu"><a href="trend_constructors.html">AR</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="va">mod</span> <span class="op">&lt;-</span> <span class="fu"><a href="mvgam.html">mvgam</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="fu">s</span><span class="op">(</span><span class="va">x</span><span class="op">)</span>, trend_formula <span class="op">=</span> <span class="op">~</span> <span class="fu"><a href="trend_constructors.html">AR</a></span><span class="op">(</span>p <span class="op">=</span> <span class="fl">1</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span><span class="va">mod</span> <span class="op">&lt;-</span> <span class="fu"><a href="mvgam.html">mvgam</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="fu">s</span><span class="op">(</span><span class="va">x</span>, k <span class="op">=</span> <span class="fl">5</span><span class="op">)</span>, trend_formula <span class="op">=</span> <span class="op">~</span> <span class="fu"><a href="trend_constructors.html">AR</a></span><span class="op">(</span>p <span class="op">=</span> <span class="fl">1</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>              data    <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span>,</span></span>
 <span class="r-in"><span>              family  <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>              chains  <span class="op">=</span> <span class="fl">2</span>, silent <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 9 of 2000 (0.0%) transitions ended with a divergence.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 5 of 2000 (0.0%) transitions ended with a divergence.</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> See https://mc-stan.org/misc/warnings for details.</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Residual diagnostics, the default</span></span></span>
@@ -177,7 +179,7 @@ such as <code>smooths</code> for <code><a href="conditional_smooths.mvgam.html">
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># The slope of a local linear trend</span></span></span>
 <span class="r-in"><span><span class="va">mod_llt</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/update.html" class="external-link">update</a></span><span class="op">(</span><span class="va">mod</span>, trend_formula <span class="op">=</span> <span class="op">~</span> <span class="fu"><a href="LLT.html">LLT</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 2 of 2000 (0.0%) transitions ended with a divergence.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 7 of 2000 (0.0%) transitions ended with a divergence.</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> See https://mc-stan.org/misc/warnings for details.</span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">mod_llt</span>, type <span class="op">=</span> <span class="st">"trend"</span>, component <span class="op">=</span> <span class="st">"slope"</span><span class="op">)</span></span></span>
 <span class="r-plt img"><img src="plot.mvgam-4.png" alt="" width="700" height="433"></span>

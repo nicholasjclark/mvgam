@@ -63,9 +63,7 @@ hindcast(
   adds `"season"`. `"predictor"` holds the effects of the trend
   formula's covariates. `c("level", "predictor")` gives the level with
   those effects. A factor model projects each component through its
-  loadings, as it projects the trend. The result is an ordinary
-  [mvgam_forecast-class](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam.md)
-  with the components in its `component` slot.
+  loadings, as it projects the trend.
 
 - ndraws:
 
@@ -79,18 +77,19 @@ hindcast(
 
 - obs_uncertainty:
 
-  Logical. When `FALSE`, skips observation-family sampling for
-  `type = "response"`, returning the family mean instead. Defaults to
-  `TRUE`.
+  Logical, `TRUE` by default. `FALSE` returns the family's mean under
+  `type = "response"`, in place of a sampled observation.
 
 - process_error:
 
   Logical. `FALSE` (the default) takes the fitted latent state of each
   draw. `type = "response"` then adds the observation noise alone.
-  `TRUE` adds fresh trend innovations to the linear predictor, as
+  `TRUE` replaces the fitted states with the covariate part plus newly
+  drawn innovations, as
   [`posterior_epred.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/posterior_epred.mvgam.md)
-  does with the same argument. A `component` is a fitted state and needs
-  `FALSE`.
+  gives with the same argument. The hindcast then shows what the model
+  predicts without the observed history. A `component` is a fitted state
+  and needs `FALSE`.
 
 - resp:
 
@@ -111,11 +110,11 @@ extrapolates the fitted state.
 [`posterior_predict.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/posterior_predict.mvgam.md)
 and
 [`posterior_epred.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/posterior_epred.mvgam.md)
-predict by integrating over the trend's dynamics. The [multivariate
-article](https://nicholasjclark.github.io/mvgam/articles/mvbf.html)
+predict from the covariate part of the model. The [multivariate
+article](https://nicholasjclark.github.io/mvgam/dev/articles/mvbf.html)
 compares `type = "trend"` hindcasts of one latent state from a joint
 model and from each data source alone. The [N-mixture
-article](https://nicholasjclark.github.io/mvgam/articles/nmix.html)
+article](https://nicholasjclark.github.io/mvgam/dev/articles/nmix.html)
 summarises `type = "latent_state"` hindcasts of abundance.
 
 Other predictions:
@@ -146,13 +145,13 @@ simdat <- sim_mvgam(family = poisson(), n_series = 1L,
                      n_timepoints = 120L, trend_model = AR())
 
 mod <- mvgam(
-  y ~ s(x),
+  y ~ s(x, k = 5),
   trend_formula = ~ AR(p = 1),
   data    = simdat$data_train,
   family  = poisson(),
   chains  = 2, silent = 2
 )
-#> Warning: 386 of 2000 (19.0%) transitions ended with a divergence.
+#> Warning: 36 of 2000 (2.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 
 # The fitted states track the training counts
@@ -171,7 +170,7 @@ plot(hindcast(mod, process_error = TRUE))
 
 # A local linear trend's slope, the level's growth per step
 mod_llt <- update(mod, trend_formula = ~ LLT())
-#> Warning: 3 of 2000 (0.0%) transitions ended with a divergence.
+#> Warning: 2 of 2000 (0.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 plot(hindcast(mod_llt, type = "trend", component = "slope"))
 

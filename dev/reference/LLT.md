@@ -3,6 +3,18 @@
 A latent level that moves with a latent growth rate, the local linear
 trend of Harvey (1989). Each latent process carries a level and a slope:
 
+\$\$\mu_t = \mu\_{t-1} + \beta\_{t-1} + \eta_t\$\$ \$\$\beta_t = \phi
+\beta\_{t-1} + \zeta_t\$\$
+
+The level innovations \\\eta_t\\ have scale `sigma_trend` and the slope
+innovations \\\zeta_t\\ scale `sigma_slope_trend`. A small
+`sigma_slope_trend` gives a trend that keeps its direction. A zero scale
+gives a random walk with a fixed drift. `damped = TRUE` estimates
+\\\phi\\ on (0, 1) as `ar1_slope_trend`, which pulls the growth rate
+back toward zero over the horizon (Gardner and McKenzie 1985). The
+undamped trend has \\\phi = 1\\. Its forecasts extend the current growth
+rate.
+
 ## Usage
 
 ``` r
@@ -41,47 +53,39 @@ LLT(
 
 - cor:
 
-  `Logical`. Include correlated process errors as part of a multivariate
-  normal process model? If `TRUE` and if `n_series > 1` in the supplied
-  data, a fully structured covariance matrix will be estimated for the
-  process errors.
+  `Logical`. Correlate the innovations of different series? `TRUE`
+  estimates a full covariance matrix of the innovations when the data
+  hold more than one series.
   [`AR()`](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md)
   and
   [`RW()`](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md)
-  default to `NULL`, which resolves to `FALSE` for an ungrouped trend
-  and to `TRUE` whenever `gr` names a grouping variable: a grouped trend
-  estimates correlations among the `subgr` units within each level of
-  `gr`, which is the model `gr` exists to specify.
-  [`VAR()`](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md)
-  and
+  default to `NULL`. That means `FALSE` for an ungrouped trend and
+  `TRUE` when `gr` names a grouping variable.
+  [`VAR()`](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md),
   [`ZMVN()`](https://nicholasjclark.github.io/mvgam/dev/reference/ZMVN.md)
-  always estimate correlations and refuse `cor = FALSE`, as do
-  `AR(gr = ...)` and `RW(gr = ...)`.
+  and grouped
+  [`AR()`](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md)
+  and
+  [`RW()`](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md)
+  trends always estimate correlations. They refuse `cor = FALSE`.
   [`CAR()`](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md)
   defaults to `FALSE`.
 
 - gr:
 
-  An optional grouping variable, which must be a `factor` in the
-  supplied `data`, for setting up hierarchical residual correlation
-  structures. If specified, this sets up a model where the residual
-  correlations for a specific level of `gr` are modelled hierarchically:
+  An optional `factor` in `data` that groups the series, such as region.
+  Each level of `gr` takes its own correlation matrix among the
+  innovations of its series. The matrices are pooled toward one global
+  matrix:
 
   \\\Omega\_{group} = \alpha\_{cor}\Omega\_{global} + (1 -
-  \alpha\_{cor})\Omega\_{group, local}\\,
+  \alpha\_{cor})\Omega\_{group, local}\\
 
-  where \\\Omega\_{global}\\ is a *global* correlation matrix,
-  \\\Omega\_{group, local}\\ is a *local deviation* correlation matrix
-  and \\\alpha\_{cor}\\ is a weighting parameter controlling how
-  strongly the local correlation matrix \\\Omega\_{group}\\ is shrunk
-  towards the global correlation matrix \\\Omega\_{global}\\ (larger
-  values of \\\alpha\_{cor}\\ indicate a greater degree of shrinkage,
-  i.e. a greater degree of partial pooling).
-
-  A grouped trend estimates correlations among the `subgr` units within
-  each level of `gr`. Without `subgr`, the series column names those
-  units. `cor` defaults to `TRUE` for such a trend. An explicit
-  `cor = FALSE` is refused.
+  Here \\\Omega\_{global}\\ is shared by every group, \\\Omega\_{group,
+  local}\\ is the deviation of one group and \\\alpha\_{cor}\\ sets the
+  weight on the global matrix. An \\\alpha\_{cor}\\ near 1 pools the
+  groups strongly. Without `subgr`, the series column names the series
+  within each group.
 
   Within a
   [`VAR()`](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md)
@@ -91,9 +95,9 @@ LLT(
 
   Two constraints apply to hierarchical trend models:
 
-  - `gr` must be constant within each series (each series belongs to a
-    single group). Models with `gr` varying within a series are rejected
-    at validation time.
+  - Each series belongs to one group.
+    [`mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam.md)
+    refuses a `gr` that varies within a series.
 
   - Every group must hold the same number of series. The Stan program
     sizes each group's correlation block from one shared count.
@@ -107,7 +111,7 @@ LLT(
   needs no `series` column.
 
   For example, to model counts of several species (`species` in `data`)
-  across three regions (`region`) with residuals correlated within
+  across three regions (`region`) with innovations correlated within
   regions, specify `gr = region` and `subgr = species`.
   [`mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam.md)
   then builds the series as
@@ -163,16 +167,20 @@ LLT(
   [`get_prior`](https://nicholasjclark.github.io/mvgam/dev/reference/get_prior.md)
   lists `nu_trend` with the other trend classes.
 
-  Three caveats apply. The bound of `2` is required. Below it the
-  innovations have no finite variance. An autoregressive trend then has
-  no stationary covariance to start from. Above it, the first states of
-  an autoregressive trend take the stationary mean and covariance. Their
-  distribution matches the stationary law exactly under Gaussian
-  innovations alone. A finite mix of t variates has heavier tails than
-  the infinite sum that defines that law. The degrees of freedom are
-  informed only through the tail of the latent process. They are weakly
-  identified in short series: below roughly 200 time points, the
-  posterior stays close to its prior.
+  Three caveats apply:
+
+  - A fixed value must exceed `2`. Below it the innovations have no
+    finite variance. An autoregressive trend then has no stationary
+    covariance to start from.
+
+  - The first states of an autoregressive trend take the stationary mean
+    and covariance. Under t innovations the true stationary distribution
+    has heavier tails than that.
+
+  - Only the tails of the latent process inform the degrees of freedom.
+    Below roughly 200 time points their posterior stays close to the
+    prior.
+
   [`VAR()`](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md)
   samples its states directly and
   [`PW()`](https://nicholasjclark.github.io/mvgam/dev/reference/piecewise_trends.md)
@@ -197,18 +205,6 @@ An object of class `mvgam_trend`.
 
 ## Details
 
-\$\$\mu_t = \mu\_{t-1} + \beta\_{t-1} + \eta_t\$\$ \$\$\beta_t = \phi
-\beta\_{t-1} + \zeta_t\$\$
-
-The level shocks \\\eta_t\\ have scale `sigma_trend` and the slope
-shocks \\\zeta_t\\ scale `sigma_slope_trend`. A small
-`sigma_slope_trend` gives a trend that keeps its direction. A zero scale
-gives a random walk with a fixed drift. `damped = TRUE` estimates
-\\\phi\\ on (0, 1) as `ar1_slope_trend`, which pulls the growth rate
-back toward zero over the horizon (Gardner and McKenzie 1985). The
-undamped trend has \\\phi = 1\\. Its forecasts extend the current growth
-rate.
-
 The level shocks take the innovation structure of
 [`RW()`](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md):
 `cor` correlates them across series, `gr` and `subgr` pool their
@@ -223,23 +219,28 @@ series can lie far outside the slope's stationary distribution. The
 level starts at its first shock. The observation intercept carries its
 mean.
 
-Default priors scale with the number of time points \\N\\ and widen by
-the factor \\s\\ that brms applies to its own default scales, as
+Default priors scale with the number of time points \\N\\ and with the
+factor \\s\\ that brms uses to widen its own default scales, as
 [`get_prior()`](https://nicholasjclark.github.io/mvgam/dev/reference/get_prior.md)
-describes. The shock scales `sigma_trend` and `sigma_slope_trend` take
-`gamma(2, .)` priors. At their prior medians, the level shocks and the
-slope shocks each move the trend over the series by a standard deviation
-of \\s\\. The slope's median accounts for the damping at the median of
-its prior. A `gamma(2, .)` density rises from zero. It keeps a nearly
-fixed level or slope within reach and steers the sampler away from the
-boundary at zero. `init_slope_trend ~ normal(0, 2 / r)`, where \\r = 1 +
-\phi + \dots + \phi^{N - 2}\\ is how far a unit initial slope moves the
-level by the end of the series, gives the initial slope \\2 s\\ of
-growth over the series at one prior standard deviation. An undamped
-slope has \\r = N - 1\\. A factor model with every loading sampled
-measures both in units of its level's spread over the series,
-\\\sqrt{N}\\. Its loadings carry \\s\\. `ar1_slope_trend` takes
-`beta(18, 2)`, with median 0.91.
+describes:
+
+- `sigma_trend` and `sigma_slope_trend` take `gamma(2, .)` priors. At
+  its prior median, each kind of shock alone moves the trend by a
+  standard deviation of \\s\\ over the series. The slope prior allows
+  for damping at the prior median of `ar1_slope_trend`. A `gamma(2, .)`
+  density is zero at zero. It allows a nearly fixed level or slope and
+  keeps the sampler off that boundary.
+
+- `init_slope_trend` takes `normal(0, 2 / r)`. Here \\r = 1 + \phi +
+  \dots + \phi^{N - 2}\\ is how far a unit initial slope moves the level
+  by the end of the series. It is \\N - 1\\ without damping. One prior
+  standard deviation then gives growth of \\2 s\\ over the series.
+
+- `ar1_slope_trend` takes `beta(18, 2)`, with median 0.91.
+
+A factor model with every loading sampled measures these scales in units
+of \\\sqrt{N}\\, the spread of its level over the series. Its loadings
+carry \\s\\.
 [`get_prior()`](https://nicholasjclark.github.io/mvgam/dev/reference/get_prior.md)
 prints the resolved values.
 
@@ -255,20 +256,19 @@ chain started at random can stall far from the posterior.
 starts every chain from Stan's Pathfinder approximation.
 
 In a factor model with every loading sampled, the loadings set each
-factor's scale and the level shocks take unit scale. The factors share
-one `sigma_slope_trend` and one `ar1_slope_trend`. The model is then
-unchanged under a rotation of the factors. The QR rotation that
+factor's scale. The level shocks take a fixed scale of one. Every factor
+keeps its level noise. The factors share one `sigma_slope_trend` and one
+`ar1_slope_trend`. A rotation of the factors then leaves the model
+unchanged. The QR rotation of
 [`RW()`](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md)
-factors take identifies the loadings. A trend with no level noise would
-need an infinite slope scale. A factor model always keeps some level
-noise. A `trend_map` that fixes loadings keeps one slope scale per
-factor.
+factors identifies the loadings. A `trend_map` that fixes loadings keeps
+one slope scale per factor.
 
 *Seasonality*: `season` adds a stochastic season \\\gamma_t\\ to the
 level, the trigonometric form of Harvey (1989) with the non-integer and
 multiple periods of De Livera et al. (2011). The latent state is
-\\\mu_t + \gamma_t\\. Harmonic \\j\\ of period \\s\\ holds a state pair
-that turns by \\\lambda_j = 2 \pi j / s\\ at each step and takes
+\\\mu_t + \gamma_t\\. Harmonic \\j\\ of period \\m\\ holds a state pair
+that turns by \\\lambda_j = 2 \pi j / m\\ at each step and takes
 Gaussian shocks of scale `sigma_season_trend`:
 
 \$\$\gamma\_{j,t} = \cos\lambda_j \gamma\_{j,t-1} + \sin\lambda_j
@@ -278,8 +278,8 @@ Gaussian shocks of scale `sigma_season_trend`:
 
 Common periods are 4 for quarterly data, 12 for monthly data, 52.18 for
 weekly data over years, 7 and 365.25 for daily data and 24 and 168 for
-hourly data. `LLT(season = 12, harmonics = K)` states the season that
-`AddTrig(period = 12, frequencies = 1:K)` states in bsts.
+hourly data. `LLT(season = 12, harmonics = K)` fits the season that
+`AddTrig(period = 12, frequencies = 1:K)` specifies in bsts.
 
 The season is the sum of the first states over the harmonics. A small
 `sigma_season_trend` keeps the seasonal shape nearly fixed. A zero scale
@@ -291,10 +291,9 @@ season from the level and the observation intercept. Two periods sharing
 a harmonic, such as 6 and 12 with three or more harmonics, are refused.
 A period longer than the data overlaps the slope and draws a warning.
 The starting pairs `init_season_trend` are estimated under one prior for
-both states of every harmonic. A rotation of a pair leaves that prior
-unchanged, which places the phase at the first time point with no
-further choice. Seasonal shocks are independent across series. In a
-factor model each factor has its own season, mapped to the series
+both states of every harmonic. That prior treats every phase at the
+first time point alike. Seasonal shocks are independent across series.
+In a factor model each factor has its own season, mapped to the series
 through the loadings.
 
 `sigma_season_trend` takes a `gamma(2, .)` prior whose median puts the

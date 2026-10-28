@@ -110,9 +110,10 @@ each row's contribution as they do in the Stan model.
 
 The
 [`posterior_epred.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/posterior_epred.mvgam.md)
-family of methods integrates over the trend dynamics. A covariate effect
-then has the same meaning at every time. Those predictions describe no
-particular observed series and do not give an ELPD.
+family of methods uses the covariate part of the model by default. A
+covariate effect then has the same meaning at every time. Those
+predictions describe no particular observed series and do not give an
+ELPD.
 
 ## See also
 
@@ -122,7 +123,7 @@ and
 estimate the ELPD from this matrix.
 [`hindcast.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/hindcast.mvgam.md)
 returns the latent states it conditions on. The [forecast evaluation
-article](https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html)
+article](https://nicholasjclark.github.io/mvgam/dev/articles/forecast_evaluation.html)
 compares models by cross-validation.
 
 Other model comparison:
@@ -144,12 +145,12 @@ set.seed(13)
 simdat <- sim_mvgam(family = poisson(), n_series = 1L,
                      n_timepoints = 120L, trend_model = AR())
 
-mod <- mvgam(y ~ s(x),
+mod <- mvgam(y ~ s(x, k = 5),
               trend_formula = ~ AR(p = 1),
               data    = simdat$data_train,
               family  = poisson(),
               chains  = 2, silent = 2)
-#> Warning: 9 of 2000 (0.0%) transitions ended with a divergence.
+#> Warning: 5 of 2000 (0.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 
 # One row per draw, one column per observation
@@ -162,7 +163,7 @@ dim(ll)
 ll_fixed <- log_lik(mod, incl_autocor = FALSE)
 c(with_trend = mean(rowSums(ll)), without = mean(rowSums(ll_fixed)))
 #> with_trend    without 
-#>  -196.7973  -289.2782 
+#>  -197.5655  -301.1188 
 
 # Next, loo() estimates the ELPD from these densities
 # }

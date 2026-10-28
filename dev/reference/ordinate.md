@@ -152,7 +152,7 @@ Computing*, 34, 143.
 with `type = "factors"` plots each factor's path.
 [`residual_cor()`](https://nicholasjclark.github.io/mvgam/dev/reference/residual_cor.md)
 gives the correlations among series the factors imply. The [JSDM
-article](https://nicholasjclark.github.io/mvgam/articles/jsdgam.html)
+article](https://nicholasjclark.github.io/mvgam/dev/articles/jsdgam.html)
 interprets a biplot of species loadings.
 
 Other latent dynamics:
@@ -190,16 +190,16 @@ p
 
 attr(p, "rotation")$loadings
 #>              [,1]       [,2]
-#> sp_1   0.60548993 -0.2315881
-#> sp_2   0.68630223  0.2883360
-#> sp_3   0.12719789  0.1515715
-#> sp_4  -0.02685917 -0.7239206
-#> sp_5  -0.52357776  0.1271335
-#> sp_6  -0.11555648 -0.1464999
-#> sp_7   0.46866634  0.3473488
-#> sp_8  -0.07828871  0.8324566
-#> sp_9  -0.42613444 -1.1481722
-#> sp_10 -0.71723983  0.5033344
+#> sp_1   0.60745650 -0.2202705
+#> sp_2   0.67935731  0.3021084
+#> sp_3   0.12943708  0.1450690
+#> sp_4  -0.02370251 -0.7202976
+#> sp_5  -0.51760860  0.1211760
+#> sp_6  -0.11628356 -0.1486426
+#> sp_7   0.46559233  0.3600778
+#> sp_8  -0.09247473  0.8351259
+#> sp_9  -0.39936142 -1.1601838
+#> sp_10 -0.73241241  0.4858374
 
 # Next, residual_cor(mod) gives the species correlations the
 # factors imply

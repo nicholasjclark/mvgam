@@ -1,28 +1,32 @@
 # Example use cases for mvgam
 
-mvgam is a package for fitting dynamic generalized additive models
-(GAMs) to univariate or multivariate data. It combines the flexibility
-of smooth functions with latent temporal processes to model
-autocorrelation, seasonality, and uncertainty. The package supports both
-univariate and multivariate time series, making it especially useful for
-ecological and environmental forecasting. Bayesian inference via Stan
-allows for full uncertainty quantification and forecasting in complex,
-non-Gaussian settings.
+New to mvgam? Start with
+[`mvgam`](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam.md),
+whose Workflow section lists the steps of an analysis and whose Terms
+section defines the vocabulary these pages use.
+[`mvgam_data`](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam_data.md)
+checks a data frame before fitting. The [overview
+article](https://nicholasjclark.github.io/mvgam/dev/articles/mvgam_overview.html)
+walks through a full analysis.
 
-This help page provides external links to example applications and
-discussions relevant to the use of mvgam models. These examples span
-non-Gaussian time series modelling, multivariate abundance forecasting,
-and the use of complex predictors such as time-varying seasonality,
-monotonic nonlinear effects and Gaussian processes.
+mvgam fits dynamic generalized additive models (GAMs) to one or many
+time series. Smooth functions of covariates sit beside a latent
+time-series process that carries the autocorrelation the covariates
+leave behind. Stan samples the posterior. Every prediction and forecast
+then carries the uncertainty of every parameter.
+
+The links below lead to questions, blog posts, articles and videos where
+these models answered a practical problem. They cover counts and other
+non-Gaussian series, several series modelled together, and predictors
+such as seasonality that changes over time, monotonic effects and
+Gaussian processes.
 
 ## Details
 
 **Non-Gaussian time series modelling and forecasting**
 
-mvgam is designed for real-world time series data that include discrete,
-zero-inflated, or overdispersed observations. It supports latent dynamic
-components and smooth terms to model autocorrelation, trends, and
-uncertainty.
+Counts, proportions and binary outcomes rarely suit a Gaussian model. A
+latent trend on the link scale handles their autocorrelation.
 
 - [Uncertain serial autocorrelation in GAM count model
   residuals](https://stats.stackexchange.com/questions/657495)
@@ -49,16 +53,15 @@ uncertainty.
   `mvgam`](https://ecogambler.netlify.app/blog/vector-autoregressions/)
 
 - [Article: State-space vector autoregressions with
-  `mvgam`](https://nicholasjclark.github.io/mvgam/articles/var.html)
+  `mvgam`](https://nicholasjclark.github.io/mvgam/dev/articles/var.html)
 
 - [Video tutorial: Ecological forecasting with Dynamic Generalized
   Additive Models](https://www.youtube.com/watch?v=0zZopLlomsQ&t=4s)
 
 **Multivariate time series modelling and forecasting**
 
-mvgam supports multivariate models with shared or correlated latent
-trends, making it suitable for a broad range of applications that gather
-data on multiple time series simultaneously.
+Series measured together, such as several species at one site, can share
+latent trends or have trends that are correlated.
 
 - [Ecological modelling: multivariate abundance time-series
   data](https://stats.stackexchange.com/questions/172645)
@@ -76,16 +79,15 @@ data on multiple time series simultaneously.
   `mvgam`](https://ecogambler.netlify.app/blog/distributed-lags-mgcv/)
 
 - [Article: One shared process, many sensors: multi-response
-  `mvgam`](https://nicholasjclark.github.io/mvgam/articles/mvbf.html)
+  `mvgam`](https://nicholasjclark.github.io/mvgam/dev/articles/mvbf.html)
 
 - [Video tutorial: Time series in R and Stan using the `mvgam` package:
   hierarchical GAMs](https://www.youtube.com/watch?v=2POK_FVwCHk)
 
 **Seasonality and other complex predictors**
 
-mvgam allows for flexible modelling of seasonal patterns and nonlinear
-effects using cyclic smooths, Gaussian processes, monotonic smooths and
-hierarchical structures.
+Cyclic smooths model seasonal patterns. Gaussian processes, monotonic
+smooths and hierarchical smooths model other nonlinear effects.
 
 - [Gaussian process smoothers (`bs = "gp"`) in
   GAMs](https://stats.stackexchange.com/questions/478384)
@@ -104,6 +106,12 @@ hierarchical structures.
 
 - [Video tutorial: Time series in R and Stan using the `mvgam` package:
   an introduction](https://www.youtube.com/watch?v=fzPJUW8x6DU)
+
+## See also
+
+[`mvgam`](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam.md),
+[`mvgam_data`](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam_data.md),
+[`trend_constructors`](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md)
 
 ## Author
 

@@ -52,17 +52,13 @@ pp_check(
 
 - ndraws:
 
-  Positive integer indicating how many posterior draws should be used.
-  If `NULL` all draws are used. If not specified, the number of
-  posterior draws is chosen automatically. Ignored if `draw_ids` is not
-  `NULL`.
+  Number of posterior draws to plot. `NULL` (the default) takes the
+  default of the type, listed under Details.
 
 - prefix:
 
-  The prefix of the bayesplot function to be applied. Either \`"ppc"\`
-  (posterior predictive check; the default) or \`"ppd"\` (posterior
-  predictive distribution), the latter being the same as the former
-  except that the observed data is not shown for \`"ppd"\`.
+  `"ppc"` (the default) plots the observed data with the replicates.
+  `"ppd"` plots the replicates alone.
 
 - group:
 
@@ -88,8 +84,8 @@ pp_check(
 
 - draw_ids:
 
-  An integer vector specifying the posterior draws to be used. If `NULL`
-  (the default), all draws are used.
+  Optional integer vector naming the posterior draws to plot. `NULL`
+  (the default) lets `ndraws` choose them.
 
 - per_obs:
 
@@ -129,11 +125,11 @@ the model inferred at each time, as
 and
 [`hindcast.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/hindcast.mvgam.md)
 use. The check then compares the fitted trajectory with the series that
-produced it. Replicates of `newdata` take the covariate surface of
-[`posterior_predict.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/posterior_predict.mvgam.md).
-Passing `incl_autocor` sets the surface explicitly. The `loo_*` types
-always take the fitted state, which is the state their importance
-weights come from.
+produced it. Replicates of `newdata` use the covariate part of the
+model, as
+[`posterior_predict.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/posterior_predict.mvgam.md)
+does. Passing `incl_autocor` chooses between the two. The `loo_*` types
+use the fitted state. Their importance weights come from it.
 
 Overlay types default to 10 draws. Interval, ribbon and statistic types
 use every draw. The residual histograms and ribbons default to 500
@@ -208,10 +204,10 @@ returns the residuals the residual types plot.
 models series observed at unevenly spaced times.
 [`loo.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/loo.mvgam.md)
 scores the fit. The [overview
-article](https://nicholasjclark.github.io/mvgam/articles/mvgam_overview.html)
+article](https://nicholasjclark.github.io/mvgam/dev/articles/mvgam_overview.html)
 explains a rootogram. The [N-mixture
-article](https://nicholasjclark.github.io/mvgam/articles/nmix.html) runs
-the discrepancy check.
+article](https://nicholasjclark.github.io/mvgam/dev/articles/nmix.html)
+runs the discrepancy check.
 
 Other model checking:
 [`mvgam_diagnostics`](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam_diagnostics.md),
@@ -229,15 +225,17 @@ Nicholas J Clark
 set.seed(13)
 simdat <- sim_mvgam(family = poisson(), n_series = 1L,
                     n_timepoints = 120L, trend_model = AR())
-mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
+mod <- mvgam(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1),
              data = simdat$data_train, family = poisson(),
              chains = 2, silent = 2)
-#> Warning: 9 of 2000 (0.0%) transitions ended with a divergence.
+#> Warning: 5 of 2000 (0.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 
-# Observed counts against the predictive distribution. A bar
-# hanging below zero marks a count the model under-predicts
-pp_check(mod, type = "rootogram")
+# A hanging rootogram, on the square-root scale. Each bar shows how
+# often a count was observed. It hangs from the curve of its expected
+# frequency under the model. A bar ending below zero marks a count the
+# model under-predicts
+pp_check(mod, type = "rootogram", style = "hanging")
 
 
 # Randomised quantile residuals over time. A trend the model missed

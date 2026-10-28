@@ -3,6 +3,33 @@
 Posterior draws of the residuals of a fitted `mvgam` model, of two
 types:
 
+- `"quantile"` (default): randomised quantile residuals (Dunn and Smyth
+  1996), also called Dunn-Smyth or PIT residuals. Each observation
+  passes through the distribution function of its predictive
+  distribution, then through the standard normal quantile function.
+  Under a correctly specified model the residuals are independent
+  N(0, 1) draws for any response family.
+
+- `"ordinary"`: the predictive error, `y` minus a
+  [`posterior_predict.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/posterior_predict.mvgam.md)
+  draw, per draw.
+
+In sample, both types compare each observation with predictions that
+condition on the latent trend state the model inferred at that time, the
+state
+[`hindcast.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/hindcast.mvgam.md)
+returns. For `newdata` the fit has no such state. The predictions then
+use the covariate part of the model, without the trend's innovations.
+Passing `process_error = TRUE` adds them.
+[`pp_check.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/pp_check.mvgam.md)
+and
+[`predictive_error.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/predictive_error.mvgam.md)
+use the same predictions.
+
+Pearson residuals are not supported. A Pearson residual of a count or a
+bounded response is skewed and discrete even under a correctly specified
+model.
+
 ## Usage
 
 ``` r
@@ -58,9 +85,8 @@ residuals(
 
 - probs:
 
-  Numeric vector of probabilities for quantile computation. Default is
-  `c(0.025, 0.975)` for 95% credible intervals. Can be a single value or
-  multiple values.
+  Two probabilities for the lower and upper quantile columns of the
+  summary. Default `c(0.025, 0.975)`, a 95% interval.
 
 - ...:
 
@@ -78,32 +104,6 @@ mean, or the median with `robust = TRUE`), `Est.Error` (the standard
 deviation, or the MAD) and one quantile per `probs`.
 
 ## Details
-
-- `"quantile"` (default): randomised quantile residuals (Dunn and Smyth
-  1996), also called Dunn-Smyth or PIT residuals. Each observation
-  passes through the distribution function of its predictive
-  distribution, then through the standard normal quantile function.
-  Under a correctly specified model the residuals are independent
-  N(0, 1) draws for any response family.
-
-- `"ordinary"`: the predictive error, `y` minus a
-  [`posterior_predict.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/posterior_predict.mvgam.md)
-  draw, per draw.
-
-In sample, both types compare each observation with predictions that
-condition on the latent trend state the model inferred at that time, the
-state
-[`hindcast.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/hindcast.mvgam.md)
-returns. For `newdata` the fit has no such state. The prediction then
-integrates over the trend dynamics, which widens the residuals.
-[`pp_check.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/pp_check.mvgam.md)
-and
-[`predictive_error.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/predictive_error.mvgam.md)
-use the same predictions.
-
-Pearson residuals are not supported. A Pearson residual of a count or a
-bounded response is skewed and discrete even under a correctly specified
-model.
 
 Each draw places an observation in a PIT interval `[lower, upper]`. The
 residual is `qnorm(u)` for a `u` drawn uniformly from that interval. Two
@@ -154,8 +154,8 @@ bounds a residual at about +/-8.13. On the analytic route one draw can
 place an observation beyond that bound. Such isolated values describe
 that draw. A misfit shifts the residual across most draws. The empirical
 route reaches the clamp whenever an observation lies outside every
-simulated value, which few draws make common. Use `ndraws >= 500` there,
-the default of the residual histograms and ribbons of
+simulated value. With few draws that happens often. Use `ndraws >= 500`
+there, the default of the residual histograms and ribbons of
 [`pp_check.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/pp_check.mvgam.md).
 
 ## Multivariate families ([`mvn()`](https://nicholasjclark.github.io/mvgam/dev/reference/mvn.md), [`mvt()`](https://nicholasjclark.github.io/mvgam/dev/reference/mvt.md), [`diri()`](https://nicholasjclark.github.io/mvgam/dev/reference/diri.md))
@@ -218,6 +218,7 @@ Dunn, P. K. and Smyth, G. K. (1996). Randomized quantile residuals.
 
 Hartig, F. (2024). DHARMa: Residual diagnostics for hierarchical
 (multi-level / mixed) regression models. R package.
+<https://CRAN.R-project.org/package=DHARMa>
 
 ## See also
 
@@ -241,22 +242,22 @@ Nicholas J Clark
 set.seed(13)
 simdat <- sim_mvgam(family = poisson(), n_series = 1L,
                     n_timepoints = 120L, trend_model = AR())
-mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
+mod <- mvgam(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1),
              data = simdat$data_train, family = poisson(),
              chains = 2, silent = 2)
-#> Warning: 9 of 2000 (0.0%) transitions ended with a divergence.
+#> Warning: 5 of 2000 (0.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 
 # Quantile residuals summarised per observation
 r <- residuals(mod)
 head(r)
-#>          Estimate Est.Error       Q2.5     Q97.5
-#> [1,]  0.206917476 0.6044010 -1.0444688  1.372859
-#> [2,]  0.295047452 0.8594235 -1.3763295  1.973261
-#> [3,]  0.202469899 0.7526646 -1.3533240  1.677792
-#> [4,] -1.660155136 0.6212018 -2.8928733 -0.479511
-#> [5,]  0.729958240 0.7508535 -0.7776137  2.149186
-#> [6,] -0.007497605 0.7808384 -1.5937807  1.503789
+#>         Estimate Est.Error       Q2.5      Q97.5
+#> [1,]  0.04305444 0.6276094 -1.2293330  1.2065680
+#> [2,]  0.43102182 0.9100175 -1.4328467  2.1089368
+#> [3,]  0.08381852 0.7538234 -1.3775664  1.5728609
+#> [4,] -1.66884248 0.6492969 -2.9454988 -0.3349742
+#> [5,]  0.74917410 0.7539337 -0.7791357  2.2124208
+#> [6,]  0.11081097 0.7590387 -1.4080932  1.5538332
 
 # One draw of the residuals should look like N(0, 1) draws
 r1 <- residuals(mod, summary = FALSE, draw_ids = 1)

@@ -2,7 +2,7 @@
 
 ### Getting started
 
-Shape your data, then meet the modelling surface that consumes it.
+Prepare your data and fit a first state-space model.
 
 - [Formatting data for
   mvgam](https://nicholasjclark.github.io/mvgam/dev/articles/data.md):
@@ -11,8 +11,8 @@ Shape your data, then meet the modelling surface that consumes it.
 
 ### Latent dynamics
 
-Trend processes that carry temporal structure the observation model
-cannot see, and the post-fit tools that interrogate them.
+Latent trends that model dependence over time. The articles also
+interpret a fitted trend.
 
 - [State-space vector autoregressions with
   mvgam](https://nicholasjclark.github.io/mvgam/dev/articles/var.md):

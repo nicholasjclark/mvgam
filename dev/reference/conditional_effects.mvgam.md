@@ -1,26 +1,25 @@
 # Display conditional effects of predictors for mvgam models
 
-Plot the conditional effects of one or more numeric / categorical
-predictors in fitted `mvgam` models, including up-to-three-way
-interactions. A thin wrapper around
-[`marginaleffects::plot_predictions()`](https://rdrr.io/pkg/marginaleffects/man/plot_predictions.html)
-that auto-enumerates the model's term labels (across both observation
-and trend submodels) and produces one ggplot per term.
+Plots how the prediction changes with each predictor, holding the other
+predictors at typical values. Predictors of the observation and trend
+formulas both count, as do interactions of up to three terms. Each
+effect gets one panel, drawn by
+[`marginaleffects::plot_predictions()`](https://rdrr.io/pkg/marginaleffects/man/plot_predictions.html).
 
-`as.data.frame.mvgam_conditional_effects()` returns the underlying
-prediction grid as a long-format `data.frame` (one row per grid point,
-per effect, per response). Columns are `resp` (present only when the fit
-is multivariate), `effect` (the primary conditioning variable name),
-`estimate__`, `lower__`, `upper__`, followed by whichever additional
-grid columns marginaleffects populated. The three estimate columns take
-brms's names, as in the frame
-[`conditional_smooths.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/conditional_smooths.mvgam.md)
-returns.
+[`as.data.frame()`](https://rdrr.io/r/base/as.data.frame.html) returns
+the numbers the panels plot, one row per grid point of each effect. Use
+it to build a custom plot, overlay several fits or compare with a known
+truth. The columns are:
 
-Use this to reach the raw numbers when you want to build a custom plot,
-overlay several fits, or compare against a known truth. It removes the
-need to know whether the fit was univariate or multivariate before
-extracting.
+- `resp`, the response, for a multivariate fit alone.
+
+- `effect`, the predictor the panel varies.
+
+- `estimate__`, `lower__` and `upper__`, the prediction and its
+  interval, named as in brms and
+  [`conditional_smooths.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/conditional_smooths.mvgam.md).
+
+- The other grid columns that marginaleffects filled.
 
 ## Usage
 
@@ -52,7 +51,13 @@ as.data.frame(x, row.names = NULL, optional = FALSE, ...)
 
 - x:
 
-  An object of class `mvgam_conditional_effects`.
+  A fitted `mvgam` object. The
+  [`plot()`](https://rdrr.io/r/graphics/plot.default.html),
+  [`print()`](https://rdrr.io/r/base/print.html) and
+  [`as.data.frame()`](https://rdrr.io/r/base/as.data.frame.html) methods
+  take the `mvgam_conditional_effects` object that
+  [`conditional_effects()`](https://paulbuerkner.com/brms/reference/conditional_effects.brmsfit.html)
+  returns.
 
 - effects:
 
@@ -92,9 +97,9 @@ as.data.frame(x, row.names = NULL, optional = FALSE, ...)
   Logical. Passed to
   [`plot_predictions()`](https://rdrr.io/pkg/marginaleffects/man/plot_predictions.html)
   / `get_predict.mvgam`. With the default `FALSE` the trend contributes
-  its deterministic submodel. The panel then shows the covariate effect
-  with the latent process held out. `TRUE` integrates over the trend's
-  dynamics, which widens the band by the latent state's own spread.
+  its covariate part. The panel then shows the covariate effect with the
+  latent process held out. `TRUE` adds innovations drawn from the
+  trend's long-run spread. The band then widens by that spread.
 
 - series:
 
@@ -114,7 +119,15 @@ as.data.frame(x, row.names = NULL, optional = FALSE, ...)
 
 - ...:
 
-  Ignored.
+  For
+  [`conditional_effects()`](https://paulbuerkner.com/brms/reference/conditional_effects.brmsfit.html),
+  further arguments of
+  [`marginaleffects::plot_predictions()`](https://rdrr.io/pkg/marginaleffects/man/plot_predictions.html).
+  A name that function does not take is refused. The
+  [`plot()`](https://rdrr.io/r/graphics/plot.default.html) and
+  [`print()`](https://rdrr.io/r/base/print.html) methods ignore them.
+  [`as.data.frame()`](https://rdrr.io/r/base/as.data.frame.html) refuses
+  them.
 
 - plot:
 
@@ -134,7 +147,8 @@ as.data.frame(x, row.names = NULL, optional = FALSE, ...)
 An object of class `mvgam_conditional_effects`: a named list with one
 `ggplot` per effect, drawn by the `plot` and `print` methods.
 
-Invisibly, a flat named list of ggplot objects, as
+The [`plot()`](https://rdrr.io/r/graphics/plot.default.html) method
+returns, invisibly, a flat named list of ggplot objects, as
 [`brms::conditional_effects()`](https://paulbuerkner.com/brms/reference/conditional_effects.brmsfit.html)
 plots return one. A multivariate fit's panels are named
 `<response>.<effect>`, response by response.
@@ -158,7 +172,7 @@ summarise effects as numbers.
 computes the expected values the panels draw.
 [`pp_check.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/pp_check.mvgam.md)
 checks the fit against the data. The [overview
-vignette](https://nicholasjclark.github.io/mvgam/articles/mvgam_overview.html)
+vignette](https://nicholasjclark.github.io/mvgam/dev/articles/mvgam_overview.html)
 interprets effects in both formulas.
 
 Other predictions:
@@ -184,11 +198,11 @@ Nicholas J Clark
 set.seed(13)
 simdat <- sim_mvgam(family = poisson(), n_series = 1L,
                      n_timepoints = 120L, trend_model = AR())
-mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
+mod <- mvgam(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1),
               data    = simdat$data_train,
               family  = poisson(),
               chains  = 2, silent = 2)
-#> Warning: 9 of 2000 (0.0%) transitions ended with a divergence.
+#> Warning: 5 of 2000 (0.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 
 # The effect of x on the expected count, with the observations
@@ -203,7 +217,7 @@ conditional_effects(mod, type = "link")
 marginaleffects::avg_slopes(mod, variables = "x", type = "expected")
 #> 
 #>  Estimate 2.5 % 97.5 %
-#>     -1.64  -3.8 0.0399
+#>      -1.1 -2.04  -0.33
 #> 
 #> Term: x
 #> Type: expected

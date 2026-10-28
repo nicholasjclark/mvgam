@@ -50,8 +50,7 @@ posterior_transition_matrix(
 - probs:
 
   Numeric vector of probabilities for quantile computation. Default is
-  `c(0.025, 0.975)` for 95% credible intervals. Can be a single value or
-  multiple values.
+  `c(0.025, 0.975)` for 95% credible intervals.
 
 - lag:
 
@@ -132,7 +131,7 @@ simdat <- sim_mvgam(family = gaussian(), n_series = 3L,
 var_mod <- mvgam(y ~ 1, trend_formula = ~ VAR(p = 1),
                  data = simdat$data_train, family = gaussian(),
                  chains = 2, silent = 2)
-#> Warning: 3 of 2000 (0.0%) transitions ended with a divergence.
+#> Warning: 44 of 2000 (2.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 #> Warning: 1 of 2 chains had an E-BFMI less than 0.3.
 #> See https://mc-stan.org/misc/warnings for details.
@@ -143,12 +142,12 @@ A
 #> Lag-1 VAR transition matrix from an mvgam fit
 #>   Group      : single-panel
 #>   Dimension  : 3 x 3
-#>   Mean |A_ij| (i != j): 0.12
+#>   Mean |A_ij| (i != j): 0.11
 #>   Point estimate:
 #>          series_1 series_2 series_3
-#> series_1     0.68     0.03     0.14
-#> series_2     0.08     0.53     0.21
-#> series_3     0.17     0.08     0.56
+#> series_1     0.71     0.02     0.10
+#> series_2     0.10     0.54     0.16
+#> series_3     0.20     0.08     0.51
 #>   95% CI on each cell available in `A_lower` / `A_upper`.
 plot(A)
 

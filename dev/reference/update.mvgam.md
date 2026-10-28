@@ -126,7 +126,7 @@ and
 compare a refit with the original.
 [`stancode.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/stancode.mvgam_formula.md)
 shows the compiled model. The [forecast evaluation
-article](https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html)
+article](https://nicholasjclark.github.io/mvgam/dev/articles/forecast_evaluation.html)
 compares competing models by their forecasts.
 
 Other model fitting:
@@ -156,23 +156,25 @@ simdat <- sim_mvgam(family = poisson(), n_series = 1L,
                     n_timepoints = 120L, trend_model = "None")
 mod <- mvgam(y ~ s(x), data = simdat$data_train,
              family = poisson(), chains = 2, silent = 2)
-#> Warning: 2 of 2000 (0.0%) transitions ended with a divergence.
+#> Warning: 3 of 2000 (0.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 # }
 # \dontrun{
 # Swap the family for a negative binomial. The formula, priors, data
 # and sampler settings carry over
 upd <- update(mod, family = negbinomial())
-#> Warning: 3 of 2000 (0.0%) transitions ended with a divergence.
+#> Warning: 17 of 2000 (1.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 
 # Compare the two fits by approximate leave-one-out cross-validation.
-# The better model has elpd_diff = 0. A difference smaller than about
-# two of its standard errors favours neither model
+# The better model comes first, with elpd_diff = 0. An elpd_diff
+# smaller than 4 in size means the two predict about equally well.
+# p_worse is the probability that a model predicts worse than the best
 loo_compare(mod, upd)
-#>  model elpd_diff se_diff p_worse diag_diff diag_elpd
-#>    mod       0.0     0.0      NA                    
-#>    upd      -0.3     0.8    0.67   N < 100          
+#> Warning: Some Pareto k diagnostic values are too high. See help('pareto-k-diagnostic') for details.
+#>  model elpd_diff se_diff p_worse diag_diff      diag_elpd
+#>    mod       0.0     0.0      NA                         
+#>    upd      -0.7     0.7    0.82   N < 100 1 k_psis > 0.7
 #> 
 #> Diagnostic flags present.
 #> See ?`loo-glossary` (sections `diag_diff` and `diag_elpd`)
@@ -180,7 +182,7 @@ loo_compare(mod, upd)
 
 # A change of sampler settings alone reuses the compiled model
 longer <- update(mod, iter = 3000, recompile = FALSE)
-#> Warning: 7 of 3000 (0.0%) transitions ended with a divergence.
+#> Warning: 50 of 3000 (2.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 # }
 ```

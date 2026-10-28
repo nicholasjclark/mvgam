@@ -34,7 +34,10 @@ score(
 
 - score:
 
-  Character; one of the names above.
+  Character; one of the names under 'Available scores'. `"drps"` suits
+  counts, `"crps"` continuous data and `"brier"` binary data. `"energy"`
+  and `"variogram"` score several series jointly. Lower scores are
+  better.
 
 - interval_width:
 
@@ -143,10 +146,12 @@ series at the same forecast times.
 Gneiting, T. and Raftery, A. E. (2007). Strictly Proper Scoring Rules,
 Prediction, and Estimation. *Journal of the American Statistical
 Association*, 102(477), 359-378.
+[doi:10.1198/016214506000001437](https://doi.org/10.1198/016214506000001437)
 
 Scheuerer, M. and Hamill, T. M. (2015). Variogram-based proper scoring
 rules for probabilistic forecasts of multivariate quantities. *Monthly
 Weather Review*, 143(4), 1321-1334.
+[doi:10.1175/MWR-D-14-00269.1](https://doi.org/10.1175/MWR-D-14-00269.1)
 
 ## See also
 
@@ -156,7 +161,7 @@ produces the forecast.
 scores several forecasts with one rule.
 [`ensemble.mvgam_forecast()`](https://nicholasjclark.github.io/mvgam/dev/reference/ensemble.mvgam_forecast.md)
 combines forecasts. The [forecast evaluation
-article](https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html)
+article](https://nicholasjclark.github.io/mvgam/dev/articles/forecast_evaluation.html)
 compares models by their scores at each horizon.
 
 Other forecasting:
@@ -173,12 +178,12 @@ Other forecasting:
 set.seed(11)
 simdat <- sim_mvgam(family = poisson(), n_series = 2L,
                     n_timepoints = 120L, trend_model = AR())
-mod <- mvgam(y ~ s(x),
+mod <- mvgam(y ~ s(x, k = 5),
              trend_formula = ~ AR(p = 1),
              data = simdat$data_train,
              family = poisson(),
              chains = 2, silent = 2)
-#> Warning: 68 of 2000 (3.0%) transitions ended with a divergence.
+#> Warning: 491 of 2000 (25.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 
 # Forecast the held-out times, then score each series
@@ -186,12 +191,12 @@ fc <- forecast(mod, newdata = simdat$data_test)
 sc <- score(fc, score = "drps")
 head(sc$series_1)
 #>       score in_interval interval_width eval_horizon score_type
-#> 1 11.731191           0            0.9            1       drps
-#> 2  6.451002           1            0.9            2       drps
-#> 3  5.015142           0            0.9            3       drps
-#> 4  4.689884           1            0.9            4       drps
-#> 5 32.562311           0            0.9            5       drps
-#> 6  3.100287           1            0.9            6       drps
+#> 1 12.018737           0            0.9            1       drps
+#> 2  6.756861           1            0.9            2       drps
+#> 3  5.054312           0            0.9            3       drps
+#> 4  5.029708           1            0.9            4       drps
+#> 5 32.373675           0            0.9            5       drps
+#> 6  3.049877           1            0.9            6       drps
 
 # The DRPS summed over series at each forecast horizon
 library(ggplot2)
@@ -205,12 +210,12 @@ ggplot(sc$all_series, aes(eval_horizon, score)) +
 # A joint score of both series at each horizon
 head(score(fc, score = "energy")$all_series)
 #>       score eval_horizon score_type
-#> 1 10.896537            1     energy
-#> 2 10.335534            2     energy
-#> 3  5.101671            3     energy
-#> 4  5.610206            4     energy
-#> 5 32.236838            5     energy
-#> 6  3.358091            6     energy
+#> 1 11.037514            1     energy
+#> 2 10.566751            2     energy
+#> 3  5.058591            3     energy
+#> 4  5.834418            4     energy
+#> 5 32.058046            5     energy
+#> 6  3.370899            6     energy
 
 # Next: compare_scores() ranks several models by one rule
 # }

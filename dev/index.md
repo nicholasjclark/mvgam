@@ -51,6 +51,11 @@ working installation of `Stan` through
 [`rstan`](https://mc-stan.org/users/interfaces/rstan) or
 [`cmdstanr`](https://mc-stan.org/cmdstanr/).
 
+## Cheatsheet
+
+[![mvgam usage
+cheatsheet](https://github.com/nicholasjclark/mvgam/raw/master/misc/mvgam_cheatsheet.png)](https://github.com/nicholasjclark/mvgam/raw/master/misc/mvgam_cheatsheet.pdf)
+
 ## A state-space model of rodent captures
 
 The `portal_data` from [the Portal

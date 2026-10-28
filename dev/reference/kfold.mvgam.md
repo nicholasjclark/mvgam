@@ -1,13 +1,28 @@
 # K-fold cross-validation for `mvgam` fits
 
-Estimates the expected log predictive density of held-out groups of
-rows. A fold that importance sampling approximates well takes the PSIS
+Measures how well a model predicts groups of data it was not fitted to,
+such as sites or species. Each fold of groups is held out in turn and
+scored by its expected log predictive density (ELPD). Higher is better.
+A fold that importance sampling approximates well takes the PSIS
 estimate of [`loo::loo()`](https://mc-stan.org/loo/reference/loo.html)
 on the fold's summed log likelihood. The rest are refitted without the
 fold, as
 [`lfo_cv.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/lfo_cv.mvgam.md)
 refits the time blocks it cannot approximate. Three settings cover the
 range:
+
+- `pareto_k_threshold = Inf` refits nothing. Pareto-k warnings mark
+  folds the approximation fits poorly.
+
+- The default refits the folds whose Pareto-k exceeds
+  `pareto_k_threshold`, which is often a handful.
+
+- `exact = TRUE` refits every fold, as
+  [`brms::kfold()`](https://mc-stan.org/loo/reference/kfold-generic.html)
+  does.
+
+`group` takes several columns, such as `c("site", "season")`. Every row
+of one combination stays in the same fold.
 
 ## Usage
 
@@ -115,34 +130,17 @@ results. It holds:
 - `pareto_k_threshold`: the threshold applied, with
   `pareto_k_threshold_adaptive` `TRUE` when the default rule set it.
 
-## Details
-
-- `pareto_k_threshold = Inf` refits nothing. Pareto-k warnings mark
-  folds the approximation fits poorly.
-
-- The default refits the folds whose Pareto-k exceeds
-  `pareto_k_threshold`, which is often a handful.
-
-- `exact = TRUE` refits every fold, as
-  [`brms::kfold()`](https://mc-stan.org/loo/reference/kfold-generic.html)
-  does.
-
-`group` takes several columns, such as `c("site", "season")`. Every row
-of one combination stays in the same fold.
-
 ## References
 
-Burkner P-C, Gabry J, Vehtari A (2020). Approximate leave-future-out
-cross-validation for Bayesian time series models. *Journal of
-Statistical Computation and Simulation*, 90(14), 2499–2523.
+Burkner, P.-C., Gabry, J. and Vehtari, A. (2020). Approximate
+leave-future-out cross-validation for Bayesian time series models.
+*Journal of Statistical Computation and Simulation*, 90(14):2499-2523.
 [doi:10.1080/00949655.2020.1783262](https://doi.org/10.1080/00949655.2020.1783262)
-.
 
-Vehtari A, Gelman A, Gabry J (2017). Practical Bayesian model evaluation
-using leave-one-out cross-validation and WAIC. *Statistics and
-Computing*, 27, 1413–1432.
+Vehtari, A., Gelman, A. and Gabry, J. (2017). Practical Bayesian model
+evaluation using leave-one-out cross-validation and WAIC. *Statistics
+and Computing*, 27:1413-1432.
 [doi:10.1007/s11222-016-9696-4](https://doi.org/10.1007/s11222-016-9696-4)
-.
 
 ## See also
 
@@ -154,7 +152,7 @@ scores forecasts from rolling origins.
 and
 [`plot.mvgam_kfold()`](https://nicholasjclark.github.io/mvgam/dev/reference/plot.mvgam_kfold.md)
 report each group. The [forecast evaluation
-article](https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html)
+article](https://nicholasjclark.github.io/mvgam/dev/articles/forecast_evaluation.html)
 compares models by cross-validation.
 
 Other model comparison:
@@ -185,7 +183,7 @@ mod <- mvgam(y ~ s(season, bs = "cc"),
               data    = simdat$data_train,
               family  = gaussian(),
               chains  = 2, silent = 2)
-#> Warning: 3 of 2000 (0.0%) transitions ended with a divergence.
+#> Warning: 67 of 2000 (3.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 
 # Neighbouring times share information through the trend. Folds of
@@ -194,33 +192,33 @@ mod <- mvgam(y ~ s(season, bs = "cc"),
 blocks <- cut(simdat$data_train$time, breaks = 4L, labels = FALSE)
 k <- kfold(mod, folds = blocks)
 #> kfold: refitting 4 fold(s) ...
-#> Warning: 9 of 2000 (0.0%) transitions ended with a divergence.
+#> Warning: 7 of 2000 (0.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
-#> Warning: 1 of 2 chains had an E-BFMI less than 0.3.
+#> Warning: 20 of 2000 (1.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
-#> Warning: 6 of 2000 (0.0%) transitions ended with a divergence.
+#> Warning: 2 of 2 chains had an E-BFMI less than 0.3.
+#> See https://mc-stan.org/misc/warnings for details.
+#> Warning: 7 of 2000 (0.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 #> Warning: 5 of 2000 (0.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
-#> Warning: 23 of 2000 (1.0%) transitions ended with a divergence.
-#> See https://mc-stan.org/misc/warnings for details.
 k
 #> mvgam k-fold cross-validation
-#>   elpd_kfold : -135.79 (SE 10.72)
-#>   kfoldic    : 271.58 (SE 21.43)
+#>   elpd_kfold : -135.38 (SE 9.61)
+#>   kfoldic    : 270.76 (SE 19.21)
 #>   groups     : 4 (fold)
 #>   refits     : 4 of 4 folds
-#>   Pareto k   : max 1.62, median 1.31, threshold 0.70 (adaptive)
+#>   Pareto k   : max 1.76, median 1.18, threshold 0.70 (adaptive)
 #> 
 #> Lowest ELPD (share of the total):
-#>   2                    -41.30 (30.4%)
-#>   1                    -34.51 (25.4%)
-#>   4                    -30.49 (22.5%)
+#>   2                    -39.64 (29.3%)
+#>   1                    -35.49 (26.2%)
+#>   4                    -31.75 (23.4%)
 #> 
 #> Largest change from PSIS to refit:
-#>   2                    -34.82 -> -41.30
-#>   1                    -31.30 -> -34.51
-#>   3                    -27.84 -> -29.49
+#>   1                    -31.38 -> -35.49
+#>   2                    -36.32 -> -39.64
+#>   4                    -29.31 -> -31.75
 
 # The ELPD and Pareto k of each block
 plot(k)

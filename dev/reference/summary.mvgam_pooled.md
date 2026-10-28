@@ -27,9 +27,8 @@ print(x, digits = 2, ...)
 
 - probs:
 
-  Numeric vector of probabilities for quantile computation. Default is
-  `c(0.025, 0.975)` for 95% credible intervals. Can be a single value or
-  multiple values.
+  Two probabilities for the lower and upper bounds of the credible
+  interval. Default `c(0.025, 0.975)`, a 95% interval.
 
 - robust:
 

@@ -147,7 +147,7 @@ whose shape drifts over the years, as
     <div class="section level2">
     <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>
     <div class="dont-index"><p>The
-<a href="https://nicholasjclark.github.io/mvgam/articles/data.html">data article</a> covers the long format
+<a href="https://nicholasjclark.github.io/mvgam/dev/articles/data.html">data article</a> covers the long format
 and its conversion in more depth. <code><a href="LLT.html">LLT()</a></code> takes the same periods
 for a season that drifts.</p>
 <p>Other model fitting:
@@ -192,13 +192,13 @@ for a season that drifts.</p>
 <span class="r-in"><span>  site_b <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/Poisson.html" class="external-link">rpois</a></span><span class="op">(</span><span class="fl">28</span>, <span class="fl">8</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="fu">series_to_mvgam</span><span class="op">(</span><span class="va">wide</span><span class="op">)</span><span class="op">)</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   series time y       date season</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1 site_a    1 4 2024-01-01      5</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2 site_b    1 7 2024-01-01      5</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3 site_a    2 4 2024-01-02      6</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4 site_b    2 6 2024-01-02      6</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 5 site_a    3 5 2024-01-03      7</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 6 site_b    3 6 2024-01-03      7</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   series time  y       date season</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1 site_a    1  8 2024-01-01      5</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2 site_b    1  8 2024-01-01      5</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3 site_a    2 10 2024-01-02      6</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4 site_b    2 11 2024-01-02      6</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5 site_a    3  4 2024-01-03      7</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6 site_b    3 12 2024-01-03      7</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Next: fit the training data, for example with</span></span></span>
 <span class="r-in"><span><span class="co"># mvgam(y ~ s(season, bs = "cc"), trend_formula = ~ AR(),</span></span></span>

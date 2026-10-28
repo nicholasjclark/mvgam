@@ -177,23 +177,23 @@ summary(fit_ar)
 #> == Observation Model ==
 #> Regression Coefficients:
 #>           Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> Intercept     0.81      0.61    -0.39     2.12 1.00      632      872
+#> Intercept     0.83      0.65    -0.54     2.09 1.00     1294     1215
 #> 
 #> == Trend Model ==
 #> Smoothing Spline Hyperparameters:
 #>                   Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> sds(smintemp_1)       1.11      1.02     0.04     3.66 1.01     1075     1761
-#> sds(sndvi_ma12_1)     2.48      1.65     0.15     6.32 1.00      713      752
+#> sds(smintemp_1)       1.09      0.97     0.04     3.55 1.00     1753     1899
+#> sds(sndvi_ma12_1)     2.45      1.64     0.16     6.34 1.00     1648     1969
 #> 
 #> Regression Coefficients:
 #>              Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> smintemp_1       3.36      2.27    -1.47     8.09 1.00     1366     1684
-#> sndvi_ma12_1     3.36      4.53    -4.53    15.22 1.01      433      161
+#> smintemp_1       3.47      2.24    -0.91     8.29 1.00     1955     2110
+#> sndvi_ma12_1     2.92      4.12    -4.62    11.89 1.00     1753     1267
 #> 
 #> Trend Specific Parameters:
 #>                 Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> sigma_trend[PP]     0.70      0.14     0.46     1.01 1.01     1236     2140
-#> ar1_trend[PP]       0.82      0.10     0.58     0.98 1.01      328      134
+#> sigma_trend[PP]     0.70      0.15     0.45     1.02 1.00     1420     2277
+#> ar1_trend[PP]       0.81      0.10     0.60     0.96 1.00     1139     1271
 #> 
 #> Draws were sampled using sampling(NUTS). For each parameter, Bulk_ESS
 #> and Tail_ESS are effective sample size measures, and Rhat is the potential
@@ -279,25 +279,25 @@ summary(scores)
 #> # A tibble: 12 × 4
 #>    series eval_horizon    GAM     AR
 #>    <fct>         <int>  <dbl>  <dbl>
-#>  1 PP                1  8.38   4.82 
-#>  2 PP                2 14.4    9.67 
+#>  1 PP                1  8.38   4.80 
+#>  2 PP                2 14.4    9.87 
 #>  3 PP                3 NA     NA    
-#>  4 PP                4  0.482  1.66 
-#>  5 PP                5  6.14   4.07 
-#>  6 PP                6  4.48   3.23 
-#>  7 PP                7  2.08   1.92 
-#>  8 PP                8  0.369  0.803
-#>  9 PP                9  1.49   1.71 
-#> 10 PP               10  4.43   3.42 
-#> 11 PP               11  9.80   7.22 
-#> 12 PP               12  9.15   6.64
+#>  4 PP                4  0.483  1.63 
+#>  5 PP                5  6.12   4.04 
+#>  6 PP                6  4.52   3.16 
+#>  7 PP                7  2.06   1.87 
+#>  8 PP                8  0.386  0.770
+#>  9 PP                9  1.52   1.69 
+#> 10 PP               10  4.48   3.42 
+#> 11 PP               11  9.79   7.13 
+#> 12 PP               12  9.11   6.62
 plot(scores, relative = "GAM")
 ```
 
 ![](mvgam_overview_files/figure-html/scores-1.png)
 
 The latent state improves the forecasts. The AR model has the lower CRPS
-in 8 of the 11 scored months. Its CRPS sums to 45.2 against 61.2 for the
+in 8 of the 11 scored months. Its CRPS sums to 45 against 61.3 for the
 smooth-only model. Its 90% intervals contain 11 of the 11 held-out
 counts. Those of the model without a latent state contain 4.
 
@@ -360,7 +360,7 @@ plot(fc_cor)
 ![](mvgam_overview_files/figure-html/cor-forecast-1.png)
 
 The forecasts track the held-out counts of all four species. Their 90%
-intervals contain 43 of the 44 held-out counts.
+intervals contain 42 of the 44 held-out counts.
 
 [`residual_cor()`](https://nicholasjclark.github.io/mvgam/dev/reference/residual_cor.md)
 returns the correlations among the species’ innovations, which measure
@@ -376,7 +376,7 @@ plot(rc)
 ![](mvgam_overview_files/figure-html/cor-resid-1.png)
 
 The two pocket mouse species, PB and PP, share the strongest
-correlation, 0.55 (95% interval 0.13 to 0.84). `n_lv` would instead
+correlation, 0.53 (95% interval 0.09 to 0.84). `n_lv` would instead
 estimate a few shared latent factors for many species.
 [`VAR()`](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md)
 would estimate how each species’ state affects the others at the next

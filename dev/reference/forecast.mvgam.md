@@ -34,28 +34,38 @@ forecast(
 
 - newdata:
 
-  Optional `data.frame` with the columns of the training data, holding
-  the time and series cells to forecast. Rows with times beyond the
-  training grid set the horizon. When `NULL`,
+  Optional `data.frame` with the columns of the training data, one row
+  per series and future time to forecast. When `NULL`,
   [`forecast()`](https://generics.r-lib.org/reference/forecast.html)
   uses the held-out data given to `mvgam(newdata = )`. A fit without
   held-out data needs `newdata`.
 
-  Five trends step once per time point: AR(), RW(), VAR(), LLT() and
-  PW(). Their forecast times must continue the training series at its
-  own spacing, without a gap. After training ends at `t = 30`, a request
-  for `t = 41:42` is refused: two rows would report a two-step spread
-  for a twelve-step horizon. Supply every intervening time, whether or
-  not the response is observed there.
-  [`CAR()`](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md)
-  takes the elapsed gap into its kernel. Each series may have its own
-  forecast times, all after the last fitted time.
-  [`ZMVN()`](https://nicholasjclark.github.io/mvgam/dev/reference/ZMVN.md)
-  has no temporal dynamics and takes any later times.
+  The trend decides which future times are allowed:
+
+  - [`AR()`](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md),
+    [`RW()`](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md),
+    [`VAR()`](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md),
+    [`LLT()`](https://nicholasjclark.github.io/mvgam/dev/reference/LLT.md)
+    and
+    [`PW()`](https://nicholasjclark.github.io/mvgam/dev/reference/piecewise_trends.md)
+    step once per time point. Their forecast times must continue each
+    series at its own spacing, with no gap. After training ends at
+    `t = 30`, rows for `t = 41:42` alone are refused. The trend would
+    step once and twice, though those times are 11 and 12 steps past the
+    end of training. Supply every time in between, with or without a
+    response.
+
+  - [`CAR()`](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md)
+    allows for the gap between times. Each series may have its own
+    forecast times, all after the last fitted time.
+
+  - [`ZMVN()`](https://nicholasjclark.github.io/mvgam/dev/reference/ZMVN.md)
+    has no time dynamics and takes any later times.
+
   [`ZMVN()`](https://nicholasjclark.github.io/mvgam/dev/reference/ZMVN.md)
   and
   [`PW()`](https://nicholasjclark.github.io/mvgam/dev/reference/piecewise_trends.md)
-  need one set of forecast times shared by every series.
+  need the same forecast times for every series.
 
 - ...:
 
@@ -86,9 +96,7 @@ forecast(
   adds `"season"`. `"predictor"` holds the effects of the trend
   formula's covariates. `c("level", "predictor")` gives the level with
   those effects. A factor model projects each component through its
-  loadings, as it projects the trend. The result is an ordinary
-  [mvgam_forecast-class](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam.md)
-  with the components in its `component` slot.
+  loadings, as it projects the trend.
 
 - ndraws:
 
@@ -102,24 +110,24 @@ forecast(
 
 - coef_uncertainty:
 
-  Logical. When `FALSE`, every forecast draw uses the first of the draws
-  `ndraws` or `draw_ids` select for every coefficient in the observation
-  and trend formulas: population-level effects, smooth bases, random
-  effect levels and Hilbert-space `gp(x, k)` bases. Defaults to `TRUE`.
+  Logical, `TRUE` by default. `FALSE` holds the coefficients of the
+  observation and trend formulas at one posterior draw, the first that
+  `ndraws` or `draw_ids` selects. That includes smooth, random-effect
+  and Hilbert-space `gp(x, k)` coefficients. The forecast then leaves
+  out their uncertainty. Turning off one source of uncertainty at a time
+  shows how much each contributes to a forecast.
 
 - trend_uncertainty:
 
-  Logical. When `FALSE`, every forecast draw uses the first of the
-  selected draws for the trend dynamics parameters (`sigma`, AR, MA and
-  VAR coefficients), the last fitted state and the trend formula's
-  predictor `mu_trend`. Each draw still takes fresh innovations. The
-  spread then shows innovation noise alone. Defaults to `TRUE`.
+  Logical, `TRUE` by default. `FALSE` holds the parameters of the trend
+  dynamics (`sigma`, AR, MA and VAR coefficients), the last fitted state
+  and the trend formula's predictor at that same draw. Each draw still
+  takes new innovations. The spread then shows innovation noise alone.
 
 - obs_uncertainty:
 
-  Logical. When `FALSE`, skips observation-family sampling for
-  `type = "response"`, returning the family mean instead. Defaults to
-  `TRUE`.
+  Logical, `TRUE` by default. `FALSE` returns the family's mean under
+  `type = "response"`, in place of a sampled observation.
 
 - resp:
 
@@ -131,7 +139,8 @@ forecast(
 An object of class
 [mvgam_forecast-class](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam.md).
 Hindcasts and forecasts are returned as named lists of
-`[ndraws, n_times]` matrices, one per series.
+`[ndraws, n_times]` matrices, one per series. A forecast of state
+components names them in its `component` slot.
 
 ## See also
 
@@ -140,12 +149,12 @@ returns the fitted latent states.
 [`posterior_predict.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/posterior_predict.mvgam.md)
 and
 [`posterior_epred.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/posterior_epred.mvgam.md)
-predict by integrating over the trend's stochastic dynamics.
+predict from the covariate part of the model.
 [`forecast()`](https://generics.r-lib.org/reference/forecast.html)
 extrapolates the fitted latent state.
 [`score.mvgam_forecast()`](https://nicholasjclark.github.io/mvgam/dev/reference/score.mvgam_forecast.md)
 scores a forecast against held-out data. The [forecast evaluation
-article](https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html)
+article](https://nicholasjclark.github.io/mvgam/dev/articles/forecast_evaluation.html)
 scores, compares and combines the forecasts of three models of rodent
 counts.
 
@@ -166,14 +175,14 @@ simdat <- sim_mvgam(family = poisson(), n_series = 1L,
                      proportional_train = 0.75)
 
 mod <- mvgam(
-  y ~ s(x),
+  y ~ s(x, k = 5),
   trend_formula = ~ AR(p = 1),
   data    = simdat$data_train,
   newdata = simdat$data_test,
   family  = poisson(),
   chains  = 2, silent = 2
 )
-#> Warning: 386 of 2000 (19.0%) transitions ended with a divergence.
+#> Warning: 36 of 2000 (2.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 
 # The held-out data given to mvgam() set the forecast horizon
@@ -192,11 +201,11 @@ plot(forecast(mod, type = "expected"))
 # Next, score the forecast against the held-out counts
 head(score(fc, score = "crps")[[1]])
 #>       score in_interval interval_width eval_horizon score_type
-#> 1 1.8327820           1            0.9            1       crps
-#> 2 1.9730375           1            0.9            2       crps
-#> 3 2.5622158           1            0.9            3       crps
-#> 4 1.3601955           1            0.9            4       crps
-#> 5 0.6947603           1            0.9            5       crps
-#> 6 3.9339607           1            0.9            6       crps
+#> 1 1.7075098           1            0.9            1       crps
+#> 2 2.2048900           1            0.9            2       crps
+#> 3 2.2784688           1            0.9            3       crps
+#> 4 1.4094038           1            0.9            4       crps
+#> 5 0.6126763           1            0.9            5       crps
+#> 6 4.3284377           1            0.9            6       crps
 # }
 ```

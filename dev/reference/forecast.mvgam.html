@@ -74,21 +74,21 @@ maps the trend to the response scale.</p>
 
 <dt id="arg-newdata">newdata<a class="anchor" aria-label="anchor" href="#arg-newdata"></a></dt>
 <dd><p>Optional <code>data.frame</code> with the columns of the
-training data, holding the time and series cells to forecast.
-Rows with times beyond the training grid set the horizon. When
-<code>NULL</code>, <code><a href="https://generics.r-lib.org/reference/forecast.html" class="external-link">forecast()</a></code> uses the held-out data given to
+training data, one row per series and future time to forecast.
+When <code>NULL</code>, <code><a href="https://generics.r-lib.org/reference/forecast.html" class="external-link">forecast()</a></code> uses the held-out data given to
 <code>mvgam(newdata = )</code>. A fit without held-out data needs <code>newdata</code>.</p>
-<p>Five trends step once per time point: AR(), RW(), VAR(), LLT()
-and PW(). Their forecast times must continue the training series
-at its own spacing, without a gap. After training ends at
-<code>t = 30</code>, a request for <code>t = 41:42</code> is refused: two rows would
-report a two-step spread for a twelve-step horizon. Supply every
-intervening time, whether or not the response is observed there.
-<code><a href="trend_constructors.html">CAR()</a></code> takes the elapsed gap into its kernel. Each series may
-have its own forecast times, all after the last fitted time.
-<code><a href="ZMVN.html">ZMVN()</a></code> has no temporal dynamics and takes any later times.
-<code><a href="ZMVN.html">ZMVN()</a></code> and <code><a href="piecewise_trends.html">PW()</a></code> need one set of forecast times shared by
-every series.</p></dd>
+<p>The trend decides which future times are allowed:</p><ul><li><p><code><a href="trend_constructors.html">AR()</a></code>, <code><a href="trend_constructors.html">RW()</a></code>, <code><a href="trend_constructors.html">VAR()</a></code>, <code><a href="LLT.html">LLT()</a></code> and <code><a href="piecewise_trends.html">PW()</a></code> step once per
+time point. Their forecast times must continue each series at
+its own spacing, with no gap. After training ends at <code>t = 30</code>,
+rows for <code>t = 41:42</code> alone are refused. The trend would step
+once and twice, though those times are 11 and 12 steps past the
+end of training. Supply every time in between, with or without
+a response.</p></li>
+<li><p><code><a href="trend_constructors.html">CAR()</a></code> allows for the gap between times. Each series may
+have its own forecast times, all after the last fitted time.</p></li>
+<li><p><code><a href="ZMVN.html">ZMVN()</a></code> has no time dynamics and takes any later times.</p></li>
+</ul><p><code><a href="ZMVN.html">ZMVN()</a></code> and <code><a href="piecewise_trends.html">PW()</a></code> need the same forecast times for every
+series.</p></dd>
 
 
 <dt id="arg--">...<a class="anchor" aria-label="anchor" href="#arg--"></a></dt>
@@ -112,8 +112,7 @@ Several names give the sum of their components. <code><a href="LLT.html">LLT()</
 step. A seasonal <code><a href="LLT.html">LLT()</a></code> adds <code>"season"</code>. <code>"predictor"</code> holds the
 effects of the trend formula's covariates. <code>c("level", "predictor")</code> gives the level with those effects. A factor model
 projects each component through its loadings, as it projects the
-trend. The result is an ordinary <a href="mvgam.html">mvgam_forecast-class</a>
-with the components in its <code>component</code> slot.</p></dd>
+trend.</p></dd>
 
 
 <dt id="arg-ndraws">ndraws<a class="anchor" aria-label="anchor" href="#arg-ndraws"></a></dt>
@@ -128,28 +127,27 @@ draw indices to use. NULL (default) uses all draws (subject to
 
 
 <dt id="arg-coef-uncertainty">coef_uncertainty<a class="anchor" aria-label="anchor" href="#arg-coef-uncertainty"></a></dt>
-<dd><p>Logical. When <code>FALSE</code>, every forecast
-draw uses the first of the draws <code>ndraws</code> or <code>draw_ids</code> select
-for every coefficient in the
-observation and trend formulas: population-level effects, smooth
-bases, random effect levels and Hilbert-space <code>gp(x, k)</code> bases.
-Defaults to <code>TRUE</code>.</p></dd>
+<dd><p>Logical, <code>TRUE</code> by default. <code>FALSE</code> holds
+the coefficients of the observation and trend formulas at one
+posterior draw, the first that <code>ndraws</code> or <code>draw_ids</code> selects. That
+includes smooth, random-effect and Hilbert-space <code>gp(x, k)</code>
+coefficients. The forecast then leaves out their uncertainty.
+Turning off one source of uncertainty at a time shows how much each
+contributes to a forecast.</p></dd>
 
 
 <dt id="arg-trend-uncertainty">trend_uncertainty<a class="anchor" aria-label="anchor" href="#arg-trend-uncertainty"></a></dt>
-<dd><p>Logical. When <code>FALSE</code>, every forecast
-draw uses the first of the selected draws for the trend dynamics
-parameters (<code>sigma</code>, AR, MA and VAR coefficients), the last
-fitted state and the trend formula's predictor <code>mu_trend</code>. Each
-draw still takes fresh innovations. The spread then shows
-innovation noise alone. Defaults to <code>TRUE</code>.</p></dd>
+<dd><p>Logical, <code>TRUE</code> by default. <code>FALSE</code> holds
+the parameters of the trend dynamics (<code>sigma</code>, AR, MA and VAR
+coefficients), the last fitted state and the trend formula's
+predictor at that same draw. Each draw still takes new
+innovations. The spread then shows innovation noise alone.</p></dd>
 
 
 <dt id="arg-obs-uncertainty">obs_uncertainty<a class="anchor" aria-label="anchor" href="#arg-obs-uncertainty"></a></dt>
-<dd><p>Logical. When <code>FALSE</code>, skips
-observation-family sampling for <code>type = "response"</code>,
-returning the family mean instead.
-Defaults to <code>TRUE</code>.</p></dd>
+<dd><p>Logical, <code>TRUE</code> by default. <code>FALSE</code> returns
+the family's mean under <code>type = "response"</code>, in place of a sampled
+observation.</p></dd>
 
 
 <dt id="arg-resp">resp<a class="anchor" aria-label="anchor" href="#arg-resp"></a></dt>
@@ -162,16 +160,17 @@ responses.</p></dd>
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
     <p>An object of class <a href="mvgam.html">mvgam_forecast-class</a>.
 Hindcasts and forecasts are returned as named lists of
-<code>[ndraws, n_times]</code> matrices, one per series.</p>
+<code>[ndraws, n_times]</code> matrices, one per series. A forecast of state
+components names them in its <code>component</code> slot.</p>
     </div>
     <div class="section level2">
     <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>
     <div class="dont-index"><p><code><a href="hindcast.mvgam.html">hindcast.mvgam()</a></code> returns the fitted latent states.
 <code><a href="posterior_predict.mvgam.html">posterior_predict.mvgam()</a></code> and <code><a href="posterior_epred.mvgam.html">posterior_epred.mvgam()</a></code> predict
-by integrating over the trend's stochastic dynamics. <code><a href="https://generics.r-lib.org/reference/forecast.html" class="external-link">forecast()</a></code>
+from the covariate part of the model. <code><a href="https://generics.r-lib.org/reference/forecast.html" class="external-link">forecast()</a></code>
 extrapolates the fitted latent state. <code><a href="score.mvgam_forecast.html">score.mvgam_forecast()</a></code>
 scores a forecast against held-out data. The
-<a href="https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html">forecast evaluation article</a>
+<a href="https://nicholasjclark.github.io/mvgam/dev/articles/forecast_evaluation.html">forecast evaluation article</a>
 scores, compares and combines the forecasts of three models of
 rodent counts.</p>
 <p>Other forecasting:
@@ -191,14 +190,14 @@ rodent counts.</p>
 <span class="r-in"><span>                     proportional_train <span class="op">=</span> <span class="fl">0.75</span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="va">mod</span> <span class="op">&lt;-</span> <span class="fu"><a href="mvgam.html">mvgam</a></span><span class="op">(</span></span></span>
-<span class="r-in"><span>  <span class="va">y</span> <span class="op">~</span> <span class="fu">s</span><span class="op">(</span><span class="va">x</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>  <span class="va">y</span> <span class="op">~</span> <span class="fu">s</span><span class="op">(</span><span class="va">x</span>, k <span class="op">=</span> <span class="fl">5</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>  trend_formula <span class="op">=</span> <span class="op">~</span> <span class="fu"><a href="trend_constructors.html">AR</a></span><span class="op">(</span>p <span class="op">=</span> <span class="fl">1</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>  data    <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span>,</span></span>
 <span class="r-in"><span>  newdata <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_test</span>,</span></span>
 <span class="r-in"><span>  family  <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>  chains  <span class="op">=</span> <span class="fl">2</span>, silent <span class="op">=</span> <span class="fl">2</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 386 of 2000 (19.0%) transitions ended with a divergence.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 36 of 2000 (2.0%) transitions ended with a divergence.</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> See https://mc-stan.org/misc/warnings for details.</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># The held-out data given to mvgam() set the forecast horizon</span></span></span>
@@ -217,12 +216,12 @@ rodent counts.</p>
 <span class="r-in"><span><span class="co"># Next, score the forecast against the held-out counts</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="fu"><a href="score.html">score</a></span><span class="op">(</span><span class="va">fc</span>, score <span class="op">=</span> <span class="st">"crps"</span><span class="op">)</span><span class="op">[[</span><span class="fl">1</span><span class="op">]</span><span class="op">]</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>       score in_interval interval_width eval_horizon score_type</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1 1.8327820           1            0.9            1       crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2 1.9730375           1            0.9            2       crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3 2.5622158           1            0.9            3       crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4 1.3601955           1            0.9            4       crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 5 0.6947603           1            0.9            5       crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 6 3.9339607           1            0.9            6       crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1 1.7075098           1            0.9            1       crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2 2.2048900           1            0.9            2       crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3 2.2784688           1            0.9            3       crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4 1.4094038           1            0.9            4       crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5 0.6126763           1            0.9            5       crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6 4.3284377           1            0.9            6       crps</span>
 <span class="r-in"><span><span class="co"># }</span></span></span>
 <span class="r-in"><span></span></span>
 </code></pre></div>

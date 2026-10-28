@@ -14,10 +14,11 @@ Pass a family as you would to
 [`stats::glm()`](https://rdrr.io/r/stats/glm.html), for example
 `mvgam(y ~ x, trend_formula = ~ AR(p = 1), family = nmix())`. The
 [N-mixture
-article](https://nicholasjclark.github.io/mvgam/articles/nmix.html) fits
+article](https://nicholasjclark.github.io/mvgam/dev/articles/nmix.html)
+fits
 [`nmix()`](https://nicholasjclark.github.io/mvgam/dev/reference/nmix.md).
 The [JSDM
-article](https://nicholasjclark.github.io/mvgam/articles/jsdgam.html)
+article](https://nicholasjclark.github.io/mvgam/dev/articles/jsdgam.html)
 fits a joint species distribution model.
 
 ## Families mvgam adds
@@ -35,9 +36,9 @@ every argument.
 | [`com_binomial()`](https://nicholasjclark.github.io/mvgam/dev/reference/com_binomial.md) | logit | `link`, `"logit"` only |
 | [`nmix()`](https://nicholasjclark.github.io/mvgam/dev/reference/nmix.md) | log (state), logit (detection) | `type`, one of `"poisson_binomial"`, `"royle_nichols"` or `"poisson_poisson"`; `multi_season` |
 | [`occ()`](https://nicholasjclark.github.io/mvgam/dev/reference/occ.md) | logit (state and detection) | `multi_season` |
-| [`diri()`](https://nicholasjclark.github.io/mvgam/dev/reference/diri.md) | identity | none |
-| [`multi()`](https://nicholasjclark.github.io/mvgam/dev/reference/multi.md) | identity | none |
-| [`categ()`](https://nicholasjclark.github.io/mvgam/dev/reference/categ.md) | identity | none |
+| [`diri()`](https://nicholasjclark.github.io/mvgam/dev/reference/diri.md) | softmax over each unit's categories | none |
+| [`multi()`](https://nicholasjclark.github.io/mvgam/dev/reference/multi.md) | softmax over each unit's categories | none |
+| [`categ()`](https://nicholasjclark.github.io/mvgam/dev/reference/categ.md) | softmax over each unit's categories | none |
 | [`mvn()`](https://nicholasjclark.github.io/mvgam/dev/reference/mvn.md) | identity | none |
 | [`mvt()`](https://nicholasjclark.github.io/mvgam/dev/reference/mvt.md) | identity | none |
 
@@ -142,18 +143,19 @@ every argument.
 ## Link functions
 
 A brms or stats family takes a `link` argument as usual.
-`poisson(link = "sqrt")` and `Gamma(link = "log")` both work. mvgam
-writes the Stan code for the families in the table against one scale.
-Those families fix their link.
+`poisson(link = "sqrt")` and `Gamma(link = "log")` both work. The
+families mvgam adds each have the one link the table gives.
 
 ## Data layout
 
 [`nmix()`](https://nicholasjclark.github.io/mvgam/dev/reference/nmix.md)
 and
 [`occ()`](https://nicholasjclark.github.io/mvgam/dev/reference/occ.md)
-are closure-unit families. They expect several rows per closure unit,
-one per visit. They model the state and the detection process with
-separate linear predictors.
+are closure-unit families. A closure unit is a site, or a site in one
+season, whose true occupancy or abundance holds across its repeat
+visits. The families expect several rows per closure unit, one per
+visit. They model the state and the detection process with separate
+linear predictors.
 [`bf()`](https://paulbuerkner.com/brms/reference/brmsformula.html)
 supplies the second, as in `bf(y ~ elev, p ~ tod)`.
 [`sim_closure_unit_data()`](https://nicholasjclark.github.io/mvgam/dev/reference/sim_closure_unit_data.md)

@@ -2,7 +2,9 @@
 
 Use `lv_axis()` in a `trend_formula` in any position that takes a factor
 variable, to give each latent factor its own effect. In a model with no
-latent factors it gives each series its own effect.
+latent factors it gives each series its own effect. Use it when a
+covariate should act differently on different series, such as
+temperature raising one species and lowering another.
 
 ## Usage
 
@@ -12,9 +14,11 @@ lv_axis()
 
 ## Value
 
-`NULL` (invisibly). The function exists solely as a formula sentinel.
+`NULL` (invisibly). The function only marks a term in a formula.
 
 ## Details
+
+For example:
 
 
     trend_formula = ~ s(elev, by = lv_axis()) + AR(n_lv = 2)
@@ -55,13 +59,14 @@ With no latent factors, `lv_axis()` is each series:
 With `n_lv` latent factors, each of these is estimated once per factor.
 The coefficient of one factor has no scale of its own. The loadings and
 the factor effects trade scale. The data identify their product.
-[`conditional_effects()`](https://paulbuerkner.com/brms/reference/conditional_effects.brmsfit.html)
-and [`predict()`](https://rdrr.io/r/stats/predict.html) report that
-product, the effect of the covariate on each series, and
-[`conditional_effects()`](https://paulbuerkner.com/brms/reference/conditional_effects.brmsfit.html)
+[`conditional_effects.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/conditional_effects.mvgam.md)
+and
+[`predict.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/predict.mvgam.md)
+report that product, the effect of the covariate on each series.
+[`conditional_effects.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/conditional_effects.mvgam.md)
 draws a panel per series. When every `lv_axis()` term is a slope or a
 level,
-[`cmdstanr::summary()`](https://mc-stan.org/cmdstanr/reference/fit-method-summary.html)
+[`summary.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/summary.mvgam.md)
 reports the per-factor coefficients in the basis of the identified
 loadings `Z_tilde`.
 
@@ -71,9 +76,9 @@ loadings `Z_tilde`.
 fits per-factor effects across species.
 [`conditional_effects.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/conditional_effects.mvgam.md)
 plots the effect on each series. The [dynamic factor
-vignette](https://nicholasjclark.github.io/mvgam/articles/dfm.html) fits
-factor models. The [JSDM
-article](https://nicholasjclark.github.io/mvgam/articles/jsdgam.html)
+vignette](https://nicholasjclark.github.io/mvgam/dev/articles/dfm.html)
+fits factor models. The [JSDM
+article](https://nicholasjclark.github.io/mvgam/dev/articles/jsdgam.html)
 fits per-factor trait and covariate effects.
 
 Other trend models:
@@ -107,7 +112,7 @@ mod <- mvgam(
   chains        = 2,
   silent        = 2
 )
-#> Warning: 33 of 2000 (2.0%) transitions ended with a divergence.
+#> Warning: 4 of 2000 (0.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 summary(mod)
 #>  Family: gaussian 
@@ -122,38 +127,38 @@ summary(mod)
 #> == Observation Model ==
 #> Regression Coefficients:
 #>           Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> Intercept     0.10      0.25    -0.45     0.53 1.01      266      746
+#> Intercept    -0.09      0.17    -0.39     0.25 1.00      376      479
 #> 
 #> Further Distributional Parameters:
 #>       Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> sigma     0.89      0.11     0.70     1.11 1.02      216      354
+#> sigma     0.98      0.10     0.79     1.17 1.01      299      450
 #> 
 #> == Trend Model ==
 #> Regression Coefficients:
 #>                       Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS
-#> season:seriesseries_1     1.32      0.22     0.88     1.75 1.00     1450
-#> season:seriesseries_2     0.72      0.31     0.09     1.33 1.00     1339
-#> season:seriesseries_3    -1.05      0.26    -1.58    -0.54 1.00     1464
+#> season:seriesseries_1     1.36      0.25     0.87     1.85 1.00     1740
+#> season:seriesseries_2     0.66      0.23     0.21     1.11 1.00     2130
+#> season:seriesseries_3    -1.32      0.27    -1.87    -0.81 1.00     1564
 #>                       Tail_ESS
-#> season:seriesseries_1     1206
-#> season:seriesseries_2     1399
-#> season:seriesseries_3     1302
+#> season:seriesseries_1     1459
+#> season:seriesseries_2     1559
+#> season:seriesseries_3     1447
 #> 
 #> Trend Specific Parameters:
 #>                       Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS
-#> sigma_trend[series_1]     0.34      0.20     0.02     0.79 1.01      320
-#> sigma_trend[series_2]     0.72      0.25     0.14     1.17 1.01      255
-#> sigma_trend[series_3]     0.43      0.17     0.15     0.80 1.01      508
-#> ar1_trend[series_1]       0.37      0.51    -0.67     0.99 1.01      216
-#> ar1_trend[series_2]       0.50      0.29    -0.17     0.94 1.00      350
-#> ar1_trend[series_3]       0.78      0.21     0.25     0.99 1.01      442
+#> sigma_trend[series_1]     0.38      0.18     0.06     0.77 1.02      231
+#> sigma_trend[series_2]     0.30      0.21     0.01     0.77 1.00      408
+#> sigma_trend[series_3]     0.45      0.24     0.08     0.96 1.01      349
+#> ar1_trend[series_1]       0.72      0.34    -0.34     0.99 1.01      315
+#> ar1_trend[series_2]      -0.00      0.40    -0.74     0.83 1.00     1079
+#> ar1_trend[series_3]       0.59      0.36    -0.32     0.98 1.01      297
 #>                       Tail_ESS
-#> sigma_trend[series_1]      630
-#> sigma_trend[series_2]      252
-#> sigma_trend[series_3]      560
-#> ar1_trend[series_1]        153
-#> ar1_trend[series_2]        599
-#> ar1_trend[series_3]        308
+#> sigma_trend[series_1]      224
+#> sigma_trend[series_2]      811
+#> sigma_trend[series_3]      288
+#> ar1_trend[series_1]        373
+#> ar1_trend[series_2]        749
+#> ar1_trend[series_3]        694
 #> 
 #> Draws were sampled using sampling(NUTS). For each parameter, Bulk_ESS
 #> and Tail_ESS are effective sample size measures, and Rhat is the potential
@@ -179,7 +184,7 @@ get_prior(
   family = gaussian()
 )
 #>                   prior     class           coef group resp dpar nlpar lb ub
-#>  student_t(3, 0.1, 2.5) Intercept                                           
+#>  student_t(3, 0.2, 2.5) Intercept                                           
 #>    student_t(3, 0, 2.5)     sigma                                       0   
 #>          normal(0, 0.5) ar1_trend                                      -1  1
 #>    student_t(3, 0, 0.5)         Z                                           

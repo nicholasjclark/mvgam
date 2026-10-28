@@ -96,27 +96,27 @@ columns, the lower and upper bounds.</p>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed</a></span><span class="op">(</span><span class="fl">13</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="va">simdat</span> <span class="op">&lt;-</span> <span class="fu"><a href="sim_mvgam.html">sim_mvgam</a></span><span class="op">(</span>family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson</a></span><span class="op">(</span><span class="op">)</span>, n_series <span class="op">=</span> <span class="fl">1L</span>,</span></span>
 <span class="r-in"><span>                    n_timepoints <span class="op">=</span> <span class="fl">120L</span>, trend_model <span class="op">=</span> <span class="fu"><a href="trend_constructors.html">AR</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="va">mod</span> <span class="op">&lt;-</span> <span class="fu"><a href="mvgam.html">mvgam</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="fu">s</span><span class="op">(</span><span class="va">x</span><span class="op">)</span>, trend_formula <span class="op">=</span> <span class="op">~</span> <span class="fu"><a href="trend_constructors.html">AR</a></span><span class="op">(</span>p <span class="op">=</span> <span class="fl">1</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span><span class="va">mod</span> <span class="op">&lt;-</span> <span class="fu"><a href="mvgam.html">mvgam</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="fu">s</span><span class="op">(</span><span class="va">x</span>, k <span class="op">=</span> <span class="fl">5</span><span class="op">)</span>, trend_formula <span class="op">=</span> <span class="op">~</span> <span class="fu"><a href="trend_constructors.html">AR</a></span><span class="op">(</span>p <span class="op">=</span> <span class="fl">1</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>             data <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span>, family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>             chains <span class="op">=</span> <span class="fl">2</span>, silent <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 9 of 2000 (0.0%) transitions ended with a divergence.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 5 of 2000 (0.0%) transitions ended with a divergence.</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> See https://mc-stan.org/misc/warnings for details.</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># 90 percent intervals, one row per observation</span></span></span>
 <span class="r-in"><span><span class="va">intervals</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://mc-stan.org/rstantools/reference/predictive_interval.html" class="external-link">predictive_interval</a></span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">intervals</span><span class="op">)</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>      5%   95%</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1,]  0  5.00</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [2,]  7 23.00</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [3,]  3 13.05</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [4,]  4 14.00</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [5,]  1  9.00</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [6,]  2 14.00</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>      5% 95%</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1,]  0   5</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [2,]  6  20</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [3,]  3  14</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [4,]  4  15</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [5,]  1   9</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [6,]  2  12</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># The share of observed counts the intervals cover</span></span></span>
 <span class="r-in"><span><span class="va">y</span> <span class="op">&lt;-</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span><span class="op">$</span><span class="va">y</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="va">y</span> <span class="op">&gt;=</span> <span class="va">intervals</span><span class="op">[</span>, <span class="fl">1</span><span class="op">]</span> <span class="op">&amp;</span> <span class="va">y</span> <span class="op">&lt;=</span> <span class="va">intervals</span><span class="op">[</span>, <span class="fl">2</span><span class="op">]</span><span class="op">)</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] 0.8</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1] 0.7888889</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Next: pp_check() plots the predictive draws against the data</span></span></span>
 <span class="r-in"><span><span class="co"># }</span></span></span>

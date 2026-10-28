@@ -5,7 +5,7 @@ the `posterior::draws_*` classes. Parameters take their brms names, such
 as `b_x` and `sd_grp__Intercept`. A trend parameter indexed by series
 takes the series name, as in `sigma_trend[series_1]`. The [integrated
 data model
-article](https://nicholasjclark.github.io/mvgam/articles/idm.html)
+article](https://nicholasjclark.github.io/mvgam/dev/articles/idm.html)
 contrasts intercepts drawn with
 [`as_draws_df()`](https://mc-stan.org/posterior/reference/draws_df.html).
 
@@ -158,39 +158,38 @@ Nicholas J Clark
 set.seed(13)
 simdat <- sim_mvgam(family = poisson(), n_series = 1L,
                      n_timepoints = 120L, trend_model = AR())
-mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
+mod <- mvgam(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1),
               data    = simdat$data_train,
               family  = poisson(),
               chains  = 2, silent = 2)
-#> Warning: 9 of 2000 (0.0%) transitions ended with a divergence.
+#> Warning: 5 of 2000 (0.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 
 # Trend-dynamics parameters as a data frame of draws
 head(as.data.frame(mod, variable = "trend_params"))
 #>   sigma_trend[series_1] ar1_trend[series_1] .chain .iteration .draw
-#> 1             0.4111121           0.4148928      1          1     1
-#> 2             0.4219180           0.5387783      1          2     2
-#> 3             0.3199136           0.7333736      1          3     3
-#> 4             0.4825790           0.7190115      1          4     4
-#> 5             0.4319198           0.7813397      1          5     5
-#> 6             0.4639083           0.7478594      1          6     6
+#> 1             0.4747979           0.6952397      1          1     1
+#> 2             0.4098684           0.7876823      1          2     2
+#> 3             0.4974144           0.6125546      1          3     3
+#> 4             0.4301547           0.6917517      1          4     4
+#> 5             0.4835361           0.3383189      1          5     5
+#> 6             0.4086803           0.5631561      1          6     6
 
 # Regular expressions select by pattern, here the smooth's basis
 # coefficients and its smoothing SD
 colnames(as.matrix(mod, variable = c("^s_", "^sds_"), regex = TRUE))
-#> [1] "s_sx_1[1]" "s_sx_1[2]" "s_sx_1[3]" "s_sx_1[4]" "s_sx_1[5]" "s_sx_1[6]"
-#> [7] "s_sx_1[7]" "s_sx_1[8]" "sds_sx_1" 
+#> [1] "s_sx_1[1]" "s_sx_1[2]" "s_sx_1[3]" "sds_sx_1" 
 
 # One random variable per parameter, printed as mean and SD
 as_draws_rvars(mod, variable = "trend_params")
 #> # A draws_rvars: 1000 iterations, 2 chains, and 2 variables
 #> $sigma_trend: rvar<1000,2>[1] mean ± sd:
 #>      series_1 
-#> 0.44 ± 0.073  
+#> 0.47 ± 0.072  
 #> 
 #> $ar1_trend: rvar<1000,2>[1] mean ± sd:
 #>     series_1 
-#> 0.59 ± 0.15  
+#> 0.56 ± 0.14  
 #> 
 
 # Next, mcmc_plot(mod) plots the same draws

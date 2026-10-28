@@ -40,9 +40,8 @@ ranef(
 
 - probs:
 
-  Numeric vector of probabilities for quantile computation. Default is
-  `c(0.025, 0.975)` for 95% credible intervals. Can be a single value or
-  multiple values.
+  Two probabilities for the lower and upper bounds of the credible
+  interval. Default `c(0.025, 0.975)`, a 95% interval.
 
 - pars:
 
@@ -107,20 +106,20 @@ Nicholas J Clark
 set.seed(14)
 simdat <- sim_mvgam(family = poisson(), n_series = 4L,
                     n_timepoints = 120L, trend_model = AR())
-mod <- mvgam(y ~ s(x) + (1 | series),
+mod <- mvgam(y ~ s(x, k = 5) + (1 | series),
              trend_formula = ~ AR(p = 1),
              data = simdat$data_train, family = poisson(),
              chains = 2, silent = 2)
-#> Warning: 76 of 2000 (4.0%) transitions ended with a divergence.
+#> Warning: 24 of 2000 (1.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 
 # Each series' intercept deviation, one row per series
 ranef(mod)$series[, , "Intercept"]
 #>             Estimate Est.Error       Q2.5     Q97.5
-#> series_1  0.02302209 0.1547355 -0.2854640 0.4089481
-#> series_2 -0.01007524 0.1581944 -0.3519195 0.3527626
-#> series_3 -0.05932478 0.1603765 -0.4272920 0.2608693
-#> series_4  0.08101280 0.1675221 -0.1899871 0.4942324
+#> series_1  0.01786056 0.1484211 -0.2984343 0.3563554
+#> series_2 -0.01737725 0.1533627 -0.3660618 0.3304502
+#> series_3 -0.06269192 0.1613000 -0.4453253 0.2283232
+#> series_4  0.08603233 0.1743587 -0.2064177 0.5164707
 
 # Next: VarCorr() gives the standard deviation of these deviations
 # }

@@ -70,13 +70,13 @@ The forecast takes the shades of the red bayesplot scheme. The hindcast
 band is light grey, which separates in-sample uncertainty from the
 nested forecast bands.
 
-For state-extrapolating prediction over arbitrary newdata see
 [`forecast.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/forecast.mvgam.md)
 and
-[`hindcast.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/hindcast.mvgam.md);
-for marginal-MC prediction see
+[`hindcast.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/hindcast.mvgam.md)
+return the objects this method draws. Predictions that leave out the
+fitted trend state come from
 [`posterior_predict.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/posterior_predict.mvgam.md)
-/
+and
 [`posterior_epred.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/posterior_epred.mvgam.md).
 
 ## See also
@@ -84,11 +84,45 @@ for marginal-MC prediction see
 [`forecast.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/forecast.mvgam.md),
 [`hindcast.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/hindcast.mvgam.md),
 [`score.mvgam_forecast()`](https://nicholasjclark.github.io/mvgam/dev/reference/score.mvgam_forecast.md),
-[`summary.mvgam_forecast()`](https://nicholasjclark.github.io/mvgam/dev/reference/summary.mvgam_forecast.md),
-[`irf()`](https://nicholasjclark.github.io/mvgam/dev/reference/irf.mvgam.md),
-[`fevd()`](https://nicholasjclark.github.io/mvgam/dev/reference/fevd.mvgam.md),
-[`stability()`](https://nicholasjclark.github.io/mvgam/dev/reference/stability.mvgam.md)
+[`summary.mvgam_forecast()`](https://nicholasjclark.github.io/mvgam/dev/reference/summary.mvgam_forecast.md)
 
 ## Author
 
 Nicholas J Clark
+
+## Examples
+
+``` r
+# \dontrun{
+set.seed(1)
+simdat <- sim_mvgam(family = poisson(), n_series = 1L,
+                    n_timepoints = 120L, trend_model = AR())
+# Two models of one count series: a smooth of x with and without
+# an AR(1) trend. The trend model samples with smaller steps
+# (adapt_delta = 0.95). That avoids divergent transitions when
+# lfo_cv() refits it to shorter stretches of the series
+mod_gam <- mvgam(y ~ s(x, k = 5), data = simdat$data_train,
+                 family = poisson(), chains = 2, silent = 2)
+#> Warning: 209 of 2000 (10.0%) transitions ended with a divergence.
+#> See https://mc-stan.org/misc/warnings for details.
+mod_ar <- mvgam(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1),
+                data = simdat$data_train, family = poisson(),
+                chains = 2, silent = 2,
+                control = list(adapt_delta = 0.95))
+#> Warning: 3 of 2000 (0.0%) transitions ended with a divergence.
+#> See https://mc-stan.org/misc/warnings for details.
+# }
+# \dontrun{
+fc <- forecast(mod_ar, newdata = simdat$data_test)
+
+# The grey hindcast band covers the training times. The red bands
+# are the 80% and 95% forecast intervals, with the held-out counts
+# as points
+plot(fc, probs = c(0.8, 0.95))
+
+
+# The forecast alone
+plot(fc, hindcast = FALSE)
+
+# }
+```

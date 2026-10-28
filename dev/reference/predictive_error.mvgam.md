@@ -83,7 +83,8 @@ The errors are those
 [`residuals.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/residuals.mvgam.md)
 returns with `type = "ordinary"`. In sample, each prediction carries the
 latent trend state the model inferred at that time. A prediction for
-`newdata` integrates over the trend dynamics.
+`newdata` uses the covariate part of the model, without the trend's
+innovations.
 
 ## See also
 
@@ -115,10 +116,10 @@ Nicholas J Clark
 set.seed(13)
 simdat <- sim_mvgam(family = poisson(), n_series = 1L,
                     n_timepoints = 120L, trend_model = AR())
-mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
+mod <- mvgam(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1),
              data = simdat$data_train, family = poisson(),
              chains = 2, silent = 2)
-#> Warning: 9 of 2000 (0.0%) transitions ended with a divergence.
+#> Warning: 5 of 2000 (0.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 
 # Observed minus predicted counts, one row per draw
@@ -131,8 +132,8 @@ mae <- colMeans(abs(err))
 simdat$data_train[order(mae, decreasing = TRUE)[1:3], c("time", "y")]
 #>    time  y
 #> 71   71 30
-#> 84   84 23
 #> 89   89 28
+#> 65   65 26
 
 # Next: residuals(mod) returns randomised quantile residuals
 # }

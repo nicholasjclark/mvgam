@@ -204,6 +204,30 @@ long data frames of <span class="pkg">bayesplot</span>. The counting methods ret
 an integer.</p>
     </div>
     <div class="section level2">
+    <h2 id="checking-a-fit">Checking a fit<a class="anchor" aria-label="anchor" href="#checking-a-fit"></a></h2>
+
+
+<p>Three checks come before any interpretation of a fit. Vehtari et al.
+(2021) give the thresholds for the first two.</p><ol><li><p>Every Rhat should be below 1.01. <code>max(rhat(mod))</code> gives the
+largest. A higher value means the chains disagree about the
+posterior. Longer chains, such as <code>update(mod, iter = 4000)</code>,
+often resolve it.</p></li>
+<li><p>The bulk and tail effective sample sizes should exceed 400.
+<code><a href="summary.mvgam.html">summary.mvgam()</a></code> prints them as <code>Bulk_ESS</code> and <code>Tail_ESS</code>.
+Longer chains raise them.</p></li>
+<li><p>There should be no divergent transitions. The fit warns when
+there are any. <code>sum(nuts_params(mod, pars = "divergent__")$Value)</code>
+counts them. A divergence marks a region of the posterior the
+sampler could not explore. Its draws may then be biased. Refit
+with smaller sampler steps,
+<code>update(mod, control = list(adapt_delta = 0.95))</code>.</p></li>
+</ol><p>Divergences that persist at a higher <code>adapt_delta</code> usually mean the
+data cannot separate some of the parameters. A common cause is a
+smooth with more flexibility than the series supports, competing
+with the trend for the same variation. A smaller basis, such as
+<code>s(x, k = 5)</code>, or a more informative prior then helps.</p>
+    </div>
+    <div class="section level2">
     <h2 id="references">References<a class="anchor" aria-label="anchor" href="#references"></a></h2>
     <p>Vehtari, A., Gelman, A., Simpson, D., Carpenter, B. and
 Burkner, P.-C. (2021). Rank-normalization, folding, and
@@ -235,31 +259,32 @@ extracts them. <code><a href="mvgam_loo_extras.html">loo_R2.mvgam()</a></code> i
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed</a></span><span class="op">(</span><span class="fl">13</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="va">simdat</span> <span class="op">&lt;-</span> <span class="fu"><a href="sim_mvgam.html">sim_mvgam</a></span><span class="op">(</span>family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson</a></span><span class="op">(</span><span class="op">)</span>, n_series <span class="op">=</span> <span class="fl">1L</span>,</span></span>
 <span class="r-in"><span>                     n_timepoints <span class="op">=</span> <span class="fl">120L</span>, trend_model <span class="op">=</span> <span class="fu"><a href="trend_constructors.html">AR</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="va">mod</span> <span class="op">&lt;-</span> <span class="fu"><a href="mvgam.html">mvgam</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="fu">s</span><span class="op">(</span><span class="va">x</span><span class="op">)</span>, trend_formula <span class="op">=</span> <span class="op">~</span> <span class="fu"><a href="trend_constructors.html">AR</a></span><span class="op">(</span>p <span class="op">=</span> <span class="fl">1</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span><span class="va">mod</span> <span class="op">&lt;-</span> <span class="fu"><a href="mvgam.html">mvgam</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="fu">s</span><span class="op">(</span><span class="va">x</span>, k <span class="op">=</span> <span class="fl">5</span><span class="op">)</span>, trend_formula <span class="op">=</span> <span class="op">~</span> <span class="fu"><a href="trend_constructors.html">AR</a></span><span class="op">(</span>p <span class="op">=</span> <span class="fl">1</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>              data    <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span>,</span></span>
 <span class="r-in"><span>              family  <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>              chains  <span class="op">=</span> <span class="fl">2</span>, silent <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 9 of 2000 (0.0%) transitions ended with a divergence.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 5 of 2000 (0.0%) transitions ended with a divergence.</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> See https://mc-stan.org/misc/warnings for details.</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># The population coefficients with 95% intervals</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/pkg/nlme/man/fixed.effects.html" class="external-link">fixef</a></span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>           Estimate Est.Error      Q2.5     Q97.5</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Intercept 1.631420 0.1431782  1.358022  1.920492</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> sx_1      7.695626 4.9158900 -1.807508 17.733728</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>           Estimate Est.Error     Q2.5     Q97.5</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Intercept 1.632552 0.1392937 1.342661  1.910896</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sx_1      8.482562 2.3412990 3.681986 13.005870</span>
 <span class="r-in"><span></span></span>
-<span class="r-in"><span><span class="co"># Rhat near 1 and effective sample ratios above 0.1 indicate mixing</span></span></span>
+<span class="r-in"><span><span class="co"># Rhat below 1.01 and effective sample ratios above 0.1 suggest the</span></span></span>
+<span class="r-in"><span><span class="co"># chains mixed</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://mc-stan.org/posterior/reference/rhat.html" class="external-link">rhat</a></span><span class="op">(</span><span class="va">mod</span>, pars <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"ar1_trend"</span>, <span class="st">"sigma_trend"</span><span class="op">)</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   ar1_trend[series_1] sigma_trend[series_1] </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>              1.006388              1.002338 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>              1.000484              1.000697 </span>
 <span class="r-in"><span><span class="fu"><a href="https://mc-stan.org/bayesplot/reference/bayesplot-extractors.html" class="external-link">neff_ratio</a></span><span class="op">(</span><span class="va">mod</span>, pars <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"ar1_trend"</span>, <span class="st">"sigma_trend"</span><span class="op">)</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   ar1_trend[series_1] sigma_trend[series_1] </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>             0.2036302             0.2875883 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>             0.1906273             0.3953472 </span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># The share of variance in the counts the model explains</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://mc-stan.org/rstantools/reference/bayes_R2.html" class="external-link">bayes_R2</a></span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>     Estimate Est.Error     Q2.5     Q97.5</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> R2 0.8345563 0.0372526 0.749718 0.8951963</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>     Estimate  Est.Error     Q2.5     Q97.5</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> R2 0.8310123 0.03899731 0.743291 0.8922462</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Next, mcmc_plot() draws the posterior of these parameters</span></span></span>
 <span class="r-in"><span><span class="co"># }</span></span></span>

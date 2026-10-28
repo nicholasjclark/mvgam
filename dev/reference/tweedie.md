@@ -113,14 +113,14 @@ set.seed(3)
 simdat <- sim_mvgam(family = tweedie(), n_series = 1L,
                     n_timepoints = 120L, trend_model = AR())
 mod <- mvgam(
-  y ~ s(x),
+  y ~ s(x, k = 5),
   trend_formula = ~ AR(p = 1),
   data          = simdat$data_train,
   family        = tweedie(),
   chains        = 2,
   silent        = 2
 )
-#> Warning: 51 of 2000 (3.0%) transitions ended with a divergence.
+#> Warning: 32 of 2000 (2.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 
 # The dispersion and power

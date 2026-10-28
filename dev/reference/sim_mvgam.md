@@ -63,7 +63,10 @@ sim_mvgam(
   or
   [`PW()`](https://nicholasjclark.github.io/mvgam/dev/reference/piecewise_trends.md).
   `NULL` (the default) takes the type's own trend. `"None"` simulates no
-  trend.
+  trend. To fit the simulated data, name the same trend inside
+  `trend_formula`, as in `mvgam(y ~ s(x), trend_formula = ~ AR())`.
+  [`mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam.md)
+  refuses a `trend_model` argument.
 
 - prop_trend:
 
@@ -185,7 +188,7 @@ fits the simulated data.
 simulates occupancy and N-mixture data.
 [`sim_jsdgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/sim_jsdgam.md)
 simulates site-by-species data. The [overview
-article](https://nicholasjclark.github.io/mvgam/articles/mvgam_overview.html)
+article](https://nicholasjclark.github.io/mvgam/dev/articles/mvgam_overview.html)
 fits a model to data from `sim_mvgam()`.
 
 Other simulation:

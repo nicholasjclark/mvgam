@@ -1,7 +1,11 @@
 # Calculate latent VAR impulse response functions
 
 Compute Generalized or Orthogonalized Impulse Response Functions (IRFs)
-from `mvgam` models with Vector Autoregressive dynamics
+from `mvgam` models with Vector Autoregressive dynamics. An impulse
+response traces how the latent trend of every series moves over `h` time
+steps after a one-standard-deviation innovation to one series. The
+default generalised responses suit most analyses. Orthogonalised
+responses need a causal ordering of the series.
 
 ## Usage
 
@@ -114,9 +118,9 @@ linear multivariate models. Economics Letters 58, 17-29.
 and
 [`stability()`](https://nicholasjclark.github.io/mvgam/dev/reference/stability.mvgam.md)
 summarise the same VAR dynamics. The [VAR
-article](https://nicholasjclark.github.io/mvgam/articles/var.html) runs
-`irf()` on a plankton community. The [hierarchical VAR
-article](https://nicholasjclark.github.io/mvgam/articles/hierarchical_var.html)
+article](https://nicholasjclark.github.io/mvgam/dev/articles/var.html)
+runs `irf()` on a plankton community. The [hierarchical VAR
+article](https://nicholasjclark.github.io/mvgam/dev/articles/hierarchical_var.html)
 runs it on each group of a hierarchical VAR.
 
 Other latent dynamics:
@@ -144,7 +148,7 @@ simdat <- sim_mvgam(family = gaussian(), n_series = 3L,
 var_mod <- mvgam(y ~ 1, trend_formula = ~ VAR(p = 1),
                  data = simdat$data_train, family = gaussian(),
                  chains = 2, silent = 2)
-#> Warning: 3 of 2000 (0.0%) transitions ended with a divergence.
+#> Warning: 44 of 2000 (2.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 #> Warning: 1 of 2 chains had an E-BFMI less than 0.3.
 #> See https://mc-stan.org/misc/warnings for details.

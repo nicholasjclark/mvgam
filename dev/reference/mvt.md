@@ -67,12 +67,14 @@ fit <- jsdgam(
   chains         = 2L,
   silent         = 2
 )
+#> Warning: 14 of 2000 (1.0%) transitions ended with a divergence.
+#> See https://mc-stan.org/misc/warnings for details.
 #> Warning: 2 of 2 chains had an E-BFMI less than 0.3.
 #> See https://mc-stan.org/misc/warnings for details.
 
 # The degrees of freedom, against 5 in the simulation
 posterior_summary(fit, variable = "nu")
 #>    Estimate Est.Error     Q2.5    Q97.5
-#> nu 7.496331  4.557953 3.281795 18.84507
+#> nu 8.921448   5.83514 3.262335 23.14878
 # }
 ```

@@ -1,7 +1,11 @@
-# LOO information criteria for mvgam models
+# Approximate leave-one-out cross-validation for mvgam models
 
-Extract the LOOIC (leave-one-out information criterion) using
-[`loo::loo()`](https://mc-stan.org/loo/reference/loo.html).
+Estimates the expected log predictive density (ELPD) of each observation
+had it been left out of the fit, with
+[`loo::loo()`](https://mc-stan.org/loo/reference/loo.html). The ELPD
+measures how well a model predicts data it has not seen. Higher is
+better. Each observation also takes a Pareto \\k\\ diagnostic. Above 0.7
+the approximation is unreliable for that observation.
 
 ## Usage
 
@@ -56,12 +60,9 @@ loo_compare(
   The arguments of
   [brms::loo.brmsfit](https://paulbuerkner.com/brms/reference/loo.brmsfit.html).
   mvgam uses two of them. `resp` scopes a multivariate fit to one
-  response. `save_psis` keeps the smoothing object. `pointwise` would
-  stream the density. `moment_match` and `reloo` would refit the model,
-  configured by `k_threshold` and the `*_args` lists. `compare` and
-  `model_names` would rank several models, which `loo_compare.mvgam()`
-  does. mvgam runs none of these. Supplying one raises an error naming
-  it.
+  response. `save_psis` keeps the smoothing object. Supplying any of the
+  others raises an error. To compare several models, pass the fits to
+  `loo_compare.mvgam()`.
 
 - model_names:
 
@@ -74,7 +75,7 @@ loo_compare(
   [`log_lik.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/log_lik.mvgam.md).
   `TRUE` scores each observation under the latent trend state the model
   inferred at that time. The ELPD then describes the series that was
-  observed. `FALSE` scores the deterministic submodel alone.
+  observed. `FALSE` scores the covariate part of the model alone.
 
 - incl_dynamics:
 
@@ -102,25 +103,20 @@ one row per model, best first. Its `p_worse`, `diag_diff` and
 
 ## Details
 
-When comparing two (or more) fitted `mvgam` models, we can estimate the
-difference in their in-sample predictive accuracies using the Expected
-Log Predictive Density (ELPD). This metric can be approximated using
-Pareto Smoothed Importance Sampling (PSIS), which re-weights posterior
-draws to approximate predictions for a datapoint had it not been
-included in the original model fit (i.e. leave-one-out
-cross-validation).
+Exact leave-one-out cross-validation would refit the model once per
+observation. Pareto smoothed importance sampling (PSIS) avoids the
+refits. It re-weights the posterior draws of the one fit to approximate
+the posterior without each observation (Vehtari et al. 2017).
+[`loo::loo()`](https://mc-stan.org/loo/reference/loo.html) describes the
+method.
 
-See [`loo::loo()`](https://mc-stan.org/loo/reference/loo.html) and
-[`loo::loo_compare()`](https://mc-stan.org/loo/reference/loo_compare.html)
-for further details on how this importance sampling works.
-
-A fit with a latent trend routinely strains this approximation. Leaving
-an observation out keeps its influence on the state the model inferred
-at that time. The re-weighted density still conditions on a state
-estimated from that observation. The ELPD then measures conditional
-in-sample fit. The effective number of parameters climbs towards the
-number of observations. Check the Pareto \\k\\ diagnostics before
-trusting a comparison.
+The approximation often fails for a fit with a latent trend. Each
+observation strongly informs the state at its own time. Removing it
+changes that part of the posterior a great deal. The importance weights
+then vary widely. Many observations get a Pareto \\k\\ above 0.7. The
+effective number of parameters also climbs towards the number of
+observations. Check the Pareto \\k\\ diagnostics before trusting a
+comparison.
 [`lfo_cv.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/lfo_cv.mvgam.md)
 refits along the time axis and scores each window against data the model
 has not seen.
@@ -128,6 +124,41 @@ has not seen.
 with
 [`score.mvgam_forecast()`](https://nicholasjclark.github.io/mvgam/dev/reference/score.mvgam_forecast.md)
 scores a held-out horizon.
+
+## Which comparison tool?
+
+- Fit to the observed data:
+
+  [`loo()`](https://mc-stan.org/loo/reference/loo.html) or
+  [`waic.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/waic.mvgam.md),
+  ranked with `loo_compare.mvgam()`. Trust it for a model without a
+  trend, or once the Pareto \\k\\ diagnostics are low.
+
+- Skill at forecasting:
+
+  [`lfo_cv.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/lfo_cv.mvgam.md)
+  on each model, ranked with
+  [`loo_compare.mvgam_lfo()`](https://nicholasjclark.github.io/mvgam/dev/reference/loo_compare.mvgam_lfo.md)
+  and plotted with
+  [`compare_elpds()`](https://nicholasjclark.github.io/mvgam/dev/reference/compare_elpds.md).
+
+- Accuracy over one held-out horizon:
+
+  [`forecast.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/forecast.mvgam.md)
+  with
+  [`score.mvgam_forecast()`](https://nicholasjclark.github.io/mvgam/dev/reference/score.mvgam_forecast.md),
+  several models at once with
+  [`compare_scores()`](https://nicholasjclark.github.io/mvgam/dev/reference/compare_scores.md).
+
+- Prediction for held-out sites or species:
+
+  [`kfold.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/kfold.mvgam.md)
+  with `group`.
+
+The ELPD is higher for the better model. CRPS, DRPS and the other scores
+of
+[`score.mvgam_forecast()`](https://nicholasjclark.github.io/mvgam/dev/reference/score.mvgam_forecast.md)
+are lower for the better model.
 
 ## References
 
@@ -154,7 +185,7 @@ scores forecasts by refitting along the time axis.
 runs grouped k-fold cross-validation.
 [`loo_model_weights.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam_loo_extras.md)
 weights models by their predictions. The [forecast evaluation
-article](https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html)
+article](https://nicholasjclark.github.io/mvgam/dev/articles/forecast_evaluation.html)
 compares models by approximate and exact cross-validation.
 
 Other model comparison:
@@ -183,7 +214,7 @@ simdat <- sim_mvgam(family = poisson(), n_series = 1L,
                     n_timepoints = 120L, trend_model = "None")
 mod <- mvgam(y ~ s(x), data = simdat$data_train,
              family = poisson(), chains = 2, silent = 2)
-#> Warning: 2 of 2000 (0.0%) transitions ended with a divergence.
+#> Warning: 3 of 2000 (0.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 # }
 # \dontrun{
@@ -196,12 +227,12 @@ loo(mod)
 #> Computed from 2000 posterior draws and 90 log-likelihood terms.
 #> 
 #>          Estimate   SE
-#> elpd_loo   -208.8  8.5
-#> p_loo         8.0  1.5
-#> looic       417.7 17.0
+#> elpd_loo   -208.9  8.5
+#> p_loo         8.0  1.6
+#> looic       417.7 16.9
 #> ------
 #> MCSE of elpd_loo is 0.1.
-#> MCSE and ESS estimates assume MCMC draws (r_eff in [0.4, 1.2]).
+#> MCSE and ESS estimates assume MCMC draws (r_eff in [0.6, 1.2]).
 #> 
 #> All Pareto k estimates are good (k < 0.7).
 #> See help('pareto-k-diagnostic') for details.

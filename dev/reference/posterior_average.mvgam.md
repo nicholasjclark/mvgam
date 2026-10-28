@@ -94,8 +94,8 @@ pp_average(
 
 - model_names:
 
-  Optional character vector of model labels; overrides the names
-  inferred from the call.
+  Optional character vector of model names, one per forecast. It
+  replaces the names taken from the call.
 
 - control:
 
@@ -127,8 +127,7 @@ pp_average(
 - probs:
 
   Numeric vector of probabilities for quantile computation. Default is
-  `c(0.025, 0.975)` for 95% credible intervals. Can be a single value or
-  multiple values.
+  `c(0.025, 0.975)` for 95% credible intervals.
 
 - robust:
 
@@ -153,7 +152,7 @@ draws taken from each fit.
 computes the weights.
 [`ensemble()`](https://nicholasjclark.github.io/mvgam/dev/reference/ensemble.mvgam_forecast.md)
 averages forecasts. The [forecast evaluation
-article](https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html)
+article](https://nicholasjclark.github.io/mvgam/dev/articles/forecast_evaluation.html)
 weights and combines competing models.
 
 Other model comparison:
@@ -182,7 +181,7 @@ simdat <- sim_mvgam(family = poisson(), n_series = 1L,
                     n_timepoints = 120L, trend_model = "None")
 mod <- mvgam(y ~ s(x), data = simdat$data_train,
              family = poisson(), chains = 2, silent = 2)
-#> Warning: 2 of 2000 (0.0%) transitions ended with a divergence.
+#> Warning: 3 of 2000 (0.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 # }
 # \dontrun{
@@ -194,31 +193,31 @@ loo_model_weights(mod, mod_lin)
 #> Method: stacking
 #> ------
 #>         weight
-#> mod     0.898 
-#> mod_lin 0.102 
+#> mod     0.897 
+#> mod_lin 0.103 
 
 # The intercept, averaged over both fits under those weights
 pa <- posterior_average(mod, mod_lin, variable = "b_Intercept")
 attr(pa, "weights")
-#>      mod  mod_lin 
-#> 0.897515 0.102485 
+#>       mod   mod_lin 
+#> 0.8965409 0.1034591 
 summary(pa)
 #>   b_Intercept   
-#>  Min.   :1.496  
-#>  1st Qu.:1.598  
-#>  Median :1.632  
+#>  Min.   :1.459  
+#>  1st Qu.:1.599  
+#>  Median :1.633  
 #>  Mean   :1.632  
-#>  3rd Qu.:1.667  
+#>  3rd Qu.:1.666  
 #>  Max.   :1.805  
 
 # Averaged expected counts, one row per observation
 head(pp_average(mod, mod_lin, method = "posterior_epred"))
 #>       Estimate Est.Error     Q2.5     Q97.5
-#> [1,]  2.895976 0.4848519 2.058548  3.941971
-#> [2,] 12.971016 2.0798592 7.892636 16.448289
-#> [3,]  7.127309 0.6490576 5.932693  8.456080
-#> [4,]  8.690601 1.0261885 6.943644 11.103724
-#> [5,]  2.769417 0.5250686 1.881987  3.980057
-#> [6,]  8.318495 1.8816762 5.470898 12.854960
+#> [1,]  2.912185 0.5095547 2.025116  3.962233
+#> [2,] 12.981826 2.0984110 7.892636 16.206994
+#> [3,]  7.118987 0.6362446 5.969749  8.410939
+#> [4,]  8.664794 1.0146162 7.005163 11.093057
+#> [5,]  2.774361 0.5300401 1.841259  3.902372
+#> [6,]  8.366062 1.8957861 5.454869 12.855426
 # }
 ```

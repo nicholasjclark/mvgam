@@ -114,7 +114,7 @@ season whose shape drifts over the years, as
 ## See also
 
 The [data
-article](https://nicholasjclark.github.io/mvgam/articles/data.html)
+article](https://nicholasjclark.github.io/mvgam/dev/articles/data.html)
 covers the long format and its conversion in more depth.
 [`LLT()`](https://nicholasjclark.github.io/mvgam/dev/reference/LLT.md)
 takes the same periods for a season that drifts.
@@ -161,13 +161,13 @@ wide <- data.frame(
   site_b = rpois(28, 8)
 )
 head(series_to_mvgam(wide))
-#>   series time y       date season
-#> 1 site_a    1 4 2024-01-01      5
-#> 2 site_b    1 7 2024-01-01      5
-#> 3 site_a    2 4 2024-01-02      6
-#> 4 site_b    2 6 2024-01-02      6
-#> 5 site_a    3 5 2024-01-03      7
-#> 6 site_b    3 6 2024-01-03      7
+#>   series time  y       date season
+#> 1 site_a    1  8 2024-01-01      5
+#> 2 site_b    1  8 2024-01-01      5
+#> 3 site_a    2 10 2024-01-02      6
+#> 4 site_b    2 11 2024-01-02      6
+#> 5 site_a    3  4 2024-01-03      7
+#> 6 site_b    3 12 2024-01-03      7
 
 # Next: fit the training data, for example with
 # mvgam(y ~ s(season, bs = "cc"), trend_formula = ~ AR(),

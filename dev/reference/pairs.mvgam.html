@@ -64,14 +64,30 @@ data separate them poorly.</p>
 
 
 <dt id="arg-variable">variable<a class="anchor" aria-label="anchor" href="#arg-variable"></a></dt>
-<dd><p>Names of the variables (parameters) to plot, as given by a
-character vector or a regular expression (if <code>regex = TRUE</code>). By
-default, a hopefully not too large selection of variables is plotted.</p></dd>
+<dd><p>Either a keyword shortcut, a character vector of
+parameter names, or (when <code>regex = TRUE</code>) a vector of regular
+expressions. Recognised keywords:</p><ul><li><p><code>"betas"</code>: population-level coefficients, the set
+<code><a href="https://paulbuerkner.com/brms/reference/fixef.brmsfit.html" class="external-link">brms::fixef()</a></code> reports (<code>b_*</code>, <code>bs_*</code> and <code>bsp_*</code>).</p></li>
+<li><p><code>"obs_params"</code>: observation-family distributional
+parameters (<code>sigma</code>, <code>phi</code>, <code>shape</code>, ...).</p></li>
+<li><p><code>"smooth_params"</code>: smooth-term standard deviations
+(<code>sds_*</code>).</p></li>
+<li><p><code>"trend_betas"</code>: the trend formula's population-level
+coefficients (<code>b_*_trend</code>, <code>bs_*_trend</code> and <code>bsp_*_trend</code>).</p></li>
+<li><p><code>"trend_params"</code>: trend-dynamics parameters
+(autoregressive coefficients, innovation SDs, ...).</p></li>
+<li><p><code>"trend_smooth_params"</code>: trend-side smooth SDs.</p></li>
+</ul><p><code>NULL</code> (the default) returns every parameter. A bare vector name,
+such as <code>"sigma_trend"</code>, selects every element. Group-level
+effects, factor loadings and latent states have no keyword. Select
+them by name. <code><a href="index-mvgam.html">variables.mvgam()</a></code> lists the names a fit holds.</p></dd>
 
 
 <dt id="arg-regex">regex<a class="anchor" aria-label="anchor" href="#arg-regex"></a></dt>
-<dd><p>Logical; Indicates whether <code>variable</code> should
-be treated as regular expressions. Defaults to <code>FALSE</code>.</p></dd>
+<dd><p>Logical. When <code>TRUE</code>, each entry of <code>variable</code> is
+treated as a regular expression and any parameter matching at
+least one pattern is selected. Keyword shortcuts are still
+honoured. Defaults to <code>FALSE</code>.</p></dd>
 
 
 <dt id="arg--">...<a class="anchor" aria-label="anchor" href="#arg--"></a></dt>
@@ -117,11 +133,11 @@ hierarchical fit. They are drawn when <code>variable</code> names them.</p>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed</a></span><span class="op">(</span><span class="fl">13</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="va">simdat</span> <span class="op">&lt;-</span> <span class="fu"><a href="sim_mvgam.html">sim_mvgam</a></span><span class="op">(</span>family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson</a></span><span class="op">(</span><span class="op">)</span>, n_series <span class="op">=</span> <span class="fl">1L</span>,</span></span>
 <span class="r-in"><span>                     n_timepoints <span class="op">=</span> <span class="fl">120L</span>, trend_model <span class="op">=</span> <span class="fu"><a href="trend_constructors.html">AR</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="va">mod</span> <span class="op">&lt;-</span> <span class="fu"><a href="mvgam.html">mvgam</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="fu">s</span><span class="op">(</span><span class="va">x</span><span class="op">)</span>, trend_formula <span class="op">=</span> <span class="op">~</span> <span class="fu"><a href="trend_constructors.html">AR</a></span><span class="op">(</span>p <span class="op">=</span> <span class="fl">1</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span><span class="va">mod</span> <span class="op">&lt;-</span> <span class="fu"><a href="mvgam.html">mvgam</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="fu">s</span><span class="op">(</span><span class="va">x</span>, k <span class="op">=</span> <span class="fl">5</span><span class="op">)</span>, trend_formula <span class="op">=</span> <span class="op">~</span> <span class="fu"><a href="trend_constructors.html">AR</a></span><span class="op">(</span>p <span class="op">=</span> <span class="fl">1</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>              data    <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span>,</span></span>
 <span class="r-in"><span>              family  <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>              chains  <span class="op">=</span> <span class="fl">2</span>, silent <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 9 of 2000 (0.0%) transitions ended with a divergence.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 5 of 2000 (0.0%) transitions ended with a divergence.</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> See https://mc-stan.org/misc/warnings for details.</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># The trend's autoregression against its innovation scale</span></span></span>

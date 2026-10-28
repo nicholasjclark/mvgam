@@ -30,9 +30,8 @@ shared_variation(object, probs = c(0.025, 0.975), robust = FALSE, ...)
 
 - probs:
 
-  Numeric vector of probabilities for quantile computation. Default is
-  `c(0.025, 0.975)` for 95% credible intervals. Can be a single value or
-  multiple values.
+  Two probabilities for the lower and upper bounds of the credible
+  interval. Default `c(0.025, 0.975)`, a 95% interval.
 
 - robust:
 
@@ -105,7 +104,7 @@ and
 [`mvt()`](https://nicholasjclark.github.io/mvgam/dev/reference/mvt.md)
 it adds each series' residual variance to the diagonal of `Delta` first.
 The [joint species distribution
-article](https://nicholasjclark.github.io/mvgam/articles/jsdgam.html)
+article](https://nicholasjclark.github.io/mvgam/dev/articles/jsdgam.html)
 interprets both for a community of species.
 
 Other latent dynamics:
@@ -144,7 +143,7 @@ mod <- jsdgam(
   chains         = 2,
   silent         = 2
 )
-#> Warning: 32 of 2000 (2.0%) transitions ended with a divergence.
+#> Warning: 49 of 2000 (2.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 
 # The species-by-species covariance the two factors induce
@@ -156,12 +155,12 @@ sv
 #> 
 #> Diagonal (captured variance per series):
 #>      Estimate  Q2.5  Q97.5
-#> sp_1    2.206 0.013 18.285
-#> sp_2    2.841 0.029 19.025
-#> sp_3    1.333 0.012  9.884
-#> sp_4    1.468 0.014  9.408
-#> sp_5    7.476 0.039 63.444
-#> sp_6    1.011 0.016  5.837
+#> sp_1    3.181 0.014 35.988
+#> sp_2    2.668 0.037 20.761
+#> sp_3    2.014 0.013 16.764
+#> sp_4    1.267 0.015  7.893
+#> sp_5    6.781 0.036 63.237
+#> sp_6    1.807 0.017  9.492
 #> 
 #> plot() draws the full matrix as a heatmap.
 plot(sv)

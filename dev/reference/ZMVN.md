@@ -1,8 +1,10 @@
-# Specify correlated residual processes in mvgam
+# Correlated latent effects with no time dependence
 
-Set up latent correlated multivariate Gaussian residual processes in
-mvgam. The constructor records its arguments. The model evaluates them
-against the data.
+A latent effect for each unit, such as a site, plot or time point, drawn
+from a multivariate normal that correlates the series. Unlike the other
+trends, the effect at one unit does not depend on the previous one. The
+constructor records its arguments. The model evaluates them against the
+data.
 
 ## Usage
 
@@ -24,15 +26,13 @@ ZMVN(
 - time:
 
   The unquoted name of the `numeric` or `integer` variable in `data`
-  that indexes the units whose latent residuals are correlated. Defaults
-  to `time`, as for the other trends. The units can be sites, plots or
-  any other replicate.
+  that indexes the units, such as sites, plots or times. Defaults to
+  `time`, as for the other trends.
 
-  ZMVN takes these values at any spacing. The likelihood is \\x\_{u, :}
-  \sim MVN(0, \Sigma)\\ with \\\Sigma\\ indexed by series alone. The gap
-  between two units enters nowhere. Use ZMVN for spatial or otherwise
-  non-temporal units, where gaps are natural: dropped sites, stratified
-  k-fold refits or irregular sampling grids.
+  The values may have any spacing. Each unit's effects follow \\x\_{u,
+  :} \sim MVN(0, \Sigma)\\, with \\\Sigma\\ indexed by series alone. The
+  gap between two units plays no part. That suits sites, dropped units,
+  k-fold refits and irregular sampling.
 
 - series:
 
@@ -42,11 +42,11 @@ ZMVN(
 
 - gr:
 
-  An optional grouping `factor` in `data` that sets up hierarchical
-  residual correlations. Each level's correlation matrix shrinks toward
-  a global one by the weight `alpha_cor_trend`, as
+  An optional grouping `factor` in `data`. Each of its levels takes its
+  own correlation matrix among the latent effects. Each matrix shrinks
+  toward a global one by the weight `alpha_cor_trend`, as
   [trend_constructors](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md)
-  sets out. Without `subgr`, the series column names the units within
+  sets out. Without `subgr`, the series column names the series within
   each level.
 
 - subgr:
@@ -56,7 +56,7 @@ ZMVN(
   [trend_constructors](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md)
   describes. For species (`species`) counted at sites (`site`) in
   regions (`region`), `time = site`, `gr = region` and `subgr = species`
-  correlate the species' residuals within each region.
+  correlate the species' latent effects within each region.
 
 - n_lv:
 
@@ -68,20 +68,20 @@ ZMVN(
 
 - cor:
 
-  `Logical`. Include correlated process errors as part of a multivariate
-  normal process model? If `TRUE` and if `n_series > 1` in the supplied
-  data, a fully structured covariance matrix will be estimated for the
-  process errors.
+  `Logical`. Correlate the innovations of different series? `TRUE`
+  estimates a full covariance matrix of the innovations when the data
+  hold more than one series.
   [`AR()`](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md)
   and
   [`RW()`](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md)
-  default to `NULL`, which resolves to `FALSE` for an ungrouped trend
-  and to `TRUE` whenever `gr` names a grouping variable: a grouped trend
-  estimates correlations among the `subgr` units within each level of
-  `gr`, which is the model `gr` exists to specify.
-  [`VAR()`](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md)
-  and `ZMVN()` always estimate correlations and refuse `cor = FALSE`, as
-  do `AR(gr = ...)` and `RW(gr = ...)`.
+  default to `NULL`. That means `FALSE` for an ungrouped trend and
+  `TRUE` when `gr` names a grouping variable.
+  [`VAR()`](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md),
+  `ZMVN()` and grouped
+  [`AR()`](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md)
+  and
+  [`RW()`](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md)
+  trends always estimate correlations. They refuse `cor = FALSE`.
   [`CAR()`](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md)
   defaults to `FALSE`.
 
@@ -117,16 +117,20 @@ ZMVN(
   [`get_prior`](https://nicholasjclark.github.io/mvgam/dev/reference/get_prior.md)
   lists `nu_trend` with the other trend classes.
 
-  Three caveats apply. The bound of `2` is required. Below it the
-  innovations have no finite variance. An autoregressive trend then has
-  no stationary covariance to start from. Above it, the first states of
-  an autoregressive trend take the stationary mean and covariance. Their
-  distribution matches the stationary law exactly under Gaussian
-  innovations alone. A finite mix of t variates has heavier tails than
-  the infinite sum that defines that law. The degrees of freedom are
-  informed only through the tail of the latent process. They are weakly
-  identified in short series: below roughly 200 time points, the
-  posterior stays close to its prior.
+  Three caveats apply:
+
+  - A fixed value must exceed `2`. Below it the innovations have no
+    finite variance. An autoregressive trend then has no stationary
+    covariance to start from.
+
+  - The first states of an autoregressive trend take the stationary mean
+    and covariance. Under t innovations the true stationary distribution
+    has heavier tails than that.
+
+  - Only the tails of the latent process inform the degrees of freedom.
+    Below roughly 200 time points their posterior stays close to the
+    prior.
+
   [`VAR()`](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md)
   samples its states directly and
   [`PW()`](https://nicholasjclark.github.io/mvgam/dev/reference/piecewise_trends.md)
@@ -207,10 +211,10 @@ fits `ZMVN()` factors across species.
 and
 [`ordinate()`](https://nicholasjclark.github.io/mvgam/dev/reference/ordinate.md)
 interpret the fitted correlations. The [dynamic factor
-vignette](https://nicholasjclark.github.io/mvgam/articles/dfm.html)
+vignette](https://nicholasjclark.github.io/mvgam/dev/articles/dfm.html)
 builds factor models with a partial `trend_map`. The [integrated
 distribution model
-article](https://nicholasjclark.github.io/mvgam/articles/idm.html)
+article](https://nicholasjclark.github.io/mvgam/dev/articles/idm.html)
 shares one latent process across several observation families.
 
 Other trend models:

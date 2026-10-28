@@ -112,7 +112,7 @@ factor models. *Biometrika*, 98(2), 291-306.
 reports the covariance the factors give the series.
 [`compare_loadings()`](https://nicholasjclark.github.io/mvgam/dev/reference/compare_loadings.md)
 compares the loadings under two priors. The [JSDM
-article](https://nicholasjclark.github.io/mvgam/articles/jsdgam.html)
+article](https://nicholasjclark.github.io/mvgam/dev/articles/jsdgam.html)
 fits an MGP prior and counts its active factors.
 
 Other latent dynamics:

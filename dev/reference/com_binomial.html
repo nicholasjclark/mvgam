@@ -187,6 +187,8 @@ dependent service rates. <em>Journal of Industrial Engineering</em>,
 <span class="r-in"><span>  chains <span class="op">=</span> <span class="fl">2</span>,</span></span>
 <span class="r-in"><span>  silent <span class="op">=</span> <span class="fl">2</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 1 of 2000 (0.0%) transitions ended with a divergence.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> See https://mc-stan.org/misc/warnings for details.</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># The posterior for `nu` lies above the binomial's value of 1</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">fit</span><span class="op">)</span></span></span>
@@ -200,16 +202,16 @@ dependent service rates. <em>Journal of Industrial Engineering</em>,
 <span class="r-out co"><span class="r-pr">#&gt;</span> == Observation Model ==</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Smoothing Spline Hyperparameters:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>           Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> sds(sx_1)     4.44      1.56     2.15     8.27 1.00      878     1102</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sds(sx_1)     4.48      1.59     2.24     8.24 1.00      774     1054</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Regression Coefficients:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>           Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Intercept    -0.12      0.10    -0.32     0.08 1.00     2241     1410</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> sx_1         -2.96      5.75   -14.11     9.66 1.00      877      876</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Intercept    -0.12      0.10    -0.32     0.07 1.00     2116     1211</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sx_1         -3.11      5.64   -14.18     8.56 1.00      992     1234</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Further Distributional Parameters:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>    Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> nu     3.11      0.39     2.41     3.93 1.00     1913     1319</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> nu     3.11      0.39     2.39     3.91 1.00     1944     1644</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Draws were sampled using sampling(NUTS). For each parameter, Bulk_ESS</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> and Tail_ESS are effective sample size measures, and Rhat is the potential</span>

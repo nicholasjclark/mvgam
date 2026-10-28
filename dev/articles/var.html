@@ -269,24 +269,24 @@ formula:</p>
 <div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/pkg/nlme/man/fixed.effects.html" class="external-link">fixef</a></span><span class="op">(</span><span class="va">fit</span>, trend_effects <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span>, <span class="fl">2</span><span class="op">)</span></span>
 <span><span class="co">#&gt;                                   Estimate Est.Error  Q2.5 Q97.5</span></span>
-<span><span class="co">#&gt; seriesDiatoms_trend                   0.40      0.26 -0.14  0.93</span></span>
-<span><span class="co">#&gt; seriesGreens_trend                    0.24      0.39 -0.54  0.97</span></span>
-<span><span class="co">#&gt; seriesUnicells_trend                  1.03      0.36  0.31  1.78</span></span>
-<span><span class="co">#&gt; seriesCryptomonas_trend               0.53      0.21  0.12  0.95</span></span>
-<span><span class="co">#&gt; seriesDaphnia_trend                   0.05      0.20 -0.35  0.45</span></span>
-<span><span class="co">#&gt; seriesDiatoms:TP_annual_trend         0.54      0.57 -0.61  1.66</span></span>
-<span><span class="co">#&gt; seriesGreens:TP_annual_trend          0.42      0.82 -1.29  1.97</span></span>
-<span><span class="co">#&gt; seriesUnicells:TP_annual_trend        2.88      0.76  1.31  4.35</span></span>
-<span><span class="co">#&gt; seriesCryptomonas:TP_annual_trend     0.21      0.44 -0.66  1.11</span></span>
-<span><span class="co">#&gt; seriesDaphnia:TP_annual_trend        -0.29      0.44 -1.16  0.60</span></span>
-<span><span class="co">#&gt; seriesDiatoms:temp_anom_trend        -0.57      0.30 -1.17  0.02</span></span>
-<span><span class="co">#&gt; seriesGreens:temp_anom_trend          0.23      0.43 -0.60  1.08</span></span>
-<span><span class="co">#&gt; seriesUnicells:temp_anom_trend       -0.07      0.32 -0.66  0.56</span></span>
-<span><span class="co">#&gt; seriesCryptomonas:temp_anom_trend     0.33      0.26 -0.19  0.84</span></span>
-<span><span class="co">#&gt; seriesDaphnia:temp_anom_trend         0.20      0.24 -0.26  0.67</span></span></code></pre></div>
+<span><span class="co">#&gt; seriesDiatoms_trend                   0.42      0.26 -0.10  0.94</span></span>
+<span><span class="co">#&gt; seriesGreens_trend                    0.20      0.42 -0.64  0.99</span></span>
+<span><span class="co">#&gt; seriesUnicells_trend                  1.02      0.38  0.19  1.75</span></span>
+<span><span class="co">#&gt; seriesCryptomonas_trend               0.52      0.20  0.11  0.92</span></span>
+<span><span class="co">#&gt; seriesDaphnia_trend                   0.02      0.20 -0.39  0.41</span></span>
+<span><span class="co">#&gt; seriesDiatoms:TP_annual_trend         0.58      0.55 -0.46  1.71</span></span>
+<span><span class="co">#&gt; seriesGreens:TP_annual_trend          0.39      0.84 -1.20  2.02</span></span>
+<span><span class="co">#&gt; seriesUnicells:TP_annual_trend        2.91      0.77  1.31  4.44</span></span>
+<span><span class="co">#&gt; seriesCryptomonas:TP_annual_trend     0.21      0.41 -0.60  1.03</span></span>
+<span><span class="co">#&gt; seriesDaphnia:TP_annual_trend        -0.34      0.42 -1.16  0.51</span></span>
+<span><span class="co">#&gt; seriesDiatoms:temp_anom_trend        -0.53      0.32 -1.17  0.08</span></span>
+<span><span class="co">#&gt; seriesGreens:temp_anom_trend          0.25      0.42 -0.57  1.06</span></span>
+<span><span class="co">#&gt; seriesUnicells:temp_anom_trend       -0.05      0.31 -0.65  0.58</span></span>
+<span><span class="co">#&gt; seriesCryptomonas:temp_anom_trend     0.35      0.25 -0.13  0.85</span></span>
+<span><span class="co">#&gt; seriesDaphnia:temp_anom_trend         0.20      0.25 -0.29  0.70</span></span></code></pre></div>
 <p>Because total phosphorus fell across the record, the positive slope
 of the unicellular algae on phosphorus predicts the decline the first
-figure shows. Their slope is 2.88 [1.31, 4.35] standard deviations of
+figure shows. Their slope is 2.91 [1.31, 4.44] standard deviations of
 log density per unit of phosphorus. The intervals of the other four
 phosphorus slopes span zero.</p>
 <p>mvgam computes effects on the outcome scale through the
@@ -306,11 +306,11 @@ separately for each taxon:</p>
 <span>                            by <span class="op">=</span> <span class="st">"series"</span>, type <span class="op">=</span> <span class="st">"expected"</span><span class="op">)</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt;       series Estimate  2.5 % 97.5 %</span></span>
-<span><span class="co">#&gt;  Diatoms        0.542 -0.607  1.655</span></span>
-<span><span class="co">#&gt;  Greens         0.438 -1.286  1.971</span></span>
-<span><span class="co">#&gt;  Unicells       2.896  1.309  4.346</span></span>
-<span><span class="co">#&gt;  Cryptomonas    0.218 -0.658  1.109</span></span>
-<span><span class="co">#&gt;  Daphnia       -0.285 -1.155  0.602</span></span>
+<span><span class="co">#&gt;  Diatoms        0.563 -0.460  1.712</span></span>
+<span><span class="co">#&gt;  Greens         0.379 -1.204  2.025</span></span>
+<span><span class="co">#&gt;  Unicells       2.917  1.314  4.440</span></span>
+<span><span class="co">#&gt;  Cryptomonas    0.201 -0.599  1.030</span></span>
+<span><span class="co">#&gt;  Daphnia       -0.351 -1.165  0.515</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Term: TP_annual</span></span>
 <span><span class="co">#&gt; Type: expected</span></span>
@@ -343,7 +343,7 @@ credible intervals.
 <p>Diatoms peak in spring and reach their low in autumn. Green algae and
 <em>Daphnia</em> peak in mid-summer. <em>Cryptomonas</em> peaks in
 April. The temperature anomaly adds little once season is in the model.
-Its largest slope, for the diatoms, is -0.57 [-1.17, 0.02].</p>
+Its largest slope, for the diatoms, is -0.53 [-1.17, 0.08].</p>
 </div>
 <div class="section level2">
 <h2 id="interactions-among-the-taxa">Interactions among the taxa<a class="anchor" aria-label="anchor" href="#interactions-among-the-taxa"></a>
@@ -364,17 +364,17 @@ deviation this month:</p>
 <span><span class="co">#&gt; Lag-1 VAR transition matrix from an mvgam fit</span></span>
 <span><span class="co">#&gt;   Group      : single-panel</span></span>
 <span><span class="co">#&gt;   Dimension  : 5 x 5</span></span>
-<span><span class="co">#&gt;   Mean |A_ij| (i != j): 0.10</span></span>
+<span><span class="co">#&gt;   Mean |A_ij| (i != j): 0.11</span></span>
 <span><span class="co">#&gt;   Point estimate:</span></span>
 <span><span class="co">#&gt;             Diatoms Greens Unicells Cryptomonas Daphnia</span></span>
-<span><span class="co">#&gt; Diatoms        0.37  -0.03    -0.03        0.32   -0.19</span></span>
-<span><span class="co">#&gt; Greens        -0.09   0.40     0.13        0.07    0.14</span></span>
-<span><span class="co">#&gt; Unicells      -0.08   0.02     0.65       -0.14   -0.15</span></span>
+<span><span class="co">#&gt; Diatoms        0.37  -0.03    -0.03        0.34   -0.18</span></span>
+<span><span class="co">#&gt; Greens        -0.09   0.41     0.14        0.09    0.14</span></span>
+<span><span class="co">#&gt; Unicells      -0.07   0.03     0.66       -0.16   -0.15</span></span>
 <span><span class="co">#&gt; Cryptomonas   -0.06   0.00     0.06        0.50   -0.24</span></span>
-<span><span class="co">#&gt; Daphnia        0.03  -0.02     0.07        0.18    0.47</span></span>
+<span><span class="co">#&gt; Daphnia        0.02  -0.02     0.06        0.21    0.47</span></span>
 <span><span class="co">#&gt;   95% CI on each cell available in `A_lower` / `A_upper`.</span></span></code></pre></div>
 <p>The diagonal describes persistence. Each taxon’s deviation carries a
-coefficient between 0.37 and 0.65 into the next month. The heatmap
+coefficient between 0.37 and 0.66 into the next month. The heatmap
 outlines each cell whose 95% interval excludes zero:</p>
 <div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">A</span><span class="op">)</span></span></code></pre></div>
@@ -388,14 +388,14 @@ intervals that exclude zero.
 <p>In this fit, 2 of the twenty off-diagonal cells clear zero. Two cells
 have an ecological interpretation. The first is grazing. A month with
 more <em>Daphnia</em> than expected is followed by fewer
-<em>Cryptomonas</em>, with a coefficient of -0.24 [-0.43, -0.04]. The
-effect of <em>Cryptomonas</em> on <em>Daphnia</em> is 0.18 [-0.09,
-0.67]. It is positive in 90% of the posterior draws, which suggests that
+<em>Cryptomonas</em>, with a coefficient of -0.24 [-0.43, -0.05]. The
+effect of <em>Cryptomonas</em> on <em>Daphnia</em> is 0.21 [-0.07,
+0.82]. It is positive in 91% of the posterior draws, which suggests that
 more food in one month brings more grazers in the next. Fourteen years
 of monthly data do not settle that effect.</p>
 <p>The second cell links <em>Cryptomonas</em> to the diatoms. A month
 with more <em>Cryptomonas</em> than expected is followed by more
-diatoms, with a coefficient of 0.32 [0.01, 0.84]. Because no feeding
+diatoms, with a coefficient of 0.34 [0.01, 0.95]. Because no feeding
 link runs between two phytoplankton groups, the likelier source is a
 driver the model omits, such as a change in mixing that favours one
 group before the other. A coefficient in
@@ -420,19 +420,19 @@ reports these correlations:</p>
 <span><span class="co">#&gt; <span style="color: #949494;"># A tibble: 10 × 11</span></span></span>
 <span><span class="co">#&gt;    series_1    series_2   Estimate Est.Error Q_lower Q_upper   ESS prob_positive</span></span>
 <span><span class="co">#&gt;    <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>       <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>         <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>     <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>   <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>   <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>         <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span></span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 1</span> Unicells    Cryptomon…   0.476     0.143   0.261   0.691   169.         1    </span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 2</span> Diatoms     Cryptomon…   0.267     0.129   0.038<span style="text-decoration: underline;">5</span>  0.494   797.         0.988</span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 3</span> Cryptomonas Daphnia      0.244     0.113   0.023<span style="text-decoration: underline;">5</span>  0.439  <span style="text-decoration: underline;">1</span>434.         0.986</span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 4</span> Diatoms     Unicells     0.176     0.097<span style="text-decoration: underline;">6</span> -<span style="color: #BB0000;">0.011</span><span style="color: #BB0000; text-decoration: underline;">9</span>  0.355  <span style="text-decoration: underline;">1</span>672.         0.967</span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 5</span> Unicells    Daphnia     -<span style="color: #BB0000;">0.142</span>     0.098<span style="text-decoration: underline;">6</span> -<span style="color: #BB0000;">0.320</span>   0.051<span style="text-decoration: underline;">4</span> <span style="text-decoration: underline;">1</span>668.         0.074</span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 6</span> Diatoms     Greens       0.123     0.095<span style="text-decoration: underline;">6</span> -<span style="color: #BB0000;">0.067</span><span style="color: #BB0000; text-decoration: underline;">1</span>  0.303  <span style="text-decoration: underline;">1</span>736.         0.906</span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 7</span> Greens      Cryptomon…   0.109     0.112  -<span style="color: #BB0000;">0.106</span>   0.329  <span style="text-decoration: underline;">1</span>371.         0.841</span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 8</span> Diatoms     Daphnia      0.103     0.107  -<span style="color: #BB0000;">0.107</span>   0.298   629.         0.836</span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 9</span> Greens      Daphnia      0.033<span style="text-decoration: underline;">4</span>    0.096<span style="text-decoration: underline;">9</span> -<span style="color: #BB0000;">0.157</span>   0.219  <span style="text-decoration: underline;">1</span>358.         0.634</span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">10</span> Greens      Unicells    -<span style="color: #BB0000;">0.014</span><span style="color: #BB0000; text-decoration: underline;">4</span>    0.097<span style="text-decoration: underline;">8</span> -<span style="color: #BB0000;">0.208</span>   0.169  <span style="text-decoration: underline;">1</span>406.         0.443</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 1</span> Unicells    Cryptomon…  0.480      0.141   0.273   0.697   164.        1     </span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 2</span> Diatoms     Cryptomon…  0.270      0.134   0.039<span style="text-decoration: underline;">2</span>  0.537   207.        0.990 </span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 3</span> Cryptomonas Daphnia     0.241      0.111   0.034<span style="text-decoration: underline;">1</span>  0.433  <span style="text-decoration: underline;">1</span>002.        0.984 </span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 4</span> Diatoms     Unicells    0.176      0.099<span style="text-decoration: underline;">7</span> -<span style="color: #BB0000;">0.013</span><span style="color: #BB0000; text-decoration: underline;">0</span>  0.363   778.        0.968 </span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 5</span> Unicells    Daphnia    -<span style="color: #BB0000;">0.141</span>      0.097<span style="text-decoration: underline;">6</span> -<span style="color: #BB0000;">0.320</span>   0.048<span style="text-decoration: underline;">7</span> <span style="text-decoration: underline;">1</span>131.        0.076<span style="text-decoration: underline;">3</span></span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 6</span> Diatoms     Greens      0.122      0.095<span style="text-decoration: underline;">5</span> -<span style="color: #BB0000;">0.059</span><span style="color: #BB0000; text-decoration: underline;">2</span>  0.302  <span style="text-decoration: underline;">1</span>617.        0.902 </span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 7</span> Greens      Cryptomon…  0.108      0.113  -<span style="color: #BB0000;">0.125</span>   0.316   965.        0.834 </span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 8</span> Diatoms     Daphnia     0.095<span style="text-decoration: underline;">4</span>     0.109  -<span style="color: #BB0000;">0.134</span>   0.291   410.        0.822 </span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 9</span> Greens      Daphnia     0.031<span style="text-decoration: underline;">9</span>     0.100  -<span style="color: #BB0000;">0.165</span>   0.219  <span style="text-decoration: underline;">1</span>048.        0.631 </span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">10</span> Greens      Unicells   -<span style="color: #BB0000;">0.005</span><span style="color: #BB0000; text-decoration: underline;">77</span>    0.101  -<span style="color: #BB0000;">0.201</span>   0.188   732.        0.471 </span></span>
 <span><span class="co">#&gt; <span style="color: #949494;"># ℹ 3 more variables: prob_negative &lt;dbl&gt;, prob_nonzero &lt;dbl&gt;, sig &lt;lgl&gt;</span></span></span></code></pre></div>
 <p>The shocks of the unicellular algae and <em>Cryptomonas</em>
-correlate most strongly, at 0.48 [0.26, 0.69]. The model holds no
+correlate most strongly, at 0.48 [0.27, 0.70]. The model holds no
 covariate that would explain the shared rise.</p>
 <p>The default, <code>covariance = "stationary"</code>, correlates the
 deviations themselves. Each deviation accumulates the shocks of many
@@ -450,13 +450,13 @@ Outlined pairs have 95% credible intervals that exclude zero.
 <p>The two correlations differ where
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>A</mi><annotation encoding="application/x-tex">A</annotation></semantics></math>
 couples the taxa. The shocks of <em>Cryptomonas</em> and
-<em>Daphnia</em> correlate at 0.24 [0.02, 0.44]. Their deviations
-correlate at 0.21 [-0.02, 0.42]. Grazing passes each shock to the other
+<em>Daphnia</em> correlate at 0.24 [0.03, 0.43]. Their deviations
+correlate at 0.21 [0.00, 0.41]. Grazing passes each shock to the other
 taxon over the following months, which changes the correlation the
 shared shocks create.
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>A</mi><annotation encoding="application/x-tex">A</annotation></semantics></math>
 barely couples the unicellular algae and <em>Cryptomonas</em>. Their
-correlations are 0.48 [0.26, 0.69] for the shocks and 0.50 [0.26, 0.70]
+correlations are 0.48 [0.27, 0.70] for the shocks and 0.50 [0.29, 0.71]
 for the deviations.</p>
 </div>
 <div class="section level2">
@@ -483,15 +483,15 @@ shock in Daphnia, with 95% credible intervals. Horizon 1 is the month of
 the shock.
 </p>
 </div>
-<p>A shock raises <em>Daphnia</em> by 0.42 [0.35, 0.50] in its first
+<p>A shock raises <em>Daphnia</em> by 0.43 [0.35, 0.50] in its first
 month. The rise falls below 0.05 by month 4. Because the shocks of
 <em>Daphnia</em> and <em>Cryptomonas</em> are correlated,
 <em>Cryptomonas</em> moves with <em>Daphnia</em> in the first month, by
 0.10 [0.01, 0.19]. Grazing then acts through
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>A</mi><annotation encoding="application/x-tex">A</annotation></semantics></math>.
-In the third month <em>Cryptomonas</em> is at -0.09 [-0.17, 0.00]
+In the third month <em>Cryptomonas</em> is at -0.08 [-0.16, 0.00]
 relative to its expected level. The unicellular algae change by -0.13
-[-0.24, -0.03] in the second month. Every response stays within 0.01 of
+[-0.23, -0.03] in the second month. Every response stays within 0.01 of
 zero from month 7.</p>
 </div>
 <div class="section level2">
@@ -518,12 +518,12 @@ Colours are the taxa whose shocks generate the variance.
 </div>
 <p>For every taxon but <em>Cryptomonas</em>, its own shocks generate
 most of its forecast variance. At twelve months those own shares run
-from 68% to 91%. For <em>Cryptomonas</em>, the unicellular algae
+from 68% to 90%. For <em>Cryptomonas</em>, the unicellular algae
 generate 18% of its forecast variance in the first month and 23% by
 month twelve. Most of that share comes from the correlation of the two
 taxa’s shocks. The ordering assigns it to the unicellular algae because
 they come first. The coupling of the two taxa appears in the
-<em>Daphnia</em> panel, where <em>Cryptomonas</em> shocks generate 16%
+<em>Daphnia</em> panel, where <em>Cryptomonas</em> shocks generate 17%
 of the twelve-month forecast variance. Reordering the levels of
 <code>series</code> and refitting would move the shared part of each
 correlated pair to the other taxon. The generalised impulse responses
@@ -553,11 +553,11 @@ Posterior distributions of reactivity and of the mean and variance
 return rates. The dashed line marks zero reactivity.
 </p>
 </div>
-<p>Reactivity is -0.15 [-0.38, 0.43], with 81% of the posterior below
+<p>Reactivity is -0.15 [-0.38, 0.54], with 79% of the posterior below
 zero. The data favour a community that damps every perturbation from the
 first month. They do not exclude one that briefly amplifies some
-perturbations. The mean return rate is 0.65 [0.54, 0.77]. At the median,
-a deviation halves in about 1.6 months. The plankton community returns
+perturbations. The mean return rate is 0.66 [0.54, 0.79]. At the median,
+a deviation halves in about 1.7 months. The plankton community returns
 to its seasonal and nutrient-driven means within a season.</p>
 </div>
 <div class="section level2">
@@ -592,12 +592,12 @@ observation, in the units of the data. Lower is better.
 <span>  row.names <span class="op">=</span> <span class="cn">NULL</span></span>
 <span><span class="op">)</span></span>
 <span><span class="co">#&gt;         taxon mean_crps  coverage</span></span>
-<span><span class="co">#&gt; 1     Diatoms 0.3845181 0.9166667</span></span>
-<span><span class="co">#&gt; 2      Greens 0.4629722 1.0000000</span></span>
-<span><span class="co">#&gt; 3    Unicells 0.3105877 1.0000000</span></span>
-<span><span class="co">#&gt; 4 Cryptomonas 0.3413625 0.8333333</span></span>
-<span><span class="co">#&gt; 5     Daphnia 0.2364582 1.0000000</span></span></code></pre></div>
-<p>Of the 60 observations in 1994, 57 fell inside their 90% intervals,
+<span><span class="co">#&gt; 1     Diatoms 0.3845818 0.9166667</span></span>
+<span><span class="co">#&gt; 2      Greens 0.4619623 1.0000000</span></span>
+<span><span class="co">#&gt; 3    Unicells 0.3056566 1.0000000</span></span>
+<span><span class="co">#&gt; 4 Cryptomonas 0.3396723 0.9166667</span></span>
+<span><span class="co">#&gt; 5     Daphnia 0.2370524 1.0000000</span></span></code></pre></div>
+<p>Of the 60 observations in 1994, 58 fell inside their 90% intervals,
 close to the coverage the intervals claim. The CRPS compares models
 scored on the same data, such as this VAR against an independent
 autoregression for each taxon. The <a href="forecast_evaluation.html">forecast evaluation article</a> works

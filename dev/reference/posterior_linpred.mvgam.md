@@ -50,39 +50,46 @@ posterior_linpred(
 
 - process_error:
 
-  Logical; if `TRUE`, the trend adds a sampled innovation to its
-  deterministic submodel. Each posterior draw takes one innovation from
-  the distribution the trend settles into. An autoregressive trend
-  settles into its stationary distribution: an AR(1) draws at
-  \\\sigma^2/(1-\rho^2)\\. The Jensen correction on a log link is
-  \\\sigma^2/(2(1-\rho^2))\\. A random walk lacks a stationary
-  distribution and a
+  Logical. `FALSE`, the default, leaves the trend's innovations out of
+  the prediction. `TRUE` adds a random deviation at each time and
+  series, drawn anew for every posterior draw from the spread the trend
+  shows over the long run. For an AR(1) trend with innovation SD
+  \\\sigma\\ and coefficient \\\rho\\ that spread has variance
+  \\\sigma^2/(1-\rho^2)\\. On a log link the deviations raise the
+  average prediction by the factor \\\exp(\sigma^2/(2(1-\rho^2)))\\. A
+  random walk has no long-run spread. A
   [`ZMVN()`](https://nicholasjclark.github.io/mvgam/dev/reference/ZMVN.md)
-  trend lacks dynamics. Both draw their innovations directly.
+  trend has no dynamics. These two draw from the innovation covariance
+  itself.
   [`CAR()`](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md)
-  uses one stationary covariance at every time of an irregular grid and
-  draws from it. If `FALSE`, the default, the trend contributes its
-  deterministic submodel alone, at its own per-draw values. The argument
-  applies under `incl_autocor = FALSE`. Conditioning on the fitted state
-  already fixes every innovation.
+  draws from one long-run covariance at every time of an irregular grid.
+  The argument applies under `incl_autocor = FALSE`. The fitted state
+  already holds every innovation.
 
   Each call draws new innovations. Two calls on one fit give different
   results. Set a seed to reproduce a result.
 
 - incl_autocor:
 
-  Logical; which prediction surface the trend contribution comes from.
-  `FALSE`, the default, omits the fitted `trend[t, s]` and uses the two
-  submodels' covariate structure. The effect is the same at the first
-  time point as at the fiftieth. `TRUE` uses the latent state the model
-  inferred at each time. That is the quantity
+  Logical. Chooses which version of the trend each prediction uses.
+  `FALSE`, the default, uses the covariate part of the model: the
+  effects in the observation formula and the trend formula, without the
+  trend's innovations. A prediction then depends on the covariates
+  alone. It is the same at the first time point as at the fiftieth.
+  Questions about covariate effects use this version. `TRUE` uses the
+  fitted state, the value the trend took at each observed time as
   [`hindcast()`](https://nicholasjclark.github.io/mvgam/dev/reference/hindcast.md)
-  returns. The ELPD is computed from it.
+  returns it. The section 'Which prediction function?' of
+  [`predict.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/predict.mvgam.md)
+  compares the functions.
+
+  An ELPD or an \\R^2\\ describes the observed series.
+  [`log_lik()`](https://mc-stan.org/rstantools/reference/log_lik.html),
   [`loo_R2.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam_loo_extras.md)
   and
   [`bayes_R2.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam_diagnostics.md)
-  request this surface. An R^2 describes the observed series. A row
-  whose time falls outside the fitted grid is refused under `TRUE`.
+  use `TRUE` for that reason. A time outside the training data is
+  refused under `TRUE`.
   [`forecast.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/forecast.mvgam.md)
   predicts those times. An in-sample interval under `TRUE` conditions on
   states estimated from the same observations. It covers them more often
@@ -93,8 +100,8 @@ posterior_linpred(
 
   The default suits a model whose covariates explain most of the signal.
   When most of the series-level variation lies in the trend, as in a fit
-  with few covariates and a strong autoregressive process, this surface
-  has little to say.
+  with few covariates and a strong autoregressive process, the covariate
+  part has little to say.
   [`hindcast.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/hindcast.mvgam.md)
   and
   [`forecast.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/forecast.mvgam.md)
@@ -125,8 +132,8 @@ posterior_linpred(
 
 - sample_new_levels:
 
-  Character; accepted for brms compatibility and not used, since new
-  levels are refused. See `allow_new_levels`.
+  Character; accepted for brms compatibility. It has no effect, because
+  new levels are refused. See `allow_new_levels`.
 
 - resp:
 
@@ -157,12 +164,24 @@ a named list, one element per response.
 
 The observation predictor holds the fixed, group-level, smooth and
 Gaussian process terms of `formula`. The trend predictor holds the terms
-of `trend_formula`. `process_error = TRUE` adds one sampled innovation
-per posterior draw, on the link scale.
+of `trend_formula`. `process_error = TRUE` adds a sampled deviation at
+each time and series, on the link scale.
 [`posterior_epred.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/posterior_epred.mvgam.md)
 and
 [`posterior_predict.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/posterior_predict.mvgam.md)
 apply the family's mean and noise to that same predictor.
+
+## Trend state
+
+By default the trend enters through its covariate part, without the
+state it took at each observed time. The brms counterparts of this
+method use that fitted state. `incl_autocor = TRUE` uses it here too, as
+[`fitted.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/fitted.mvgam.md)
+and
+[`pp_check.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/pp_check.mvgam.md)
+do on the training data. The section 'Which prediction function?' of
+[`predict.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/predict.mvgam.md)
+compares the prediction functions.
 
 ## See also
 
@@ -174,7 +193,7 @@ returns predictive draws.
 and
 [`forecast.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/forecast.mvgam.md)
 take the trend from its fitted state. The [forecast evaluation
-article](https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html)
+article](https://nicholasjclark.github.io/mvgam/dev/articles/forecast_evaluation.html)
 scores predictions of held-out times.
 
 Other predictions:
@@ -196,10 +215,10 @@ Other predictions:
 set.seed(13)
 simdat <- sim_mvgam(family = poisson(), n_series = 1L,
                     n_timepoints = 120L, trend_model = AR())
-mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
+mod <- mvgam(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1),
              data = simdat$data_train, family = poisson(),
              chains = 2, silent = 2)
-#> Warning: 9 of 2000 (0.0%) transitions ended with a divergence.
+#> Warning: 5 of 2000 (0.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 
 # Log rates, one row per draw and one column per observation

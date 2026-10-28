@@ -51,6 +51,11 @@ working installation of `Stan` through
 [`rstan`](https://mc-stan.org/users/interfaces/rstan) or
 [`cmdstanr`](https://mc-stan.org/cmdstanr/).
 
+## Cheatsheet
+
+[![mvgam usage
+cheatsheet](https://github.com/nicholasjclark/mvgam/raw/master/misc/mvgam_cheatsheet.png)](https://github.com/nicholasjclark/mvgam/raw/master/misc/mvgam_cheatsheet.pdf)
+
 ## A state-space model of rodent captures
 
 The `portal_data` from [the Portal
@@ -787,7 +792,7 @@ Entry points that compile a state-space model and sample it.
 Building the observation formula and choosing a latent trend process.
 
 - [`mvgam_formula()`](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam_formula.md)
-  : Create an mvgam formula object
+  : Pair an observation formula with a trend formula
 
 - [`print(`*`<mvgam_formula>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/print.mvgam_formula.md)
   : Print method for mvgam_formula objects
@@ -801,7 +806,7 @@ Building the observation formula and choosing a latent trend process.
   [`VAR()`](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md)
   :
 
-  Trend Model Constructors for mvgam
+  Latent trend models for mvgam
 
 - [`LLT()`](https://nicholasjclark.github.io/mvgam/dev/reference/LLT.md)
   :
@@ -812,9 +817,7 @@ Building the observation formula and choosing a latent trend process.
   : Piecewise linear or logistic trends
 
 - [`ZMVN()`](https://nicholasjclark.github.io/mvgam/dev/reference/ZMVN.md)
-  :
-
-  Specify correlated residual processes in mvgam
+  : Correlated latent effects with no time dependence
 
 - [`lv_axis()`](https://nicholasjclark.github.io/mvgam/dev/reference/lv_axis.md)
   : Vary a trend effect along the trend's axis
@@ -833,8 +836,8 @@ Building the observation formula and choosing a latent trend process.
 
 ## Observation families
 
-Likelihoods mvgam adds on top of the brms family library, for counts,
-compositions, occupancy and abundance.
+Families mvgam adds to those of brms, for counts, compositions,
+occupancy and abundance.
 
 - [`mvgam_families`](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam_families.md)
   : Observation families supported by mvgam
@@ -917,7 +920,7 @@ shape a proposed family expects.
   : Convert time series objects to mvgam long format
 
 - [`pivot_detection_array()`](https://nicholasjclark.github.io/mvgam/dev/reference/pivot_detection_array.md)
-  : Pivot a detection array to mvgam long-format
+  : Convert a detection array to the long format of mvgam
 
 - [`pivot_species_matrix()`](https://nicholasjclark.github.io/mvgam/dev/reference/pivot_species_matrix.md)
   : Pivot a wide species matrix to mvgam long-format
@@ -969,14 +972,14 @@ checks.
 
 ## Prediction and forecasting
 
-Propagating the fitted latent state forward, and marginalising over it
-for covariate-driven prediction.
+Forecasts carry the fitted trend forward in time. Predictions from
+covariates leave the fitted trend out.
 
 - [`predict(`*`<mvgam>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/predict.mvgam.md)
-  : Draws from the Posterior Distribution of an mvgam Model
+  : Posterior predictions from an mvgam model
 
 - [`fitted(`*`<mvgam>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/fitted.mvgam.md)
-  : Expected Values from the Posterior Distribution
+  : Expected values of an mvgam model
 
 - [`posterior_epred(`*`<mvgam>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/posterior_epred.mvgam.md)
   : Expected values of the response for each posterior draw
@@ -1053,8 +1056,8 @@ for covariate-driven prediction.
 
 ## Model criticism and cross-validation
 
-Posterior predictive checks, residuals, information criteria and the
-forecast-honest alternatives to them.
+Posterior predictive checks, residuals, leave-one-out criteria and
+cross-validation of forecasts.
 
 - [`pp_check(`*`<mvgam>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/pp_check.mvgam.md)
   :
@@ -1082,7 +1085,7 @@ forecast-honest alternatives to them.
   [`loo_compare(`*`<mvgam>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/loo.mvgam.md)
   :
 
-  LOO information criteria for mvgam models
+  Approximate leave-one-out cross-validation for mvgam models
 
 - [`waic(`*`<mvgam>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/waic.mvgam.md)
   : Widely applicable information criterion for mvgam models
@@ -1188,8 +1191,8 @@ forecast-honest alternatives to them.
 
 ## Posterior summaries and diagnostics
 
-Reading parameters off a fit, checking convergence, and recovering the
-Stan program that produced it.
+Parameter summaries and convergence checks for a fit. The Stan program
+and data that produced it.
 
 - [`summary(`*`<mvgam>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/summary.mvgam.md)
   : Summary of mvgam model fits
@@ -1341,8 +1344,8 @@ interfaces.
 
 ## Interrogating a fitted VAR
 
-Impulse responses, variance decompositions and stability metrics read
-off the posterior for the transition matrix and innovation covariance.
+Impulse responses, variance decompositions and stability measures
+computed from the posterior of a VAR trend.
 
 - [`irf()`](https://nicholasjclark.github.io/mvgam/dev/reference/irf.mvgam.md)
   : Calculate latent VAR impulse response functions
@@ -1470,8 +1473,7 @@ correlations a factor model implies.
 
 ## Plotting
 
-The general-purpose plot methods for a fitted model, and the theme they
-are drawn with.
+Plot methods for a fitted model. mvgam_theme() styles every figure.
 
 - [`plot(`*`<mvgam>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/plot.mvgam.md)
   :
@@ -1500,8 +1502,6 @@ Example data used across the vignettes, articles and examples.
   : Simulated coral bleaching index with irregular CAR(1) state
 - [`lake_chemistry`](https://nicholasjclark.github.io/mvgam/dev/reference/lake_chemistry.md)
   : Simulated lake chemistry with correlated random-walk state
-- [`glm_analysis`](https://nicholasjclark.github.io/mvgam/dev/reference/glm_analysis.md)
-  : GLM likelihood detection and trend injection
 
 ## Re-exports
 
@@ -1609,7 +1609,7 @@ Generics re-exported from brms, posterior, loo and marginaleffects.
 
 ### Getting started
 
-Shape your data, then meet the modelling surface that consumes it.
+Prepare your data and fit a first state-space model.
 
 - [Formatting data for
   mvgam](https://nicholasjclark.github.io/mvgam/dev/articles/data.md):
@@ -1618,8 +1618,8 @@ Shape your data, then meet the modelling surface that consumes it.
 
 ### Latent dynamics
 
-Trend processes that carry temporal structure the observation model
-cannot see, and the post-fit tools that interrogate them.
+Latent trends that model dependence over time. The articles also
+interpret a fitted trend.
 
 - [State-space vector autoregressions with
   mvgam](https://nicholasjclark.github.io/mvgam/dev/articles/var.md):

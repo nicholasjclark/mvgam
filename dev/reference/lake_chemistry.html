@@ -91,12 +91,11 @@ from month 31 onwards in all lakes.</p></dd>
 </dl></div>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
-    <p>A pooled fit that ignores both the latent state and the
-lake-level slope variation reports a near-zero aggregate
-treatment effect with wide credible intervals. The state-space
-fit (<code>trend_formula = ~ RW(cor = TRUE)</code>) with random treatment
-slopes recovers the heterogeneity. The wide aggregate CI comes
-from lake-level variation in the treatment effect.</p>
+    <p>A pooled fit with one treatment slope for all lakes reports an
+effect near zero with a wide credible interval. The positive and
+negative responses cancel. A state-space fit
+(<code>trend_formula = ~ RW(cor = TRUE)</code>) with a treatment slope for each
+lake recovers the response of every lake.</p>
 <p>True generative components:</p><ul><li><p>Per-lake intercepts (centred).</p></li>
 <li><p>Latent random walk with cross-lake innovation correlation
 <code>0.6</code> between <code>(alpine, boreal)</code> and <code>(coastal, delta)</code>,
@@ -105,17 +104,88 @@ independent for <code>estuary</code>. Innovation standard deviation
 <li><p>Heterogeneous treatment slopes:
 <code>(alpine = +0.8, boreal = +0.6, coastal = -0.5, delta = -0.7, estuary = -0.6)</code>.</p></li>
 <li><p>Observation noise <code>sigma = 0.4</code>.</p></li>
-</ul><p>Recommended fit (state-space, with treatment on the observation
-equation and the correlated drift on the latent state):</p>
-<p></p><div class="sourceCode r"><pre><code><span><span class="fu"><a href="../reference/mvgam.html">mvgam</a></span><span class="op">(</span></span>
-<span>  formula <span class="op">=</span> <span class="va">y</span> <span class="op">~</span> <span class="va">treated</span> <span class="op">+</span> <span class="op">(</span><span class="va">treated</span> <span class="op">||</span> <span class="va">lake</span><span class="op">)</span>,</span>
-<span>  trend_formula <span class="op">=</span> <span class="op">~</span> <span class="fu"><a href="../reference/trend_constructors.html">RW</a></span><span class="op">(</span>cor <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span>,</span>
-<span>  data <span class="op">=</span> <span class="va">lake_chemistry</span>,</span>
-<span>  family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">gaussian</a></span><span class="op">(</span><span class="op">)</span></span>
-<span><span class="op">)</span></span></code></pre><p></p></div>
-<p>Built by <code>data-raw/build_lake_chemistry.R</code>.</p>
+</ul></div>
+    <div class="section level2">
+    <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>
+    <div class="dont-index"><p><code><a href="trend_constructors.html">RW()</a></code> for the trend, <code><a href="residual_cor.html">residual_cor()</a></code> to extract the fitted
+correlations between lakes, <code><a href="ranef.mvgam.html">ranef.mvgam()</a></code> for the lake slopes,
+<code><a href="mvgam_data.html">mvgam_data()</a></code> to check the data.</p></div>
     </div>
 
+    <div class="section level2">
+    <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/data.html" class="external-link">data</a></span><span class="op">(</span><span class="va">lake_chemistry</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="mvgam_data.html">mvgam_data</a></span><span class="op">(</span><span class="va">lake_chemistry</span>, family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">gaussian</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span></span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">✔</span> Data check passed for family 'gaussian (link = identity)'.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> series: 5 levels</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> time:   1 to 60</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> n obs:  300 (0 NA)</span>
+<span class="r-plt img"><img src="lake_chemistry-1.png" alt="" width="700" height="433"></span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># \dontrun{</span></span></span>
+<span class="r-in"><span><span class="co"># A model with the structure the data were simulated from</span></span></span>
+<span class="r-in"><span><span class="va">mod</span> <span class="op">&lt;-</span> <span class="fu"><a href="mvgam.html">mvgam</a></span><span class="op">(</span></span></span>
+<span class="r-in"><span>  formula <span class="op">=</span> <span class="va">y</span> <span class="op">~</span> <span class="va">treated</span> <span class="op">+</span> <span class="op">(</span><span class="va">treated</span> <span class="op">||</span> <span class="va">lake</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>  trend_formula <span class="op">=</span> <span class="op">~</span> <span class="fu"><a href="trend_constructors.html">RW</a></span><span class="op">(</span>cor <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>  data <span class="op">=</span> <span class="va">lake_chemistry</span>,</span></span>
+<span class="r-in"><span>  family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">gaussian</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>  chains <span class="op">=</span> <span class="fl">2</span>, silent <span class="op">=</span> <span class="fl">2</span></span></span>
+<span class="r-in"><span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  Family: gaussian </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   Links: mu = identity; sigma = log </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Formula: y ~ treated + (treated || lake) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    Data: lake_chemistry (Number of observations: 300) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  Series: 5 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  Trends: RW </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   Draws: 2 chains, each with iter = 2000; warmup = 1000; thin = 1; </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>          total post-warmup draws = 2000</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> == Observation Model ==</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Multilevel Hyperparameters:</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ~lake (Number of levels: 5)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>               Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sd(Intercept)     1.99      0.80     0.95     3.89 1.00     1007     1372</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sd(treated)       1.09      0.69     0.09     2.83 1.00      421      266</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Regression Coefficients:</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>           Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Intercept     0.18      0.87    -1.56     1.90 1.00      671      999</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> treated      -0.37      0.64    -1.67     0.87 1.00      753      772</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Further Distributional Parameters:</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>       Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sigma     0.41      0.03     0.35     0.46 1.01      364      689</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> == Trend Model ==</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Trend Specific Parameters:</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                      Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sigma_trend[alpine]      0.34      0.08     0.21     0.50 1.00      519</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sigma_trend[boreal]      0.26      0.06     0.17     0.39 1.00      937</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sigma_trend[coastal]     0.24      0.06     0.14     0.37 1.00      699</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sigma_trend[delta]       0.35      0.07     0.22     0.51 1.00      668</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sigma_trend[estuary]     0.34      0.07     0.21     0.51 1.00      883</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                      Tail_ESS</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sigma_trend[alpine]       993</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sigma_trend[boreal]      1383</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sigma_trend[coastal]     1297</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sigma_trend[delta]       1142</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sigma_trend[estuary]     1172</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Draws were sampled using sampling(NUTS). For each parameter, Bulk_ESS</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> and Tail_ESS are effective sample size measures, and Rhat is the potential</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> scale reduction factor on split chains (at convergence, Rhat = 1).</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Next steps:</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   - `pp_check(fit)`: posterior predictive checks</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   - `residual_cor(fit)`: implied cross-series correlations</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   - `forecast(fit, newdata = ...)`: out-of-sample forecasts</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   - `lfo_cv(fit)`: leave-future-out model comparison</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   - `conditional_effects(fit)`: covariate effects</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Use `how_to_cite(fit)` for a methods paragraph and `methods_md(fit)` for its equations.</span>
+<span class="r-in"><span><span class="co"># }</span></span></span>
+</code></pre></div>
+    </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
     </nav></aside></div>
 

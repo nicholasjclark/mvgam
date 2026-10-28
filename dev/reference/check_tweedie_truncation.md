@@ -40,6 +40,11 @@ them share the one `M`. `mphi` and `mtheta` are taken per observation.
 This covers a parameter given a formula of its own as well as a scalar
 one.
 
+## See also
+
+[`tweedie()`](https://nicholasjclark.github.io/mvgam/dev/reference/tweedie.md)
+for the family and its argument `M`.
+
 ## Examples
 
 ``` r
@@ -47,15 +52,15 @@ one.
 set.seed(3)
 simdat <- sim_mvgam(family = tweedie(), n_series = 1L,
                     n_timepoints = 120L, trend_model = AR())
-mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
+mod <- mvgam(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1),
              data = simdat$data_train, family = tweedie(),
              chains = 2, silent = 2)
-#> Warning: 51 of 2000 (3.0%) transitions ended with a divergence.
+#> Warning: 32 of 2000 (2.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 
 # The largest Poisson rate the fit implies, against the default M = 30
 check_tweedie_truncation(mod)
-#> Tweedie truncation diagnostic. M = 30, max(lambda) at posterior mean = 4.91 (ratio = 0.164).
+#> Tweedie truncation diagnostic. M = 30, max(lambda) at posterior mean = 4.97 (ratio = 0.166).
 
 # A warning here would call for a refit with a longer series, such
 # as family = tweedie(M = 60)

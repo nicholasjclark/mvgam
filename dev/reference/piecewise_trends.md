@@ -125,7 +125,7 @@ Statistician*, 72, 37-45.
 for a trend whose growth changes continuously.
 [`get_prior()`](https://nicholasjclark.github.io/mvgam/dev/reference/get_prior.md)
 lists the default priors. The [forecast evaluation
-article](https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html)
+article](https://nicholasjclark.github.io/mvgam/dev/articles/forecast_evaluation.html)
 compares a piecewise trend with other trends out of sample.
 
 Other trend models:

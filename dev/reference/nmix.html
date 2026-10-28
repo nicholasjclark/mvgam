@@ -158,8 +158,9 @@ product close to the truth (Knape et al. 2018). <code><a href="pp_check.mvgam.ht
 <p>A <code>cap</code> column, constant within each unit and at least its largest
 count, sets the cap <code>K_max</code>. Without one, <code>"poisson_binomial"</code> and
 <code>"poisson_poisson"</code> take each unit's largest count plus 100, as
-<code>unmarked::pcount()</code> does. <code>"royle_nichols"</code> takes 25, as
-<code>unmarked::occuRN()</code> does. A detection gives no floor on <code>N</code>.
+<code>unmarked::pcount()</code> does. <code>"royle_nichols"</code> takes a fixed 25, as
+<code>unmarked::occuRN()</code> does. Its 0 / 1 detections carry no count to
+build a cap from.
 A lower cap shortens the sum and speeds sampling. A cap that binds
 biases abundance down. <code><a href="latent_N_saturation.html">latent_N_saturation()</a></code> reports, for each
 unit, the posterior probability that <code>N</code> equals its cap. A
@@ -215,9 +216,9 @@ Ecology and Evolution</em>, 9, 2102-2114.
     <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>
     <div class="dont-index"><p><code><a href="occ.html">occ()</a></code> for the related joint-occupancy family and
 <code><a href="pp_check.mvgam.html">pp_check.mvgam()</a></code> for closure-unit goodness-of-fit checks. The
-<a href="https://nicholasjclark.github.io/mvgam/articles/nmix.html">N-mixture article</a> fits N-mixture and
+<a href="https://nicholasjclark.github.io/mvgam/dev/articles/nmix.html">N-mixture article</a> fits N-mixture and
 occupancy models from data preparation to inference. The
-<a href="https://nicholasjclark.github.io/mvgam/articles/data.html">data article</a> sets out the row layout
+<a href="https://nicholasjclark.github.io/mvgam/dev/articles/data.html">data article</a> sets out the row layout
 that <code>nmix()</code> expects.</p>
 <p>Other observation families:
 <code><a href="beta_nb.html">beta_nb()</a></code>,

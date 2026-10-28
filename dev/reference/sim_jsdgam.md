@@ -166,7 +166,7 @@ fits the model these data come from.
 simulates occupancy and N-mixture data.
 [`sim_mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/sim_mvgam.md)
 simulates time series. The [joint species distribution
-article](https://nicholasjclark.github.io/mvgam/articles/jsdgam.html)
+article](https://nicholasjclark.github.io/mvgam/dev/articles/jsdgam.html)
 fits and interprets models of this kind.
 
 Other simulation:

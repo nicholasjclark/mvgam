@@ -77,9 +77,8 @@ deviation (MAD).</p></dd>
 
 
 <dt id="arg-probs">probs<a class="anchor" aria-label="anchor" href="#arg-probs"></a></dt>
-<dd><p>Numeric vector of probabilities for quantile computation.
-Default is <code>c(0.025, 0.975)</code> for 95% credible intervals. Can be a
-single value or multiple values.</p></dd>
+<dd><p>Two probabilities for the lower and upper bounds of the
+credible interval. Default <code>c(0.025, 0.975)</code>, a 95% interval.</p></dd>
 
 
 <dt id="arg-pars">pars<a class="anchor" aria-label="anchor" href="#arg-pars"></a></dt>
@@ -143,20 +142,20 @@ effects.</p>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed</a></span><span class="op">(</span><span class="fl">14</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="va">simdat</span> <span class="op">&lt;-</span> <span class="fu"><a href="sim_mvgam.html">sim_mvgam</a></span><span class="op">(</span>family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson</a></span><span class="op">(</span><span class="op">)</span>, n_series <span class="op">=</span> <span class="fl">4L</span>,</span></span>
 <span class="r-in"><span>                    n_timepoints <span class="op">=</span> <span class="fl">120L</span>, trend_model <span class="op">=</span> <span class="fu"><a href="trend_constructors.html">AR</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="va">mod</span> <span class="op">&lt;-</span> <span class="fu"><a href="mvgam.html">mvgam</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="fu">s</span><span class="op">(</span><span class="va">x</span><span class="op">)</span> <span class="op">+</span> <span class="op">(</span><span class="fl">1</span> <span class="op">|</span> <span class="va">series</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span><span class="va">mod</span> <span class="op">&lt;-</span> <span class="fu"><a href="mvgam.html">mvgam</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="fu">s</span><span class="op">(</span><span class="va">x</span>, k <span class="op">=</span> <span class="fl">5</span><span class="op">)</span> <span class="op">+</span> <span class="op">(</span><span class="fl">1</span> <span class="op">|</span> <span class="va">series</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>             trend_formula <span class="op">=</span> <span class="op">~</span> <span class="fu"><a href="trend_constructors.html">AR</a></span><span class="op">(</span>p <span class="op">=</span> <span class="fl">1</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>             data <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span>, family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>             chains <span class="op">=</span> <span class="fl">2</span>, silent <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 76 of 2000 (4.0%) transitions ended with a divergence.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 24 of 2000 (1.0%) transitions ended with a divergence.</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> See https://mc-stan.org/misc/warnings for details.</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Each series' intercept deviation, one row per series</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/pkg/nlme/man/random.effects.html" class="external-link">ranef</a></span><span class="op">(</span><span class="va">mod</span><span class="op">)</span><span class="op">$</span><span class="va">series</span><span class="op">[</span>, , <span class="st">"Intercept"</span><span class="op">]</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>             Estimate Est.Error       Q2.5     Q97.5</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> series_1  0.02302209 0.1547355 -0.2854640 0.4089481</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> series_2 -0.01007524 0.1581944 -0.3519195 0.3527626</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> series_3 -0.05932478 0.1603765 -0.4272920 0.2608693</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> series_4  0.08101280 0.1675221 -0.1899871 0.4942324</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> series_1  0.01786056 0.1484211 -0.2984343 0.3563554</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> series_2 -0.01737725 0.1533627 -0.3660618 0.3304502</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> series_3 -0.06269192 0.1613000 -0.4453253 0.2283232</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> series_4  0.08603233 0.1743587 -0.2064177 0.5164707</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Next: VarCorr() gives the standard deviation of these deviations</span></span></span>
 <span class="r-in"><span><span class="co"># }</span></span></span>

@@ -19,9 +19,8 @@ summary(object, probs = c(0.025, 0.975), robust = FALSE, matrices = FALSE, ...)
 
 - probs:
 
-  Numeric vector of probabilities for quantile computation. Default is
-  `c(0.025, 0.975)` for 95% credible intervals. Can be a single value or
-  multiple values.
+  Two probabilities for the lower and upper bounds of the credible
+  interval. Default `c(0.025, 0.975)`, a 95% interval.
 
 - robust:
 
@@ -115,8 +114,25 @@ Each block has the columns:
 
   Bulk and tail effective sample sizes.
 
+Vehtari et al. (2021) recommend an Rhat below 1.01 and bulk and tail
+effective sample sizes above 400 before a summary is used. A fit should
+also have no divergent transitions. The section 'Checking a fit' of
+[mvgam_diagnostics](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam_diagnostics.md)
+says what to do when one of these checks fails.
+
+## References
+
+Vehtari, A., Gelman, A., Simpson, D., Carpenter, B. and Burkner, P.-C.
+(2021). Rank-normalization, folding, and localization: an improved Rhat
+for assessing convergence of MCMC. *Bayesian Analysis*, 16(2):667-718.
+[doi:10.1214/20-BA1221](https://doi.org/10.1214/20-BA1221)
+
 ## See also
 
+[mvgam_diagnostics](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam_diagnostics.md)
+checks convergence.
+[`pp_check.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/pp_check.mvgam.md)
+checks the fit against the data.
 [`how_to_cite()`](https://nicholasjclark.github.io/mvgam/dev/reference/how_to_cite.mvgam.md)
 drafts a methods paragraph for the model.
 [`methods_md()`](https://nicholasjclark.github.io/mvgam/dev/reference/methods_md.md)
@@ -145,17 +161,17 @@ Other posterior summaries:
 set.seed(13)
 simdat <- sim_mvgam(family = poisson(), n_series = 1L,
                      n_timepoints = 120L, trend_model = AR())
-mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
+mod <- mvgam(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1),
               data = simdat$data_train,
               family = poisson(),
               chains = 2, silent = 2)
-#> Warning: 9 of 2000 (0.0%) transitions ended with a divergence.
+#> Warning: 5 of 2000 (0.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 
 summary(mod)
 #>  Family: poisson 
 #>   Links: mu = log 
-#> Formula: y ~ s(x) 
+#> Formula: y ~ s(x, k = 5) 
 #>    Data: simdat$data_train (Number of observations: 90) 
 #>  Trends: AR(1) 
 #>   Draws: 2 chains, each with iter = 2000; warmup = 1000; thin = 1; 
@@ -164,21 +180,21 @@ summary(mod)
 #> == Observation Model ==
 #> Smoothing Spline Hyperparameters:
 #>           Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> sds(sx_1)     4.32      1.65     1.93     8.28 1.00      583      999
+#> sds(sx_1)     5.14      1.98     2.37     9.97 1.00      876      977
 #> 
 #> Regression Coefficients:
 #>           Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> Intercept     1.63      0.14     1.36     1.92 1.01      791      571
-#> sx_1          7.70      4.92    -1.81    17.73 1.00      785     1102
+#> Intercept     1.63      0.14     1.34     1.91 1.00     1075      887
+#> sx_1          8.48      2.34     3.68    13.01 1.00      831     1119
 #> 
 #> == Trend Model ==
 #> Trend Specific Parameters:
 #>                       Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS
-#> sigma_trend[series_1]     0.44      0.07     0.30     0.59 1.00      575
-#> ar1_trend[series_1]       0.59      0.15     0.28     0.85 1.01      407
+#> sigma_trend[series_1]     0.47      0.07     0.34     0.62 1.00      791
+#> ar1_trend[series_1]       0.56      0.14     0.25     0.81 1.00      381
 #>                       Tail_ESS
-#> sigma_trend[series_1]     1100
-#> ar1_trend[series_1]        955
+#> sigma_trend[series_1]     1196
+#> ar1_trend[series_1]        961
 #> 
 #> Draws were sampled using sampling(NUTS). For each parameter, Bulk_ESS
 #> and Tail_ESS are effective sample size measures, and Rhat is the potential
@@ -194,12 +210,12 @@ summary(mod)
 # Each block is a data frame, such as the trend's dynamics
 round(summary(mod)$trend_spec, 2)
 #>                       Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS
-#> sigma_trend[series_1]     0.44      0.07     0.30     0.59 1.00   575.18
-#> ar1_trend[series_1]       0.59      0.15     0.28     0.85 1.01   407.26
+#> sigma_trend[series_1]     0.47      0.07     0.34     0.62    1   790.69
+#> ar1_trend[series_1]       0.56      0.14     0.25     0.81    1   381.25
 #>                       Tail_ESS
-#> sigma_trend[series_1]  1099.50
-#> ar1_trend[series_1]     954.86
+#> sigma_trend[series_1]  1196.07
+#> ar1_trend[series_1]     960.50
 
-# Next: how_to_cite() drafts the methods paragraph
+# Next: pp_check(mod) compares draws from the model with the data
 # }
 ```

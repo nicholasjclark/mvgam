@@ -36,9 +36,8 @@ mvgam_multiple(formula, trend_formula = NULL, data_list, combine = TRUE, ...)
   [`lv_axis()`](https://nicholasjclark.github.io/mvgam/dev/reference/lv_axis.md)
   in a term to vary its effect by latent factor, or by series in a model
   without factors, as in `~ x:lv_axis() + AR()`. The series column
-  itself is not supported in a term of this formula. An exact `gp()`
-  term here also predicts in-sample alone. Forecasting a model that
-  holds one requires the approximate form.
+  itself is not supported in a term of this formula. Forecasting
+  requires the approximate form of any `gp()` term here.
 
 - data_list:
 
@@ -126,13 +125,13 @@ fit_pooled <- mvgam_multiple(
   chains = 2,
   silent = 2
 )
-#> Warning: 47 of 2000 (2.0%) transitions ended with a divergence.
+#> Warning: 38 of 2000 (2.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
-#> Warning: 220 of 2000 (11.0%) transitions ended with a divergence.
+#> Warning: 407 of 2000 (20.0%) transitions ended with a divergence.
+#> See https://mc-stan.org/misc/warnings for details.
+#> Warning: 697 of 2000 (35.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 #> Warning: 1 of 2 chains had an E-BFMI less than 0.3.
-#> See https://mc-stan.org/misc/warnings for details.
-#> Warning: 110 of 2000 (6.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 
 # The summary adds the convergence of each imputation fit
@@ -148,21 +147,21 @@ summary(fit_pooled)
 #> == Observation Model ==
 #> Regression Coefficients:
 #>           Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> Intercept     0.08      0.19    -0.29     0.46 1.01     1643     2284
-#> x             0.44      0.19     0.11     0.82 1.03      848     1945
+#> Intercept     0.09      0.19    -0.27     0.44 1.15     1264     1718
+#> x             0.44      0.16     0.14     0.78 1.06     1550     2286
 #> 
 #> Further Distributional Parameters:
 #>       Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> sigma     1.08      0.22     0.59     1.46 1.08      214      174
+#> sigma     0.98      0.30     0.41     1.45 1.55      167       93
 #> 
 #> == Trend Model ==
 #> Trend Specific Parameters:
 #>                       Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS
-#> sigma_trend[series_1]     0.41      0.33     0.01     1.16 1.07      192
-#> ar1_trend[series_1]       0.09      0.37    -0.70     0.73 1.02     2282
+#> sigma_trend[series_1]     0.52      0.41     0.01     1.44 1.47      172
+#> ar1_trend[series_1]       0.13      0.35    -0.61     0.75 1.15      764
 #>                       Tail_ESS
-#> sigma_trend[series_1]      174
-#> ar1_trend[series_1]       3099
+#> sigma_trend[series_1]      436
+#> ar1_trend[series_1]       1961
 #> 
 #> Draws were sampled using sampling(NUTS). For each parameter, Bulk_ESS
 #> and Tail_ESS are effective sample size measures, and Rhat is the potential
@@ -178,9 +177,9 @@ summary(fit_pooled)
 #> Multiple imputation: 3 fits of 2000 draws each, pooled.
 #> Rhat is each parameter's largest and each ESS its sum over the fits.
 #>    Imputation Max_Rhat Min_Bulk_ESS Min_Tail_ESS
-#>             1    1.019           97           54
-#>             2    1.087           17           17
-#>             3    1.024           73           18
+#>             1    1.018          130           54
+#>             2    1.110           13           13
+#>             3    1.622            3           11
 
 # Next, `combine = FALSE` returns the three fits as a list
 # }

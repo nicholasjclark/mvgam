@@ -148,11 +148,11 @@ Nicholas J Clark
 set.seed(13)
 simdat <- sim_mvgam(family = poisson(), n_series = 1L,
                      n_timepoints = 120L, trend_model = AR())
-mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
+mod <- mvgam(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1),
               data    = simdat$data_train,
               family  = poisson(),
               chains  = 2, silent = 2)
-#> Warning: 9 of 2000 (0.0%) transitions ended with a divergence.
+#> Warning: 5 of 2000 (0.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 
 # The smooth with 30 of its draws
@@ -161,12 +161,12 @@ plot(cs)
 
 head(cs[[1]])
 #>           x effect1__ cond__ estimate__      se__     lower__   upper__
-#> 1 -1.956267 -1.956267      1  0.2071589 0.2821661 -0.33025761 0.7337982
-#> 2 -1.916330 -1.916330      1  0.2392826 0.2270119 -0.25263255 0.6775496
-#> 3 -1.876393 -1.876393      1  0.2507761 0.2217439 -0.17511226 0.6599440
-#> 4 -1.836457 -1.836457      1  0.2699572 0.2363200 -0.09783097 0.6580855
-#> 5 -1.796520 -1.796520      1  0.3178227 0.1945313 -0.02092190 0.6572136
-#> 6 -1.756583 -1.756583      1  0.3687286 0.1613741  0.05551992 0.6700141
+#> 1 -1.956267 -1.956267      1  0.1395892 0.2528395 -0.33127905 0.6819955
+#> 2 -1.916330 -1.916330      1  0.1810723 0.2343669 -0.24878642 0.6823771
+#> 3 -1.876393 -1.876393      1  0.2233491 0.2146605 -0.16871206 0.6827754
+#> 4 -1.836457 -1.836457      1  0.2747993 0.1916381 -0.09094228 0.6832153
+#> 5 -1.796520 -1.796520      1  0.3282185 0.1809053 -0.01363752 0.6837284
+#> 6 -1.756583 -1.756583      1  0.3828878 0.1715279  0.06293585 0.6843500
 
 # Next, plot(mod, type = "smooths") draws the same panels in one
 # figure

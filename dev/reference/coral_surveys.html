@@ -104,17 +104,90 @@ identifiable.</p>
 <li><p>Shared smooth nonlinear obs-side effect of SST, evaluated via
 a thin-plate basis.</p></li>
 <li><p>Observation noise <code>sigma_obs = 0.3</code>.</p></li>
-</ul><p>Recommended fit (state-space; SST on the observation equation,
-CAR(1) on the latent state):</p>
-<p></p><div class="sourceCode r"><pre><code><span><span class="fu"><a href="../reference/mvgam.html">mvgam</a></span><span class="op">(</span></span>
-<span>  formula <span class="op">=</span> <span class="va">y</span> <span class="op">~</span> <span class="fu">s</span><span class="op">(</span><span class="va">sst</span>, k <span class="op">=</span> <span class="fl">8</span><span class="op">)</span>,</span>
-<span>  trend_formula <span class="op">=</span> <span class="op">~</span> <span class="fu"><a href="../reference/trend_constructors.html">CAR</a></span><span class="op">(</span><span class="op">)</span>,</span>
-<span>  data <span class="op">=</span> <span class="va">coral_surveys</span>,</span>
-<span>  family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">gaussian</a></span><span class="op">(</span><span class="op">)</span></span>
-<span><span class="op">)</span></span></code></pre><p></p></div>
-<p>Built by <code>data-raw/build_coral_surveys.R</code>.</p>
+</ul></div>
+    <div class="section level2">
+    <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>
+    <div class="dont-index"><p><code><a href="trend_constructors.html">CAR()</a></code> for the trend, <code><a href="trend_constructors.html">AR()</a></code> for evenly spaced surveys,
+<code><a href="mvgam_data.html">mvgam_data()</a></code> to check the data.</p></div>
     </div>
 
+    <div class="section level2">
+    <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/data.html" class="external-link">data</a></span><span class="op">(</span><span class="va">coral_surveys</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="mvgam_data.html">mvgam_data</a></span><span class="op">(</span><span class="va">coral_surveys</span>, family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">gaussian</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span></span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">✔</span> Data check passed for family 'gaussian (link = identity)'.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> series: 3 levels</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> time:   1 to 178</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> n obs:  150 (0 NA)</span>
+<span class="r-plt img"><img src="coral_surveys-1.png" alt="" width="700" height="433"></span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># \dontrun{</span></span></span>
+<span class="r-in"><span><span class="co"># A model with the structure the data were simulated from</span></span></span>
+<span class="r-in"><span><span class="va">mod</span> <span class="op">&lt;-</span> <span class="fu"><a href="mvgam.html">mvgam</a></span><span class="op">(</span></span></span>
+<span class="r-in"><span>  formula <span class="op">=</span> <span class="va">y</span> <span class="op">~</span> <span class="fu">s</span><span class="op">(</span><span class="va">sst</span>, k <span class="op">=</span> <span class="fl">8</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>  trend_formula <span class="op">=</span> <span class="op">~</span> <span class="fu"><a href="trend_constructors.html">CAR</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>  data <span class="op">=</span> <span class="va">coral_surveys</span>,</span></span>
+<span class="r-in"><span>  family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">gaussian</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>  chains <span class="op">=</span> <span class="fl">2</span>, silent <span class="op">=</span> <span class="fl">2</span></span></span>
+<span class="r-in"><span><span class="op">)</span></span></span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 69 of 2000 (3.0%) transitions ended with a divergence.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> See https://mc-stan.org/misc/warnings for details.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 2 of 2 chains had an E-BFMI less than 0.3.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> See https://mc-stan.org/misc/warnings for details.</span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  Family: gaussian </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   Links: mu = identity; sigma = log </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Formula: y ~ s(sst, k = 8) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    Data: coral_surveys (Number of observations: 150) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  Series: 3 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  Trends: CAR </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   Draws: 2 chains, each with iter = 2000; warmup = 1000; thin = 1; </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>          total post-warmup draws = 2000</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> == Observation Model ==</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Smoothing Spline Hyperparameters:</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>             Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sds(ssst_1)     1.69      0.92     0.40     4.05 1.01      343      542</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Regression Coefficients:</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>           Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Intercept     0.03      0.14    -0.23     0.30 1.01      391      479</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ssst_1       10.20      2.93     5.67    16.67 1.01      391      819</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Further Distributional Parameters:</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>       Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sigma     0.48      0.11     0.24     0.68 1.02       54       54</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> == Trend Model ==</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Trend Specific Parameters:</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                       Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sigma_trend[flynn]        0.61      0.17     0.23     0.90 1.01      119</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sigma_trend[myrmidon]     0.59      0.15     0.30     0.89 1.01       97</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sigma_trend[pixie]        0.33      0.13     0.10     0.58 1.03       74</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ar1_trend[flynn]          0.29      0.20     0.02     0.77 1.00      471</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ar1_trend[myrmidon]       0.82      0.10     0.58     0.97 1.01      238</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ar1_trend[pixie]          0.59      0.22     0.13     0.95 1.00      327</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                       Tail_ESS</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sigma_trend[flynn]         213</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sigma_trend[myrmidon]      452</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sigma_trend[pixie]         166</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ar1_trend[flynn]           317</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ar1_trend[myrmidon]        468</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ar1_trend[pixie]           571</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Draws were sampled using sampling(NUTS). For each parameter, Bulk_ESS</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> and Tail_ESS are effective sample size measures, and Rhat is the potential</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> scale reduction factor on split chains (at convergence, Rhat = 1).</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Next steps:</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   - `pp_check(fit)`: posterior predictive checks</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   - `forecast(fit, newdata = ...)`: out-of-sample forecasts</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   - `lfo_cv(fit)`: leave-future-out model comparison</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   - `conditional_effects(fit)`: covariate effects</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Use `how_to_cite(fit)` for a methods paragraph and `methods_md(fit)` for its equations.</span>
+<span class="r-in"><span><span class="co"># }</span></span></span>
+</code></pre></div>
+    </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
     </nav></aside></div>
 

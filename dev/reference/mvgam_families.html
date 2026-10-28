@@ -59,8 +59,8 @@ They cover counts observed with imperfect detection, compositions
 and counts whose dispersion a negative binomial cannot reach.</p>
 <p>Pass a family as you would to <code><a href="https://paulbuerkner.com/brms/reference/brm.html" class="external-link">brms::brm()</a></code> or <code><a href="https://rdrr.io/r/stats/glm.html" class="external-link">stats::glm()</a></code>, for
 example <code>mvgam(y ~ x, trend_formula = ~ AR(p = 1), family = nmix())</code>.
-The <a href="https://nicholasjclark.github.io/mvgam/articles/nmix.html">N-mixture article</a> fits <code><a href="nmix.html">nmix()</a></code>.
-The <a href="https://nicholasjclark.github.io/mvgam/articles/jsdgam.html">JSDM article</a> fits a joint species
+The <a href="https://nicholasjclark.github.io/mvgam/dev/articles/nmix.html">N-mixture article</a> fits <code><a href="nmix.html">nmix()</a></code>.
+The <a href="https://nicholasjclark.github.io/mvgam/dev/articles/jsdgam.html">JSDM article</a> fits a joint species
 distribution model.</p>
     </div>
 
@@ -74,7 +74,7 @@ accepts <code>"logit"</code> alone. The table lists every argument.</p>
 <table class="table table"><tr><td><strong>Family</strong></td><td><strong>Link</strong></td><td><strong>Arguments</strong></td></tr><tr><td><code><a href="tweedie.html">tweedie()</a></code></td><td>log</td><td><code>M</code>, the truncation point of the
 compound Poisson sum</td></tr><tr><td><code><a href="beta_nb.html">beta_nb()</a></code></td><td>log</td><td>none</td></tr><tr><td><code><a href="com_binomial.html">com_binomial()</a></code></td><td>logit</td><td><code>link</code>, <code>"logit"</code> only</td></tr><tr><td><code><a href="nmix.html">nmix()</a></code></td><td>log (state), logit (detection)</td><td><code>type</code>, one of
 <code>"poisson_binomial"</code>, <code>"royle_nichols"</code> or
-<code>"poisson_poisson"</code>; <code>multi_season</code></td></tr><tr><td><code><a href="occ.html">occ()</a></code></td><td>logit (state and detection)</td><td><code>multi_season</code></td></tr><tr><td><code><a href="diri.html">diri()</a></code></td><td>identity</td><td>none</td></tr><tr><td><code><a href="multi.html">multi()</a></code></td><td>identity</td><td>none</td></tr><tr><td><code><a href="categ.html">categ()</a></code></td><td>identity</td><td>none</td></tr><tr><td><code><a href="mvn.html">mvn()</a></code></td><td>identity</td><td>none</td></tr><tr><td><code><a href="mvt.html">mvt()</a></code></td><td>identity</td><td>none</td></tr></table></div>
+<code>"poisson_poisson"</code>; <code>multi_season</code></td></tr><tr><td><code><a href="occ.html">occ()</a></code></td><td>logit (state and detection)</td><td><code>multi_season</code></td></tr><tr><td><code><a href="diri.html">diri()</a></code></td><td>softmax over each unit's categories</td><td>none</td></tr><tr><td><code><a href="multi.html">multi()</a></code></td><td>softmax over each unit's categories</td><td>none</td></tr><tr><td><code><a href="categ.html">categ()</a></code></td><td>softmax over each unit's categories</td><td>none</td></tr><tr><td><code><a href="mvn.html">mvn()</a></code></td><td>identity</td><td>none</td></tr><tr><td><code><a href="mvt.html">mvt()</a></code></td><td>identity</td><td>none</td></tr></table></div>
     <div class="section level2">
     <h2 id="choosing-by-the-shape-of-the-response">Choosing by the shape of the response<a class="anchor" aria-label="anchor" href="#choosing-by-the-shape-of-the-response"></a></h2>
 
@@ -148,15 +148,17 @@ structure.</p></dd>
 
 <p>A <span class="pkg">brms</span> or <span class="pkg">stats</span> family takes a <code>link</code> argument as
 usual. <code>poisson(link = "sqrt")</code> and <code>Gamma(link = "log")</code> both
-work. mvgam writes the Stan code for the families in the table
-against one scale. Those families fix their link.</p>
+work. The families mvgam adds each have the one link the table
+gives.</p>
     </div>
     <div class="section level2">
     <h2 id="data-layout">Data layout<a class="anchor" aria-label="anchor" href="#data-layout"></a></h2>
 
 
-<p><code><a href="nmix.html">nmix()</a></code> and <code><a href="occ.html">occ()</a></code> are closure-unit families. They expect several
-rows per closure unit, one per visit. They model the state and the
+<p><code><a href="nmix.html">nmix()</a></code> and <code><a href="occ.html">occ()</a></code> are closure-unit families. A closure unit is a
+site, or a site in one season, whose true occupancy or abundance
+holds across its repeat visits. The families expect several rows
+per closure unit, one per visit. They model the state and the
 detection process with separate linear predictors. <code><a href="https://paulbuerkner.com/brms/reference/brmsformula.html" class="external-link">bf()</a></code> supplies
 the second, as in <code>bf(y ~ elev, p ~ tod)</code>.
 <code><a href="sim_closure_unit_data.html">sim_closure_unit_data()</a></code> simulates the layout they take.

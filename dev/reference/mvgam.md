@@ -1,9 +1,20 @@
 # Fit a Bayesian multivariate state-space model
 
-Fits the model in Stan. The observation `formula` takes brms syntax, and
-`trend_formula` adds a latent dynamic process, such as a random walk or
-an autoregression, with predictors of its own. A list of multiply
-imputed data frames fits the model to each frame and pools the draws.
+Fits a state-space model in Stan. Each observation follows the
+observation `family`. On the link scale its mean is the sum of the
+effects in `formula` and a latent trend \\z\_{t,s}\\ for series \\s\\ at
+time \\t\\. The data never record the trend directly. `trend_formula`
+names how it moves from one time to the next, through a trend
+constructor such as
+[`AR()`](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md).
+It also takes predictors of the trend. With an `AR(p = 1)` trend:
+\$\$g(\mu\_{t,s}) = \eta\_{t,s} + \eta^{(z)}\_{t,s} + z\_{t,s}, \qquad
+z\_{t,s} = \phi_s z\_{t-1,s} + \epsilon\_{t,s}\$\$ Here \\g\\ is the
+link, \\\eta\\ the predictor from `formula`, \\\eta^{(z)}\\ the
+predictor from `trend_formula` and \\\epsilon\\ the trend's innovation
+at each time. The [overview
+article](https://nicholasjclark.github.io/mvgam/dev/articles/mvgam_overview.html)
+walks through a full analysis.
 
 ## Usage
 
@@ -48,32 +59,32 @@ mvgam(
   [`lv_axis()`](https://nicholasjclark.github.io/mvgam/dev/reference/lv_axis.md)
   in a term to vary its effect by latent factor, or by series in a model
   without factors, as in `~ x:lv_axis() + AR()`. The series column
-  itself is not supported in a term of this formula. An exact `gp()`
-  term here also predicts in-sample alone. Forecasting a model that
-  holds one requires the approximate form.
+  itself is not supported in a term of this formula. Forecasting
+  requires the approximate form of any `gp()` term here.
 
 - data:
 
-  Data frame, or a list of multiply imputed data frames or a `mids`
-  object from mice.
+  Data frame in long format, one row per series and time. A model with a
+  trend needs a numeric `time` column and a factor `series` column, or
+  the columns a trend constructor names through its `time` and `series`
+  arguments.
+  [`mvgam_data()`](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam_data.md)
+  checks a frame against a family before fitting. A list of multiply
+  imputed data frames, or a `mids` object from mice, is also accepted.
   [`mvgam_multiple()`](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam_multiple.md)
   describes the imputation path.
 
 - newdata:
 
   Optional held-out `data.frame`, stored on the fit as
-  `object$test_data`.
+  `object$test_data`. Fitting draws no forecasts.
   [`forecast()`](https://generics.r-lib.org/reference/forecast.html)
-  forecasts to it when called without `newdata`.
-  `plot(fit, type = "series")` overlays it. The fit itself draws no
-  forecasts.
-  [`forecast()`](https://generics.r-lib.org/reference/forecast.html)
-  propagates the fitted latent state forward in time per posterior draw.
-  `posterior_predict(mod, newdata = mod$test_data)` marginalises over
-  the trend's stochastic dynamics at the supplied design points. Use
-  [`forecast()`](https://generics.r-lib.org/reference/forecast.html) for
-  time-series forecasting and `posterior_predict()` for marginal
-  predictive checks.
+  called without `newdata` forecasts these times, carrying the fitted
+  latent state forward. `plot(fit, type = "series")` overlays them.
+  `posterior_predict()` on these data uses the covariate part alone. The
+  section 'Which prediction function?' of
+  [`predict.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/predict.mvgam.md)
+  compares the two.
 
 - trend_map:
 
@@ -92,110 +103,16 @@ mvgam(
   A factor model without a `trend_map` samples every loading. It
   identifies `Z` after sampling by a thin QR rotation (Heaps and Jermyn
   2024). A `trend_map` with any fixed entry takes no rotation. The
-  argument requires a `trend_formula`. It is an alternative to the
-  `trend_map` argument of the trend constructor, and supplying both is
-  an error. `loadings_prior` lists the `trend_map` forms a structured
-  loadings prior accepts.
+  argument requires a `trend_formula`. The trend constructor takes a
+  `trend_map` argument too. Supplying both is an error. `loadings_prior`
+  lists the `trend_map` forms a structured loadings prior accepts.
 
 - loadings_prior:
 
-  Optional named list specifying a structured prior on the unconstrained
-  factor loadings matrix following Heaps & Jermyn (2024). The loadings
-  belong to a trend with latent factors. The argument requires a
-  `trend_formula`. Supplying it without one is an error. When supplied,
-  the default iid `to_vector(Z) ~ student_t(3, 0, 0.5)` prior is
-  replaced with a per-column matrix-normal prior of the form
-  `Z[, i] ~ multi_normal_cholesky(0, L_Phi)`, where the among-row scale
-  matrix `Phi` is assembled multiplicatively from any combination of:
-
-  - a per-series feature matrix (`features`), expanded into an ARD
-    exponential kernel via `gp_exponential_cov()`
-
-  - one or more pairwise distance matrices (`distances`), each
-    contributing an `exp(-d / theta)` factor
-
-  Accepted fields:
-
-  - `features`: string lookup into `data2`, a numeric matrix, or a
-    data.frame. Columns are encoded by type (numeric/integer/logical:
-    z-score; ordered factor: z-score after
-    [`as.numeric()`](https://rdrr.io/r/base/numeric.html); unordered
-    factor / character: one-hot with all levels retained, following
-    Heaps Sect. 6.2). Each encoded column receives its own ARD
-    length-scale.
-
-  - `distances`: string name (or character vector of names) of pairwise
-    distance matrices in `data2`, or a single matrix / named list of
-    matrices passed inline. Each matrix is rescaled to maximum entry one
-    so the default length-scale prior is interpretable on a unit scale
-    (matching Heaps Supps S4.2.1).
-
-  - `column_shrinkage`: `"iid"` (default; no shrinkage) or `"mgp"`
-    (multiplicative-gamma-process increasing shrinkage of Bhattacharya &
-    Dunson 2011, used in Heaps Eq. (9)). `"mgp"` applies its column
-    scale through the shared innovation scale. It is available for
-    [`AR()`](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md),
-    [`RW()`](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md)
-    and
-    [`ZMVN()`](https://nicholasjclark.github.io/mvgam/dev/reference/ZMVN.md)
-    trends.
-    [`VAR()`](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md)
-    builds its own innovation covariance and has no shared scale for it;
-    pair a
-    [`VAR()`](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md)
-    factor model with `"iid"` instead.
-
-  - `mgp_a1`, `mgp_a2`: numeric MGP hyperparameters, only used when
-    `column_shrinkage = "mgp"`. Default `(2, 4)` lies within the
-    `a2 in [3, 5]` range recommended for moderate-n ecology / community
-    panels by Legramanti, Durante and Dunson (2020, JRSS-B) and
-    Schiavon, Canale and Dunson (2022, Biometrics 78:995). Heaps Sect.
-    6.3.1 used `(2, 3)` for the gas-demand application; Sect. 6.2.2 used
-    `(2, 6)` for the Finnish-bird JSDM. Lower `a2` for less shrinkage
-    when the data weakly identify the active rank.
-
-  Length-scales receive a `lognormal(0, 1)` prior in the model block.
-  This prior is set on the standardised distance scale. Pairwise
-  distance matrices are rescaled to `max(d) = 1` inside the normaliser.
-  A length-scale of 1 then corresponds to correlation `exp(-1)` between
-  the two most distant series. Heaps' Finnish-birds application (Sect.
-  6.2.2) used the wider `lognormal(0, sqrt(10))` instead; override the
-  default by passing a
-  [`prior()`](https://paulbuerkner.com/brms/reference/set_prior.html)
-  for `theta_features` / `theta_dist_<name>` if your data weakly
-  identify length-scales and you want less regularisation. Note: the
-  `max(d) = 1` rule is the natural generic standardisation. Heaps Supps
-  S4.2.1 used "root-to-tip distance = 1" for ultrametric phylogenies,
-  which corresponds to `max(d) = 2` (twice the per-leaf depth);
-  pre-standardise your distance matrix to match if exact parity matters.
-  Identification. The structured prior applies to the sampled columns of
-  `Z`. Where the QR rotation gives the reported loadings `Z_tilde`, each
-  of its columns mixes the sampled columns.
-  [`shared_variation()`](https://nicholasjclark.github.io/mvgam/dev/reference/shared_variation.md)
-  and
-  [`residual_cor()`](https://nicholasjclark.github.io/mvgam/dev/reference/residual_cor.md)
-  use `Z Z'`, which is the same before and after the rotation. See the
-  Identification section of the trend constructors.
-
-  Compatibility with `trend_map`:
-
-  - `trend_map = NULL` (default): compatible. `n_lv` alone triggers the
-    free-Z factor model; `loadings_prior` applies to the sampled `Z`
-    column-wise.
-
-  - `trend_map = matrix(NA_real_, n_series, n_lv)` (all-NA mask, used
-    internally by
-    [`jsdgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/jsdgam.md)):
-    compatible. Treated as a free-Z trigger upstream; `loadings_prior`
-    applies as if `trend_map` were `NULL`.
-
-  - `trend_map` with a mix of fixed entries and `NA`s: incompatible.
-    Partial-Z parameterises the free entries as a vector under an iid
-    `student_t(3, 0, 1)` prior, which would overlap with the
-    matrix-normal structure and double-count regularisation.
-
-  - Fully-fixed `trend_map` (no `NA`s): incompatible. The structured
-    prior has no free parameters to act on.
+  Optional named list giving a structured prior on the loadings of a
+  factor model, such as species traits or a phylogeny. Most models leave
+  it `NULL`. The section 'Structured loadings priors' of `mvgam()`
+  describes its fields.
 
 - backend:
 
@@ -285,21 +202,9 @@ mvgam(
   outweighing the gain. A brms family without a `trend_formula` uses the
   threading brms writes.
 
-  A brms-native family with a `trend_formula` samples serially whatever
-  `threads` says. When it threads, brms moves the `mu` assignment inside
-  `partial_log_lik_lpmf`, where mvgam cannot add the trend to it. The
-  program is then built without threading. This applies to every trend
-  model under a brms-native family:
-  [`RW()`](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md),
-  [`AR()`](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md),
-  [`VAR()`](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md),
-  [`LLT()`](https://nicholasjclark.github.io/mvgam/dev/reference/LLT.md),
-  [`ZMVN()`](https://nicholasjclark.github.io/mvgam/dev/reference/ZMVN.md),
-  [`CAR()`](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md)
-  and
-  [`PW()`](https://nicholasjclark.github.io/mvgam/dev/reference/piecewise_trends.md).
-  Each fit that drops the request warns. A batch script that fits
-  repeatedly shows it every time.
+  A brms family with a `trend_formula` samples each chain on one thread
+  whatever `threads` says. The threaded likelihood brms writes leaves no
+  place to add the trend. Each such fit warns.
 
 - save_pars:
 
@@ -346,9 +251,19 @@ mvgam(
 
   `chains`, `iter`, `warmup`, `thin`, `seed` and `control` reach Stan as
   in [`brms::brm()`](https://paulbuerkner.com/brms/reference/brm.html).
-  `cores` sets how many chains sample at once. It defaults to
-  `getOption("mc.cores")` when that option is set and otherwise to one
-  fewer than the machine's cores, up to `chains`.
+  `chains` defaults to 4, each running 2000 iterations of which the
+  first half are warmup. Results for publication should use at least
+  four. The examples use two for speed. If the sampler reports divergent
+  transitions, refit with `control = list(adapt_delta = 0.95)` or
+  simplify the model.
+  [mvgam_diagnostics](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam_diagnostics.md)
+  describes the checks. `cores` sets how many chains sample at once. It
+  defaults to `getOption("mc.cores")` when that option is set and
+  otherwise to one fewer than the machine's cores, up to `chains`.
+
+  `silent` sets how much the fit prints. `0` shows everything, Stan's
+  own messages included. `1`, the default, shows the sampler's progress
+  and mvgam's notices. `2` prints warnings alone.
 
   `algorithm` selects how the posterior is explored. It accepts
   `"sampling"` (the default), `"meanfield"`, `"fullrank"` or
@@ -359,11 +274,11 @@ mvgam(
   `"0"`, a numeric value, a list or a function. With
   `backend = "cmdstanr"` it also accepts `"pathfinder"`. That keyword
   runs Stan's Pathfinder approximation on the compiled model and draws
-  one starting value per chain from it. The requested algorithm still
-  explores the posterior. The fit stays exact. It helps a model whose
-  chains stall at a poor starting point or fill warmup with divergences.
-  On a model that already warms up cleanly it adds about a second and
-  lowers effective samples per second.
+  one starting value per chain from it. Sampling then proceeds as usual
+  from those values. It helps a model whose chains stall at a poor
+  starting point or fill warmup with divergences. On a model that
+  already warms up cleanly it adds about a second and lowers effective
+  samples per second.
 
   Five arguments shape the Stan program and reach brms unchanged:
 
@@ -388,6 +303,174 @@ mvgam(
 
 An object of class `mvgam`.
 
+## Structured loadings priors
+
+A factor trend loads each series on a few latent factors through the
+matrix `Z`. By default each entry of `Z` takes an independent
+`student_t(3, 0, 0.5)` prior. `loadings_prior` replaces it with the
+structured prior of Heaps and Jermyn (2024). Each column of `Z` then
+follows a multivariate normal whose covariance `Phi` makes similar
+series load alike. `Phi` is the product of a kernel over series features
+and one factor `exp(-d / theta)` per distance matrix. The argument
+requires a `trend_formula` whose trend has latent factors.
+
+The list takes these fields:
+
+- `features`:
+
+  Per-series features, as a numeric matrix, a data frame or the name of
+  an element of `data2`. Numeric, integer and logical columns are
+  z-scored. An ordered factor is z-scored on its codes. An unordered
+  factor or character column is one-hot encoded with every level kept
+  (Heaps and Jermyn 2024, Section 6.2). Each encoded column takes its
+  own length-scale.
+
+- `distances`:
+
+  Pairwise distance matrices, as the names of elements of `data2`, a
+  matrix or a named list of matrices. Each is rescaled to a largest
+  entry of 1.
+
+- `column_shrinkage`:
+
+  `"iid"`, the default, shrinks no column. `"mgp"` shrinks later columns
+  more strongly through the multiplicative gamma process of Bhattacharya
+  and Dunson (2011), applied to the shared innovation scale.
+  [`AR()`](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md),
+  [`RW()`](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md)
+  and
+  [`ZMVN()`](https://nicholasjclark.github.io/mvgam/dev/reference/ZMVN.md)
+  trends accept it. A
+  [`VAR()`](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md)
+  trend builds its own innovation covariance. It takes `"iid"`.
+
+- `mgp_a1`, `mgp_a2`:
+
+  The hyperparameters of `"mgp"`, by default 2 and 4. Heaps and Jermyn
+  used an `mgp_a2` of 3 and 6 in their two applications. A lower
+  `mgp_a2` shrinks less, for data that weakly identify the number of
+  active factors.
+
+Each length-scale takes a `lognormal(0, 1)` prior. Distances are
+rescaled to a largest entry of 1. A length-scale of 1 then gives a
+correlation of `exp(-1)` between the two most distant series. Heaps and
+Jermyn used the wider `lognormal(0, sqrt(10))`. A
+[`prior()`](https://paulbuerkner.com/brms/reference/set_prior.html) on
+`theta_features` or `theta_dist_<name>` replaces the default. They
+rescaled a phylogeny to a root-to-tip distance of 1, which gives a
+largest pairwise distance of 2. Rescale a distance matrix before fitting
+to match their scale.
+
+The prior applies to the sampled columns of `Z`. The reported loadings
+`Z_tilde` come from a QR rotation of them. Each column of `Z_tilde`
+mixes the sampled columns.
+[`shared_variation()`](https://nicholasjclark.github.io/mvgam/dev/reference/shared_variation.md)
+and
+[`residual_cor()`](https://nicholasjclark.github.io/mvgam/dev/reference/residual_cor.md)
+use `Z Z'`, which the rotation leaves unchanged. The Identification
+section of
+[trend_constructors](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md)
+describes the rotation.
+
+A `trend_map` with no fixed entries, `NULL` or a matrix of `NA`, is
+compatible.
+[`jsdgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/jsdgam.md)
+passes the second form. A `trend_map` that fixes any loading is refused.
+Its free entries take the default prior of class `Z`, which the
+structured prior would duplicate.
+
+## Terms used in this documentation
+
+- Latent trend, latent state:
+
+  The unobserved value \\z\_{t,s}\\ that the trend constructor evolves
+  over time.
+
+- Innovation:
+
+  The random change the trend takes at each time step,
+  \\\epsilon\_{t,s}\\ above. Other texts call it a process error or a
+  shock. `cor = TRUE` correlates the innovations of different series.
+
+- Fitted state, covariate part:
+
+  The two versions of the trend a prediction can use. The section 'Which
+  prediction function?' of
+  [`predict.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/predict.mvgam.md)
+  defines them.
+
+- Prior:
+
+  A distribution stating which values of a parameter are plausible
+  before the data are seen.
+  [`get_prior.mvgam_formula()`](https://nicholasjclark.github.io/mvgam/dev/reference/get_prior.mvgam_formula.md)
+  lists the defaults.
+
+- Posterior draw:
+
+  One joint sample of every parameter from the posterior distribution.
+  Summaries and predictions average over the draws.
+
+- Hindcast, forecast:
+
+  Predictions at the training times and after them. See
+  [`hindcast.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/hindcast.mvgam.md)
+  and
+  [`forecast.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/forecast.mvgam.md).
+
+- Closure unit:
+
+  A site, or a site in one season, whose true occupancy or abundance
+  holds across its repeat visits. See
+  [`occ()`](https://nicholasjclark.github.io/mvgam/dev/reference/occ.md)
+  and
+  [`nmix()`](https://nicholasjclark.github.io/mvgam/dev/reference/nmix.md).
+
+- ELPD, Pareto k:
+
+  The expected log predictive density scores predictions of held-out
+  data. Higher is better. A Pareto k above 0.7 marks an observation
+  whose leave-one-out approximation is unreliable. See
+  [`loo.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/loo.mvgam.md).
+
+## Workflow
+
+A typical analysis takes these steps:
+
+1.  Check the data with
+    [`mvgam_data()`](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam_data.md).
+
+2.  Choose a family
+    ([mvgam_families](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam_families.md))
+    and a trend
+    ([trend_constructors](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md)).
+    Inspect the default priors with
+    [`get_prior.mvgam_formula()`](https://nicholasjclark.github.io/mvgam/dev/reference/get_prior.mvgam_formula.md).
+
+3.  Fit with `mvgam()`, then check convergence with
+    [`summary.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/summary.mvgam.md)
+    and
+    [mvgam_diagnostics](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam_diagnostics.md).
+
+4.  Check the fit against the data with
+    [`pp_check.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/pp_check.mvgam.md)
+    and `plot(fit, type = "residuals")`.
+
+5.  Interpret effects with
+    [`conditional_effects.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/conditional_effects.mvgam.md).
+
+6.  Forecast with
+    [`forecast.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/forecast.mvgam.md).
+    Compare models with
+    [`lfo_cv.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/lfo_cv.mvgam.md)
+    or
+    [`loo.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/loo.mvgam.md).
+
+7.  Report the model with
+    [`how_to_cite()`](https://nicholasjclark.github.io/mvgam/dev/reference/how_to_cite.mvgam.md)
+    and
+    [`methods_md()`](https://nicholasjclark.github.io/mvgam/dev/reference/methods_md.md).
+
 ## References
 
 Clark, N. J. and Wells, K. (2023). Dynamic Generalized Additive Models
@@ -406,15 +489,16 @@ Heaps, S. E. and Jermyn, I. H. (2024). Structured prior distributions
 for the covariance matrix in latent factor models. *Statistics and
 Computing*, 34:143.
 [doi:10.1007/s11222-024-10454-0](https://doi.org/10.1007/s11222-024-10454-0)
-(post-hoc QR identification of latent factor loadings; structured
-`loadings_prior` construction.)
+
+Bhattacharya, A. and Dunson, D. B. (2011). Sparse Bayesian infinite
+factor models. *Biometrika*, 98(2):291-306.
+[doi:10.1093/biomet/asr013](https://doi.org/10.1093/biomet/asr013)
 
 Riutort-Mayol, G., Burkner, P.-C., Andersen, M. R., Solin, A. and
 Vehtari, A. (2023). Practical Hilbert space approximate Bayesian
 Gaussian processes for probabilistic programming. *Statistics and
 Computing*, 33:1.
 [doi:10.1007/s11222-022-10167-2](https://doi.org/10.1007/s11222-022-10167-2)
-(used when `formula` or `trend_formula` contains `gp()` terms.)
 
 ## See also
 
@@ -428,16 +512,16 @@ writes a methods paragraph for a fitted model.
 writes its equations.
 [`jsdgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/jsdgam.md)
 fits joint species distribution models. The [overview
-vignette](https://nicholasjclark.github.io/mvgam/articles/mvgam_overview.html)
+vignette](https://nicholasjclark.github.io/mvgam/dev/articles/mvgam_overview.html)
 introduces the package. The [data
-vignette](https://nicholasjclark.github.io/mvgam/articles/data.html)
+vignette](https://nicholasjclark.github.io/mvgam/dev/articles/data.html)
 sets out the data format. The [forecast evaluation
-article](https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html)
+article](https://nicholasjclark.github.io/mvgam/dev/articles/forecast_evaluation.html)
 scores and compares forecasts. The [multivariate formula
-article](https://nicholasjclark.github.io/mvgam/articles/mvbf.html) fits
-several responses at once. The [integrated distribution model
-article](https://nicholasjclark.github.io/mvgam/articles/idm.html) ties
-several observation families to one latent process.
+article](https://nicholasjclark.github.io/mvgam/dev/articles/mvbf.html)
+fits several responses at once. The [integrated distribution model
+article](https://nicholasjclark.github.io/mvgam/dev/articles/idm.html)
+ties several observation families to one latent process.
 
 Other model fitting:
 [`check_newdata()`](https://nicholasjclark.github.io/mvgam/dev/reference/check_newdata.md),
@@ -472,18 +556,18 @@ head(simdat$data_train)
 # The parameters a model takes, with their default priors, before
 # any fitting. A `prior` argument to mvgam() replaces any of them
 get_prior(
-  mvgam_formula(y ~ s(x), trend_formula = ~ AR(p = 1)),
+  mvgam_formula(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1)),
   data   = simdat$data_train,
   family = poisson()
 )
-#>                   prior       class coef group resp dpar nlpar lb ub tag
-#>  student_t(3, 1.4, 2.5)   Intercept                                     
-#>                  (flat)           b                                     
-#>                  (flat)           b sx_1                                
-#>    student_t(3, 0, 2.5)         sds                             0       
-#>    student_t(3, 0, 2.5)         sds s(x)                        0       
-#>          exponential(2) sigma_trend                             0       
-#>          normal(0, 0.5)   ar1_trend                            -1  1    
+#>                   prior       class        coef group resp dpar nlpar lb ub tag
+#>  student_t(3, 1.4, 2.5)   Intercept                                            
+#>                  (flat)           b                                            
+#>                  (flat)           b        sx_1                                
+#>    student_t(3, 0, 2.5)         sds                                    0       
+#>    student_t(3, 0, 2.5)         sds s(x, k = 5)                        0       
+#>          exponential(2) sigma_trend                                    0       
+#>          normal(0, 0.5)   ar1_trend                                   -1  1    
 #>        source
 #>       default
 #>       default
@@ -496,7 +580,7 @@ get_prior(
 # A smooth of x in the observation model and an AR(1) latent trend.
 # The test data are stored on the fit for forecasting
 mod <- mvgam(
-  y ~ s(x),
+  y ~ s(x, k = 5),
   trend_formula = ~ AR(p = 1),
   data          = simdat$data_train,
   newdata       = simdat$data_test,
@@ -504,12 +588,12 @@ mod <- mvgam(
   chains        = 2,
   silent        = 2
 )
-#> Warning: 21 of 2000 (1.0%) transitions ended with a divergence.
+#> Warning: 20 of 2000 (1.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 summary(mod)
 #>  Family: poisson 
 #>   Links: mu = log 
-#> Formula: y ~ s(x) 
+#> Formula: y ~ s(x, k = 5) 
 #>    Data: simdat$data_train (Number of observations: 75) 
 #>  Trends: AR(1) 
 #>   Draws: 2 chains, each with iter = 2000; warmup = 1000; thin = 1; 
@@ -518,21 +602,21 @@ summary(mod)
 #> == Observation Model ==
 #> Smoothing Spline Hyperparameters:
 #>           Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> sds(sx_1)     9.68      4.02     2.87    19.38 1.00      232      216
+#> sds(sx_1)     4.18      1.81     1.65     9.00 1.01      774      704
 #> 
 #> Regression Coefficients:
 #>           Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> Intercept     1.57      0.21     1.20     1.99 1.01      783      726
-#> sx_1         -7.48      9.51   -26.65    10.01 1.00      377      822
+#> Intercept     1.55      0.15     1.25     1.85 1.00      855      843
+#> sx_1          7.17      2.77     1.64    12.60 1.00      781     1120
 #> 
 #> == Trend Model ==
 #> Trend Specific Parameters:
 #>                       Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS
-#> sigma_trend[series_1]     0.37      0.09     0.22     0.57 1.00      381
-#> ar1_trend[series_1]       0.69      0.15     0.34     0.93 1.00      300
+#> sigma_trend[series_1]     0.54      0.08     0.38     0.71 1.00      837
+#> ar1_trend[series_1]       0.46      0.17     0.11     0.76 1.00      522
 #>                       Tail_ESS
-#> sigma_trend[series_1]      690
-#> ar1_trend[series_1]        579
+#> sigma_trend[series_1]     1195
+#> ar1_trend[series_1]        918
 #> 
 #> Draws were sampled using sampling(NUTS). For each parameter, Bulk_ESS
 #> and Tail_ESS are effective sample size measures, and Rhat is the potential

@@ -124,32 +124,27 @@ Other tidiers:
 set.seed(13)
 simdat <- sim_mvgam(family = poisson(), n_series = 1L,
                      n_timepoints = 120L, trend_model = AR())
-mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
+mod <- mvgam(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1),
               data    = simdat$data_train,
               family  = poisson(),
               chains  = 2, silent = 2)
-#> Warning: 9 of 2000 (0.0%) transitions ended with a divergence.
+#> Warning: 5 of 2000 (0.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 
 # One row per parameter, with broom's column names
 td <- tidy(mod)
 td
-#> # A tibble: 13 × 6
-#>    term                  type              estimate std.error conf.low conf.high
-#>    <chr>                 <chr>                <dbl>     <dbl>    <dbl>     <dbl>
-#>  1 Intercept             observation_beta     1.63     0.143     1.36      1.92 
-#>  2 sx_1                  observation_beta     7.70     4.92     -1.81     17.7  
-#>  3 sds_sx_1              observation_smoo…    4.32     1.65      1.93      8.28 
-#>  4 s_sx_1[1]             observation_smoo…   -2.23     4.46    -12.6       5.10 
-#>  5 s_sx_1[2]             observation_smoo…   -2.07     2.23     -6.83      2.20 
-#>  6 s_sx_1[3]             observation_smoo…   -5.21     1.26     -7.68     -2.87 
-#>  7 s_sx_1[4]             observation_smoo…    0.164    1.20     -2.24      2.49 
-#>  8 s_sx_1[5]             observation_smoo…    1.01     2.36     -3.49      5.83 
-#>  9 s_sx_1[6]             observation_smoo…   -2.60     2.91     -8.56      2.81 
-#> 10 s_sx_1[7]             observation_smoo…    6.62     4.15     -0.160    15.5  
-#> 11 s_sx_1[8]             observation_smoo…    0.765    3.64     -6.41      8.12 
-#> 12 sigma_trend[series_1] trend_model_param    0.435    0.0730    0.302     0.589
-#> 13 ar1_trend[series_1]   trend_model_param    0.589    0.145     0.284     0.855
+#> # A tibble: 8 × 6
+#>   term                  type               estimate std.error conf.low conf.high
+#>   <chr>                 <chr>                 <dbl>     <dbl>    <dbl>     <dbl>
+#> 1 Intercept             observation_beta    1.63       0.139     1.34      1.91 
+#> 2 sx_1                  observation_beta    8.48       2.34      3.68     13.0  
+#> 3 sds_sx_1              observation_smoot…  5.14       1.98      2.37      9.97 
+#> 4 s_sx_1[1]             observation_smoot…  1.44       1.78     -1.99      5.14 
+#> 5 s_sx_1[2]             observation_smoot…  0.00553    2.04     -4.06      4.11 
+#> 6 s_sx_1[3]             observation_smoot… -8.44       1.69    -11.7      -5.02 
+#> 7 sigma_trend[series_1] trend_model_param   0.470      0.0716    0.337     0.624
+#> 8 ar1_trend[series_1]   trend_model_param   0.565      0.144     0.254     0.814
 
 # The `type` column separates the trend's parameters from the
 # observation model's
@@ -157,16 +152,16 @@ td[td$type == "trend_model_param", ]
 #> # A tibble: 2 × 6
 #>   term                  type              estimate std.error conf.low conf.high
 #>   <chr>                 <chr>                <dbl>     <dbl>    <dbl>     <dbl>
-#> 1 sigma_trend[series_1] trend_model_param    0.435    0.0730    0.302     0.589
-#> 2 ar1_trend[series_1]   trend_model_param    0.589    0.145     0.284     0.855
+#> 1 sigma_trend[series_1] trend_model_param    0.470    0.0716    0.337     0.624
+#> 2 ar1_trend[series_1]   trend_model_param    0.565    0.144     0.254     0.814
 
 # The fixed effects alone, with convergence diagnostics
 tidy(mod, effects = "fixed", rhat = TRUE, ess = TRUE)
 #> # A tibble: 2 × 8
 #>   term      type            estimate std.error conf.low conf.high  rhat ess_bulk
 #>   <chr>     <chr>              <dbl>     <dbl>    <dbl>     <dbl> <dbl>    <dbl>
-#> 1 Intercept observation_be…     1.63     0.143     1.36      1.92  1.01     791.
-#> 2 sx_1      observation_be…     7.70     4.92     -1.81     17.7   1.00     785.
+#> 1 Intercept observation_be…     1.63     0.139     1.34      1.91  1.00    1075.
+#> 2 sx_1      observation_be…     8.48     2.34      3.68     13.0   1.00     831.
 
 # Next, augment() adds fitted values and residuals to the data
 # }

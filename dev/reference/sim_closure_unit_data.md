@@ -197,8 +197,8 @@ simulates state-space time series.
 [`sim_jsdgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/sim_jsdgam.md)
 simulates site-by-species data without a detection process. The
 [N-mixture
-article](https://nicholasjclark.github.io/mvgam/articles/nmix.html) fits
-occupancy and N-mixture models to data of this layout.
+article](https://nicholasjclark.github.io/mvgam/dev/articles/nmix.html)
+fits occupancy and N-mixture models to data of this layout.
 
 Other simulation:
 [`sim_jsdgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/sim_jsdgam.md),

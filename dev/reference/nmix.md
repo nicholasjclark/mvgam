@@ -109,10 +109,10 @@ with `type = "fit_stat"` tests the per-unit totals for such misfit.
 A `cap` column, constant within each unit and at least its largest
 count, sets the cap `K_max`. Without one, `"poisson_binomial"` and
 `"poisson_poisson"` take each unit's largest count plus 100, as
-`unmarked::pcount()` does. `"royle_nichols"` takes 25, as
-`unmarked::occuRN()` does. A detection gives no floor on `N`. A lower
-cap shortens the sum and speeds sampling. A cap that binds biases
-abundance down.
+`unmarked::pcount()` does. `"royle_nichols"` takes a fixed 25, as
+`unmarked::occuRN()` does. Its 0 / 1 detections carry no count to build
+a cap from. A lower cap shortens the sum and speeds sampling. A cap that
+binds biases abundance down.
 [`latent_N_saturation()`](https://nicholasjclark.github.io/mvgam/dev/reference/latent_N_saturation.md)
 reports, for each unit, the posterior probability that `N` equals its
 cap. A prediction frame may carry its own `cap`.
@@ -168,11 +168,11 @@ models to overdispersion. *Methods in Ecology and Evolution*, 9,
 for the related joint-occupancy family and
 [`pp_check.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/pp_check.mvgam.md)
 for closure-unit goodness-of-fit checks. The [N-mixture
-article](https://nicholasjclark.github.io/mvgam/articles/nmix.html) fits
-N-mixture and occupancy models from data preparation to inference. The
-[data
-article](https://nicholasjclark.github.io/mvgam/articles/data.html) sets
-out the row layout that `nmix()` expects.
+article](https://nicholasjclark.github.io/mvgam/dev/articles/nmix.html)
+fits N-mixture and occupancy models from data preparation to inference.
+The [data
+article](https://nicholasjclark.github.io/mvgam/dev/articles/data.html)
+sets out the row layout that `nmix()` expects.
 
 Other observation families:
 [`beta_nb()`](https://nicholasjclark.github.io/mvgam/dev/reference/beta_nb.md),

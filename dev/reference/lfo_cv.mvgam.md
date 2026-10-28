@@ -8,6 +8,13 @@ refitted only where the Pareto k exceeds `pareto_k_threshold`. The
 algorithm is that of Burkner, Gabry and Vehtari (2020), as in the [loo
 PSIS-LFO vignette](https://mc-stan.org/loo/articles/loo2-lfo.html).
 
+The ELPD of each fold is higher for the better model. CRPS and the other
+scores of
+[`score.mvgam_forecast()`](https://nicholasjclark.github.io/mvgam/dev/reference/score.mvgam_forecast.md)
+are lower for the better model.
+[`loo.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/loo.mvgam.md)
+explains the ELPD and the Pareto k diagnostic.
+
 ## Usage
 
 ``` r
@@ -124,15 +131,14 @@ A list of class `mvgam_lfo`, with one element per origin in each vector.
 
 ## References
 
-Paul-Christian Burkner, Jonah Gabry and Aki Vehtari (2020). Approximate
+Burkner, P.-C., Gabry, J. and Vehtari, A. (2020). Approximate
 leave-future-out cross-validation for Bayesian time series models.
-*Journal of Statistical Computation and Simulation*. 90:14, 2499-2523.
+*Journal of Statistical Computation and Simulation*, 90(14):2499-2523.
 [doi:10.1080/00949655.2020.1783262](https://doi.org/10.1080/00949655.2020.1783262)
 
-Aki Vehtari, Daniel Simpson, Andrew Gelman, Yuling Yao and Jonah Gabry
-(2024). Pareto smoothed importance sampling. *Journal of Machine
-Learning Research*. 25(72), 1-58.
-<https://jmlr.org/papers/v25/19-556.html>
+Vehtari, A., Simpson, D., Gelman, A., Yao, Y. and Gabry, J. (2024).
+Pareto smoothed importance sampling. *Journal of Machine Learning
+Research*, 25(72):1-58. <https://jmlr.org/papers/v25/19-556.html>
 
 ## See also
 
@@ -144,7 +150,7 @@ weights them.
 approximates leave-one-out cross-validation.
 [`kfold.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/kfold.mvgam.md)
 runs grouped k-fold cross-validation. The [forecast evaluation
-article](https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html)
+article](https://nicholasjclark.github.io/mvgam/dev/articles/forecast_evaluation.html)
 runs `lfo_cv()` on rodent counts, with its Pareto k refits and stacking
 weights.
 
@@ -179,27 +185,27 @@ simdat <- sim_mvgam(family = poisson(), n_series = 1L,
                      n_timepoints = 120L, trend_model = AR())
 
 mod <- mvgam(
-  y ~ s(x),
+  y ~ s(x, k = 5),
   trend_formula = ~ AR(p = 1),
   data    = simdat$data_train,
   family  = poisson(),
   chains  = 2, silent = 2
 )
-#> Warning: 386 of 2000 (19.0%) transitions ended with a divergence.
+#> Warning: 36 of 2000 (2.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 
 # Forecasts one time step after each origin from t = 60, scored by
 # ELPD and CRPS. The model is refitted only where the Pareto k is high.
 lfo <- lfo_cv(mod, min_t = 60L, score = c("elpd", "crps"))
-#> Warning: 64 of 2000 (3.0%) transitions ended with a divergence.
-#> See https://mc-stan.org/misc/warnings for details.
-#> Warning: 34 of 2000 (2.0%) transitions ended with a divergence.
+#> Warning: 38 of 2000 (2.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 #> Warning: 54 of 2000 (3.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
-#> Warning: 50 of 2000 (2.0%) transitions ended with a divergence.
+#> Warning: 22 of 2000 (1.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
-#> Warning: 102 of 2000 (5.0%) transitions ended with a divergence.
+#> Warning: 19 of 2000 (1.0%) transitions ended with a divergence.
+#> See https://mc-stan.org/misc/warnings for details.
+#> Warning: 6 of 2000 (0.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 lfo
 #> Approximate leave-future-out cross-validation
@@ -207,8 +213,8 @@ lfo
 #>   pareto_k_threshold : 0.697 (adaptive)
 #>   evaluation points  : 30
 #>   refits             : 5
-#>   ELPD               : sum = -79.17, mean = -2.64
-#>   crps               : sum = 59.62, mean = 1.99
+#>   ELPD               : sum = -78.96, mean = -2.63
+#>   crps               : sum = 57.91, mean = 1.93
 
 # Pareto k, ELPD and CRPS at each origin. Points past the dashed
 # line are highlighted
@@ -220,16 +226,16 @@ summary(lfo)
 #> # A tibble: 30 × 6
 #>    eval_time refit_here pareto_k n_obs  elpd  crps
 #>        <int> <lgl>         <dbl> <int> <dbl> <dbl>
-#>  1        61 TRUE         NA         1 -2.48 1.29 
-#>  2        62 FALSE        -1.56      1 -1.69 0.553
-#>  3        63 FALSE        -0.756     1 -2.54 1.48 
-#>  4        64 FALSE        -0.569     1 -2.41 1.06 
-#>  5        65 FALSE        -0.370     1 -1.60 0.868
-#>  6        66 FALSE        -0.155     1 -2.42 1.54 
-#>  7        67 FALSE         0.104     1 -2.79 3.05 
-#>  8        68 FALSE         0.563     1 -3.00 2.09 
-#>  9        69 FALSE         0.616     1 -2.42 2.50 
-#> 10        70 TRUE          0.893     1 -2.97 2.96 
+#>  1        61 TRUE        NA          1 -2.55 1.57 
+#>  2        62 FALSE       -1.63       1 -1.74 0.677
+#>  3        63 FALSE       -0.793      1 -2.52 1.50 
+#>  4        64 FALSE       -0.464      1 -2.46 1.05 
+#>  5        65 FALSE       -0.227      1 -1.66 0.877
+#>  6        66 FALSE       -0.123      1 -2.39 1.51 
+#>  7        67 FALSE       -0.0401     1 -2.78 3.21 
+#>  8        68 FALSE        0.563      1 -3.01 2.00 
+#>  9        69 TRUE         0.816      1 -2.45 2.09 
+#> 10        70 FALSE       -1.47       1 -2.89 2.79 
 #> # ℹ 20 more rows
 
 # Next, rank models by their forecasts with loo_compare()

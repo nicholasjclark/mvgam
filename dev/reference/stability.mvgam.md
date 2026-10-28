@@ -152,9 +152,9 @@ autoregressions. *Journal of Computational and Graphical Statistics*,
 and
 [`fevd()`](https://nicholasjclark.github.io/mvgam/dev/reference/fevd.mvgam.md)
 summarise the same VAR dynamics. The [VAR
-article](https://nicholasjclark.github.io/mvgam/articles/var.html) runs
-`stability()` on a plankton community. The [hierarchical VAR
-article](https://nicholasjclark.github.io/mvgam/articles/hierarchical_var.html)
+article](https://nicholasjclark.github.io/mvgam/dev/articles/var.html)
+runs `stability()` on a plankton community. The [hierarchical VAR
+article](https://nicholasjclark.github.io/mvgam/dev/articles/hierarchical_var.html)
 reports the metrics for each group of a hierarchical VAR.
 
 Other latent dynamics:
@@ -182,7 +182,7 @@ simdat <- sim_mvgam(family = gaussian(), n_series = 3L,
 var_mod <- mvgam(y ~ 1, trend_formula = ~ VAR(p = 1),
                  data = simdat$data_train, family = gaussian(),
                  chains = 2, silent = 2)
-#> Warning: 3 of 2000 (0.0%) transitions ended with a divergence.
+#> Warning: 44 of 2000 (2.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 #> Warning: 1 of 2 chains had an E-BFMI less than 0.3.
 #> See https://mc-stan.org/misc/warnings for details.
@@ -190,9 +190,9 @@ var_mod <- mvgam(y ~ 1, trend_formula = ~ VAR(p = 1),
 # Posterior medians and intervals of the stability metrics
 stab <- stability(var_mod)
 stab[stab$metric %in% c("reactivity", "mean_return_rate"), ]
-#>             metric    Estimate  Est.Error       Q2.5     Q97.5
-#> 7       reactivity -0.07064339 0.11252483 -0.2705272 0.3302954
-#> 8 mean_return_rate  0.83169171 0.06748073  0.6661313 0.9353162
+#>             metric    Estimate Est.Error       Q2.5     Q97.5
+#> 7       reactivity -0.06752746 0.1284961 -0.2841517 0.7699353
+#> 8 mean_return_rate  0.82382811 0.0735674  0.6710897 0.9331748
 
 # The full posterior of each metric
 plot(stability(var_mod, summary = FALSE))

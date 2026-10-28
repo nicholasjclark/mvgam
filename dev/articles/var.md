@@ -211,26 +211,26 @@ density when no taxon deviates from its mean.
 
 round(fixef(fit, trend_effects = TRUE), 2)
 #>                                   Estimate Est.Error  Q2.5 Q97.5
-#> seriesDiatoms_trend                   0.40      0.26 -0.14  0.93
-#> seriesGreens_trend                    0.24      0.39 -0.54  0.97
-#> seriesUnicells_trend                  1.03      0.36  0.31  1.78
-#> seriesCryptomonas_trend               0.53      0.21  0.12  0.95
-#> seriesDaphnia_trend                   0.05      0.20 -0.35  0.45
-#> seriesDiatoms:TP_annual_trend         0.54      0.57 -0.61  1.66
-#> seriesGreens:TP_annual_trend          0.42      0.82 -1.29  1.97
-#> seriesUnicells:TP_annual_trend        2.88      0.76  1.31  4.35
-#> seriesCryptomonas:TP_annual_trend     0.21      0.44 -0.66  1.11
-#> seriesDaphnia:TP_annual_trend        -0.29      0.44 -1.16  0.60
-#> seriesDiatoms:temp_anom_trend        -0.57      0.30 -1.17  0.02
-#> seriesGreens:temp_anom_trend          0.23      0.43 -0.60  1.08
-#> seriesUnicells:temp_anom_trend       -0.07      0.32 -0.66  0.56
-#> seriesCryptomonas:temp_anom_trend     0.33      0.26 -0.19  0.84
-#> seriesDaphnia:temp_anom_trend         0.20      0.24 -0.26  0.67
+#> seriesDiatoms_trend                   0.42      0.26 -0.10  0.94
+#> seriesGreens_trend                    0.20      0.42 -0.64  0.99
+#> seriesUnicells_trend                  1.02      0.38  0.19  1.75
+#> seriesCryptomonas_trend               0.52      0.20  0.11  0.92
+#> seriesDaphnia_trend                   0.02      0.20 -0.39  0.41
+#> seriesDiatoms:TP_annual_trend         0.58      0.55 -0.46  1.71
+#> seriesGreens:TP_annual_trend          0.39      0.84 -1.20  2.02
+#> seriesUnicells:TP_annual_trend        2.91      0.77  1.31  4.44
+#> seriesCryptomonas:TP_annual_trend     0.21      0.41 -0.60  1.03
+#> seriesDaphnia:TP_annual_trend        -0.34      0.42 -1.16  0.51
+#> seriesDiatoms:temp_anom_trend        -0.53      0.32 -1.17  0.08
+#> seriesGreens:temp_anom_trend          0.25      0.42 -0.57  1.06
+#> seriesUnicells:temp_anom_trend       -0.05      0.31 -0.65  0.58
+#> seriesCryptomonas:temp_anom_trend     0.35      0.25 -0.13  0.85
+#> seriesDaphnia:temp_anom_trend         0.20      0.25 -0.29  0.70
 ```
 
 Because total phosphorus fell across the record, the positive slope of
 the unicellular algae on phosphorus predicts the decline the first
-figure shows. Their slope is 2.88 \[1.31, 4.35\] standard deviations of
+figure shows. Their slope is 2.91 \[1.31, 4.44\] standard deviations of
 log density per unit of phosphorus. The intervals of the other four
 phosphorus slopes span zero.
 
@@ -253,11 +253,11 @@ marginaleffects::avg_slopes(fit, variables = "TP_annual",
                             by = "series", type = "expected")
 #> 
 #>       series Estimate  2.5 % 97.5 %
-#>  Diatoms        0.542 -0.607  1.655
-#>  Greens         0.438 -1.286  1.971
-#>  Unicells       2.896  1.309  4.346
-#>  Cryptomonas    0.218 -0.658  1.109
-#>  Daphnia       -0.285 -1.155  0.602
+#>  Diatoms        0.563 -0.460  1.712
+#>  Greens         0.379 -1.204  2.025
+#>  Unicells       2.917  1.314  4.440
+#>  Cryptomonas    0.201 -0.599  1.030
+#>  Daphnia       -0.351 -1.165  0.515
 #> 
 #> Term: TP_annual
 #> Type: expected
@@ -301,7 +301,7 @@ credible intervals.
 Diatoms peak in spring and reach their low in autumn. Green algae and
 *Daphnia* peak in mid-summer. *Cryptomonas* peaks in April. The
 temperature anomaly adds little once season is in the model. Its largest
-slope, for the diatoms, is -0.57 \[-1.17, 0.02\].
+slope, for the diatoms, is -0.53 \[-1.17, 0.08\].
 
 ## Interactions among the taxa
 
@@ -317,19 +317,19 @@ A
 #> Lag-1 VAR transition matrix from an mvgam fit
 #>   Group      : single-panel
 #>   Dimension  : 5 x 5
-#>   Mean |A_ij| (i != j): 0.10
+#>   Mean |A_ij| (i != j): 0.11
 #>   Point estimate:
 #>             Diatoms Greens Unicells Cryptomonas Daphnia
-#> Diatoms        0.37  -0.03    -0.03        0.32   -0.19
-#> Greens        -0.09   0.40     0.13        0.07    0.14
-#> Unicells      -0.08   0.02     0.65       -0.14   -0.15
+#> Diatoms        0.37  -0.03    -0.03        0.34   -0.18
+#> Greens        -0.09   0.41     0.14        0.09    0.14
+#> Unicells      -0.07   0.03     0.66       -0.16   -0.15
 #> Cryptomonas   -0.06   0.00     0.06        0.50   -0.24
-#> Daphnia        0.03  -0.02     0.07        0.18    0.47
+#> Daphnia        0.02  -0.02     0.06        0.21    0.47
 #>   95% CI on each cell available in `A_lower` / `A_upper`.
 ```
 
 The diagonal describes persistence. Each taxon’s deviation carries a
-coefficient between 0.37 and 0.65 into the next month. The heatmap
+coefficient between 0.37 and 0.66 into the next month. The heatmap
 outlines each cell whose 95% interval excludes zero:
 
 ``` r
@@ -348,15 +348,15 @@ intervals that exclude zero.
 In this fit, 2 of the twenty off-diagonal cells clear zero. Two cells
 have an ecological interpretation. The first is grazing. A month with
 more *Daphnia* than expected is followed by fewer *Cryptomonas*, with a
-coefficient of -0.24 \[-0.43, -0.04\]. The effect of *Cryptomonas* on
-*Daphnia* is 0.18 \[-0.09, 0.67\]. It is positive in 90% of the
+coefficient of -0.24 \[-0.43, -0.05\]. The effect of *Cryptomonas* on
+*Daphnia* is 0.21 \[-0.07, 0.82\]. It is positive in 91% of the
 posterior draws, which suggests that more food in one month brings more
 grazers in the next. Fourteen years of monthly data do not settle that
 effect.
 
 The second cell links *Cryptomonas* to the diatoms. A month with more
 *Cryptomonas* than expected is followed by more diatoms, with a
-coefficient of 0.32 \[0.01, 0.84\]. Because no feeding link runs between
+coefficient of 0.34 \[0.01, 0.95\]. Because no feeding link runs between
 two phytoplankton groups, the likelier source is a driver the model
 omits, such as a change in mixing that favours one group before the
 other. A coefficient in $`A`$ records that one deviation predicts
@@ -379,21 +379,21 @@ summary(rc_innov)
 #> # A tibble: 10 × 11
 #>    series_1    series_2   Estimate Est.Error Q_lower Q_upper   ESS prob_positive
 #>    <chr>       <chr>         <dbl>     <dbl>   <dbl>   <dbl> <dbl>         <dbl>
-#>  1 Unicells    Cryptomon…   0.476     0.143   0.261   0.691   169.         1    
-#>  2 Diatoms     Cryptomon…   0.267     0.129   0.0385  0.494   797.         0.988
-#>  3 Cryptomonas Daphnia      0.244     0.113   0.0235  0.439  1434.         0.986
-#>  4 Diatoms     Unicells     0.176     0.0976 -0.0119  0.355  1672.         0.967
-#>  5 Unicells    Daphnia     -0.142     0.0986 -0.320   0.0514 1668.         0.074
-#>  6 Diatoms     Greens       0.123     0.0956 -0.0671  0.303  1736.         0.906
-#>  7 Greens      Cryptomon…   0.109     0.112  -0.106   0.329  1371.         0.841
-#>  8 Diatoms     Daphnia      0.103     0.107  -0.107   0.298   629.         0.836
-#>  9 Greens      Daphnia      0.0334    0.0969 -0.157   0.219  1358.         0.634
-#> 10 Greens      Unicells    -0.0144    0.0978 -0.208   0.169  1406.         0.443
+#>  1 Unicells    Cryptomon…  0.480      0.141   0.273   0.697   164.        1     
+#>  2 Diatoms     Cryptomon…  0.270      0.134   0.0392  0.537   207.        0.990 
+#>  3 Cryptomonas Daphnia     0.241      0.111   0.0341  0.433  1002.        0.984 
+#>  4 Diatoms     Unicells    0.176      0.0997 -0.0130  0.363   778.        0.968 
+#>  5 Unicells    Daphnia    -0.141      0.0976 -0.320   0.0487 1131.        0.0763
+#>  6 Diatoms     Greens      0.122      0.0955 -0.0592  0.302  1617.        0.902 
+#>  7 Greens      Cryptomon…  0.108      0.113  -0.125   0.316   965.        0.834 
+#>  8 Diatoms     Daphnia     0.0954     0.109  -0.134   0.291   410.        0.822 
+#>  9 Greens      Daphnia     0.0319     0.100  -0.165   0.219  1048.        0.631 
+#> 10 Greens      Unicells   -0.00577    0.101  -0.201   0.188   732.        0.471 
 #> # ℹ 3 more variables: prob_negative <dbl>, prob_nonzero <dbl>, sig <lgl>
 ```
 
 The shocks of the unicellular algae and *Cryptomonas* correlate most
-strongly, at 0.48 \[0.26, 0.69\]. The model holds no covariate that
+strongly, at 0.48 \[0.27, 0.70\]. The model holds no covariate that
 would explain the shared rise.
 
 The default, `covariance = "stationary"`, correlates the deviations
@@ -414,12 +414,12 @@ Posterior mean correlations among the deviations of the five taxa.
 Outlined pairs have 95% credible intervals that exclude zero.
 
 The two correlations differ where $`A`$ couples the taxa. The shocks of
-*Cryptomonas* and *Daphnia* correlate at 0.24 \[0.02, 0.44\]. Their
-deviations correlate at 0.21 \[-0.02, 0.42\]. Grazing passes each shock
+*Cryptomonas* and *Daphnia* correlate at 0.24 \[0.03, 0.43\]. Their
+deviations correlate at 0.21 \[0.00, 0.41\]. Grazing passes each shock
 to the other taxon over the following months, which changes the
 correlation the shared shocks create. $`A`$ barely couples the
-unicellular algae and *Cryptomonas*. Their correlations are 0.48 \[0.26,
-0.69\] for the shocks and 0.50 \[0.26, 0.70\] for the deviations.
+unicellular algae and *Cryptomonas*. Their correlations are 0.48 \[0.27,
+0.70\] for the shocks and 0.50 \[0.29, 0.71\] for the deviations.
 
 ## Impulse responses
 
@@ -455,12 +455,12 @@ Generalised impulse responses of each taxon to a one standard deviation
 shock in Daphnia, with 95% credible intervals. Horizon 1 is the month of
 the shock.
 
-A shock raises *Daphnia* by 0.42 \[0.35, 0.50\] in its first month. The
+A shock raises *Daphnia* by 0.43 \[0.35, 0.50\] in its first month. The
 rise falls below 0.05 by month 4. Because the shocks of *Daphnia* and
 *Cryptomonas* are correlated, *Cryptomonas* moves with *Daphnia* in the
 first month, by 0.10 \[0.01, 0.19\]. Grazing then acts through $`A`$. In
-the third month *Cryptomonas* is at -0.09 \[-0.17, 0.00\] relative to
-its expected level. The unicellular algae change by -0.13 \[-0.24,
+the third month *Cryptomonas* is at -0.08 \[-0.16, 0.00\] relative to
+its expected level. The unicellular algae change by -0.13 \[-0.23,
 -0.03\] in the second month. Every response stays within 0.01 of zero
 from month 7.
 
@@ -492,12 +492,12 @@ Colours are the taxa whose shocks generate the variance.
 
 For every taxon but *Cryptomonas*, its own shocks generate most of its
 forecast variance. At twelve months those own shares run from 68% to
-91%. For *Cryptomonas*, the unicellular algae generate 18% of its
+90%. For *Cryptomonas*, the unicellular algae generate 18% of its
 forecast variance in the first month and 23% by month twelve. Most of
 that share comes from the correlation of the two taxa’s shocks. The
 ordering assigns it to the unicellular algae because they come first.
 The coupling of the two taxa appears in the *Daphnia* panel, where
-*Cryptomonas* shocks generate 16% of the twelve-month forecast variance.
+*Cryptomonas* shocks generate 17% of the twelve-month forecast variance.
 Reordering the levels of `series` and refitting would move the shared
 part of each correlated pair to the other taxon. The generalised impulse
 responses above are the same in any order.
@@ -530,11 +530,11 @@ reactivity.](var_files/figure-html/stability-1.png)
 Posterior distributions of reactivity and of the mean and variance
 return rates. The dashed line marks zero reactivity.
 
-Reactivity is -0.15 \[-0.38, 0.43\], with 81% of the posterior below
+Reactivity is -0.15 \[-0.38, 0.54\], with 79% of the posterior below
 zero. The data favour a community that damps every perturbation from the
 first month. They do not exclude one that briefly amplifies some
-perturbations. The mean return rate is 0.65 \[0.54, 0.77\]. At the
-median, a deviation halves in about 1.6 months. The plankton community
+perturbations. The mean return rate is 0.66 \[0.54, 0.79\]. At the
+median, a deviation halves in about 1.7 months. The plankton community
 returns to its seasonal and nutrient-driven means within a season.
 
 ## Forecasting the held-out year
@@ -576,14 +576,14 @@ data.frame(
   row.names = NULL
 )
 #>         taxon mean_crps  coverage
-#> 1     Diatoms 0.3845181 0.9166667
-#> 2      Greens 0.4629722 1.0000000
-#> 3    Unicells 0.3105877 1.0000000
-#> 4 Cryptomonas 0.3413625 0.8333333
-#> 5     Daphnia 0.2364582 1.0000000
+#> 1     Diatoms 0.3845818 0.9166667
+#> 2      Greens 0.4619623 1.0000000
+#> 3    Unicells 0.3056566 1.0000000
+#> 4 Cryptomonas 0.3396723 0.9166667
+#> 5     Daphnia 0.2370524 1.0000000
 ```
 
-Of the 60 observations in 1994, 57 fell inside their 90% intervals,
+Of the 60 observations in 1994, 58 fell inside their 90% intervals,
 close to the coverage the intervals claim. The CRPS compares models
 scored on the same data, such as this VAR against an independent
 autoregression for each taxon. The [forecast evaluation

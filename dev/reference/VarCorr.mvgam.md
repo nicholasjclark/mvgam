@@ -103,17 +103,17 @@ Nicholas J Clark
 set.seed(14)
 simdat <- sim_mvgam(family = poisson(), n_series = 4L,
                     n_timepoints = 120L, trend_model = AR())
-mod <- mvgam(y ~ s(x) + (1 | series),
+mod <- mvgam(y ~ s(x, k = 5) + (1 | series),
              trend_formula = ~ AR(p = 1),
              data = simdat$data_train, family = poisson(),
              chains = 2, silent = 2)
-#> Warning: 76 of 2000 (4.0%) transitions ended with a divergence.
+#> Warning: 24 of 2000 (1.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 
 # The standard deviation of the series intercepts
 VarCorr(mod)$series$sd
 #>            Estimate Est.Error        Q2.5     Q97.5
-#> Intercept 0.1984474  0.219979 0.006018553 0.7665907
+#> Intercept 0.2001548  0.212956 0.006089667 0.8145818
 
 # Next: ranef() gives each series' own deviation
 # }

@@ -21,14 +21,38 @@ pairs(x, variable = NULL, regex = FALSE, ...)
 
 - variable:
 
-  Names of the variables (parameters) to plot, as given by a character
-  vector or a regular expression (if `regex = TRUE`). By default, a
-  hopefully not too large selection of variables is plotted.
+  Either a keyword shortcut, a character vector of parameter names, or
+  (when `regex = TRUE`) a vector of regular expressions. Recognised
+  keywords:
+
+  - `"betas"`: population-level coefficients, the set
+    [`brms::fixef()`](https://paulbuerkner.com/brms/reference/fixef.brmsfit.html)
+    reports (`b_*`, `bs_*` and `bsp_*`).
+
+  - `"obs_params"`: observation-family distributional parameters
+    (`sigma`, `phi`, `shape`, ...).
+
+  - `"smooth_params"`: smooth-term standard deviations (`sds_*`).
+
+  - `"trend_betas"`: the trend formula's population-level coefficients
+    (`b_*_trend`, `bs_*_trend` and `bsp_*_trend`).
+
+  - `"trend_params"`: trend-dynamics parameters (autoregressive
+    coefficients, innovation SDs, ...).
+
+  - `"trend_smooth_params"`: trend-side smooth SDs.
+
+  `NULL` (the default) returns every parameter. A bare vector name, such
+  as `"sigma_trend"`, selects every element. Group-level effects, factor
+  loadings and latent states have no keyword. Select them by name.
+  [`variables.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/index-mvgam.md)
+  lists the names a fit holds.
 
 - regex:
 
-  Logical; Indicates whether `variable` should be treated as regular
-  expressions. Defaults to `FALSE`.
+  Logical. When `TRUE`, each entry of `variable` is treated as a regular
+  expression and any parameter matching at least one pattern is
+  selected. Keyword shortcuts are still honoured. Defaults to `FALSE`.
 
 - ...:
 
@@ -78,11 +102,11 @@ Other posterior summaries:
 set.seed(13)
 simdat <- sim_mvgam(family = poisson(), n_series = 1L,
                      n_timepoints = 120L, trend_model = AR())
-mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
+mod <- mvgam(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1),
               data    = simdat$data_train,
               family  = poisson(),
               chains  = 2, silent = 2)
-#> Warning: 9 of 2000 (0.0%) transitions ended with a divergence.
+#> Warning: 5 of 2000 (0.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 
 # The trend's autoregression against its innovation scale

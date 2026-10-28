@@ -1,13 +1,32 @@
-# Pivot a detection array to mvgam long-format
+# Convert a detection array to the long format of mvgam
 
-Convert the multi-dimensional detection histories used by `unmarked`,
-`ubms`, `flocker` and `spOccupancy` into the long-format closure-unit
-layout `mvgam(family = occ() / nmix())` and
-`jsdgam(family = occ() / nmix())` expect. One row per
-`(species, site, season, visit)` tuple. Single-species data drops the
-`series` axis; single-season data sets `season = 1` for every row and
-`time = site`. Multi-season data has two modes selected via
+Occupancy and N-mixture packages such as unmarked, ubms, flocker and
+spOccupancy store detection histories as matrices or arrays, with one
+dimension for sites and one for visits.
+[`mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam.md)
+and
+[`jsdgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/jsdgam.md)
+with
+[`occ()`](https://nicholasjclark.github.io/mvgam/dev/reference/occ.md)
+or
+[`nmix()`](https://nicholasjclark.github.io/mvgam/dev/reference/nmix.md)
+take a long data frame instead, with one row per species, site, season
+and visit. This function converts the one to the other and copies the
+covariates onto the matching rows.
+
+Data from one season give `time = site`. Each site is then one closure
+unit. Data from several seasons take one of two layouts, chosen by
 `multi_season`:
+
+- `"fused"` (the default) gives each site in each season its own closure
+  unit, with `time = (site - 1) * T + season` for \\T\\ seasons. Use it
+  when the seasons are independent given the covariates.
+
+- `"hierarchical"` keeps `time = season`. Fit it with
+  `occ(multi_season = TRUE)` or `nmix(multi_season = TRUE)`. Name `site`
+  in the observation formula, as in `s(site, bs = "re")`. The latent
+  trend then runs over seasons. The model has no explicit colonisation
+  or extinction rates.
 
 ## Usage
 
@@ -114,12 +133,8 @@ pivot_detection_array(
 
 - time_col:
 
-  Name of the closure-unit time identifier. Defaults to `"time"`.
-  Single-season: `time = site`. Multi-season + `multi_season = "fused"`:
-  `time = (site - 1) * T + season` (one closure unit per (site,
-  season)). Multi-season + `multi_season = "hierarchical"`:
-  `time = season` (one closure unit per (species, site, season), with
-  site referenced separately in the observation `formula`).
+  Name of the time column in the output. Defaults to `"time"`. The
+  Description gives its values for each layout.
 
 - series_col:
 
@@ -132,47 +147,27 @@ pivot_detection_array(
 
 - multi_season:
 
-  Character scalar controlling the multi-season `time` encoding.
-  `"fused"` (default) fuses `(site, season)` into a single `time` axis
-  so each `(site, season)` pair is a unique closure unit. This matches
-  the existing single-season closure-unit grouping `(series, time)` and
-  works with
-  [`occ()`](https://nicholasjclark.github.io/mvgam/dev/reference/occ.md)
-  /
-  [`nmix()`](https://nicholasjclark.github.io/mvgam/dev/reference/nmix.md)
-  unchanged. `"hierarchical"` keeps `time = season` and exposes `site`
-  as a side-car covariate for use in the observation `formula`; pair
-  with `occ(multi_season = TRUE)` or `nmix(multi_season = TRUE)` so the
-  3-axis closure-unit grouping `(series, site, time)` is activated.
-  Ignored for single-season inputs (2D matrix, 3D `[N, J, K]` array, or
-  4D array with `T = 1`).
+  `"fused"` (the default) or `"hierarchical"`, the layout for data from
+  several seasons. The Description explains both. Data from one season
+  ignore it: a matrix, a `[N, J, K]` array or a four-dimensional array
+  with \\T = 1\\.
 
 ## Value
 
-A long-format `data.frame` with columns
-`(series, time, site, season, visit, y, <site_covs>, <season_covs>, <site_season_covs>, <obs_covs>)`.
-Single-species input returns no `series` column and single-season input
-no `season` column. Rows where `y` is `NA` are dropped. Closure units
-may vary in the number of observed visits / seasons.
-
-## Details
-
-- `"fused"` (default): `time = (site - 1) * T + season`, so each (site,
-  season) pair is a unique closure-unit identifier. Use when seasons are
-  independent given covariates (single-season analysis applied per
-  season, no cross-season dynamics modelled).
-
-- `"hierarchical"`: `time = season`. Pair with
-  `occ(multi_season = TRUE)` / `nmix(multi_season = TRUE)` and reference
-  the `site` column in the observation `formula` (e.g.
-  `s(site, bs = "re")`) so per-site variation enters the observation
-  model while the trend pipeline operates on the season axis. See
-  [`?occ`](https://nicholasjclark.github.io/mvgam/dev/reference/occ.md)
-  for the multi-season scope and identification caveats. The model
-  parameterizes joint cross-species occupancy dynamics. It has no
-  explicit colonization or extinction rates.
+A long `data.frame` with the columns `series`, `site`, `season`,
+`visit`, `time` and `y`, followed by the covariates. Data from one
+species have no `series` column. Data from one season have no `season`
+column. Rows where `y` is `NA` are dropped. Units may then differ in
+their number of visits.
 
 ## See also
+
+[`occ()`](https://nicholasjclark.github.io/mvgam/dev/reference/occ.md)
+and
+[`nmix()`](https://nicholasjclark.github.io/mvgam/dev/reference/nmix.md)
+for the families that take this layout.
+[`pivot_species_matrix()`](https://nicholasjclark.github.io/mvgam/dev/reference/pivot_species_matrix.md)
+converts a site-by-species matrix.
 
 Other model fitting:
 [`check_newdata()`](https://nicholasjclark.github.io/mvgam/dev/reference/check_newdata.md),

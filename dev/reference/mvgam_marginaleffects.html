@@ -3,15 +3,15 @@
 marginaleffects::slopes() and marginaleffects::comparisons()
 take an mvgam fit. get_predict() returns the posterior draws in
 the posterior_draws attribute. marginaleffects computes every
-summary from those draws. get_coef(), get_vcov() and
-set_coef() complete the methods marginaleffects calls. The draws
-carry the uncertainty. None of the three changes a result."><meta property="og:description" content="These methods let marginaleffects::predictions(),
+summary from those draws. The uncertainty comes from the draws
+alone. marginaleffects also calls get_coef(), get_vcov() and
+set_coef(). Their output leaves every result unchanged."><meta property="og:description" content="These methods let marginaleffects::predictions(),
 marginaleffects::slopes() and marginaleffects::comparisons()
 take an mvgam fit. get_predict() returns the posterior draws in
 the posterior_draws attribute. marginaleffects computes every
-summary from those draws. get_coef(), get_vcov() and
-set_coef() complete the methods marginaleffects calls. The draws
-carry the uncertainty. None of the three changes a result."><meta property="og:image" content="https://nicholasjclark.github.io/mvgam/logo.png"><meta name="robots" content="noindex"></head><body>
+summary from those draws. The uncertainty comes from the draws
+alone. marginaleffects also calls get_coef(), get_vcov() and
+set_coef(). Their output leaves every result unchanged."><meta property="og:image" content="https://nicholasjclark.github.io/mvgam/logo.png"><meta name="robots" content="noindex"></head><body>
     <a href="#main" class="visually-hidden-focusable">Skip to contents</a>
 
 
@@ -50,9 +50,9 @@ carry the uncertainty. None of the three changes a result."><meta property="og:i
 <code><a href="https://rdrr.io/pkg/marginaleffects/man/slopes.html" class="external-link">marginaleffects::slopes()</a></code> and <code><a href="https://rdrr.io/pkg/marginaleffects/man/comparisons.html" class="external-link">marginaleffects::comparisons()</a></code>
 take an mvgam fit. <code>get_predict()</code> returns the posterior draws in
 the <code>posterior_draws</code> attribute. marginaleffects computes every
-summary from those draws. <code>get_coef()</code>, <code>get_vcov()</code> and
-<code>set_coef()</code> complete the methods marginaleffects calls. The draws
-carry the uncertainty. None of the three changes a result.</p>
+summary from those draws. The uncertainty comes from the draws
+alone. marginaleffects also calls <code>get_coef()</code>, <code>get_vcov()</code> and
+<code>set_coef()</code>. Their output leaves every result unchanged.</p>
     </div>
 
 
@@ -79,18 +79,20 @@ the median falls below the mean.</p>
     <h2 id="the-latent-trend">The latent trend<a class="anchor" aria-label="anchor" href="#the-latent-trend"></a></h2>
 
 
-<p>With <code>process_error = FALSE</code>, the default, the trend contributes its
-deterministic submodel. Each draw keeps its own coefficients. The
-result is a covariate effect with the latent process held out. Its
-credible band excludes the uncertainty of the latent state.</p>
-<p>A slope or comparison taken this way is biased low against the
-model's own <code>E[Y]</code>. Its expectation leaves out the trend's
-stationary spread. Under a log link and an AR(1) trend the factor
-is \(\exp(\sigma^2 / (2(1 - \rho^2)))\). <code>process_error = TRUE</code>
-gives the unbiased effect. Its band is wider because it includes
-the uncertainty of the latent state.</p>
-<p>When an autoregressive process carries most of the series-level
-variation, a covariate effect shows little under either setting.
+<p>By default (<code>process_error = FALSE</code>) each prediction takes the
+covariate part of the trend: the effects in its formula, without
+its innovations. Each posterior draw keeps its own coefficients. The
+result shows the effect of the covariates with the latent process
+at its mean. Its credible band leaves out the uncertainty of the
+latent state.</p>
+<p>Under a nonlinear link this falls short of the model's own <code>E[Y]</code>.
+Averaging over the innovations of an AR(1) trend raises a log-link
+expectation by the factor
+\(\exp(\sigma^2 / (2(1 - \rho^2)))\). <code>process_error = TRUE</code> adds
+the innovations. Slopes and comparisons then describe <code>E[Y]</code>, with
+wider bands.</p>
+<p>When the trend explains most of the variation in a series, the
+covariates have little left to explain under either setting.
 <code><a href="hindcast.mvgam.html">hindcast.mvgam()</a></code> and <code><a href="forecast.mvgam.html">forecast.mvgam()</a></code> return the state the
 model inferred.</p>
     </div>
@@ -101,7 +103,44 @@ interpret statistical models using marginaleffects for R and
 Python. <em>Journal of Statistical Software</em>, 111(9):1-32.
 <a href="https://doi.org/10.18637/jss.v111.i09" class="external-link">doi:10.18637/jss.v111.i09</a></p>
     </div>
+    <div class="section level2">
+    <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>
+    <div class="dont-index"><p><code><a href="conditional_effects.mvgam.html">conditional_effects.mvgam()</a></code> for quick effect plots,
+<code><a href="posterior_epred.mvgam.html">posterior_epred.mvgam()</a></code> for the predictions these methods take.</p></div>
+    </div>
 
+    <div class="section level2">
+    <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="co"># \dontrun{</span></span></span>
+<span class="r-in"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://marginaleffects.com/" class="external-link">marginaleffects</a></span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed</a></span><span class="op">(</span><span class="fl">1</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">simdat</span> <span class="op">&lt;-</span> <span class="fu"><a href="sim_mvgam.html">sim_mvgam</a></span><span class="op">(</span>n_series <span class="op">=</span> <span class="fl">1L</span>, n_timepoints <span class="op">=</span> <span class="fl">60L</span>,</span></span>
+<span class="r-in"><span>                    trend_model <span class="op">=</span> <span class="fu"><a href="trend_constructors.html">AR</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">mod</span> <span class="op">&lt;-</span> <span class="fu"><a href="mvgam.html">mvgam</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="fu">s</span><span class="op">(</span><span class="va">x</span>, k <span class="op">=</span> <span class="fl">5</span><span class="op">)</span>, trend_formula <span class="op">=</span> <span class="op">~</span> <span class="fu"><a href="trend_constructors.html">AR</a></span><span class="op">(</span>p <span class="op">=</span> <span class="fl">1</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>             data <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span>, family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>             chains <span class="op">=</span> <span class="fl">2</span>, silent <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
+<span class="r-err co"><span class="r-pr">#&gt;</span> <span class="error">Error:</span> 'y' has values outside the support of family 'poisson'.</span>
+<span class="r-err co"><span class="r-pr">#&gt;</span>   Requires: 0 &lt;= 'y' (integers only).</span>
+<span class="r-err co"><span class="r-pr">#&gt;</span>   Observed range: [-2.504, 2.943]. 23 of 45 values fall outside, the first</span>
+<span class="r-err co"><span class="r-pr">#&gt;</span>   at row 1.</span>
+<span class="r-err co"><span class="r-pr">#&gt;</span>   Check the column for missing-data sentinels such as -1 or -999.</span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># Average change in the expected count per unit of x</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/pkg/marginaleffects/man/slopes.html" class="external-link">avg_slopes</a></span><span class="op">(</span><span class="va">mod</span>, variables <span class="op">=</span> <span class="st">"x"</span>, type <span class="op">=</span> <span class="st">"expected"</span><span class="op">)</span></span></span>
+<span class="r-err co"><span class="r-pr">#&gt;</span> <span class="error">Error:</span> object 'mod' not found</span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># The same slope with the trend's innovations averaged in</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/pkg/marginaleffects/man/slopes.html" class="external-link">avg_slopes</a></span><span class="op">(</span><span class="va">mod</span>, variables <span class="op">=</span> <span class="st">"x"</span>, type <span class="op">=</span> <span class="st">"expected"</span>,</span></span>
+<span class="r-in"><span>           process_error <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></span>
+<span class="r-err co"><span class="r-pr">#&gt;</span> <span class="error">Error:</span> object 'mod' not found</span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># Expected counts across the range of x</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/pkg/marginaleffects/man/plot_predictions.html" class="external-link">plot_predictions</a></span><span class="op">(</span><span class="va">mod</span>, condition <span class="op">=</span> <span class="st">"x"</span>, type <span class="op">=</span> <span class="st">"expected"</span><span class="op">)</span></span></span>
+<span class="r-err co"><span class="r-pr">#&gt;</span> <span class="error">Error:</span> object 'mod' not found</span>
+<span class="r-in"><span><span class="co"># }</span></span></span>
+<span class="r-in"><span></span></span>
+</code></pre></div>
+    </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
     </nav></aside></div>
 

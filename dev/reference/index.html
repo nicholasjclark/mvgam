@@ -125,7 +125,7 @@
           <code><a href="mvgam_formula.html">mvgam_formula()</a></code>
 
         </dt>
-        <dd>Create an mvgam formula object</dd>
+        <dd>Pair an observation formula with a trend formula</dd>
 
         <dt>
 
@@ -146,7 +146,7 @@
           <code><a href="trend_constructors.html">RW()</a></code> <code><a href="trend_constructors.html">AR()</a></code> <code><a href="trend_constructors.html">CAR()</a></code> <code><a href="trend_constructors.html">VAR()</a></code>
 
         </dt>
-        <dd>Trend Model Constructors for <span class="pkg">mvgam</span></dd>
+        <dd>Latent trend models for <span class="pkg">mvgam</span></dd>
 
         <dt>
 
@@ -167,7 +167,7 @@
           <code><a href="ZMVN.html">ZMVN()</a></code>
 
         </dt>
-        <dd>Specify correlated residual processes in <span class="pkg">mvgam</span></dd>
+        <dd>Correlated latent effects with no time dependence</dd>
 
         <dt>
 
@@ -206,7 +206,7 @@
       </dl></div><div class="section level2">
       <h2 id="observation-families">Observation families<a class="anchor" aria-label="anchor" href="#observation-families"></a></h2>
 
-      <div class="section-desc"><p>Likelihoods mvgam adds on top of the brms family library, for counts, compositions, occupancy and abundance.</p></div>
+      <div class="section-desc"><p>Families mvgam adds to those of brms, for counts, compositions, occupancy and abundance.</p></div>
 
       <dl></dl></div><div class="section level2">
 
@@ -383,7 +383,7 @@
           <code><a href="pivot_detection_array.html">pivot_detection_array()</a></code>
 
         </dt>
-        <dd>Pivot a detection array to mvgam long-format</dd>
+        <dd>Convert a detection array to the long format of mvgam</dd>
 
         <dt>
 
@@ -473,7 +473,7 @@
       </dl></div><div class="section level2">
       <h2 id="prediction-and-forecasting">Prediction and forecasting<a class="anchor" aria-label="anchor" href="#prediction-and-forecasting"></a></h2>
 
-      <div class="section-desc"><p>Propagating the fitted latent state forward, and marginalising over it for covariate-driven prediction.</p></div>
+      <div class="section-desc"><p>Forecasts carry the fitted trend forward in time. Predictions from covariates leave the fitted trend out.</p></div>
 
       <dl></dl></div><div class="section level2">
 
@@ -485,14 +485,14 @@
           <code><a href="predict.mvgam.html">predict(<i>&lt;mvgam&gt;</i>)</a></code>
 
         </dt>
-        <dd>Draws from the Posterior Distribution of an mvgam Model</dd>
+        <dd>Posterior predictions from an mvgam model</dd>
 
         <dt>
 
           <code><a href="fitted.mvgam.html">fitted(<i>&lt;mvgam&gt;</i>)</a></code>
 
         </dt>
-        <dd>Expected Values from the Posterior Distribution</dd>
+        <dd>Expected values of an mvgam model</dd>
 
         <dt>
 
@@ -622,7 +622,7 @@
       </dl></div><div class="section level2">
       <h2 id="model-criticism-and-cross-validation">Model criticism and cross-validation<a class="anchor" aria-label="anchor" href="#model-criticism-and-cross-validation"></a></h2>
 
-      <div class="section-desc"><p>Posterior predictive checks, residuals, information criteria and the forecast-honest alternatives to them.</p></div>
+      <div class="section-desc"><p>Posterior predictive checks, residuals, leave-one-out criteria and cross-validation of forecasts.</p></div>
 
       <dl></dl></div><div class="section level2">
 
@@ -676,7 +676,7 @@
           <code><a href="loo.mvgam.html">loo(<i>&lt;mvgam&gt;</i>)</a></code> <code><a href="loo.mvgam.html">loo_compare(<i>&lt;mvgam&gt;</i>)</a></code>
 
         </dt>
-        <dd>LOO information criteria for <span class="pkg">mvgam</span> models</dd>
+        <dd>Approximate leave-one-out cross-validation for <span class="pkg">mvgam</span> models</dd>
 
         <dt>
 
@@ -820,7 +820,7 @@
       </dl></div><div class="section level2">
       <h2 id="posterior-summaries-and-diagnostics">Posterior summaries and diagnostics<a class="anchor" aria-label="anchor" href="#posterior-summaries-and-diagnostics"></a></h2>
 
-      <div class="section-desc"><p>Reading parameters off a fit, checking convergence, and recovering the Stan program that produced it.</p></div>
+      <div class="section-desc"><p>Parameter summaries and convergence checks for a fit. The Stan program and data that produced it.</p></div>
 
       <dl></dl></div><div class="section level2">
 
@@ -1043,7 +1043,7 @@
       </dl></div><div class="section level2">
       <h2 id="interrogating-a-fitted-var">Interrogating a fitted VAR<a class="anchor" aria-label="anchor" href="#interrogating-a-fitted-var"></a></h2>
 
-      <div class="section-desc"><p>Impulse responses, variance decompositions and stability metrics read off the posterior for the transition matrix and innovation covariance.</p></div>
+      <div class="section-desc"><p>Impulse responses, variance decompositions and stability measures computed from the posterior of a VAR trend.</p></div>
 
       <dl></dl></div><div class="section level2">
 
@@ -1285,7 +1285,7 @@
       </dl></div><div class="section level2">
       <h2 id="plotting">Plotting<a class="anchor" aria-label="anchor" href="#plotting"></a></h2>
 
-      <div class="section-desc"><p>The general-purpose plot methods for a fitted model, and the theme they are drawn with.</p></div>
+      <div class="section-desc"><p>Plot methods for a fitted model. mvgam_theme() styles every figure.</p></div>
 
       <dl></dl></div><div class="section level2">
 
@@ -1356,13 +1356,6 @@
 
         </dt>
         <dd>Simulated lake chemistry with correlated random-walk state</dd>
-
-        <dt>
-
-          <code><a href="glm_analysis.html">glm_analysis</a></code>
-
-        </dt>
-        <dd>GLM likelihood detection and trend injection</dd>
       </dl></div><div class="section level2">
       <h2 id="re-exports">Re-exports<a class="anchor" aria-label="anchor" href="#re-exports"></a></h2>
 

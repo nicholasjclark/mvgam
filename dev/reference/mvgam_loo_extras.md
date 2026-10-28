@@ -152,8 +152,8 @@ add_criterion(
 
 - model_names:
 
-  Optional character vector of model labels; overrides the names
-  inferred from the call.
+  Optional character vector of model names, one per forecast. It
+  replaces the names taken from the call.
 
 - summary:
 
@@ -170,8 +170,7 @@ add_criterion(
 - probs:
 
   Numeric vector of probabilities for quantile computation. Default is
-  `c(0.025, 0.975)` for 95% credible intervals. Can be a single value or
-  multiple values.
+  `c(0.025, 0.975)` for 95% credible intervals.
 
 - seed:
 
@@ -319,32 +318,32 @@ simdat <- sim_mvgam(family = poisson(), n_series = 1L,
                     n_timepoints = 120L, trend_model = "None")
 mod <- mvgam(y ~ s(x), data = simdat$data_train,
              family = poisson(), chains = 2, silent = 2)
-#> Warning: 2 of 2000 (0.0%) transitions ended with a divergence.
+#> Warning: 3 of 2000 (0.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 # }
 # \dontrun{
 # The leave-one-out R^2 is lower than the in-sample one
 loo_R2(mod)
-#>     Estimate  Est.Error      Q2.5    Q97.5
-#> R2 0.5862196 0.06603572 0.4380197 0.693439
+#>     Estimate  Est.Error     Q2.5     Q97.5
+#> R2 0.5864293 0.06594508 0.437431 0.6934755
 bayes_R2(mod)
 #>     Estimate  Est.Error      Q2.5     Q97.5
-#> R2 0.6295646 0.04875562 0.5215712 0.7120682
+#> R2 0.6295285 0.04993805 0.5201681 0.7112319
 
 # One PSIS object serves every leave-one-out prediction
 psis <- loo(mod, save_psis = TRUE)$psis_object
 head(loo_predict(mod, psis_object = psis))
 #>           mean
-#> [1,]  2.711389
-#> [2,] 13.012306
-#> [3,]  7.127970
-#> [4,]  8.644507
-#> [5,]  2.905559
-#> [6,]  8.965214
+#> [1,]  2.726495
+#> [2,] 13.067724
+#> [3,]  7.096046
+#> [4,]  8.603916
+#> [5,]  2.913653
+#> [6,]  9.077012
 head(loo_predictive_interval(mod, psis_object = psis))
 #>      q5 q95
 #> [1,]  0   6
-#> [2,]  7  19
+#> [2,]  7  20
 #> [3,]  3  12
 #> [4,]  4  14
 #> [5,]  0   6

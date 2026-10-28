@@ -68,8 +68,8 @@ model. The results must share one evaluation grid, with the same
 
 
 <dt id="arg-model-names">model_names<a class="anchor" aria-label="anchor" href="#arg-model-names"></a></dt>
-<dd><p>Optional character vector of model labels;
-overrides the names inferred from the call.</p></dd>
+<dd><p>Optional character vector of model names, one per
+forecast. It replaces the names taken from the call.</p></dd>
 
 </dl></div>
     <div class="section level2">
@@ -136,42 +136,41 @@ comparison. <em>Bayesian Analysis</em>. <a href="https://doi.org/10.1214/25-BA15
 <span class="r-in"><span><span class="va">simdat</span> <span class="op">&lt;-</span> <span class="fu"><a href="sim_mvgam.html">sim_mvgam</a></span><span class="op">(</span>family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson</a></span><span class="op">(</span><span class="op">)</span>, n_series <span class="op">=</span> <span class="fl">1L</span>,</span></span>
 <span class="r-in"><span>                    n_timepoints <span class="op">=</span> <span class="fl">120L</span>, trend_model <span class="op">=</span> <span class="fu"><a href="trend_constructors.html">AR</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="co"># Two models of one count series: a smooth of x with and without</span></span></span>
-<span class="r-in"><span><span class="co"># an AR(1) trend</span></span></span>
-<span class="r-in"><span><span class="va">mod_gam</span> <span class="op">&lt;-</span> <span class="fu"><a href="mvgam.html">mvgam</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="fu">s</span><span class="op">(</span><span class="va">x</span><span class="op">)</span>, data <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span>,</span></span>
+<span class="r-in"><span><span class="co"># an AR(1) trend. The trend model samples with smaller steps</span></span></span>
+<span class="r-in"><span><span class="co"># (adapt_delta = 0.95). That avoids divergent transitions when</span></span></span>
+<span class="r-in"><span><span class="co"># lfo_cv() refits it to shorter stretches of the series</span></span></span>
+<span class="r-in"><span><span class="va">mod_gam</span> <span class="op">&lt;-</span> <span class="fu"><a href="mvgam.html">mvgam</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="fu">s</span><span class="op">(</span><span class="va">x</span>, k <span class="op">=</span> <span class="fl">5</span><span class="op">)</span>, data <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span>,</span></span>
 <span class="r-in"><span>                 family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson</a></span><span class="op">(</span><span class="op">)</span>, chains <span class="op">=</span> <span class="fl">2</span>, silent <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 25 of 2000 (1.0%) transitions ended with a divergence.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 209 of 2000 (10.0%) transitions ended with a divergence.</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> See https://mc-stan.org/misc/warnings for details.</span>
-<span class="r-in"><span><span class="va">mod_ar</span> <span class="op">&lt;-</span> <span class="fu"><a href="mvgam.html">mvgam</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="fu">s</span><span class="op">(</span><span class="va">x</span><span class="op">)</span>, trend_formula <span class="op">=</span> <span class="op">~</span> <span class="fu"><a href="trend_constructors.html">AR</a></span><span class="op">(</span>p <span class="op">=</span> <span class="fl">1</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span><span class="va">mod_ar</span> <span class="op">&lt;-</span> <span class="fu"><a href="mvgam.html">mvgam</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="fu">s</span><span class="op">(</span><span class="va">x</span>, k <span class="op">=</span> <span class="fl">5</span><span class="op">)</span>, trend_formula <span class="op">=</span> <span class="op">~</span> <span class="fu"><a href="trend_constructors.html">AR</a></span><span class="op">(</span>p <span class="op">=</span> <span class="fl">1</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>                data <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span>, family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>                chains <span class="op">=</span> <span class="fl">2</span>, silent <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 5 of 2000 (0.0%) transitions ended with a divergence.</span>
+<span class="r-in"><span>                chains <span class="op">=</span> <span class="fl">2</span>, silent <span class="op">=</span> <span class="fl">2</span>,</span></span>
+<span class="r-in"><span>                control <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>adapt_delta <span class="op">=</span> <span class="fl">0.95</span><span class="op">)</span><span class="op">)</span></span></span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 3 of 2000 (0.0%) transitions ended with a divergence.</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> See https://mc-stan.org/misc/warnings for details.</span>
 <span class="r-in"><span><span class="co"># }</span></span></span>
 <span class="r-in"><span><span class="co"># \dontrun{</span></span></span>
 <span class="r-in"><span><span class="co"># Each origin after t = 70 forecasts the next time step. The</span></span></span>
 <span class="r-in"><span><span class="co"># pointwise log densities feed stacking weights</span></span></span>
 <span class="r-in"><span><span class="va">lfo_gam</span> <span class="op">&lt;-</span> <span class="fu"><a href="lfo_cv.mvgam.html">lfo_cv</a></span><span class="op">(</span><span class="va">mod_gam</span>, min_t <span class="op">=</span> <span class="fl">70L</span>, save_log_lik <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 4 of 2000 (0.0%) transitions ended with a divergence.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 31 of 2000 (2.0%) transitions ended with a divergence.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> See https://mc-stan.org/misc/warnings for details.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 14 of 2000 (1.0%) transitions ended with a divergence.</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> See https://mc-stan.org/misc/warnings for details.</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 6 of 2000 (0.0%) transitions ended with a divergence.</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> See https://mc-stan.org/misc/warnings for details.</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 9 of 2000 (0.0%) transitions ended with a divergence.</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> See https://mc-stan.org/misc/warnings for details.</span>
 <span class="r-in"><span><span class="va">lfo_ar</span> <span class="op">&lt;-</span> <span class="fu"><a href="lfo_cv.mvgam.html">lfo_cv</a></span><span class="op">(</span><span class="va">mod_ar</span>, min_t <span class="op">=</span> <span class="fl">70L</span>, save_log_lik <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 9 of 2000 (0.0%) transitions ended with a divergence.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 3 of 2000 (0.0%) transitions ended with a divergence.</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> See https://mc-stan.org/misc/warnings for details.</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 11 of 2000 (1.0%) transitions ended with a divergence.</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> See https://mc-stan.org/misc/warnings for details.</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 13 of 2000 (1.0%) transitions ended with a divergence.</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> See https://mc-stan.org/misc/warnings for details.</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 37 of 2000 (2.0%) transitions ended with a divergence.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 2 of 2000 (0.0%) transitions ended with a divergence.</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> See https://mc-stan.org/misc/warnings for details.</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># The model with the higher summed ELPD comes first</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://mc-stan.org/loo/reference/loo_compare.html" class="external-link">loo_compare</a></span><span class="op">(</span><span class="va">lfo_gam</span>, <span class="va">lfo_ar</span>, model_names <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"GAM"</span>, <span class="st">"AR"</span><span class="op">)</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  model elpd_diff se_diff p_worse diag_diff diag_elpd</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>     AR       0.0     0.0      NA                    </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>    GAM     -32.7     9.8    1.00   N &lt; 100          </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    GAM     -36.5    12.3    1.00   N &lt; 100          </span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Diagnostic flags present.</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> See ?`loo-glossary` (sections `diag_diff` and `diag_elpd`)</span>

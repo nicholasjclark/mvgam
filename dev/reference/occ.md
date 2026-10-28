@@ -101,11 +101,11 @@ Inference in Ecology*. Academic Press.
 for the related N-mixture family and
 [`pp_check.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/pp_check.mvgam.md)
 for closure-unit goodness-of-fit checks. The [N-mixture
-article](https://nicholasjclark.github.io/mvgam/articles/nmix.html) fits
-occupancy and N-mixture models from data preparation to inference. The
-[data
-article](https://nicholasjclark.github.io/mvgam/articles/data.html) sets
-out the row layout that `occ()` expects.
+article](https://nicholasjclark.github.io/mvgam/dev/articles/nmix.html)
+fits occupancy and N-mixture models from data preparation to inference.
+The [data
+article](https://nicholasjclark.github.io/mvgam/dev/articles/data.html)
+sets out the row layout that `occ()` expects.
 
 Other observation families:
 [`beta_nb()`](https://nicholasjclark.github.io/mvgam/dev/reference/beta_nb.md),

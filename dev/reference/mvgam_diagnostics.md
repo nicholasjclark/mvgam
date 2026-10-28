@@ -179,6 +179,31 @@ and
 return the long data frames of bayesplot. The counting methods return an
 integer.
 
+## Checking a fit
+
+Three checks come before any interpretation of a fit. Vehtari et al.
+(2021) give the thresholds for the first two.
+
+1.  Every Rhat should be below 1.01. `max(rhat(mod))` gives the largest.
+    A higher value means the chains disagree about the posterior. Longer
+    chains, such as `update(mod, iter = 4000)`, often resolve it.
+
+2.  The bulk and tail effective sample sizes should exceed 400.
+    [`summary.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/summary.mvgam.md)
+    prints them as `Bulk_ESS` and `Tail_ESS`. Longer chains raise them.
+
+3.  There should be no divergent transitions. The fit warns when there
+    are any. `sum(nuts_params(mod, pars = "divergent__")$Value)` counts
+    them. A divergence marks a region of the posterior the sampler could
+    not explore. Its draws may then be biased. Refit with smaller
+    sampler steps, `update(mod, control = list(adapt_delta = 0.95))`.
+
+Divergences that persist at a higher `adapt_delta` usually mean the data
+cannot separate some of the parameters. A common cause is a smooth with
+more flexibility than the series supports, competing with the trend for
+the same variation. A smaller basis, such as `s(x, k = 5)`, or a more
+informative prior then helps.
+
 ## References
 
 Vehtari, A., Gelman, A., Simpson, D., Carpenter, B. and Burkner, P.-C.
@@ -218,31 +243,32 @@ Nicholas J Clark
 set.seed(13)
 simdat <- sim_mvgam(family = poisson(), n_series = 1L,
                      n_timepoints = 120L, trend_model = AR())
-mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
+mod <- mvgam(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1),
               data    = simdat$data_train,
               family  = poisson(),
               chains  = 2, silent = 2)
-#> Warning: 9 of 2000 (0.0%) transitions ended with a divergence.
+#> Warning: 5 of 2000 (0.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 
 # The population coefficients with 95% intervals
 fixef(mod)
-#>           Estimate Est.Error      Q2.5     Q97.5
-#> Intercept 1.631420 0.1431782  1.358022  1.920492
-#> sx_1      7.695626 4.9158900 -1.807508 17.733728
+#>           Estimate Est.Error     Q2.5     Q97.5
+#> Intercept 1.632552 0.1392937 1.342661  1.910896
+#> sx_1      8.482562 2.3412990 3.681986 13.005870
 
-# Rhat near 1 and effective sample ratios above 0.1 indicate mixing
+# Rhat below 1.01 and effective sample ratios above 0.1 suggest the
+# chains mixed
 rhat(mod, pars = c("ar1_trend", "sigma_trend"))
 #>   ar1_trend[series_1] sigma_trend[series_1] 
-#>              1.006388              1.002338 
+#>              1.000484              1.000697 
 neff_ratio(mod, pars = c("ar1_trend", "sigma_trend"))
 #>   ar1_trend[series_1] sigma_trend[series_1] 
-#>             0.2036302             0.2875883 
+#>             0.1906273             0.3953472 
 
 # The share of variance in the counts the model explains
 bayes_R2(mod)
-#>     Estimate Est.Error     Q2.5     Q97.5
-#> R2 0.8345563 0.0372526 0.749718 0.8951963
+#>     Estimate  Est.Error     Q2.5     Q97.5
+#> R2 0.8310123 0.03899731 0.743291 0.8922462
 
 # Next, mcmc_plot() draws the posterior of these parameters
 # }

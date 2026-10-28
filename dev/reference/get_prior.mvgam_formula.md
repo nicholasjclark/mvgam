@@ -99,103 +99,11 @@ default_prior(object, ...)
 
 - loadings_prior:
 
-  Optional named list specifying a structured prior on the unconstrained
-  factor loadings matrix following Heaps & Jermyn (2024). The loadings
-  belong to a trend with latent factors. The argument requires a
-  `trend_formula`. Supplying it without one is an error. When supplied,
-  the default iid `to_vector(Z) ~ student_t(3, 0, 0.5)` prior is
-  replaced with a per-column matrix-normal prior of the form
-  `Z[, i] ~ multi_normal_cholesky(0, L_Phi)`, where the among-row scale
-  matrix `Phi` is assembled multiplicatively from any combination of:
-
-  - a per-series feature matrix (`features`), expanded into an ARD
-    exponential kernel via `gp_exponential_cov()`
-
-  - one or more pairwise distance matrices (`distances`), each
-    contributing an `exp(-d / theta)` factor
-
-  Accepted fields:
-
-  - `features`: string lookup into `data2`, a numeric matrix, or a
-    data.frame. Columns are encoded by type (numeric/integer/logical:
-    z-score; ordered factor: z-score after
-    [`as.numeric()`](https://rdrr.io/r/base/numeric.html); unordered
-    factor / character: one-hot with all levels retained, following
-    Heaps Sect. 6.2). Each encoded column receives its own ARD
-    length-scale.
-
-  - `distances`: string name (or character vector of names) of pairwise
-    distance matrices in `data2`, or a single matrix / named list of
-    matrices passed inline. Each matrix is rescaled to maximum entry one
-    so the default length-scale prior is interpretable on a unit scale
-    (matching Heaps Supps S4.2.1).
-
-  - `column_shrinkage`: `"iid"` (default; no shrinkage) or `"mgp"`
-    (multiplicative-gamma-process increasing shrinkage of Bhattacharya &
-    Dunson 2011, used in Heaps Eq. (9)). `"mgp"` applies its column
-    scale through the shared innovation scale. It is available for
-    [`AR()`](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md),
-    [`RW()`](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md)
-    and
-    [`ZMVN()`](https://nicholasjclark.github.io/mvgam/dev/reference/ZMVN.md)
-    trends.
-    [`VAR()`](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md)
-    builds its own innovation covariance and has no shared scale for it;
-    pair a
-    [`VAR()`](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md)
-    factor model with `"iid"` instead.
-
-  - `mgp_a1`, `mgp_a2`: numeric MGP hyperparameters, only used when
-    `column_shrinkage = "mgp"`. Default `(2, 4)` lies within the
-    `a2 in [3, 5]` range recommended for moderate-n ecology / community
-    panels by Legramanti, Durante and Dunson (2020, JRSS-B) and
-    Schiavon, Canale and Dunson (2022, Biometrics 78:995). Heaps Sect.
-    6.3.1 used `(2, 3)` for the gas-demand application; Sect. 6.2.2 used
-    `(2, 6)` for the Finnish-bird JSDM. Lower `a2` for less shrinkage
-    when the data weakly identify the active rank.
-
-  Length-scales receive a `lognormal(0, 1)` prior in the model block.
-  This prior is set on the standardised distance scale. Pairwise
-  distance matrices are rescaled to `max(d) = 1` inside the normaliser.
-  A length-scale of 1 then corresponds to correlation `exp(-1)` between
-  the two most distant series. Heaps' Finnish-birds application (Sect.
-  6.2.2) used the wider `lognormal(0, sqrt(10))` instead; override the
-  default by passing a
-  [`prior()`](https://paulbuerkner.com/brms/reference/set_prior.html)
-  for `theta_features` / `theta_dist_<name>` if your data weakly
-  identify length-scales and you want less regularisation. Note: the
-  `max(d) = 1` rule is the natural generic standardisation. Heaps Supps
-  S4.2.1 used "root-to-tip distance = 1" for ultrametric phylogenies,
-  which corresponds to `max(d) = 2` (twice the per-leaf depth);
-  pre-standardise your distance matrix to match if exact parity matters.
-  Identification. The structured prior applies to the sampled columns of
-  `Z`. Where the QR rotation gives the reported loadings `Z_tilde`, each
-  of its columns mixes the sampled columns.
-  [`shared_variation()`](https://nicholasjclark.github.io/mvgam/dev/reference/shared_variation.md)
-  and
-  [`residual_cor()`](https://nicholasjclark.github.io/mvgam/dev/reference/residual_cor.md)
-  use `Z Z'`, which is the same before and after the rotation. See the
-  Identification section of the trend constructors.
-
-  Compatibility with `trend_map`:
-
-  - `trend_map = NULL` (default): compatible. `n_lv` alone triggers the
-    free-Z factor model; `loadings_prior` applies to the sampled `Z`
-    column-wise.
-
-  - `trend_map = matrix(NA_real_, n_series, n_lv)` (all-NA mask, used
-    internally by
-    [`jsdgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/jsdgam.md)):
-    compatible. Treated as a free-Z trigger upstream; `loadings_prior`
-    applies as if `trend_map` were `NULL`.
-
-  - `trend_map` with a mix of fixed entries and `NA`s: incompatible.
-    Partial-Z parameterises the free entries as a vector under an iid
-    `student_t(3, 0, 1)` prior, which would overlap with the
-    matrix-normal structure and double-count regularisation.
-
-  - Fully-fixed `trend_map` (no `NA`s): incompatible. The structured
-    prior has no free parameters to act on.
+  Optional named list giving a structured prior on the loadings of a
+  factor model, such as species traits or a phylogeny. Most models leave
+  it `NULL`. The section 'Structured loadings priors' of
+  [`mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam.md)
+  describes its fields.
 
 - data2:
 
@@ -220,10 +128,9 @@ default_prior(object, ...)
   A factor model without a `trend_map` samples every loading. It
   identifies `Z` after sampling by a thin QR rotation (Heaps and Jermyn
   2024). A `trend_map` with any fixed entry takes no rotation. The
-  argument requires a `trend_formula`. It is an alternative to the
-  `trend_map` argument of the trend constructor, and supplying both is
-  an error. `loadings_prior` lists the `trend_map` forms a structured
-  loadings prior accepts.
+  argument requires a `trend_formula`. The trend constructor takes a
+  `trend_map` argument too. Supplying both is an error. `loadings_prior`
+  lists the `trend_map` forms a structured loadings prior accepts.
 
 - ...:
 
@@ -262,12 +169,12 @@ link:
 
 - The factor loadings `Z` take `student_t(3, 0, 0.5 s)`.
 
-- The shock scales and starting states of
-  [`LLT()`](https://nicholasjclark.github.io/mvgam/dev/reference/LLT.md)
-  scale with the number of time points. Its `sigma_trend` takes one of
-  them. The growth priors of a linear
-  [`PW()`](https://nicholasjclark.github.io/mvgam/dev/reference/piecewise_trends.md)
-  also scale with it. Their help pages give the forms.
+- [`LLT()`](https://nicholasjclark.github.io/mvgam/dev/reference/LLT.md)
+  is the exception. Its shock scales (`sigma_trend` among them) and its
+  starting states also scale with the number of time points. So do the
+  growth priors of a linear
+  [`PW()`](https://nicholasjclark.github.io/mvgam/dev/reference/piecewise_trends.md).
+  Their help pages give the forms.
 
 A count model on the log link rarely spreads past 2.5. Its defaults keep
 their link-scale values. Coefficients without units keep fixed priors:
@@ -282,6 +189,13 @@ per latent series. A family's residual scale has no meaning on the trend
 side. Those rows take `autoscale = FALSE`. Writing `autoscale = TRUE` on
 a trend-side class is refused.
 
+## References
+
+Heaps, S. E. and Jermyn, I. H. (2024). Structured prior distributions
+for the covariance matrix in latent factor models. *Statistics and
+Computing*, 34, 143.
+[doi:10.1007/s11222-024-10454-0](https://doi.org/10.1007/s11222-024-10454-0)
+
 ## See also
 
 [`mvgam_formula()`](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam_formula.md),
@@ -289,7 +203,7 @@ a trend-side class is refused.
 and
 [`brms::set_prior()`](https://paulbuerkner.com/brms/reference/set_prior.html).
 The [hierarchical VAR
-article](https://nicholasjclark.github.io/mvgam/articles/hierarchical_var.html)
+article](https://nicholasjclark.github.io/mvgam/dev/articles/hierarchical_var.html)
 sets priors on the observation error and the trend correlations.
 
 Other priors:

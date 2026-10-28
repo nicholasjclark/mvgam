@@ -197,8 +197,8 @@ Expected biomass by month and camera detection probability by deployment
 days, with 95% credible intervals.
 </p>
 </div>
-<p>The fitted biomass curve peaks in month 10. The deployment slope is
-0.08 [-0.04, 0.21] on the logit scale, against the 0.05 used to simulate
+<p>The fitted biomass curve peaks in month 3. The deployment slope is
+0.08 [-0.04, 0.20] on the logit scale, against the 0.05 used to simulate
 the data.</p>
 </div>
 <div class="section level2">
@@ -246,12 +246,12 @@ state.
 <span><span class="op">}</span>, <span class="fu"><a href="https://rdrr.io/r/base/numeric.html" class="external-link">numeric</a></span><span class="op">(</span><span class="fl">2</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="va">recovery</span>, <span class="fl">2</span><span class="op">)</span></span>
 <span><span class="co">#&gt;               RMSE Interval width</span></span>
-<span><span class="co">#&gt; Joint         0.26           1.24</span></span>
+<span><span class="co">#&gt; Joint         0.26           1.26</span></span>
 <span><span class="co">#&gt; Counts alone  0.32           1.36</span></span>
-<span><span class="co">#&gt; Biomass alone 0.47           1.74</span></span>
+<span><span class="co">#&gt; Biomass alone 0.48           1.73</span></span>
 <span><span class="co">#&gt; Camera alone  0.57           3.99</span></span></code></pre></div>
 <p>Ordered by root mean squared error against the simulated state, the
-fits rank joint (0.26), counts alone (0.32), biomass alone (0.47), and
+fits rank joint (0.26), counts alone (0.32), biomass alone (0.48), and
 camera alone (0.57). Intervals are narrowest in the joint fit and widest
 in the camera alone fit. A single binary record per month constrains
 abundance weakly.</p>
@@ -285,7 +285,7 @@ six-month forecast. Points are the observations.
 <p>The forecast object also feeds <code><a href="../reference/score.html">score()</a></code> once the held-out
 observations arrive.</p>
 <p>Against the simulated abundance, the four fits ranked joint (0.26),
-counts alone (0.32), biomass alone (0.47), and camera alone (0.57) by
+counts alone (0.32), biomass alone (0.48), and camera alone (0.57) by
 error. A single binary outcome per month constrains the state weakly.
 Fitted jointly, the camera record takes the state the other methods
 estimate. A monitoring programme that measures one population by several

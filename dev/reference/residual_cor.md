@@ -1,8 +1,32 @@
 # Residual correlations between the series of a fitted model
 
 Posterior correlations, covariances and optional partial correlations
-between series, from the trend's covariance. Three trend structures
-carry one:
+between the series' latent trends. Residual here means the co-variation
+of the trends left once the covariate effects are accounted for.
+[`residuals.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/residuals.mvgam.md)
+returns the observation residuals. Three kinds of trend estimate these
+correlations:
+
+- A factor trend (`n_lv` on the trend constructor). Each draw gives the
+  series covariance `Z Omega Z'`, with `Z` the loadings and `Omega` the
+  covariance of the latent states.
+  [`mvn()`](https://nicholasjclark.github.io/mvgam/dev/reference/mvn.md)
+  and
+  [`mvt()`](https://nicholasjclark.github.io/mvgam/dev/reference/mvt.md)
+  add each series' residual variance to the diagonal: `Psi^2`, or
+  `Psi^2 * nu / (nu - 2)` under
+  [`mvt()`](https://nicholasjclark.github.io/mvgam/dev/reference/mvt.md).
+
+- A trend with correlated innovations:
+  [`RW()`](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md),
+  [`AR()`](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md),
+  [`CAR()`](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md)
+  or
+  [`ZMVN()`](https://nicholasjclark.github.io/mvgam/dev/reference/ZMVN.md)
+  with `cor = TRUE`, or
+  [`VAR()`](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md).
+
+- A hierarchical trend (`gr` on the trend constructor).
 
 ## Usage
 
@@ -38,23 +62,25 @@ residual_cor(
 
   Which covariance to summarise. `"stationary"` (the default) gives the
   covariance of the latent states over the whole series. `"innovation"`
-  gives the covariance of one time step's shocks. The two coincide for a
-  trend whose states keep no memory between times.
+  gives the covariance of one time step's innovations. The two coincide
+  for a trend whose states keep no memory between times.
 
 - by_group:
 
   Logical, for a hierarchical trend. `FALSE` (the default) returns the
-  population correlation of the shocks, `tcrossprod(L_Omega_global)`,
-  under either `covariance`. `TRUE` also returns each group's
-  correlation,
+  population correlation of the innovations,
+  `tcrossprod(L_Omega_global)`, under either `covariance`. `TRUE` also
+  returns each group's correlation,
   `alpha * tcrossprod(L_global) + (1 - alpha) * tcrossprod(L_dev[g])`.
 
 - partial:
 
   Logical. `TRUE` also computes partial correlations,
-  `P_ij = -inv(R)_ij / sqrt(inv(R)_ii * inv(R)_jj)`, for the `prec*`
-  fields. A factor fit with fewer factors than series has a singular
-  covariance of rank `n_lv` and is refused.
+  `P_ij = -inv(R)_ij / sqrt(inv(R)_ii * inv(R)_jj)`. A partial
+  correlation measures the association of two series once every other
+  series is held fixed. The result stores them in the fields whose names
+  start with `prec`. A factor fit with fewer factors than series has a
+  singular covariance of rank `n_lv` and is refused.
   [`shared_variation()`](https://nicholasjclark.github.io/mvgam/dev/reference/shared_variation.md)
   reports the variation its series share. The residual variances of
   [`mvn()`](https://nicholasjclark.github.io/mvgam/dev/reference/mvn.md)
@@ -76,9 +102,8 @@ residual_cor(
 
 - probs:
 
-  Numeric vector of probabilities for quantile computation. Default is
-  `c(0.025, 0.975)` for 95% credible intervals. Can be a single value or
-  multiple values.
+  Two probabilities for the lower and upper bounds of the credible
+  interval. Default `c(0.025, 0.975)`, a 95% interval.
 
 - ndraws:
 
@@ -102,27 +127,6 @@ draws them as faceted heatmaps.
 
 ## Details
 
-- A factor trend (`n_lv` on the trend constructor). Each draw gives the
-  series covariance `Z Omega Z'`, with `Z` the loadings and `Omega` the
-  covariance of the latent states.
-  [`mvn()`](https://nicholasjclark.github.io/mvgam/dev/reference/mvn.md)
-  and
-  [`mvt()`](https://nicholasjclark.github.io/mvgam/dev/reference/mvt.md)
-  add each series' residual variance to the diagonal: `Psi^2`, or
-  `Psi^2 * nu / (nu - 2)` under
-  [`mvt()`](https://nicholasjclark.github.io/mvgam/dev/reference/mvt.md).
-
-- A trend with correlated innovations:
-  [`RW()`](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md),
-  [`AR()`](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md),
-  [`CAR()`](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md)
-  or
-  [`ZMVN()`](https://nicholasjclark.github.io/mvgam/dev/reference/ZMVN.md)
-  with `cor = TRUE`, or
-  [`VAR()`](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md).
-
-- A hierarchical trend (`gr` on the trend constructor).
-
 A correlated-innovation trend gives each draw the covariance
 `diag(sigma) L_Omega L_Omega' diag(sigma)`. A
 [`VAR()`](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md)
@@ -131,9 +135,9 @@ covariance the Stan model derives from `Phi_trend`, `Sigma_trend` and,
 under `ma = TRUE`, `Theta_trend`.
 
 The stationary covariance describes the states over the whole series. An
-`AR(cor = TRUE)` trend takes the leading block of the stationary
-covariance of its companion state, a moving-average term included. At
-one lag that block is `Sigma[a, b] / (1 - ar_a * ar_b)`. A
+`AR(cor = TRUE)` trend reports the stationary covariance of its states,
+including any moving-average term. With one lag it is
+`Sigma[a, b] / (1 - ar_a * ar_b)`. A
 [`CAR()`](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md)
 trend holds it at every time of an irregular grid. A draw whose
 autoregression is explosive has no stationary covariance and keeps its
@@ -144,8 +148,8 @@ keeps no memory between times and
 has no stationary distribution. Both report their innovation covariance.
 A hierarchical
 [`AR()`](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md)
-lifts each group's scales the same way before the global and group
-factors are mixed.
+converts each group's scales to stationary scales in the same way,
+before its global and group correlations are mixed.
 
 Under `covariance = "innovation"` a
 [`VAR()`](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md)
@@ -162,8 +166,8 @@ many series. A computation that factorises the matrix, such as
 whose per-draw matrices are valid correlation matrices. `prob_positive`
 and `prob_negative` are posterior sign probabilities. `prob_nonzero` is
 the larger of the two. `sig_cor` keeps the correlations whose
-`prob_nonzero` exceeds `prob_threshold`, 0.95. Its other entries are
-zero.
+`prob_nonzero` exceeds `prob_threshold`, fixed at 0.95. Its other
+entries are zero.
 
 [`jsdgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/jsdgam.md)
 fits the same factor model. Its species covariance follows the factor
@@ -183,8 +187,11 @@ draws the matrix as a heatmap.
 [`summary.mvgam_residcor()`](https://nicholasjclark.github.io/mvgam/dev/reference/summary.mvgam_residcor.md)
 lists the pairs.
 [`ordinate()`](https://nicholasjclark.github.io/mvgam/dev/reference/ordinate.md)
-draws the loadings as a biplot. The [joint species distribution
-article](https://nicholasjclark.github.io/mvgam/articles/jsdgam.html)
+draws the loadings as a biplot. The example of
+[trend_constructors](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md)
+takes the correlations of a `CAR(cor = TRUE)` trend. The [joint species
+distribution
+article](https://nicholasjclark.github.io/mvgam/dev/articles/jsdgam.html)
 interprets species correlations from a factor model.
 
 Other latent dynamics:

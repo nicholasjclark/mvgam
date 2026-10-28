@@ -1,10 +1,44 @@
-# Trend Model Constructors for mvgam
+# Latent trend models for mvgam
 
-Specify trend models for multivariate State-Space models in mvgam. These
-constructor functions create trend specifications for various temporal
-dynamics including random walks (RW), autoregressive models (AR, VAR,
-CAR), local linear trends (LLT) and piecewise trends (PW). A constructor
-records its arguments. The model evaluates them against the data.
+Specify the latent trend of a state-space model. Each constructor goes
+inside `trend_formula`, as in `trend_formula = ~ AR(p = 1)`. A
+constructor records its arguments. The model evaluates them against the
+data. The trends suit different series:
+
+- `RW()`:
+
+  A level that wanders with no pull back to a mean.
+
+- `AR()`:
+
+  Movement around a mean, with memory of the previous `p` times. It is a
+  common first choice.
+
+- `VAR()`:
+
+  Series whose past values drive one another, such as predators and
+  prey.
+
+- `CAR()`:
+
+  An AR(1) for series observed at irregular times.
+
+- [`ZMVN()`](https://nicholasjclark.github.io/mvgam/dev/reference/ZMVN.md):
+
+  Correlated effects with no dependence on time, such as among sites or
+  species.
+
+- [`LLT()`](https://nicholasjclark.github.io/mvgam/dev/reference/LLT.md):
+
+  A level with a slope that changes over time, with an optional season.
+
+- [`PW()`](https://nicholasjclark.github.io/mvgam/dev/reference/piecewise_trends.md):
+
+  Linear or logistic growth with changepoints.
+
+Each trend moves by a random innovation at every time step. Other texts
+call it a process error or a shock. The innovations are independent
+across series unless `cor = TRUE`.
 
 ## Usage
 
@@ -77,40 +111,30 @@ VAR(
 
 - cor:
 
-  `Logical`. Include correlated process errors as part of a multivariate
-  normal process model? If `TRUE` and if `n_series > 1` in the supplied
-  data, a fully structured covariance matrix will be estimated for the
-  process errors. `AR()` and `RW()` default to `NULL`, which resolves to
-  `FALSE` for an ungrouped trend and to `TRUE` whenever `gr` names a
-  grouping variable: a grouped trend estimates correlations among the
-  `subgr` units within each level of `gr`, which is the model `gr`
-  exists to specify. `VAR()` and
+  `Logical`. Correlate the innovations of different series? `TRUE`
+  estimates a full covariance matrix of the innovations when the data
+  hold more than one series. `AR()` and `RW()` default to `NULL`. That
+  means `FALSE` for an ungrouped trend and `TRUE` when `gr` names a
+  grouping variable. `VAR()`,
   [`ZMVN()`](https://nicholasjclark.github.io/mvgam/dev/reference/ZMVN.md)
-  always estimate correlations and refuse `cor = FALSE`, as do
-  `AR(gr = ...)` and `RW(gr = ...)`. `CAR()` defaults to `FALSE`.
+  and grouped `AR()` and `RW()` trends always estimate correlations.
+  They refuse `cor = FALSE`. `CAR()` defaults to `FALSE`.
 
 - gr:
 
-  An optional grouping variable, which must be a `factor` in the
-  supplied `data`, for setting up hierarchical residual correlation
-  structures. If specified, this sets up a model where the residual
-  correlations for a specific level of `gr` are modelled hierarchically:
+  An optional `factor` in `data` that groups the series, such as region.
+  Each level of `gr` takes its own correlation matrix among the
+  innovations of its series. The matrices are pooled toward one global
+  matrix:
 
   \\\Omega\_{group} = \alpha\_{cor}\Omega\_{global} + (1 -
-  \alpha\_{cor})\Omega\_{group, local}\\,
+  \alpha\_{cor})\Omega\_{group, local}\\
 
-  where \\\Omega\_{global}\\ is a *global* correlation matrix,
-  \\\Omega\_{group, local}\\ is a *local deviation* correlation matrix
-  and \\\alpha\_{cor}\\ is a weighting parameter controlling how
-  strongly the local correlation matrix \\\Omega\_{group}\\ is shrunk
-  towards the global correlation matrix \\\Omega\_{global}\\ (larger
-  values of \\\alpha\_{cor}\\ indicate a greater degree of shrinkage,
-  i.e. a greater degree of partial pooling).
-
-  A grouped trend estimates correlations among the `subgr` units within
-  each level of `gr`. Without `subgr`, the series column names those
-  units. `cor` defaults to `TRUE` for such a trend. An explicit
-  `cor = FALSE` is refused.
+  Here \\\Omega\_{global}\\ is shared by every group, \\\Omega\_{group,
+  local}\\ is the deviation of one group and \\\alpha\_{cor}\\ sets the
+  weight on the global matrix. An \\\alpha\_{cor}\\ near 1 pools the
+  groups strongly. Without `subgr`, the series column names the series
+  within each group.
 
   Within a `VAR()` it sets up a hierarchical panel vector
   autoregression. Each group learns its autoregressive, moving-average
@@ -119,9 +143,9 @@ VAR(
 
   Two constraints apply to hierarchical trend models:
 
-  - `gr` must be constant within each series (each series belongs to a
-    single group). Models with `gr` varying within a series are rejected
-    at validation time.
+  - Each series belongs to one group.
+    [`mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam.md)
+    refuses a `gr` that varies within a series.
 
   - Every group must hold the same number of series. The Stan program
     sizes each group's correlation block from one shared count.
@@ -135,7 +159,7 @@ VAR(
   needs no `series` column.
 
   For example, to model counts of several species (`species` in `data`)
-  across three regions (`region`) with residuals correlated within
+  across three regions (`region`) with innovations correlated within
   regions, specify `gr = region` and `subgr = species`.
   [`mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam.md)
   then builds the series as
@@ -191,17 +215,21 @@ VAR(
   [`get_prior`](https://nicholasjclark.github.io/mvgam/dev/reference/get_prior.md)
   lists `nu_trend` with the other trend classes.
 
-  Three caveats apply. The bound of `2` is required. Below it the
-  innovations have no finite variance. An autoregressive trend then has
-  no stationary covariance to start from. Above it, the first states of
-  an autoregressive trend take the stationary mean and covariance. Their
-  distribution matches the stationary law exactly under Gaussian
-  innovations alone. A finite mix of t variates has heavier tails than
-  the infinite sum that defines that law. The degrees of freedom are
-  informed only through the tail of the latent process. They are weakly
-  identified in short series: below roughly 200 time points, the
-  posterior stays close to its prior. `VAR()` samples its states
-  directly and
+  Three caveats apply:
+
+  - A fixed value must exceed `2`. Below it the innovations have no
+    finite variance. An autoregressive trend then has no stationary
+    covariance to start from.
+
+  - The first states of an autoregressive trend take the stationary mean
+    and covariance. Under t innovations the true stationary distribution
+    has heavier tails than that.
+
+  - Only the tails of the latent process inform the degrees of freedom.
+    Below roughly 200 time points their posterior stays close to the
+    prior.
+
+  `VAR()` samples its states directly and
   [`PW()`](https://nicholasjclark.github.io/mvgam/dev/reference/piecewise_trends.md)
   has no innovations. Neither takes `df`.
 
@@ -218,12 +246,9 @@ VAR(
     `ar2_trend` and `ar4_trend`.
 
   - For `VAR()` models: a positive integer. `p = k` is the VAR(k), with
-    one coefficient matrix for each of the lags `1:k`. A sparse lag
-    vector is not supported. The stationary initialisation of
-    Heaps (2023) is defined on the companion form of consecutive lags. A
-    sparse lag set has no companion form with the same identified
-    stationary covariance. Use `AR(p = c(...))` for sparse-lag
-    autoregression on a single series.
+    one coefficient matrix for each of the lags `1:k`. The stationarity
+    prior of Heaps (2023) needs consecutive lags. A sparse lag vector is
+    not supported. Use `AR(p = c(...))` for sparse lags.
 
 - coef_sharing:
 
@@ -238,8 +263,9 @@ VAR(
 
 ## Value
 
-An object of class `mvgam_trend`, which contains a list of arguments to
-be interpreted by the parsing functions in mvgam.
+An object of class `mvgam_trend` holding the constructor's arguments.
+[`mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam.md)
+builds the trend from it.
 
 ## Details
 
@@ -412,12 +438,13 @@ Computing*, 34:143.
 
 Heaps, S. E. (2023). Enforcing stationarity through the prior in vector
 autoregressions. *Journal of Computational and Graphical Statistics*,
-32:74-83. (VAR stationarity prior used for `VAR()` trends.)
+32(1):74-83.
+[doi:10.1080/10618600.2022.2079648](https://doi.org/10.1080/10618600.2022.2079648)
 
-Clark, N. J., Ernest, S. K. M., Senyondo, H., Simonis, J., White, E. P.,
-Yenni, G. M. and Karunarathna, K. A. N. K. (2025). Beyond single-species
-models: multispecies forecasts for ecological predictability. *PeerJ*,
-13:e18929.
+Clark NJ, Ernest SKM, Senyondo H, Simonis J, White EP, Yenni GM and
+Karunarathna KANK (2025). Beyond single-species models: leveraging
+multispecies forecasts to navigate the dynamics of ecological
+predictability. PeerJ, 13, e18929. https://doi.org/10.7717/peerj.18929
 
 ## See also
 
@@ -431,19 +458,19 @@ and
 interpret fitted latent dynamics.
 [`forecast()`](https://generics.r-lib.org/reference/forecast.html)
 propagates them forward. The [overview
-vignette](https://nicholasjclark.github.io/mvgam/articles/mvgam_overview.html)
+vignette](https://nicholasjclark.github.io/mvgam/dev/articles/mvgam_overview.html)
 compares the trend types. The [VAR
-article](https://nicholasjclark.github.io/mvgam/articles/var.html)
+article](https://nicholasjclark.github.io/mvgam/dev/articles/var.html)
 interprets a fitted `VAR()` with
 [`irf()`](https://nicholasjclark.github.io/mvgam/dev/reference/irf.mvgam.md),
 [`fevd()`](https://nicholasjclark.github.io/mvgam/dev/reference/fevd.mvgam.md)
 and
 [`stability()`](https://nicholasjclark.github.io/mvgam/dev/reference/stability.mvgam.md).
 The [hierarchical VAR
-article](https://nicholasjclark.github.io/mvgam/articles/hierarchical_var.html)
+article](https://nicholasjclark.github.io/mvgam/dev/articles/hierarchical_var.html)
 fits `gr` and `subgr`. The [dynamic factor
-vignette](https://nicholasjclark.github.io/mvgam/articles/dfm.html) fits
-`n_lv` and `trend_map`.
+vignette](https://nicholasjclark.github.io/mvgam/dev/articles/dfm.html)
+fits `n_lv` and `trend_map`.
 
 Other trend models:
 [`LLT()`](https://nicholasjclark.github.io/mvgam/dev/reference/LLT.md),
@@ -482,8 +509,12 @@ RW(gr = region, subgr = species)
 #>   Hierarchical grouping: region
 #>   Subgroups: species
 
-# Three Poisson series, each surveyed at its own irregular times.
-# Every series keeps about 60 percent of the occasions
+# A regularly spaced series usually starts with AR(p = 1). ?mvgam
+# fits one. The rest of this example handles irregular sampling.
+
+# Three Poisson series with a seasonal cycle, each surveyed at its
+# own irregular times. sim_mvgam(type = 6L) draws the gaps between
+# occasions. Every series keeps about 60 percent of the occasions
 set.seed(11)
 simdat <- sim_mvgam(type = 6L, family = poisson(), n_series = 3L,
                     n_timepoints = 80L)
@@ -522,7 +553,7 @@ mod <- mvgam(
   chains        = 2,
   silent        = 2
 )
-#> Warning: 6 of 2000 (0.0%) transitions ended with a divergence.
+#> Warning: 296 of 2000 (15.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 summary(mod)
 #>  Family: poisson 
@@ -537,28 +568,28 @@ summary(mod)
 #> == Observation Model ==
 #> Smoothing Spline Hyperparameters:
 #>                Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> sds(sseason_1)     1.52      0.66     0.69     3.26 1.01      750     1153
+#> sds(sseason_1)     2.26      1.92     0.72     7.28 1.06       23       28
 #> 
 #> Regression Coefficients:
 #>           Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> Intercept     1.58      0.09     1.39     1.75 1.00     1554     1406
+#> Intercept     1.59      0.09     1.41     1.75 1.00      221     1198
 #> 
 #> == Trend Model ==
 #> Trend Specific Parameters:
 #>                       Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS
-#> sigma_trend[series_1]     0.32      0.10     0.15     0.53 1.00      822
-#> sigma_trend[series_2]     0.48      0.13     0.24     0.78 1.00      913
-#> sigma_trend[series_3]     0.60      0.12     0.39     0.87 1.00     1135
-#> ar1_trend[series_1]       0.59      0.23     0.07     0.92 1.01      540
-#> ar1_trend[series_2]       0.42      0.22     0.03     0.84 1.00      615
-#> ar1_trend[series_3]       0.18      0.14     0.01     0.52 1.00     1417
+#> sigma_trend[series_1]     0.32      0.09     0.15     0.52 1.02      273
+#> sigma_trend[series_2]     0.49      0.12     0.27     0.76 1.02      738
+#> sigma_trend[series_3]     0.61      0.12     0.40     0.85 1.03       67
+#> ar1_trend[series_1]       0.52      0.28     0.03     0.93 1.06       25
+#> ar1_trend[series_2]       0.45      0.22     0.04     0.82 1.02      153
+#> ar1_trend[series_3]       0.15      0.14     0.01     0.50 1.02       54
 #>                       Tail_ESS
-#> sigma_trend[series_1]      914
-#> sigma_trend[series_2]      995
-#> sigma_trend[series_3]     1571
-#> ar1_trend[series_1]        854
-#> ar1_trend[series_2]        943
-#> ar1_trend[series_3]       1283
+#> sigma_trend[series_1]      768
+#> sigma_trend[series_2]     1311
+#> sigma_trend[series_3]     1400
+#> ar1_trend[series_1]         41
+#> ar1_trend[series_2]        872
+#> ar1_trend[series_3]       1161
 #> 
 #> Draws were sampled using sampling(NUTS). For each parameter, Bulk_ESS
 #> and Tail_ESS are effective sample size measures, and Rhat is the potential
@@ -578,7 +609,7 @@ residual_cor(mod)
 #>   Source     : correlated innovations
 #>   Covariance : stationary
 #>   Series     : 3
-#>   Mean |r_ij| (i != j): 0.21 [0.06, 0.40]
+#>   Mean |r_ij| (i != j): 0.19 [0.07, 0.38]
 #>   Pairs with prob_nonzero > 0.95: 0 / 3
 
 # Residual checks. Each series has gaps of differing length. A

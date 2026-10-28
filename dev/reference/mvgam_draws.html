@@ -51,7 +51,7 @@ of the <code>posterior::draws_*</code> classes. Parameters take their brms
 names, such as <code>b_x</code> and <code>sd_grp__Intercept</code>. A trend parameter
 indexed by series takes the series name, as in
 <code>sigma_trend[series_1]</code>. The
-<a href="https://nicholasjclark.github.io/mvgam/articles/idm.html">integrated data model article</a> contrasts
+<a href="https://nicholasjclark.github.io/mvgam/dev/articles/idm.html">integrated data model article</a> contrasts
 intercepts drawn with <code><a href="https://mc-stan.org/posterior/reference/draws_df.html" class="external-link">as_draws_df()</a></code>.</p>
     </div>
 
@@ -191,39 +191,38 @@ these draws (<code>rhat</code>, <code>neff_ratio</code>, <code>fixef</code>, <co
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed</a></span><span class="op">(</span><span class="fl">13</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="va">simdat</span> <span class="op">&lt;-</span> <span class="fu"><a href="sim_mvgam.html">sim_mvgam</a></span><span class="op">(</span>family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson</a></span><span class="op">(</span><span class="op">)</span>, n_series <span class="op">=</span> <span class="fl">1L</span>,</span></span>
 <span class="r-in"><span>                     n_timepoints <span class="op">=</span> <span class="fl">120L</span>, trend_model <span class="op">=</span> <span class="fu"><a href="trend_constructors.html">AR</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="va">mod</span> <span class="op">&lt;-</span> <span class="fu"><a href="mvgam.html">mvgam</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="fu">s</span><span class="op">(</span><span class="va">x</span><span class="op">)</span>, trend_formula <span class="op">=</span> <span class="op">~</span> <span class="fu"><a href="trend_constructors.html">AR</a></span><span class="op">(</span>p <span class="op">=</span> <span class="fl">1</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span><span class="va">mod</span> <span class="op">&lt;-</span> <span class="fu"><a href="mvgam.html">mvgam</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="fu">s</span><span class="op">(</span><span class="va">x</span>, k <span class="op">=</span> <span class="fl">5</span><span class="op">)</span>, trend_formula <span class="op">=</span> <span class="op">~</span> <span class="fu"><a href="trend_constructors.html">AR</a></span><span class="op">(</span>p <span class="op">=</span> <span class="fl">1</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>              data    <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span>,</span></span>
 <span class="r-in"><span>              family  <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>              chains  <span class="op">=</span> <span class="fl">2</span>, silent <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 9 of 2000 (0.0%) transitions ended with a divergence.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 5 of 2000 (0.0%) transitions ended with a divergence.</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> See https://mc-stan.org/misc/warnings for details.</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Trend-dynamics parameters as a data frame of draws</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/as.data.frame.html" class="external-link">as.data.frame</a></span><span class="op">(</span><span class="va">mod</span>, variable <span class="op">=</span> <span class="st">"trend_params"</span><span class="op">)</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   sigma_trend[series_1] ar1_trend[series_1] .chain .iteration .draw</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1             0.4111121           0.4148928      1          1     1</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2             0.4219180           0.5387783      1          2     2</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3             0.3199136           0.7333736      1          3     3</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4             0.4825790           0.7190115      1          4     4</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 5             0.4319198           0.7813397      1          5     5</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 6             0.4639083           0.7478594      1          6     6</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1             0.4747979           0.6952397      1          1     1</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2             0.4098684           0.7876823      1          2     2</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3             0.4974144           0.6125546      1          3     3</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4             0.4301547           0.6917517      1          4     4</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5             0.4835361           0.3383189      1          5     5</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6             0.4086803           0.5631561      1          6     6</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Regular expressions select by pattern, here the smooth's basis</span></span></span>
 <span class="r-in"><span><span class="co"># coefficients and its smoothing SD</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/colnames.html" class="external-link">colnames</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/matrix.html" class="external-link">as.matrix</a></span><span class="op">(</span><span class="va">mod</span>, variable <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"^s_"</span>, <span class="st">"^sds_"</span><span class="op">)</span>, regex <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span><span class="op">)</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "s_sx_1[1]" "s_sx_1[2]" "s_sx_1[3]" "s_sx_1[4]" "s_sx_1[5]" "s_sx_1[6]"</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [7] "s_sx_1[7]" "s_sx_1[8]" "sds_sx_1" </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "s_sx_1[1]" "s_sx_1[2]" "s_sx_1[3]" "sds_sx_1" </span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># One random variable per parameter, printed as mean and SD</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://mc-stan.org/posterior/reference/draws_rvars.html" class="external-link">as_draws_rvars</a></span><span class="op">(</span><span class="va">mod</span>, variable <span class="op">=</span> <span class="st">"trend_params"</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> # A draws_rvars: 1000 iterations, 2 chains, and 2 variables</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> $sigma_trend: rvar&lt;1000,2&gt;[1] <span style="color: #949494;">mean ± sd:</span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>      series_1 </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 0.44 ± 0.073  </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 0.47 ± 0.072  </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> $ar1_trend: rvar&lt;1000,2&gt;[1] <span style="color: #949494;">mean ± sd:</span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>     series_1 </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 0.59 ± 0.15  </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 0.56 ± 0.14  </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Next, mcmc_plot(mod) plots the same draws</span></span></span>

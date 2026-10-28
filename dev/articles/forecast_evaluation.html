@@ -163,7 +163,7 @@ captures. The dashed line marks the end of the training data.
 </div>
 <p>Each smooth of time extrapolates the slope at the end of its series.
 For DO, whose captures rose over the final training months, the median
-forecast reaches 127 captures by month 12. The held-out months recorded
+forecast reaches 126 captures by month 12. The held-out months recorded
 at most 14. The AR forecast carries its latent state forward
 instead:</p>
 <div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
@@ -195,8 +195,8 @@ horizon 3.
 </div>
 <p>Between AR and the GAM, the lower mean CRPS goes to AR on DM, AR on
 DO, the GAM on PB and the GAM on PP. On DO the mean CRPS is 3.32 for AR
-and 33.48 for the GAM. PB and PP recorded few or no captures over long
-stretches. Averaged over the species, AR scores 3.96 against 3.85 for
+and 33.70 for the GAM. PB and PP recorded few or no captures over long
+stretches. Averaged over the species, AR scores 3.94 against 3.87 for
 PW.</p>
 <p>The energy score grades the four forecasts at each horizon as one
 multivariate distribution (Gneiting et al. <a href="https://doi.org/10.1007/s11749-008-0114-x" class="external-link">2008</a>).
@@ -211,7 +211,7 @@ series is <code>all_series</code>:</p>
 Energy score of the joint forecast of the four species at each horizon.
 </p>
 </div>
-<p>The GAM’s energy score runs from 7 to 92 over the twelve months. AR
+<p>The GAM’s energy score runs from 7 to 93 over the twelve months. AR
 and PW stay below 13. <code><a href="../reference/score.html">score()</a></code> offers nine more rules, among
 them the variogram score for the dependence between series and
 threshold-weighted scores for a range of the response.</p>
@@ -245,9 +245,9 @@ that the stacking weights below require:</p>
 <span><span class="fu"><a href="https://mc-stan.org/loo/reference/loo_compare.html" class="external-link">loo_compare</a></span><span class="op">(</span><span class="va">lfo_gam</span>, <span class="va">lfo_ar</span>, <span class="va">lfo_pw</span>, model_names <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"GAM"</span>, <span class="st">"AR"</span>, <span class="st">"PW"</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt;  model elpd_diff se_diff p_worse diag_diff diag_elpd</span></span>
 <span><span class="co">#&gt;     AR       0.0     0.0      NA                    </span></span>
-<span><span class="co">#&gt;     PW     -33.7     8.0    1.00   N &lt; 100          </span></span>
-<span><span class="co">#&gt;    GAM     -60.6    18.2    1.00   N &lt; 100</span></span></code></pre></div>
-<p>AR leads. PW trails it by 34 (SE 8) and GAM by 61 (SE 18). The log
+<span><span class="co">#&gt;     PW     -41.4    10.4    1.00   N &lt; 100          </span></span>
+<span><span class="co">#&gt;    GAM     -75.2    12.7    1.00   N &lt; 100</span></span></code></pre></div>
+<p>AR leads. PW trails it by 41 (SE 10) and GAM by 75 (SE 13). The log
 score penalises an observation in the tail of a forecast far more
 heavily than the CRPS does. <code><a href="../reference/compare_elpds.html">compare_elpds()</a></code> tabulates the
 ELPD at each origin:</p>
@@ -279,8 +279,8 @@ its components:</p>
 <span><span class="co">#&gt; ------</span></span>
 <span><span class="co">#&gt;     weight</span></span>
 <span><span class="co">#&gt; GAM 0.000 </span></span>
-<span><span class="co">#&gt; AR  0.662 </span></span>
-<span><span class="co">#&gt; PW  0.338</span></span>
+<span><span class="co">#&gt; AR  0.694 </span></span>
+<span><span class="co">#&gt; PW  0.306</span></span>
 <span><span class="va">fc_ens</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/ensemble.mvgam_forecast.html">ensemble</a></span><span class="op">(</span><span class="va">fc_gam</span>, <span class="va">fc_ar</span>, <span class="va">fc_pw</span>, weights <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/numeric.html" class="external-link">as.numeric</a></span><span class="op">(</span><span class="va">weights</span><span class="op">)</span>,</span>
 <span>                   seed <span class="op">=</span> <span class="fl">2026</span><span class="op">)</span></span>
 <span><span class="va">crps_ens</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/compare_scores.html">compare_scores</a></span><span class="op">(</span><span class="va">fc_gam</span>, <span class="va">fc_ar</span>, <span class="va">fc_pw</span>, <span class="va">fc_ens</span>, score <span class="op">=</span> <span class="st">"crps"</span>,</span>
@@ -288,12 +288,12 @@ its components:</p>
 <span><span class="fu"><a href="https://rdrr.io/r/stats/aggregate.html" class="external-link">aggregate</a></span><span class="op">(</span><span class="va">score</span> <span class="op">~</span> <span class="va">model</span>, FUN <span class="op">=</span> <span class="va">mean</span>,</span>
 <span>          data <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/subset.html" class="external-link">subset</a></span><span class="op">(</span><span class="va">crps_ens</span>, <span class="va">series</span> <span class="op">!=</span> <span class="st">"all_series"</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt;      model     score</span></span>
-<span><span class="co">#&gt; 1      GAM 11.263629</span></span>
-<span><span class="co">#&gt; 2       AR  3.964813</span></span>
-<span><span class="co">#&gt; 3       PW  3.853224</span></span>
-<span><span class="co">#&gt; 4 Ensemble  3.797325</span></span></code></pre></div>
-<p>Stacking gives 0 to the GAM, 0.66 to AR and 0.34 to PW. The
-ensemble’s mean CRPS on the holdout is 3.80, the lowest of the four.</p>
+<span><span class="co">#&gt; 1      GAM 11.372691</span></span>
+<span><span class="co">#&gt; 2       AR  3.939303</span></span>
+<span><span class="co">#&gt; 3       PW  3.868367</span></span>
+<span><span class="co">#&gt; 4 Ensemble  3.791555</span></span></code></pre></div>
+<p>Stacking gives 0 to the GAM, 0.69 to AR and 0.31 to PW. The
+ensemble’s mean CRPS on the holdout is 3.79, the lowest of the four.</p>
 </div>
 <div class="section level2">
 <h2 id="summary">Summary<a class="anchor" aria-label="anchor" href="#summary"></a>
@@ -301,7 +301,7 @@ ensemble’s mean CRPS on the holdout is 3.80, the lowest of the four.</p>
 <p>The CRPS and the energy score compared the three forecasts on the
 holdout. Under leave-future-out cross-validation AR led in ELPD. The
 GAM’s smooths of time extrapolated the end of each series. Stacking
-combined the three forecasts into an ensemble with a mean CRPS of 3.80.
+combined the three forecasts into an ensemble with a mean CRPS of 3.79.
 Each step took one or two function calls on the fitted models. The CRPS
 and the log score can rank models differently. Choose the scoring rule
 before scoring any forecast.</p>

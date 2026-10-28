@@ -94,7 +94,8 @@ Defaults to <code>80L</code>.</p></dd>
 <dd><p>A trend constructor such as <code>AR(p = 1)</code>,
 <code>AR(p = c(1, 12))</code>, <code>VAR(cor = TRUE)</code>, <code><a href="trend_constructors.html">CAR()</a></code>, <code><a href="ZMVN.html">ZMVN()</a></code> or
 <code><a href="piecewise_trends.html">PW()</a></code>. <code>NULL</code> (the default) takes the type's own trend. <code>"None"</code>
-simulates no trend.</p></dd>
+simulates no trend. To fit the simulated data, name the same
+trend inside <code>trend_formula</code>, as in <code>mvgam(y ~ s(x), trend_formula = ~ AR())</code>. <code><a href="mvgam.html">mvgam()</a></code> refuses a <code>trend_model</code> argument.</p></dd>
 
 
 <dt id="arg-prop-trend">prop_trend<a class="anchor" aria-label="anchor" href="#arg-prop-trend"></a></dt>
@@ -207,7 +208,7 @@ family.</p>
     <div class="dont-index"><p><code><a href="mvgam.html">mvgam()</a></code> fits the simulated data. <code><a href="sim_closure_unit_data.html">sim_closure_unit_data()</a></code>
 simulates occupancy and N-mixture data. <code><a href="sim_jsdgam.html">sim_jsdgam()</a></code> simulates
 site-by-species data. The
-<a href="https://nicholasjclark.github.io/mvgam/articles/mvgam_overview.html">overview article</a> fits a
+<a href="https://nicholasjclark.github.io/mvgam/dev/articles/mvgam_overview.html">overview article</a> fits a
 model to data from <code>sim_mvgam()</code>.</p>
 <p>Other simulation:
 <code><a href="sim_closure_unit_data.html">sim_closure_unit_data()</a></code>,
