@@ -234,10 +234,11 @@ loo_compare(lfo_gam, lfo_ar, lfo_pw, model_names = c("GAM", "AR", "PW"))
 lc <- loo_compare(lfo_gam, lfo_ar, lfo_pw,
                   model_names = c("GAM", "AR", "PW"))
 gap <- function(m) {
-  sprintf("%.0f (SE %.0f)", -lc[m, "elpd_diff"], lc[m, "se_diff"])
+  row <- lc[lc$model == m, ]
+  sprintf("%.0f (SE %.0f)", -row$elpd_diff, row$se_diff)
 }
-leader <- rownames(lc)[1]
-trailing <- rownames(lc)[-1]
+leader <- lc$model[1]
+trailing <- lc$model[-1]
 ```
 
 `r leader` leads. `r trailing[1]` trails it by `r gap(trailing[1])` and

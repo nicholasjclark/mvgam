@@ -727,17 +727,29 @@ summary.mvgam_lfo <- function(object, ...) {
 #' @param x An `mvgam_lfo` object.
 #' @param ... Further `mvgam_lfo` objects.
 #'
-#' @return A `compare.loo` table with one row per model, best first.
+#' @return A `compare.loo` table in the layout of [loo::loo_compare()],
+#'   one row per model, best first.
 #'   \describe{
+#'     \item{`model`}{The model's name.}
 #'     \item{`elpd_diff`}{Summed ELPD difference from the best model,
 #'       zero for the best.}
 #'     \item{`se_diff`}{Standard error of `elpd_diff`,
 #'       `sqrt(N) * sd(fold_diff)` over the `N` folds.}
-#'     \item{`p_worse`, `diag_diff`, `diag_elpd`}{The diagnostics of
-#'       [loo_compare.mvgam()], with folds in place of observations.}
+#'     \item{`p_worse`}{The normal probability that the model forecasts
+#'       worse than the best one (Sivula et al. 2025). `NA` for the best
+#'       model and for a difference without spread.}
+#'     \item{`diag_diff`}{`"N < 100"` for fewer than 100 folds, else
+#'       `"|elpd_diff| < 4"` for a difference too small for its SE.}
+#'     \item{`diag_elpd`}{The number of folds whose PSIS estimate was
+#'       kept with a Pareto k above the threshold.}
 #'     \item{`elpd_lfo`}{Summed per-fold ELPD.}
 #'     \item{`se_elpd_lfo`}{Standard error of `elpd_lfo`.}
 #'   }
+#'
+#' @references
+#' Sivula, T., Magnusson, M., Matamoros, A. A. and Vehtari, A. (2025).
+#' Uncertainty in Bayesian leave-one-out cross-validation based model
+#' comparison. \emph{Bayesian Analysis}. \doi{10.1214/25-BA1569}
 #'
 #' @seealso [lfo_cv()], [loo_model_weights.mvgam_lfo()],
 #'   [compare_elpds()], [plot.mvgam_compare_elpds()]
@@ -798,25 +810,36 @@ loo_compare.mvgam_lfo <- function(x, ..., model_names = NULL) {
   elpd_diff[best] <- 0
 
   ord <- order(elpd_diff, decreasing = TRUE)
-  pareto_k_list <- lapply(models, function(m) m$pareto_ks)
-  diag_cols <- mvgam_loo_compare_diagnostics(
-    elpd_diff = elpd_diff[ord],
-    se_diff = se_diff[ord],
-    n_pointwise = n_folds,
-    pareto_k_list = pareto_k_list[ord]
-  )
+  # The diagnostics follow `loo::loo_compare()` with folds in place of
+  # observations. A refitted fold carries no PSIS error. Only a fold
+  # whose PSIS estimate was kept above the threshold is counted.
+  p_worse <- ifelse(se_diff > 0, stats::pnorm(0, elpd_diff, se_diff),
+                    NA_real_)
+  diag_diff <- if (n_folds < 100L) {
+    ifelse(elpd_diff == 0, "", "N < 100")
+  } else {
+    ifelse(elpd_diff != 0 & elpd_diff > -4, "|elpd_diff| < 4", "")
+  }
+  diag_elpd <- vapply(models, function(m) {
+    kept_high <- sum(is.finite(m$pareto_ks) & !m$refit_triggered &
+                       m$pareto_ks > m$pareto_k_threshold)
+    if (kept_high == 0L) "" else {
+      paste0(kept_high, " k_psis > ", round(m$pareto_k_threshold, 2))
+    }
+  }, character(1L))
   out <- data.frame(
-    elpd_diff = elpd_diff[ord],
-    se_diff = se_diff[ord],
-    p_worse = diag_cols$p_worse,
-    diag_diff = diag_cols$diag_diff,
-    diag_elpd = diag_cols$diag_elpd,
-    elpd_lfo = sum_elpd[ord],
-    se_elpd_lfo = se_sum[ord],
-    row.names = model_names[ord],
+    model = model_names,
+    elpd_diff = elpd_diff,
+    se_diff = se_diff,
+    p_worse = p_worse,
+    diag_diff = diag_diff,
+    diag_elpd = diag_elpd,
+    elpd_lfo = sum_elpd,
+    se_elpd_lfo = se_sum,
     stringsAsFactors = FALSE
-  )
-  class(out) <- c("compare.loo", "matrix", "data.frame")
+  )[ord, , drop = FALSE]
+  rownames(out) <- NULL
+  class(out) <- c("compare.loo", "data.frame")
   out
 }
 

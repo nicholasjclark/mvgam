@@ -263,7 +263,7 @@ loo_cmp
 ```
 
 ```{r loo-numbers, include = FALSE}
-loo_first <- rownames(loo_cmp)[1]
+loo_first <- loo_cmp$model[1]
 fe_diff <- sprintf("%.1f", -loo_cmp[2, "elpd_diff"])
 fe_se <- sprintf("%.1f", loo_cmp[2, "se_diff"])
 ```

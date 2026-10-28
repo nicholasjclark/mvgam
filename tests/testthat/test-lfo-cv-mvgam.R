@@ -243,7 +243,7 @@ test_that("loo_compare.mvgam_lfo pairs the folds of each model", {
   m2 <- mk_mvgam_lfo(c(-3, -3.7, -3.5, -3.4, -3.1))
   cmp <- loo_compare(m1, m2)
   expect_s3_class(cmp, "compare.loo")
-  expect_identical(rownames(cmp), c("m1", "m2"))
+  expect_identical(cmp$model, c("m1", "m2"))
   expect_equal(cmp$elpd_diff, c(0, sum(m2$elpds - m1$elpds)))
   expect_equal(cmp$se_diff,
                c(0, sqrt(5) * stats::sd(m2$elpds - m1$elpds)))
@@ -254,7 +254,13 @@ test_that("loo_compare.mvgam_lfo pairs the folds of each model", {
   exact <- loo_compare(m1, m3)
   expect_equal(exact$se_diff, c(0, 0))
   expect_true(all(is.na(exact$p_worse)))
-  expect_identical(exact$diag_elpd, c("N < 100", "N < 100"))
+  expect_identical(exact$diag_diff, c("", "N < 100"))
+  # A fold whose PSIS estimate was kept above the threshold is counted.
+  # A refitted fold is exact.
+  kept <- mk_mvgam_lfo(m2$elpds, pareto_ks = c(0.9, 0.9, 0.3, 0.3, 0.3),
+                       refit_triggered = c(TRUE, FALSE, FALSE, FALSE,
+                                           FALSE))
+  expect_identical(loo_compare(m1, kept)$diag_elpd, c("", "1 k_psis > 0.7"))
 })
 
 
@@ -270,35 +276,6 @@ test_that("compared LFO results must share a grid and hold ELPDs", {
   unscored$elpds <- NULL
   expect_error(loo_compare(m1, unscored), "no ELPDs")
   expect_error(loo_model_weights(m1, unscored), "no ELPDs")
-})
-
-
-test_that("mvgam_loo_compare_diagnostics computes p_worse correctly", {
-  # A candidate 3 units worse with SE 1
-  out <- mvgam:::mvgam_loo_compare_diagnostics(
-    elpd_diff = c(0, -3),
-    se_diff = c(0, 1),
-    n_pointwise = c(200L, 200L),
-    pareto_k_list = list(c(0.1, 0.2), c(0.1, 0.2))
-  )
-  expect_true(is.na(out$p_worse[1L]))
-  expect_equal(out$p_worse[2L], pnorm(0, mean = -3, sd = 1),
-               tolerance = 1e-12)
-  expect_identical(out$diag_diff, c("", "|elpd_diff| < 4"))
-  expect_identical(out$diag_elpd, c("", ""))
-})
-
-
-test_that("mvgam_loo_compare_diagnostics threshold overlays", {
-  # Few observations mark both rows. A high Pareto k adds a second note
-  out <- mvgam:::mvgam_loo_compare_diagnostics(
-    elpd_diff = c(0, -5),
-    se_diff = c(0, 2),
-    n_pointwise = c(50L, 50L),
-    pareto_k_list = list(c(0.1, 0.3), c(0.8, 0.4))
-  )
-  expect_identical(out$diag_elpd, c("N < 100", "N < 100; k_psis > 0.7"))
-  expect_identical(out$diag_diff, c("", ""))
 })
 
 

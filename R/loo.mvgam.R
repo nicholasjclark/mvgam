@@ -33,14 +33,9 @@
 #' @rdname loo.mvgam
 #'
 #' @return For `loo.mvgam`, an object of class `psis_loo` (see
-#'   [loo::loo()]). For `loo_compare.mvgam`, a `compare.loo` table with
-#'   one row per model, best first (see [loo::loo_compare()]). Three
-#'   columns follow Sivula et al. (2025). `p_worse` is the normal
-#'   probability that the model predicts worse than the best one.
-#'   `diag_diff` holds `"|elpd_diff| < 4"` for a difference too small
-#'   for its SE to be trusted. `diag_elpd` holds `"N < 100"` for too
-#'   few observations and `"k_psis > 0.7"` for an unreliable PSIS
-#'   approximation.
+#'   [loo::loo()]). For `loo_compare.mvgam`, the `compare.loo` table of
+#'   [loo::loo_compare()], one row per model, best first. Its `p_worse`,
+#'   `diag_diff` and `diag_elpd` columns follow Sivula et al. (2025).
 #'
 #' @details
 #' When comparing two (or more) fitted `mvgam` models, we can estimate the
@@ -217,37 +212,9 @@ loo_compare.mvgam <- function(
       models, as.list(substitute(list(x, ...)))[-1L], model_names
     )
   )
-  cmp <- loo_compare(estimates)
-  # Row order in `cmp` differs from `estimates`. Pareto-k
-  # diagnostics only apply on the loo path (WAIC has no PSIS).
-  est_ord <- match(rownames(cmp), names(estimates))
-  n_pw <- vapply(estimates[est_ord], function(e) {
-    if (!is.null(e$pointwise)) nrow(e$pointwise) else NA_integer_
-  }, integer(1L))
-  pareto_k_list <- if (criterion == "loo") {
-    lapply(estimates[est_ord], function(e) e$diagnostics$pareto_k)
-  } else {
-    NULL
-  }
-  diag_cols <- mvgam_loo_compare_diagnostics(
-    elpd_diff = as.numeric(cmp[, "elpd_diff"]),
-    se_diff = as.numeric(cmp[, "se_diff"]),
-    n_pointwise = n_pw,
-    pareto_k_list = pareto_k_list
-  )
-  # `cmp` is a `compare.loo` matrix. A data frame keeps its class and
-  # row names and also holds the character diagnostic columns.
-  out <- data.frame(
-    cmp[, , drop = FALSE],
-    p_worse = diag_cols$p_worse,
-    diag_diff = diag_cols$diag_diff,
-    diag_elpd = diag_cols$diag_elpd,
-    check.names = FALSE,
-    stringsAsFactors = FALSE
-  )
-  rownames(out) <- rownames(cmp)
-  class(out) <- c("compare.loo", "matrix", "data.frame")
-  out
+  # loo builds the table with the diagnostic columns of Sivula et al.
+  # (2025)
+  loo_compare(estimates)
 }
 
 #' @export

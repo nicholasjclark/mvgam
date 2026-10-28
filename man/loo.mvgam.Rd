@@ -68,14 +68,9 @@ each site counted in its species.}
 }
 \value{
 For \code{loo.mvgam}, an object of class \code{psis_loo} (see
-\code{\link[loo:loo]{loo::loo()}}). For \code{loo_compare.mvgam}, a \code{compare.loo} table with
-one row per model, best first (see \code{\link[loo:loo_compare]{loo::loo_compare()}}). Three
-columns follow Sivula et al. (2025). \code{p_worse} is the normal
-probability that the model predicts worse than the best one.
-\code{diag_diff} holds \code{"|elpd_diff| < 4"} for a difference too small
-for its SE to be trusted. \code{diag_elpd} holds \code{"N < 100"} for too
-few observations and \code{"k_psis > 0.7"} for an unreliable PSIS
-approximation.
+\code{\link[loo:loo]{loo::loo()}}). For \code{loo_compare.mvgam}, the \code{compare.loo} table of
+\code{\link[loo:loo_compare]{loo::loo_compare()}}, one row per model, best first. Its \code{p_worse},
+\code{diag_diff} and \code{diag_elpd} columns follow Sivula et al. (2025).
 }
 \description{
 Extract the LOOIC (leave-one-out information criterion) using \code{\link[loo:loo]{loo::loo()}}.

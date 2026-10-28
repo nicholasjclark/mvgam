@@ -15,14 +15,21 @@
 overrides the names inferred from the call.}
 }
 \value{
-A \code{compare.loo} table with one row per model, best first.
+A \code{compare.loo} table in the layout of \code{\link[loo:loo_compare]{loo::loo_compare()}},
+one row per model, best first.
 \describe{
+\item{\code{model}}{The model's name.}
 \item{\code{elpd_diff}}{Summed ELPD difference from the best model,
 zero for the best.}
 \item{\code{se_diff}}{Standard error of \code{elpd_diff},
 \code{sqrt(N) * sd(fold_diff)} over the \code{N} folds.}
-\item{\code{p_worse}, \code{diag_diff}, \code{diag_elpd}}{The diagnostics of
-\code{\link[=loo_compare.mvgam]{loo_compare.mvgam()}}, with folds in place of observations.}
+\item{\code{p_worse}}{The normal probability that the model forecasts
+worse than the best one (Sivula et al. 2025). \code{NA} for the best
+model and for a difference without spread.}
+\item{\code{diag_diff}}{\code{"N < 100"} for fewer than 100 folds, else
+\code{"|elpd_diff| < 4"} for a difference too small for its SE.}
+\item{\code{diag_elpd}}{The number of folds whose PSIS estimate was
+kept with a Pareto k above the threshold.}
 \item{\code{elpd_lfo}}{Summed per-fold ELPD.}
 \item{\code{se_elpd_lfo}}{Standard error of \code{elpd_lfo}.}
 }
@@ -60,6 +67,11 @@ loo_compare(lfo_gam, lfo_ar, model_names = c("GAM", "AR"))
 # part ways
 }
 
+}
+\references{
+Sivula, T., Magnusson, M., Matamoros, A. A. and Vehtari, A. (2025).
+Uncertainty in Bayesian leave-one-out cross-validation based model
+comparison. \emph{Bayesian Analysis}. \doi{10.1214/25-BA1569}
 }
 \seealso{
 \code{\link[=lfo_cv]{lfo_cv()}}, \code{\link[=loo_model_weights.mvgam_lfo]{loo_model_weights.mvgam_lfo()}},
