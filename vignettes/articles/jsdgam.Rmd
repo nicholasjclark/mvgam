@@ -256,16 +256,13 @@ loo_cmp
 ```
 
 ```{r loo-numbers, include = FALSE}
-# The prose below says the trait prior predicts better by more than
-# twice the standard error of the difference
-stopifnot(rownames(loo_cmp)[1] == "trait-informed",
-          -loo_cmp[2, "elpd_diff"] > 2 * loo_cmp[2, "se_diff"])
+loo_first <- rownames(loo_cmp)[1]
 fe_diff <- sprintf("%.1f", -loo_cmp[2, "elpd_diff"])
 fe_se <- sprintf("%.1f", loo_cmp[2, "se_diff"])
 ```
 
-With the trait prior the model predicts held-out counts better, by
-`r fe_diff` (SE `r fe_se`) in expected log predictive density.
+Leave-one-out ranks the `r loo_first` prior first. The other trails
+it by `r fe_diff` (SE `r fe_se`) in expected log predictive density.
 
 ## Residual correlations
 
@@ -338,12 +335,12 @@ these counts support.
 ## Summary
 
 The trait prior and column shrinkage tested two assumptions of the
-first ant community models: independent loadings and two factors. The
-trait prior predicted held-out counts better than independent
-loadings, by `r fe_diff` in expected log predictive density against a
-standard error of `r fe_se`. Given a ceiling of six factors, the
-shrinkage prior kept two active, the number the first models assumed. Each extension is one argument to a single `jsdgam()` call, as are
-the environmental slopes that gave all 41 species a canopy response
+first ant community models: independent loadings and two factors.
+Leave-one-out ranked the `r loo_first` prior first, by `r fe_diff` in
+expected log predictive density against a standard error of
+`r fe_se`. Given a ceiling of six factors, the shrinkage prior kept two
+active, the number the first models assumed. Each extension is one
+argument to a single `jsdgam()` call, as are the environmental slopes that gave all 41 species a canopy response
 from three covariates.
 
 ## Where to next
