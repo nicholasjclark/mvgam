@@ -191,12 +191,14 @@ intercept carries its mean.
 
 Default priors scale with the number of time points \eqn{N} and
 widen by the factor \eqn{s} that brms applies to its own default
-scales, as \code{\link[=get_prior]{get_prior()}} describes. \code{sigma_slope_trend} takes a
-half-Student-t with 3 degrees of freedom. Under its scale, the
-trend's movement over the series from the slope shocks has a
-standard deviation with prior median \eqn{s}. The movement itself
-has a 90th percentile near \eqn{2.8 s}. The scale accounts for the
-damping at the median of its prior.
+scales, as \code{\link[=get_prior]{get_prior()}} describes. The shock scales \code{sigma_trend}
+and \code{sigma_slope_trend} take \code{gamma(2, .)} priors. At their prior
+medians, the level shocks and the slope shocks each move the trend
+over the series by a standard deviation of \eqn{s}. The slope's
+median accounts for the damping at the median of its prior. A
+\code{gamma(2, .)} density rises from zero. It keeps a nearly fixed level
+or slope within reach and steers the sampler away from the boundary
+at zero.
 \code{init_slope_trend ~ normal(0, 2 / r)}, where
 \eqn{r = 1 + \phi + \dots + \phi^{N - 2}} is how far a unit
 initial slope moves the level by the end of the series, gives the
@@ -261,9 +263,9 @@ phase at the first time point with no further choice. Seasonal
 shocks are independent across series. In a factor model each factor
 has its own season, mapped to the series through the loadings.
 
-\code{sigma_season_trend} takes a half-Student-t with 3 degrees of freedom
-whose scale puts the prior median of the season's drift over the
-series at \eqn{s}, as the slope's prior does for its movement. Each
+\code{sigma_season_trend} takes a \code{gamma(2, .)} prior whose median puts
+the season's drift over the series at \eqn{s / 4}. A season that
+drifts by its own size over the series would barely repeat. Each
 starting state takes \code{normal(0, s / sqrt(K))} over \eqn{K}
 harmonics, which gives the starting seasonal pattern a root mean
 square of \eqn{s}. \code{\link[=get_prior]{get_prior()}} prints the resolved values.

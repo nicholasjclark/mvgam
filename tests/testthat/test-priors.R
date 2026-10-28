@@ -807,31 +807,35 @@ test_that("LLT and PW growth priors scale with the number of time points", {
                                    family = poisson()))
     stats::setNames(tab$prior, tab$class)
   }
-  # The shocks at times 2 to 59 reach time 60 with weights 58 to 1,
-  # and the initial slope with weight 59
+  # Each shock scale takes gamma(2, .) at the median given
+  shock <- function(median) {
+    paste0("gamma(2, ", signif(stats::qgamma(0.5, 2) / signif(median, 4),
+                               4), ")")
+  }
+  # Level shocks over 59 steps. The slope shocks at times 2 to 59 reach
+  # time 60 with weights 58 to 1. The initial slope reaches it with
+  # weight 59.
   plain <- resolved(~ LLT())
+  expect_identical(plain[["sigma_trend"]], shock(1 / sqrt(59)))
   expect_identical(plain[["sigma_slope_trend"]],
-                   paste0("student_t(3, 0, ",
-                          signif(1.3 / sqrt(sum((1:58)^2)), 4), ")"))
+                   shock(1 / sqrt(sum((1:58)^2))))
   expect_identical(plain[["init_slope_trend"]],
                    paste0("normal(0, ", signif(2 / 59, 4), ")"))
   # A damped slope reaches with geometric weights at phi = 0.913
   factor <- resolved(~ LLT(n_lv = 2, damped = TRUE))
   reach <- function(m) (1 - 0.913^m) / (1 - 0.913)
   expect_identical(factor[["sigma_slope_trend"]],
-                   paste0("student_t(3, 0, ",
-                          signif(1.3 * sqrt(60 / sum(reach(1:58)^2)), 4), ")"))
+                   shock(sqrt(60 / sum(reach(1:58)^2))))
   expect_identical(factor[["init_slope_trend"]],
                    paste0("normal(0, ", signif(2 * sqrt(60) / reach(59), 4),
                           ")"))
   expect_identical(factor[["ar1_slope_trend"]], "beta(18, 2)")
 
-  # Two harmonics drift over 59 steps. Their starting pairs give the
-  # pattern a root mean square of one unit.
+  # Two harmonics drift over 59 steps by a median of a quarter unit.
+  # Their starting pairs give the pattern a root mean square of one unit.
   seasonal <- resolved(~ LLT(season = 12, harmonics = 2))
   expect_identical(seasonal[["sigma_season_trend"]],
-                   paste0("student_t(3, 0, ", signif(1.3 / sqrt(2 * 59), 4),
-                          ")"))
+                   shock(0.25 / sqrt(2 * 59)))
   expect_identical(seasonal[["init_season_trend"]],
                    paste0("normal(0, ", signif(1 / sqrt(2), 4), ")"))
 

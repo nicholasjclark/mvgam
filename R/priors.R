@@ -537,14 +537,22 @@ get_car_parameter_prior <- function(param_name, trend_obj) {
 
 #' LLT priors scaled to the number of time points
 #'
-#' A slope shock at time `t` moves the level at the end of the series
-#' by `w_t = 1 + phi + ... + phi^(N - t - 1)`. The slope shocks move it
-#' with variance `sigma_slope^2 v`, where `v` sums the squared
-#' weights. `student_t(3, 0, 1.3 / sqrt(v))` on `sigma_slope_trend`
-#' puts the prior median of that movement's standard deviation at one
-#' link unit at every `N`. The movement itself then has prior median
-#' 0.55, 90th percentile 2.8 and 99th percentile 8.4 link units. The
-#' heavy tail lets an informative series move the posterior.
+#' Each shock scale takes `gamma(2, rate)` with median `m`, where
+#' `rate = qgamma(0.5, 2) / m`. The density rises linearly from zero. It
+#' discourages the boundary at zero, where NUTS diverges on series whose
+#' components are nearly fixed. A nearly fixed component stays within
+#' reach. A half-Student-t places its mode at the boundary. An inverse
+#' gamma rules a nearly fixed component out. The shock scales then
+#' come out too large and the forecasts too wide.
+#'
+#' - Level: the shocks of `N - 1` steps move the level by
+#'   `sigma sqrt(N - 1)`. The median `1 / sqrt(N - 1)` puts the prior
+#'   median of that movement at one link unit.
+#' - Slope: a slope shock at time `t` moves the level at time `N` by
+#'   `w_t = 1 + phi + ... + phi^(N - t - 1)`. The slope shocks move it
+#'   by `sigma_slope sqrt(v)`, where `v` sums the squared weights. The
+#'   median `1 / sqrt(v)` puts the median movement at one link unit.
+#' - Season: `llt_prior_scales()` gives the season's median.
 #'
 #' The initial slope moves the level at time `N` by its reach,
 #' `1 + phi + ... + phi^(N - 2)` per unit. A prior standard deviation
@@ -571,7 +579,7 @@ get_llt_parameter_prior <- function(param_name, trend_obj) {
   if (identical(param_name, "ar1_slope_trend")) {
     return(list(prior = "beta(18, 2)", lb = "0", ub = "1"))
   }
-  scaled <- c("sigma_slope_trend", "init_slope_trend",
+  scaled <- c("sigma_trend", "sigma_slope_trend", "init_slope_trend",
               "sigma_season_trend", "init_season_trend")
   if (!param_name %in% scaled) {
     return(NULL)
@@ -587,19 +595,19 @@ get_llt_parameter_prior <- function(param_name, trend_obj) {
                              samples_factor_loadings(trend_obj),
                              trend_prior_unit_of(trend_obj),
                              length(llt_season_frequencies(trend_obj)))
+  shock_scale <- function(median) {
+    list(prior = paste0("gamma(2, ",
+                        signif(stats::qgamma(0.5, 2) / median, 4), ")"),
+         lb = "0", ub = "")
+  }
   switch(
     param_name,
-    sigma_slope_trend = list(
-      prior = paste0("student_t(3, 0, ", scales$sigma, ")"), lb = "0",
-      ub = ""
-    ),
+    sigma_trend = shock_scale(scales$level),
+    sigma_slope_trend = shock_scale(scales$sigma),
     init_slope_trend = list(
       prior = paste0("normal(0, ", scales$init, ")"), lb = "", ub = ""
     ),
-    sigma_season_trend = list(
-      prior = paste0("student_t(3, 0, ", scales$season_sigma, ")"),
-      lb = "0", ub = ""
-    ),
+    sigma_season_trend = shock_scale(scales$season_sigma),
     init_season_trend = list(
       prior = paste0("normal(0, ", scales$season_init, ")"), lb = "",
       ub = ""
@@ -609,18 +617,19 @@ get_llt_parameter_prior <- function(param_name, trend_obj) {
 
 #' The scales of the default LLT priors
 #'
-#' The Stan program also samples the slope and season parameters in
-#' these units, which keeps a random start within a few prior scales of
-#' zero.
+#' The medians of the shock scales and the standard deviations of the
+#' starting states. The Stan program also samples the slope and season
+#' parameters in these units, which keeps a random start within a few
+#' prior scales of zero.
 #'
 #' A seasonal state pair keeps its length under rotation. Each step's
 #' shocks add `2 sigma_season^2` to its squared length. Over `N - 1`
 #' steps the `K` harmonics move the season by a standard deviation of
-#' `sigma_season sqrt(K (N - 1))`. `student_t(3, 0, 1.3 / sqrt(K (N -
-#' 1)))` puts the prior median of that drift at one link unit, as the
-#' slope prior does for the slope's movement. A starting pair at
-#' `normal(0, 1 / sqrt(K))` gives the starting seasonal pattern a mean
-#' square of one link unit squared.
+#' `sigma_season sqrt(K (N - 1))`. The median `0.25 / sqrt(K (N - 1))`
+#' puts the prior median of that drift at a quarter of a link unit. A
+#' starting pair at `normal(0, 1 / sqrt(K))` gives the starting
+#' seasonal pattern a root mean square of one link unit. A season that
+#' drifts by its own size over the series would barely repeat.
 #'
 #' @param n_time Number of time points
 #' @param damped Whether the slope is damped
@@ -628,7 +637,7 @@ get_llt_parameter_prior <- function(param_name, trend_obj) {
 #' @param spread The responses' spread on their link scale
 #' @param n_harmonics Number of seasonal harmonics, zero without a
 #'   season
-#' @return List of `sigma` and `init`, each a scalar to four
+#' @return List of `level`, `sigma` and `init`, each a scalar to four
 #'   significant digits. With harmonics it adds `season_sigma` and
 #'   `season_init`.
 #' @noRd
@@ -645,12 +654,13 @@ llt_prior_scales <- function(n_time, damped, unit_factors, spread = 1,
   reach <- function(steps) sum(phi^(seq_len(steps) - 1L))
   shocks <- vapply(seq_len(n_time - 2L), reach, numeric(1L))
   c(
-    list(sigma = signif(1.3 * unit / sqrt(sum(shocks^2)), 4),
+    list(level = signif(unit / sqrt(n_time - 1L), 4),
+         sigma = signif(unit / sqrt(sum(shocks^2)), 4),
          init = signif(2 * unit / reach(n_time - 1L), 4)),
     if (n_harmonics > 0L) {
       list(
         season_sigma = signif(
-          1.3 * unit / sqrt(n_harmonics * (n_time - 1L)), 4
+          0.25 * unit / sqrt(n_harmonics * (n_time - 1L)), 4
         ),
         season_init = signif(unit / sqrt(n_harmonics), 4)
       )
@@ -1761,9 +1771,11 @@ default_prior.mvgam <- function(object, ...) {
 #'     \code{exponential(2 / s)}, with mean \eqn{s / 2}.
 #'   \item The factor loadings \code{Z} take
 #'     \code{student_t(3, 0, 0.5 s)}.
-#'   \item The slope priors of \code{\link{LLT}()} and the growth priors
-#'     of a linear \code{\link{PW}()} also scale with the number of
-#'     time points. Their help pages give the forms.
+#'   \item The shock scales and starting states of \code{\link{LLT}()}
+#'     scale with the number of time points. Its \code{sigma_trend}
+#'     takes one of them. The growth priors of a linear
+#'     \code{\link{PW}()} also scale with it. Their help pages give the
+#'     forms.
 #' }
 #' A count model on the log link rarely spreads past 2.5. Its
 #' defaults keep their link-scale values. Coefficients without

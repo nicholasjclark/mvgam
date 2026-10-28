@@ -207,9 +207,11 @@ link:
 \code{exponential(2 / s)}, with mean \eqn{s / 2}.
 \item The factor loadings \code{Z} take
 \code{student_t(3, 0, 0.5 s)}.
-\item The slope priors of \code{\link{LLT}()} and the growth priors
-of a linear \code{\link{PW}()} also scale with the number of
-time points. Their help pages give the forms.
+\item The shock scales and starting states of \code{\link{LLT}()}
+scale with the number of time points. Its \code{sigma_trend}
+takes one of them. The growth priors of a linear
+\code{\link{PW}()} also scale with it. Their help pages give the
+forms.
 }
 A count model on the log link rarely spreads past 2.5. Its
 defaults keep their link-scale values. Coefficients without
