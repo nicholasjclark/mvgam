@@ -25,7 +25,7 @@ knitr::opts_chunk$set(
 library(mvgam)
 library(ggplot2)
 library(patchwork)
-theme_set(mvgam_theme(base_size = 12, base_family = "serif"))
+theme_set(mvgam_theme(base_size = 12))
 ```
 
 Monitoring programmes often measure one quantity with several methods.
@@ -135,7 +135,7 @@ biomass likelihoods alone.
 `pp_check()` compares draws from the posterior predictive distribution
 with the data. Without `resp` it draws one panel per response:
 
-```{r ppc, fig.asp = 1, fig.cap = "Posterior predictive checks for each response: density overlays for the count and biomass records, and the share of each outcome for the camera record."}
+```{r ppc, fig.asp = 1, fig.cap = "Posterior predictive checks for each response. A rootogram compares the frequency of each count. A density overlay checks the biomass record. Bars give the share of each camera outcome."}
 pp_check(mod_joint, ndraws = 50)
 ```
 
@@ -263,16 +263,16 @@ out its equations.
 
 Related articles:
 
-- [Integrated distribution models](https://nicholasjclark.github.io/mvgam/articles/idm.html)
+- [Integrated distribution models](idm.html)
   combine survey protocols that share one log-intensity.
-- [Joint species distribution models](https://nicholasjclark.github.io/mvgam/articles/jsdgam.html)
+- [Joint species distribution models](jsdgam.html)
   share latent factors among many species.
-- [State-space VARs](https://nicholasjclark.github.io/mvgam/articles/var.html)
+- [State-space VARs](var.html)
   give each series its own latent state, with lagged effects between
   them.
-- [Forecast evaluation](https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html)
+- [Forecast evaluation](forecast_evaluation.html)
   covers scoring rules and leave-future-out cross-validation.
-- [mvgam overview](https://nicholasjclark.github.io/mvgam/articles/mvgam_overview.html)
+- [mvgam overview](mvgam_overview.html)
   introduces the observation and trend formulas.
 
 ## References

@@ -254,7 +254,7 @@ hypothesis.mvgam <- function(x, hypothesis, class = "b", group = "",
 #'
 #' @examples
 #' \dontrun{
-#' set.seed(4)
+#' set.seed(1)
 #' simdat <- sim_mvgam(family = poisson(), n_series = 1L,
 #'                     n_timepoints = 80L, trend_model = AR())
 #'
@@ -464,6 +464,26 @@ brms::ngrps
 #'
 #' @seealso [brms::predictive_error.brmsfit()], [residuals.mvgam()],
 #'   [posterior_predict.mvgam()], [posterior_epred.mvgam()].
+#'
+#' @examples
+#' \dontrun{
+#' set.seed(13)
+#' simdat <- sim_mvgam(family = poisson(), n_series = 1L,
+#'                     n_timepoints = 120L, trend_model = AR())
+#' mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
+#'              data = simdat$data_train, family = poisson(),
+#'              chains = 2, silent = 2)
+#'
+#' # Observed minus predicted counts, one row per draw
+#' err <- predictive_error(mod, draw_ids = 1:200)
+#' dim(err)
+#'
+#' # The three observations with the largest mean absolute error
+#' mae <- colMeans(abs(err))
+#' simdat$data_train[order(mae, decreasing = TRUE)[1:3], c("time", "y")]
+#'
+#' # Next: residuals(mod) returns randomised quantile residuals
+#' }
 #'
 #' @family predictions
 #' @method predictive_error mvgam

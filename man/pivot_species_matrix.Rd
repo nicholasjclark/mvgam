@@ -46,6 +46,24 @@ a simplex (\code{diri()}, \code{multi()}, \code{categ()}), continuous-response
 (\code{mvn()}, \code{mvt()}), or bernoulli / binomial / poisson family
 expects.
 }
+\examples{
+# Counts of three species at five sites, one column per species
+Y <- matrix(c(3, 0, 5, 2, 7,
+              1, 1, 0, 4, 2,
+              0, 6, 2, 3, 1), nrow = 5,
+            dimnames = list(NULL, c("ant", "bee", "wasp")))
+long <- pivot_species_matrix(
+  Y,
+  site_covs = data.frame(elev = c(120, 340, 560, 780, 910)),
+  traits = data.frame(body_size = c(2.1, 11.5, 16.0))
+)
+# One row per site and species, each carrying its site's elevation
+# and its species' body size
+head(long)
+
+# Next, fit the long frame with jsdgam(unit = time, species = series)
+
+}
 \seealso{
 Other model fitting: 
 \code{\link{check_newdata}()},

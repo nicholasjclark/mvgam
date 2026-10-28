@@ -85,19 +85,12 @@
 #'   `r mvgam_article("forecast_evaluation", "forecast evaluation article")`
 #'   compares competing models by their forecasts.
 #'
+#' @template ex-loo-models
 #' @examples
 #' \dontrun{
-#' set.seed(13)
-#' simdat <- sim_mvgam(family = poisson(), n_series = 1L,
-#'                     n_timepoints = 120L, trend_model = AR())
-#' mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
-#'              data   = simdat$data_train,
-#'              family = poisson(),
-#'              chains = 2, silent = 2)
-#'
-#' # Add a smooth of time to the observation formula. The family,
-#' # trend, priors, data and sampler settings carry over
-#' upd <- update(mod, formula. = ~ . + s(time, k = 5))
+#' # Swap the family for a negative binomial. The formula, priors, data
+#' # and sampler settings carry over
+#' upd <- update(mod, family = negbinomial())
 #'
 #' # Compare the two fits by approximate leave-one-out cross-validation.
 #' # The better model has elpd_diff = 0. A difference smaller than about

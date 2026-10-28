@@ -148,6 +148,30 @@ cross-species occupancy dynamics. It has no explicit
 colonization or extinction rates.
 }
 }
+\examples{
+# Detections of one species at four sites over three visits, laid out
+# as the `y` slot of an unmarked frame. NA marks a missed visit
+y <- matrix(c(0, 1, 1,
+              0, 0, NA,
+              1, 1, 0,
+              0, 0, 0), nrow = 4, byrow = TRUE)
+long <- pivot_detection_array(
+  y,
+  site_covs = data.frame(forest = c(0.2, 0.8, 0.5, 0.1)),
+  obs_covs = list(wind = matrix(seq(0.1, 1.2, by = 0.1), nrow = 4))
+)
+# One row per observed visit. The missed visit is dropped
+long
+
+# Three species in a [species, site, visit] array, as spOccupancy
+# stores them. Each row names its species in 'series'
+set.seed(1)
+y3 <- array(rbinom(36, size = 1, prob = 0.4), dim = c(3, 4, 3))
+head(pivot_detection_array(y3, species = c("owl", "hawk", "kite")))
+
+# Next, fit the long frame with mvgam(family = occ())
+
+}
 \seealso{
 Other model fitting: 
 \code{\link{check_newdata}()},

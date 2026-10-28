@@ -34,6 +34,33 @@ difference comes from the paired per-fold differences with the best
 model. The results must share one evaluation grid, with the same
 \code{min_t}, \code{fc_horizon} and data.
 }
+\examples{
+\dontrun{
+set.seed(1)
+simdat <- sim_mvgam(family = poisson(), n_series = 1L,
+                    n_timepoints = 120L, trend_model = AR())
+# Two models of one count series: a smooth of x with and without
+# an AR(1) trend
+mod_gam <- mvgam(y ~ s(x), data = simdat$data_train,
+                 family = poisson(), chains = 2, silent = 2)
+mod_ar <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
+                data = simdat$data_train, family = poisson(),
+                chains = 2, silent = 2)
+}
+\dontrun{
+# Each origin after t = 70 forecasts the next time step. The
+# pointwise log densities feed stacking weights
+lfo_gam <- lfo_cv(mod_gam, min_t = 70L, save_log_lik = TRUE)
+lfo_ar <- lfo_cv(mod_ar, min_t = 70L, save_log_lik = TRUE)
+
+# The model with the higher summed ELPD comes first
+loo_compare(lfo_gam, lfo_ar, model_names = c("GAM", "AR"))
+
+# Next, compare_elpds() shows where along the series the models
+# part ways
+}
+
+}
 \seealso{
 \code{\link[=lfo_cv]{lfo_cv()}}, \code{\link[=loo_model_weights.mvgam_lfo]{loo_model_weights.mvgam_lfo()}},
 \code{\link[=compare_elpds]{compare_elpds()}}, \code{\link[=plot.mvgam_compare_elpds]{plot.mvgam_compare_elpds()}}

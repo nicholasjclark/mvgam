@@ -107,8 +107,12 @@ sc <- score(fc, score = "drps")
 head(sc$series_1)
 
 # The DRPS summed over series at each forecast horizon
-plot(sc$all_series$eval_horizon, sc$all_series$score, type = "b",
-     xlab = "Horizon", ylab = "DRPS summed over series")
+library(ggplot2)
+ggplot(sc$all_series, aes(eval_horizon, score)) +
+  geom_line(colour = "#8F2727") +
+  geom_point(colour = "#8F2727") +
+  labs(x = "Horizon", y = "DRPS summed over series") +
+  mvgam_theme()
 
 # A joint score of both series at each horizon
 head(score(fc, score = "energy")$all_series)

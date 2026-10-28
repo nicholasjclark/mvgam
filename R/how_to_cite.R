@@ -832,6 +832,38 @@ extract_sampling_info <- function(object) {
 }
 
 
+#' The sentences of a methods paragraph naming the model's structure
+#'
+#' Names the family and link of each response, then the trend and
+#' whether its innovations are correlated. A model without a trend
+#' takes the family sentence alone.
+#'
+#' @param object Fitted `mvgam` object or prefit
+#' @return Character scalar opening with a space
+#' @noRd
+model_structure_text <- function(object) {
+  checkmate::assert_class(object, "mvgam")
+  families <- formula_families(object, object$family)
+  described <- vapply(families, function(fam) {
+    paste0(resolve_family_name(fam), " with a ", fam$link, " link")
+  }, character(1L))
+  out <- if (length(described) == 1L) {
+    paste0(" Observations followed the ",
+           sub(" with", " family with", described, fixed = TRUE), ".")
+  } else {
+    paste0(" The responses followed the families ",
+           paste0(names(described), ": ", described, collapse = "; "),
+           ".")
+  }
+  trend <- printed_trend_label(object)
+  if (identical(trend, "None")) return(out)
+  paste0(
+    out, " The latent process followed ", trend, " dynamics",
+    if (trend_samples_cor(object)) " with correlated innovations", "."
+  )
+}
+
+
 #' @rdname how_to_cite.mvgam
 #' @method how_to_cite mvgam
 #' @export
@@ -850,7 +882,8 @@ how_to_cite.mvgam <- function(object, ...) {
     " mvgam fits Bayesian state-space models that combine flexible",
     " predictor effects in both the process and observation components,",
     " using functionality from the brms (Burkner 2017) and",
-    " mgcv (Wood 2017) packages."
+    " mgcv (Wood 2017) packages.",
+    model_structure_text(object)
   )
 
   # A prefit records its trend type in its metadata alone.

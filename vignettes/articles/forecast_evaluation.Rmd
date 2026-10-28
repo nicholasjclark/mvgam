@@ -24,7 +24,7 @@ knitr::opts_chunk$set(
 )
 library(mvgam)
 library(ggplot2)
-theme_set(mvgam_theme(base_size = 12, base_family = "serif"))
+theme_set(mvgam_theme(base_size = 12))
 ```
 
 A model that describes its training data well can still forecast
@@ -308,11 +308,11 @@ equations.
 
 Related articles:
 
-- [Vector autoregressions](https://nicholasjclark.github.io/mvgam/articles/var.html)
+- [Vector autoregressions](var.html)
   model the lagged effects of one species on another.
-- [Hierarchical vector autoregressions](https://nicholasjclark.github.io/mvgam/articles/hierarchical_var.html)
+- [Hierarchical vector autoregressions](hierarchical_var.html)
   pool dynamics across groups of series.
-- [N-mixture models](https://nicholasjclark.github.io/mvgam/articles/nmix.html)
+- [N-mixture models](nmix.html)
   forecast abundance from counts with imperfect detection.
 
 ## References

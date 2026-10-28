@@ -71,11 +71,12 @@ restore_color_scheme <- function(cs) {
 }
 
 
-#' Evaluate an expression under the mvgam colour scheme
+#' Evaluate an expression under the mvgam colour scheme and theme
 #'
-#' Every mvgam figure draws with the bayesplot `"red"` scheme. The
-#' scheme a user set with `bayesplot::color_scheme_set()` is restored
-#' on exit.
+#' Every mvgam figure draws with the bayesplot `"red"` scheme and
+#' [mvgam_theme()]. bayesplot fixes its theme into a plot when it builds
+#' it. Its default theme sets a serif font. The scheme and theme a user
+#' set through bayesplot are restored on exit.
 #'
 #' @param expr Expression to evaluate
 #' @param scheme Character scheme name
@@ -84,16 +85,20 @@ restore_color_scheme <- function(cs) {
 with_color_scheme <- function(expr, scheme = "red") {
   checkmate::assert_string(scheme)
   prior <- bayesplot::color_scheme_get()
+  prior_theme <- bayesplot::bayesplot_theme_set(mvgam_theme())
   bayesplot::color_scheme_set(scheme)
-  on.exit(restore_color_scheme(prior), add = TRUE)
+  on.exit({
+    restore_color_scheme(prior)
+    bayesplot::bayesplot_theme_set(prior_theme)
+  }, add = TRUE)
   force(expr)
 }
 
-#' Set the mvgam colour scheme until the calling function returns
+#' Set the mvgam colour scheme and theme until the caller returns
 #'
 #' The `rlang::local_*` form of `with_color_scheme()`. It adds an
 #' `on.exit(..., add = TRUE)` to `envir`, which restores the user's
-#' scheme.
+#' scheme and bayesplot theme.
 #'
 #' @param scheme Character scheme name
 #' @param envir Environment whose exit restores the prior scheme.
@@ -104,11 +109,15 @@ set_color_scheme_local <- function(scheme = "red", envir = parent.frame()) {
   checkmate::assert_string(scheme)
   checkmate::assert_environment(envir)
   prior <- bayesplot::color_scheme_get()
+  prior_theme <- bayesplot::bayesplot_theme_set(mvgam_theme())
   bayesplot::color_scheme_set(scheme)
   do.call(
     base::on.exit,
     list(
-      substitute(restore_color_scheme(prior), list(prior = prior)),
+      substitute({
+        restore_color_scheme(prior)
+        bayesplot::bayesplot_theme_set(prior_theme)
+      }, list(prior = prior, prior_theme = prior_theme)),
       add = TRUE
     ),
     envir = envir
@@ -119,9 +128,10 @@ set_color_scheme_local <- function(scheme = "red", envir = parent.frame()) {
 #' The ggplot theme mvgam draws with
 #'
 #' @description
-#' Every figure the package draws uses this theme. It extends
-#' [ggplot2::theme_classic()] and matches the bayesplot figures. Apply
-#' it to a plot of your own to give it the look of mvgam output.
+#' Every figure the package draws uses this theme, including the
+#' figures it draws through \pkg{bayesplot}. It extends
+#' [ggplot2::theme_classic()]. Apply it to a plot of your own to give it
+#' the look of mvgam output.
 #'
 #' mvgam's figures take their colours from the `"red"` scheme of
 #' \pkg{bayesplot}, which `bayesplot::color_scheme_get("red")` returns.
@@ -648,7 +658,8 @@ stack_response_plots <- function(plots) {
   # Each plot is wrapped as a panel. Its title row is then free for the
   # response name.
   titled <- lapply(names(plots), function(r) {
-    patchwork::wrap_elements(panel = plots[[r]]) + ggplot2::labs(title = r)
+    patchwork::wrap_elements(panel = plots[[r]]) + ggplot2::labs(title = r) +
+      mvgam_theme()
   })
   patchwork::wrap_plots(titled, ncol = 1L)
 }
@@ -807,8 +818,8 @@ interval_excludes_zero <- function(lower, upper) {
 #'
 #' `layout = "matrix"` draws rows down and columns across, as the
 #' matrix is written. `layout = "triangle"` draws the lower triangle
-#' of a symmetric matrix with both axes held open, which keeps the
-#' panel square.
+#' of a symmetric matrix. Both axes keep every level of the panel's
+#' factors, which keeps the panel square.
 #'
 #' @param panel Frame of `Var1` (row), `Var2` (column) and `value`,
 #'   with optional `clear` and `group` columns
@@ -848,11 +859,18 @@ matrix_heatmap <- function(panel, fill_scale,
     ggplot2::geom_tile(data = clear, fill = NA, colour = "black",
                        linewidth = 0.9) +
     fill_scale +
-    ggplot2::scale_x_discrete(guide = ggplot2::guide_axis(angle = 45),
+    # A vertical label is one text line wide. Labels of adjacent tiles
+    # then stay apart however many tiles the axis holds.
+    ggplot2::scale_x_discrete(guide = ggplot2::guide_axis(angle = 90),
                               drop = FALSE) +
     y_scale +
     ggplot2::labs(x = x_lab, y = y_lab) +
-    mvgam_theme()
+    mvgam_theme() +
+    # Past 30 levels a label of the base size is taller than its tile.
+    # The text shrinks in step with the tiles.
+    ggplot2::theme(axis.text = ggplot2::element_text(
+      size = ggplot2::rel(min(1, 30 / nlevels(factor(panel$Var1))))
+    ))
   if (!is.null(panel$group)) {
     p <- p +
       ggplot2::facet_wrap(
@@ -869,7 +887,8 @@ matrix_heatmap <- function(panel, fill_scale,
 #' @param clear Optional logical matrix the shape of `mat`, `TRUE` where
 #'   an entry's interval excludes zero. `NULL` marks no entry.
 #' @param lower_only Logical. `TRUE` keeps the entries below the
-#'   diagonal.
+#'   diagonal. Rows then start at the second name and columns end at
+#'   the second last. The triangle then has no empty row or column.
 #' @return Data frame of `Var1` (row), `Var2` (column), `value` and
 #'   `clear`
 #' @noRd
@@ -885,6 +904,9 @@ matrix_panel <- function(mat, clear = NULL, lower_only = FALSE) {
   out$clear <- as.vector(clear)
   if (lower_only) {
     out <- out[as.vector(lower.tri(mat)), , drop = FALSE]
+    lv <- levels(out$Var1)
+    out$Var1 <- factor(out$Var1, levels = lv[-1L])
+    out$Var2 <- factor(out$Var2, levels = lv[-length(lv)])
   }
   out
 }

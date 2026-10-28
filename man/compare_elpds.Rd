@@ -29,6 +29,37 @@ Stacks the per-step ELPDs from several \code{mvgam_lfo}
 objects into one long-format \code{tibble}, with one row per model
 and evaluation time.
 }
+\examples{
+\dontrun{
+set.seed(1)
+simdat <- sim_mvgam(family = poisson(), n_series = 1L,
+                    n_timepoints = 120L, trend_model = AR())
+# Two models of one count series: a smooth of x with and without
+# an AR(1) trend
+mod_gam <- mvgam(y ~ s(x), data = simdat$data_train,
+                 family = poisson(), chains = 2, silent = 2)
+mod_ar <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
+                data = simdat$data_train, family = poisson(),
+                chains = 2, silent = 2)
+}
+\dontrun{
+# Each origin after t = 70 forecasts the next time step. The
+# pointwise log densities feed stacking weights
+lfo_gam <- lfo_cv(mod_gam, min_t = 70L, save_log_lik = TRUE)
+lfo_ar <- lfo_cv(mod_ar, min_t = 70L, save_log_lik = TRUE)
+
+# One row per model and origin
+elpds <- compare_elpds(lfo_gam, lfo_ar, model_names = c("GAM", "AR"))
+head(elpds)
+
+# The running sum of the AR model's ELPD minus the GAM's. Hollow
+# points mark the origins where the model was refitted
+plot(elpds, relative = "GAM", cumulative = TRUE)
+
+# Next, loo_compare() sums the ELPDs with a standard error
+}
+
+}
 \seealso{
 \code{\link[=lfo_cv]{lfo_cv()}}, \code{\link[=loo_compare.mvgam_lfo]{loo_compare.mvgam_lfo()}},
 \code{\link[=loo_model_weights.mvgam_lfo]{loo_model_weights.mvgam_lfo()}},

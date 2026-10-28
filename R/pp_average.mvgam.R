@@ -58,27 +58,22 @@
 #'   `r mvgam_article("forecast_evaluation", "forecast evaluation article")`
 #'   weights and combines competing models.
 #'
+#' @template ex-loo-models
 #' @examples
 #' \dontrun{
-#' # Two models of one count series: with and without a smooth of x
-#' set.seed(13)
-#' simdat <- sim_mvgam(family = poisson(), n_series = 1L,
-#'                     n_timepoints = 120L, trend_model = AR())
-#' mod1 <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
-#'               data   = simdat$data_train, family = poisson(),
-#'               chains = 2, silent = 2)
-#' mod2 <- update(mod1, formula = y ~ 1)
+#' # The same smooth of x replaced by a linear effect
+#' mod_lin <- update(mod, formula. = y ~ x)
 #'
 #' # Stacking weights from approximate leave-one-out cross-validation
-#' loo_model_weights(mod1, mod2)
+#' loo_model_weights(mod, mod_lin)
 #'
-#' # The trend coefficient, averaged over both fits under those weights
-#' pa <- posterior_average(mod1, mod2, variable = "ar1_trend")
+#' # The intercept, averaged over both fits under those weights
+#' pa <- posterior_average(mod, mod_lin, variable = "b_Intercept")
 #' attr(pa, "weights")
 #' summary(pa)
 #'
 #' # Averaged expected counts, one row per observation
-#' head(pp_average(mod1, mod2, method = "posterior_epred"))
+#' head(pp_average(mod, mod_lin, method = "posterior_epred"))
 #' }
 #'
 #' @family model comparison

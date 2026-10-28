@@ -104,24 +104,24 @@ against data the model has not seen. \code{\link[=forecast.mvgam]{forecast.mvgam
 }
 \examples{
 \dontrun{
+# A Poisson GAM without a latent trend. PSIS approximates each
+# held-out count of such a model well (see Details of ?loo.mvgam)
 set.seed(13)
 simdat <- sim_mvgam(family = poisson(), n_series = 1L,
-                    n_timepoints = 120L, trend_model = AR())
-
-# Two models of one count series: with and without a smooth of x
-mod1 <- mvgam(y ~ s(x),
-              trend_formula = ~ AR(p = 1),
-              data   = simdat$data_train,
-              family = poisson(),
-              chains = 2, silent = 2)
-mod2 <- update(mod1, formula. = y ~ 1)
+                    n_timepoints = 120L, trend_model = "None")
+mod <- mvgam(y ~ s(x), data = simdat$data_train,
+             family = poisson(), chains = 2, silent = 2)
+}
+\dontrun{
+# The same smooth of x replaced by a linear effect
+mod_lin <- update(mod, formula. = y ~ x)
 
 # The ELPD estimate, with Pareto k diagnostics for each observation
-loo(mod1)
+loo(mod)
 
 # The better model comes first, with elpd_diff = 0. The diagnostic
 # columns say how far the difference can be trusted
-loo_compare(mod1, mod2)
+loo_compare(mod, mod_lin)
 
 # Next: lfo_cv() scores each model's forecasts of data it has not
 # seen

@@ -724,6 +724,10 @@ test_that("how_to_cite cites each family a model has", {
   )
   expect_true(all(c("jorgensen_tweedie", "dunn_smyth_tweedie") %in%
                     cited(mv)))
+  # The paragraph names each response's family and link
+  expect_match(how_to_cite(mv)$methods_text,
+               "amount: tweedie with a log link; count: poisson with a log link",
+               fixed = TRUE)
 })
 
 
@@ -745,6 +749,12 @@ test_that("how_to_cite cites a prefit's trend", {
   hier_cite <- how_to_cite(hier_mod)
   expect_true("savage_hvar" %in% names(hier_cite$bibtex))
   expect_match(hier_cite$methods_text, "exchangeable prior")
+  # The paragraph names the trend and its correlated innovations
+  expect_match(how_to_cite(mod)$methods_text,
+               "poisson family with a log link. The latent process followed VAR(1) dynamics",
+               fixed = TRUE)
+  expect_match(hier_cite$methods_text,
+               "dynamics with correlated innovations.", fixed = TRUE)
   # `other = FALSE` keeps the cited entries and drops the related ones
   bib <- withr::local_tempfile(fileext = ".bib")
   cited_only <- bibtex(hier_cite, file = bib, other = FALSE)

@@ -75,6 +75,28 @@
 #' for the covariance matrix in latent factor models. *Statistics
 #' and Computing* 34, 143. \doi{10.1007/s11222-024-10454-0}
 #'
+#' @examples
+#' \dontrun{
+#' simdat <- sim_jsdgam(family = gaussian(), n_species = 10L,
+#'                      n_sites = 60L, n_lv = 2L, seed = 3L)
+#' mod <- jsdgam(y ~ env * series, data = simdat$data_train,
+#'               family = gaussian(), n_lv = 2L, chains = 2, silent = 2)
+#'
+#' # A trait that tracks each species' true loading on the first factor
+#' set.seed(3)
+#' traits <- data.frame(
+#'   size = simdat$truth$loadings[, 1] + rnorm(10, sd = 0.2),
+#'   row.names = levels(simdat$data_train$series)
+#' )
+#' mod_traits <- jsdgam(y ~ env * series, data = simdat$data_train,
+#'                      family = gaussian(), n_lv = 2L, traits = traits,
+#'                      chains = 2, silent = 2)
+#'
+#' # Grey segments join each species' loadings under the two priors
+#' compare_loadings(mod, mod_traits,
+#'                  labels = c("Default prior", "Trait prior"))
+#' }
+#'
 #' @family latent dynamics
 #' @export
 compare_loadings <- function(

@@ -22,10 +22,11 @@
 #'   `"resid_ribbon"`, `"resid_ribbon_grouped"`, `"resid_qq"`,
 #'   `"resid_vs_fitted"`, `"resid_acf"`, `"resid_pacf"` and
 #'   `"resid_variogram"`. Type
-#'   `"fit_stat"` serves `nmix()` and `occ()` fits. The default is
-#'   `"bars"` for a bernoulli or ordinal response and `"dens_overlay"`
-#'   otherwise. Multi-response families take the defaults under
-#'   "Multi-response families".
+#'   `"fit_stat"` serves `nmix()` and `occ()` fits. A bernoulli or
+#'   ordinal response defaults to `"bars"`. Another discrete response,
+#'   such as a count, defaults to `"rootogram"`. A continuous response
+#'   defaults to `"dens_overlay"`. Multi-response families take the
+#'   defaults under "Multi-response families".
 #'
 #' @param newdata Optional data frame of the variables in the model.
 #'   `NULL` (the default) checks the training data. The residual types
@@ -254,13 +255,17 @@ pp_check.mvgam <- function(
   if (!is.null(fan)) return(fan)
   resolve_resp(object, resp)
 
-  # A density overlay of a binary or ordinal response draws smooth
-  # curves over a few discrete values. Bars show the share of each.
+  # A density overlay of a discrete response draws smooth curves that
+  # ripple between the integers. Bars show the share of each value of a
+  # binary or ordinal response. A rootogram compares the frequency of
+  # each count.
   if (type_missing && is.null(mv_cat)) {
     fam <- model_families(object, resp)
     if (identical(resolve_family_name(fam), "bernoulli") ||
           is_ordinal_family(fam)) {
       type <- "bars"
+    } else if (identical(fam$type, "int")) {
+      type <- "rootogram"
     }
   }
 
@@ -533,6 +538,15 @@ pp_check.mvgam <- function(
                       envir = parent.frame())
   if ("x" %in% ppc_formals && !is.null(x)) {
     out_plot <- out_plot + ggplot2::labs(x = x)
+  }
+  # Each bar marks an integer value. Pretty breaks between them, such
+  # as -0.5 and 0.5 for a binary response, label no value.
+  if (type %in% c("bars", "bars_grouped")) {
+    x_scale <- out_plot$scales$get_scales("x")
+    x_scale$breaks <- function(limits) {
+      breaks <- pretty(limits)
+      breaks[breaks == round(breaks)]
+    }
   }
   if (type %in% c("resid_hist", "resid_hist_grouped")) {
     out_plot <- out_plot + ggplot2::labs(x = "DS residuals")
@@ -1306,5 +1320,6 @@ mvgam_resid_panel <- function(
   if (is.null(label)) {
     return(out)
   }
-  out + patchwork::plot_annotation(title = paste0("Residuals for ", label))
+  out + patchwork::plot_annotation(title = paste0("Residuals for ", label),
+                                   theme = mvgam_theme())
 }

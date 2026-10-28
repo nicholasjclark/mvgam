@@ -24,7 +24,7 @@ knitr::opts_chunk$set(
 )
 library(mvgam)
 library(ggplot2)
-theme_set(mvgam_theme(base_size = 12, base_family = "serif"))
+theme_set(mvgam_theme(base_size = 12))
 ```
 
 Joint species distribution models (JSDMs) assign the species
@@ -55,8 +55,14 @@ numbers. `jsdgam()` takes one row per site and species:
 ```{r data}
 data(antTraits, package = "mvabund")
 abund <- antTraits$abund
+# Restore the species names that make.names() mangled, such as
+# "Pheidole.sp..A" for "Pheidole sp. A"
+species_names <- gsub("\\.(?=\\S)", " ",
+                      gsub("\\.\\.", ". ", colnames(abund)), perl = TRUE)
+colnames(abund) <- species_names
 env <- as.data.frame(scale(antTraits$env))
 traits <- antTraits$traits
+rownames(traits) <- species_names
 # Pilosity and polymorphism are scores stored as unordered factors
 traits$Pilosity <- as.numeric(as.character(traits$Pilosity))
 traits$Polymorphism <- as.numeric(as.character(traits$Polymorphism))
@@ -118,7 +124,7 @@ z <- apply(as_draws_matrix(mod_base, variable = "Z_tilde", regex = TRUE),
            2, median)
 sp <- sub("^Z_tilde\\[(.*),[0-9]+\\]$", "\\1", names(z))
 norms <- sort(tapply(z^2, sp, sum), decreasing = TRUE)
-lead <- gsub("\\.+", " ", names(norms)[1:2])
+lead <- names(norms)[1:2]
 ```
 
 The loadings of `r lead[1]` and `r lead[2]` lie furthest from the
@@ -351,11 +357,11 @@ the architecture it used. `jsdgam()` also takes a phylogeny through
 
 Related articles:
 
-- [Dynamic factor models](https://nicholasjclark.github.io/mvgam/articles/dfm.html)
+- [Dynamic factor models](dfm.html)
   give the factors dynamics over time.
-- [N-mixture models](https://nicholasjclark.github.io/mvgam/articles/nmix.html)
+- [N-mixture models](nmix.html)
   cover the closure-unit families that `occ()` belongs to.
-- [mvgam overview](https://nicholasjclark.github.io/mvgam/articles/mvgam_overview.html)
+- [mvgam overview](mvgam_overview.html)
   introduces the observation and trend formulas.
 
 ## References

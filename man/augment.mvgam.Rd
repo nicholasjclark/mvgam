@@ -85,7 +85,12 @@ aug <- augment(mod)
 head(aug)
 
 # Residuals against fitted values, from one tibble
-plot(aug$.fitted, aug$.resid, xlab = "Fitted", ylab = "Residual")
+library(ggplot2)
+ggplot(aug, aes(.fitted, .resid)) +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  geom_point(colour = "#8F2727", alpha = 0.6) +
+  labs(x = "Fitted", y = "Residual") +
+  mvgam_theme()
 
 # Next, glance() summarises the whole fit in one row
 }

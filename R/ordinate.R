@@ -35,6 +35,10 @@
 #'   make a valid `which_lvs`.
 #' @param label_sites Logical. `TRUE` labels each site score with its
 #'   unit or time value.
+#' @param label_species The series arrows to label. `"longest"` (the
+#'   default) labels the 10 longest arrows in the plotted plane.
+#'   A fit with up to 10 series then has every arrow labelled. `"all"`
+#'   labels every arrow and `"none"` labels none.
 #' @param traits `NULL`, `"auto"`, or a data frame or matrix of series
 #'   traits. `"auto"` takes the traits a `jsdgam(traits = ...)` fit
 #'   stores. Each numeric trait is regressed on the plotted loadings.
@@ -271,13 +275,23 @@ ordinate_trait_layers <- function(trait_dat) {
 #' @param species_names Character vector of series labels
 #' @param traits Data frame or matrix of traits, or `NULL`
 #' @param trait_arrow_scale Positive number scaling the trait arrows
+#' @param label_species `"longest"`, `"all"` or `"none"`: the arrows
+#'   to label
 #' @return A `ggplot` object with a `"rotation"` attribute
 #' @noRd
 ordinate_build_plot <- function(comp, which_lvs, biplot, label_sites,
                                 site_names, species_names,
-                                traits = NULL, trait_arrow_scale = 1) {
+                                traits = NULL, trait_arrow_scale = 1,
+                                label_species = "longest") {
   sp_dat <- stats::setNames(
     data.frame(comp$loadings[, which_lvs, drop = FALSE]), c("x", "y")
+  )
+  arrow_rank <- rank(-(sp_dat$x^2 + sp_dat$y^2), ties.method = "first")
+  to_label <- switch(
+    label_species,
+    longest = arrow_rank <= 10L,
+    all = rep(TRUE, NROW(sp_dat)),
+    none = rep(FALSE, NROW(sp_dat))
   )
   site_dat <- stats::setNames(
     data.frame(comp$scores[, which_lvs, drop = FALSE]), c("x", "y")
@@ -301,7 +315,7 @@ ordinate_build_plot <- function(comp, which_lvs, biplot, label_sites,
   )
   if (biplot) {
     p <- p +
-      ordinate_biplot_layers(sp_dat, species_names) +
+      ordinate_biplot_layers(sp_dat, species_names, to_label) +
       ordinate_trait_layers(ordinate_trait_arrows(
         traits = traits,
         loadings_2d = as.matrix(sp_dat),
@@ -327,6 +341,7 @@ ordinate.mvgam <- function(
   alpha = 0.5,
   rotation = c("svd", "varimax", "promax", "none"),
   label_sites = TRUE,
+  label_species = c("longest", "all", "none"),
   traits = NULL,
   trait_arrow_scale = 1,
   ...
@@ -341,6 +356,7 @@ ordinate.mvgam <- function(
   checkmate::assert_number(trait_arrow_scale, lower = 0)
   rlang::check_dots_empty()
   rotation <- match.arg(rotation)
+  label_species <- match.arg(label_species)
   n_lv <- require_factor_n_lv(object, "ordinate()")
   if (max(which_lvs) > n_lv) {
     stop(insight::format_error(c(
@@ -375,7 +391,8 @@ ordinate.mvgam <- function(
     site_names = factor_time_values(object, NROW(comp$scores)),
     species_names = fitted_series_levels(object),
     traits = resolve_auto_traits(traits, object),
-    trait_arrow_scale = trait_arrow_scale
+    trait_arrow_scale = trait_arrow_scale,
+    label_species = label_species
   )
 }
 
@@ -425,10 +442,13 @@ resolve_auto_traits <- function(traits, object) {
 #' @param sp_dat Data frame of species loadings holding `x` and `y`
 #' @param sp_names Character vector of species labels, one per row of
 #'   `sp_dat`
+#' @param to_label Logical vector, `TRUE` for the rows to label
 #' @return List of ggplot2 layers
 #' @noRd
-ordinate_biplot_layers <- function(sp_dat, sp_names) {
+ordinate_biplot_layers <- function(sp_dat, sp_names, to_label) {
   species_colour <- mvgam_colour("dark", "red")
+  label_dat <- sp_dat[to_label, c("x", "y"), drop = FALSE]
+  label_dat$label <- sp_names[to_label]
   has_arrow <- requireNamespace("ggarrow", quietly = TRUE) &&
     requireNamespace("ggpp", quietly = TRUE)
   if (has_arrow) {
@@ -455,8 +475,8 @@ ordinate_biplot_layers <- function(sp_dat, sp_names) {
       ),
       ggplot2::scale_linewidth(range = c(0.45, 1.75)),
       mvgam_repel_layer(
-        data = sp_dat,
-        mapping = ggplot2::aes(label = sp_names),
+        data = label_dat,
+        mapping = ggplot2::aes(label = .data$label),
         type = "label",
         color = species_colour, box.padding = 0.1, label.size = 0.1,
         alpha = 0.75, max.overlaps = 20, segment.color = NA,
@@ -476,8 +496,8 @@ ordinate_biplot_layers <- function(sp_dat, sp_names) {
         alpha = 0.5, color = species_colour
       ),
       mvgam_repel_layer(
-        data = sp_dat,
-        mapping = ggplot2::aes(label = sp_names),
+        data = label_dat,
+        mapping = ggplot2::aes(label = .data$label),
         type = "label",
         color = species_colour, box.padding = 0.1, label.size = 0.1,
         alpha = 0.75, max.overlaps = 20

@@ -24,7 +24,7 @@ knitr::opts_chunk$set(
 )
 library(mvgam)
 library(ggplot2)
-theme_set(mvgam_theme(base_size = 12, base_family = "serif"))
+theme_set(mvgam_theme(base_size = 12))
 ```
 
 Do the plankton of a lake regulate one another from month to month,
@@ -570,7 +570,7 @@ Of the `r scored` observations in 1994, `r inside` fell inside their
 90% intervals, close to the coverage the intervals claim. The CRPS
 compares models scored on the same data, such as this VAR against an
 independent autoregression for each taxon. The
-[forecast evaluation article](https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html)
+[forecast evaluation article](forecast_evaluation.html)
 works through that comparison with leave-future-out
 cross-validation.
 
@@ -588,16 +588,16 @@ writes a methods paragraph for a fitted model, with its references.
 
 Related articles:
 
-- [Hierarchical VARs](https://nicholasjclark.github.io/mvgam/articles/hierarchical_var.html)
+- [Hierarchical VARs](hierarchical_var.html)
   fit one VAR per group of series, such as one per lake. Each group's
   $A$ and $\Sigma$ are drawn towards a shared mean.
-- [Dynamic factor models](https://nicholasjclark.github.io/mvgam/articles/dfm.html)
+- [Dynamic factor models](dfm.html)
   describe many series with fewer latent processes than series.
-- [Forecast evaluation](https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html)
+- [Forecast evaluation](forecast_evaluation.html)
   covers scoring rules and leave-future-out cross-validation.
-- [mvgam overview](https://nicholasjclark.github.io/mvgam/articles/mvgam_overview.html)
+- [mvgam overview](mvgam_overview.html)
   introduces the observation and trend formulas.
-- [Formatting data](https://nicholasjclark.github.io/mvgam/articles/data.html)
+- [Formatting data](data.html)
   covers the long data format and `mvgam_data()`.
 
 Chapter 8 of the

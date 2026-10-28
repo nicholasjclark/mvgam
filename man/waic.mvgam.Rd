@@ -52,18 +52,18 @@ et al. (2017) recommend it over WAIC.
 }
 \examples{
 \dontrun{
+# A Poisson GAM without a latent trend. PSIS approximates each
+# held-out count of such a model well (see Details of ?loo.mvgam)
 set.seed(13)
 simdat <- sim_mvgam(family = poisson(), n_series = 1L,
-                     n_timepoints = 120L, trend_model = AR())
-
-mod <- mvgam(y ~ s(x),
-              trend_formula = ~ AR(p = 1),
-              data    = simdat$data_train,
-              family  = poisson(),
-              chains  = 2, silent = 2)
-
+                    n_timepoints = 120L, trend_model = "None")
+mod <- mvgam(y ~ s(x), data = simdat$data_train,
+             family = poisson(), chains = 2, silent = 2)
+}
+\dontrun{
 # The WAIC estimate of the ELPD, with its effective number of
-# parameters p_waic
+# parameters p_waic. A p_waic above 0.4 for any observation raises
+# a warning that recommends loo()
 waic(mod)
 
 # The PSIS estimate of the same ELPD. Its Pareto k diagnostics mark

@@ -44,7 +44,7 @@ mvgam now uses 'brms' to build its models. The observation model takes the full 
 * Predictions with `incl_autocor = TRUE` and `log_lik()` refuse times outside the fitted times. Use `forecast()`
 * `ZMVN()` and `PW()` forecasts require every series to share one set of forecast times
 * `conditional_effects()` defaults to `type = "expected"`
-* `pp_check()` draws bars for a bernoulli or ordinal response
+* `pp_check()` draws bars for a bernoulli or ordinal response and a rootogram for counts
 * Trend scale priors take the response's spread on the link scale as 'brms' defaults do. `LLT()` and `PW()` growth priors also scale with the series length
 * `PW()` `changepoint_scale` (default `0.3`) is a change in growth over the whole series
 * `CAR()` keeps its autoregressive parameter inside `(0, 1)` and measures time in median observation gaps

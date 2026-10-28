@@ -41,7 +41,7 @@ knitr::opts_chunk$set(
 )
 library(mvgam)
 library(ggplot2)
-theme_set(mvgam_theme(base_size = 12, base_family = "serif"))
+theme_set(mvgam_theme(base_size = 12))
 ```
 
 `mvgam` fits Bayesian state-space models to time series, extending
@@ -86,6 +86,8 @@ families for ecological and count data:
 | `diri()`, `multi()`, `categ()` | Compositions and categorical outcomes |
 | `mvn()`, `mvt()` | Correlated continuous responses |
 
+`?mvgam_families` lists every family by the response type it suits.
+
 `trend_formula` names the latent state with one constructor. It
 can also hold covariates and smooths that act on the state:
 
@@ -104,8 +106,8 @@ innovations across series. `gr` with `subgr` pools correlation
 matrices across groups. `n_lv` sets a number of shared latent factors
 below the number of series. `df` gives the innovations
 Student-t tails. `ma = TRUE` adds a moving-average term to `RW()`,
-`AR()` or `VAR()`. The help page of each constructor lists the
-options it takes. `hindcast()` and `forecast()` return the parts of a
+`AR()` or `VAR()`. `?trend_constructors` lists the options each
+constructor takes. `hindcast()` and `forecast()` return the parts of a
 state through `component`, such as the level, slope and season of
 `LLT()`.
 
@@ -230,26 +232,27 @@ ranked probability score (CRPS), where lower is better.
 `summary()` sets the scores out by forecast horizon:
 
 ```{r scores, fig.asp = 0.5, out.width = "70%"}
-scores <- compare_scores(fc_gam, fc_ar, score = "crps")
+scores <- compare_scores(fc_gam, fc_ar, score = "crps",
+                         model_names = c("GAM", "AR"))
 summary(scores)
-plot(scores, relative = "fc_gam")
+plot(scores, relative = "GAM")
 ```
 
 ```{r score-numbers, include = FALSE}
 by_horizon <- summary(scores)
-totals <- round(colSums(by_horizon[c("fc_gam", "fc_ar")], na.rm = TRUE), 1)
-n_scored <- sum(!is.na(by_horizon$fc_ar))
-ar_wins <- sum(by_horizon$fc_ar < by_horizon$fc_gam, na.rm = TRUE)
+totals <- round(colSums(by_horizon[c("GAM", "AR")], na.rm = TRUE), 1)
+n_scored <- sum(!is.na(by_horizon$AR))
+ar_wins <- sum(by_horizon$AR < by_horizon$GAM, na.rm = TRUE)
 pp_rows <- subset(scores, series != "all_series")
 covered <- tapply(pp_rows$in_interval, pp_rows$model, sum, na.rm = TRUE)
 ```
 
 The latent state improves the forecasts. The AR model has the lower
 CRPS in `r ar_wins` of the `r n_scored` scored months. Its CRPS
-sums to `r totals[["fc_ar"]]` against `r totals[["fc_gam"]]` for the
-smooth-only model. Its 90% intervals contain `r covered[["fc_ar"]]`
+sums to `r totals[["AR"]]` against `r totals[["GAM"]]` for the
+smooth-only model. Its 90% intervals contain `r covered[["AR"]]`
 of the `r n_scored` held-out counts. Those of the model without a
-latent state contain `r covered[["fc_gam"]]`.
+latent state contain `r covered[["GAM"]]`.
 
 `score()` also returns the log score, interval scores and, for
 several series, energy and variogram scores. `lfo_cv()` repeats

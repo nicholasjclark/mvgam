@@ -14,6 +14,7 @@ ordinate(object, ...)
   alpha = 0.5,
   rotation = c("svd", "varimax", "promax", "none"),
   label_sites = TRUE,
+  label_species = c("longest", "all", "none"),
   traits = NULL,
   trait_arrow_scale = 1,
   ...
@@ -53,6 +54,11 @@ make a valid \code{which_lvs}.}
 
 \item{label_sites}{Logical. \code{TRUE} labels each site score with its
 unit or time value.}
+
+\item{label_species}{The series arrows to label. \code{"longest"} (the
+default) labels the 10 longest arrows in the plotted plane.
+A fit with up to 10 series then has every arrow labelled. \code{"all"}
+labels every arrow and \code{"none"} labels none.}
 
 \item{traits}{\code{NULL}, \code{"auto"}, or a data frame or matrix of series
 traits. \code{"auto"} takes the traits a \code{jsdgam(traits = ...)} fit

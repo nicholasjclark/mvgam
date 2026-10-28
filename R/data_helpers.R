@@ -157,6 +157,29 @@
 #'   `season` column. Rows where `y` is `NA` are dropped. Closure
 #'   units may vary in the number of observed visits / seasons.
 #'
+#' @examples
+#' # Detections of one species at four sites over three visits, laid out
+#' # as the `y` slot of an unmarked frame. NA marks a missed visit
+#' y <- matrix(c(0, 1, 1,
+#'               0, 0, NA,
+#'               1, 1, 0,
+#'               0, 0, 0), nrow = 4, byrow = TRUE)
+#' long <- pivot_detection_array(
+#'   y,
+#'   site_covs = data.frame(forest = c(0.2, 0.8, 0.5, 0.1)),
+#'   obs_covs = list(wind = matrix(seq(0.1, 1.2, by = 0.1), nrow = 4))
+#' )
+#' # One row per observed visit. The missed visit is dropped
+#' long
+#'
+#' # Three species in a [species, site, visit] array, as spOccupancy
+#' # stores them. Each row names its species in 'series'
+#' set.seed(1)
+#' y3 <- array(rbinom(36, size = 1, prob = 0.4), dim = c(3, 4, 3))
+#' head(pivot_detection_array(y3, species = c("owl", "hawk", "kite")))
+#'
+#' # Next, fit the long frame with mvgam(family = occ())
+#'
 #' @author Nicholas J Clark
 #' @family model fitting
 #' @export
@@ -515,6 +538,23 @@ assert_no_reserved_cols <- function(nms, reserved, arg_name) {
 #' @return A long-format `data.frame` with `J * N` rows, each
 #'   carrying `series`, `time`, `y`, site covariates broadcast
 #'   across species and species traits broadcast across sites.
+#'
+#' @examples
+#' # Counts of three species at five sites, one column per species
+#' Y <- matrix(c(3, 0, 5, 2, 7,
+#'               1, 1, 0, 4, 2,
+#'               0, 6, 2, 3, 1), nrow = 5,
+#'             dimnames = list(NULL, c("ant", "bee", "wasp")))
+#' long <- pivot_species_matrix(
+#'   Y,
+#'   site_covs = data.frame(elev = c(120, 340, 560, 780, 910)),
+#'   traits = data.frame(body_size = c(2.1, 11.5, 16.0))
+#' )
+#' # One row per site and species, each carrying its site's elevation
+#' # and its species' body size
+#' head(long)
+#'
+#' # Next, fit the long frame with jsdgam(unit = time, species = series)
 #'
 #' @author Nicholas J Clark
 #' @family model fitting

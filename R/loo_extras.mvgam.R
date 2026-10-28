@@ -80,18 +80,9 @@
 #'   [bayes_R2.mvgam()] is the in-sample R^2. [lfo_cv.mvgam()] scores
 #'   forecasts of data the model has not seen.
 #'
+#' @template ex-loo-models
 #' @examples
 #' \dontrun{
-#' set.seed(13)
-#' simdat <- sim_mvgam(family = poisson(), n_series = 1L,
-#'                      n_timepoints = 120L, trend_model = AR())
-#'
-#' mod <- mvgam(y ~ s(x),
-#'               trend_formula = ~ AR(p = 1),
-#'               data    = simdat$data_train,
-#'               family  = poisson(),
-#'               chains  = 2, silent = 2)
-#'
 #' # The leave-one-out R^2 is lower than the in-sample one
 #' loo_R2(mod)
 #' bayes_R2(mod)

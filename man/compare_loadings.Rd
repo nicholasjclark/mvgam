@@ -85,6 +85,29 @@ Both fits must report the same species in the same factor
 order; the function errors otherwise. To compare fits with
 different species sets, subset before fitting.
 }
+\examples{
+\dontrun{
+simdat <- sim_jsdgam(family = gaussian(), n_species = 10L,
+                     n_sites = 60L, n_lv = 2L, seed = 3L)
+mod <- jsdgam(y ~ env * series, data = simdat$data_train,
+              family = gaussian(), n_lv = 2L, chains = 2, silent = 2)
+
+# A trait that tracks each species' true loading on the first factor
+set.seed(3)
+traits <- data.frame(
+  size = simdat$truth$loadings[, 1] + rnorm(10, sd = 0.2),
+  row.names = levels(simdat$data_train$series)
+)
+mod_traits <- jsdgam(y ~ env * series, data = simdat$data_train,
+                     family = gaussian(), n_lv = 2L, traits = traits,
+                     chains = 2, silent = 2)
+
+# Grey segments join each species' loadings under the two priors
+compare_loadings(mod, mod_traits,
+                 labels = c("Default prior", "Trait prior"))
+}
+
+}
 \references{
 Schoenemann PH (1966). A generalized solution of the orthogonal
 Procrustes problem. \emph{Psychometrika} 31, 1-10.

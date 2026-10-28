@@ -141,9 +141,13 @@ all.equal(exp(lp), posterior_epred(mod, draw_ids = 1:50))
 
 # The predictor under the fitted trend state tracks the series
 lp_state <- posterior_linpred(mod, incl_autocor = TRUE)
-plot(log1p(simdat$data_train$y), pch = 16, col = "grey60",
-     ylab = "log(1 + count)")
-lines(colMeans(lp_state), lwd = 2)
+library(ggplot2)
+ggplot(simdat$data_train, aes(time, log1p(y))) +
+  geom_point(colour = "grey60") +
+  geom_line(aes(y = colMeans(lp_state)), colour = "#8F2727",
+            linewidth = 1) +
+  labs(y = "log(1 + count)") +
+  mvgam_theme()
 
 # Next: posterior_epred() maps the predictor to expected counts
 }

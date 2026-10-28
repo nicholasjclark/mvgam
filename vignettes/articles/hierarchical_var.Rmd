@@ -24,7 +24,7 @@ knitr::opts_chunk$set(
 )
 library(mvgam)
 library(ggplot2)
-theme_set(mvgam_theme(base_size = 12, base_family = "serif"))
+theme_set(mvgam_theme(base_size = 12))
 ```
 
 Eight economies, each observed for forty-nine years on the same three
@@ -526,16 +526,16 @@ a methods paragraph for a fitted model, with its references.
 
 Related articles:
 
-- [State-space VARs](https://nicholasjclark.github.io/mvgam/articles/var.html)
+- [State-space VARs](var.html)
   fit one VAR to five plankton taxa, with covariates on the latent
   means and forecasts for a held-out year.
-- [Dynamic factor models](https://nicholasjclark.github.io/mvgam/articles/dfm.html)
+- [Dynamic factor models](dfm.html)
   describe many series with fewer latent processes than series.
-- [Forecast evaluation](https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html)
+- [Forecast evaluation](forecast_evaluation.html)
   covers scoring rules and leave-future-out cross-validation.
-- [mvgam overview](https://nicholasjclark.github.io/mvgam/articles/mvgam_overview.html)
+- [mvgam overview](mvgam_overview.html)
   introduces the observation and trend formulas.
-- [Formatting data](https://nicholasjclark.github.io/mvgam/articles/data.html)
+- [Formatting data](data.html)
   covers the long data format and `mvgam_data()`.
 
 ## References

@@ -589,7 +589,7 @@ var_matrix_heatmap <- function(panel, lag, ncol = NULL) {
   rng <- max(abs(range(panel$value, na.rm = TRUE, finite = TRUE)))
   matrix_heatmap(
     panel,
-    mvgam_diverging_scale(name = "Posterior\nA", limits = c(-rng, rng)),
+    mvgam_diverging_scale(name = "Lagged\neffect", limits = c(-rng, rng)),
     layout = "matrix",
     x_lab = paste("Process at t -", lag),
     y_lab = "Process at t",

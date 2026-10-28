@@ -29,10 +29,11 @@ mvgam adds: \code{"resid_hist"}, \code{"resid_hist_grouped"},
 \code{"resid_ribbon"}, \code{"resid_ribbon_grouped"}, \code{"resid_qq"},
 \code{"resid_vs_fitted"}, \code{"resid_acf"}, \code{"resid_pacf"} and
 \code{"resid_variogram"}. Type
-\code{"fit_stat"} serves \code{nmix()} and \code{occ()} fits. The default is
-\code{"bars"} for a bernoulli or ordinal response and \code{"dens_overlay"}
-otherwise. Multi-response families take the defaults under
-"Multi-response families".}
+\code{"fit_stat"} serves \code{nmix()} and \code{occ()} fits. A bernoulli or
+ordinal response defaults to \code{"bars"}. Another discrete response,
+such as a count, defaults to \code{"rootogram"}. A continuous response
+defaults to \code{"dens_overlay"}. Multi-response families take the
+defaults under "Multi-response families".}
 
 \item{ndraws}{Positive integer indicating how many
 posterior draws should be used.

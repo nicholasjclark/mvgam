@@ -63,8 +63,14 @@
 #' # Twenty draws of s(x) over a grid of x
 #' grid <- data.frame(x = seq(-2, 2, length.out = 50))
 #' sm <- posterior_smooths(mod, smooth = "s(x)", newdata = grid)
-#' matplot(grid$x, t(sm[1:20, ]), type = "l", lty = 1, col = "grey60",
-#'         xlab = "x", ylab = "s(x)")
+#' draws <- data.frame(x = rep(grid$x, each = 20),
+#'                     value = as.vector(sm[1:20, ]),
+#'                     draw = rep(1:20, times = 50))
+#' library(ggplot2)
+#' ggplot(draws, aes(x, value, group = draw)) +
+#'   geom_line(colour = "#8F2727", alpha = 0.4) +
+#'   labs(y = "s(x)") +
+#'   mvgam_theme()
 #'
 #' # Next, conditional_smooths(mod) summarises every smooth in one call
 #' }
@@ -417,6 +423,22 @@ brms::conditional_smooths
 #' @return A character vector of term labels, one per term of each
 #'   predictor, in the order of the panels of
 #'   [conditional_smooths.mvgam()]. Empty for a fit without smooths.
+#'
+#' @examples
+#' \dontrun{
+#' set.seed(13)
+#' simdat <- sim_mvgam(family = poisson(), n_series = 1L,
+#'                     n_timepoints = 120L, trend_model = AR())
+#' mod <- mvgam(y ~ s(x) + s(time, k = 6),
+#'              trend_formula = ~ AR(p = 1),
+#'              data = simdat$data_train, family = poisson(),
+#'              chains = 2, silent = 2)
+#'
+#' # The labels posterior_smooths() takes
+#' smooths(mod)
+#'
+#' # Next, posterior_smooths(mod, smooth = "s(x)") draws one of them
+#' }
 #'
 #' @author Nicholas J Clark
 #'

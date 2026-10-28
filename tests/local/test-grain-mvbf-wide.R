@@ -442,12 +442,18 @@ test_that("pp_check names the response it is asked for", {
     expect_equal(one$data$value[one$data$is_y],
                  dat[[r]][observed_rows[[r]]])
   }
-  # A binary response defaults to bars, a count to a density overlay
+  # A binary response defaults to bars, a count to a rootogram and a
+  # continuous response to a density overlay
   geom_of <- function(p) class(p$layers[[1L]]$geom)[1L]
-  expect_identical(geom_of(pp_check(fit, resp = "seen", ndraws = 20L)),
-                   "GeomCol")
+  seen_bars <- pp_check(fit, resp = "seen", ndraws = 20L)
+  expect_identical(geom_of(seen_bars), "GeomCol")
   expect_identical(geom_of(pp_check(fit, resp = "count", ndraws = 20L)),
+                   "GeomTile")
+  expect_identical(geom_of(pp_check(fit, resp = "mass", ndraws = 20L)),
                    "GeomLine")
+  # The binary axis labels its two values alone
+  x_breaks <- ggplot2::ggplot_build(seen_bars)$layout$panel_params[[1L]]$x$breaks
+  expect_identical(x_breaks[!is.na(x_breaks)], c(0, 1))
   # Without `resp` the check draws one figure with a panel per
   # response, titled by that response
   expect_no_warning(all_resp <- pp_check(fit, ndraws = 20L))

@@ -420,7 +420,12 @@ broom_summary_fns <- function(robust = FALSE,
 #' head(aug)
 #'
 #' # Residuals against fitted values, from one tibble
-#' plot(aug$.fitted, aug$.resid, xlab = "Fitted", ylab = "Residual")
+#' library(ggplot2)
+#' ggplot(aug, aes(.fitted, .resid)) +
+#'   geom_hline(yintercept = 0, linetype = "dashed") +
+#'   geom_point(colour = "#8F2727", alpha = 0.6) +
+#'   labs(x = "Fitted", y = "Residual") +
+#'   mvgam_theme()
 #'
 #' # Next, glance() summarises the whole fit in one row
 #' }
@@ -535,20 +540,13 @@ augment.mvgam <- function(x, robust = FALSE, conf.int = TRUE,
 #' @family tidiers
 #' @seealso [tidy.mvgam()], [augment.mvgam()], [loo.mvgam()]
 #'
+#' @template ex-loo-models
 #' @examples
 #' \dontrun{
-#' set.seed(13)
-#' simdat <- sim_mvgam(family = poisson(), n_series = 1L,
-#'                      n_timepoints = 120L, trend_model = AR())
-#' mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
-#'               data    = simdat$data_train,
-#'               family  = poisson(),
-#'               chains  = 2, silent = 2)
-#'
 #' # The sampler and data dimensions of the fit, in one row
 #' glance(mod)
 #'
-#' # Leave-one-out criteria, which take longer to compute
+#' # Leave-one-out criteria take longer to compute
 #' glance(mod, looic = TRUE)
 #' }
 #'

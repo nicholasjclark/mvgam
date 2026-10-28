@@ -24,7 +24,7 @@ knitr::opts_chunk$set(
 )
 library(mvgam)
 library(ggplot2)
-theme_set(mvgam_theme(base_size = 12, base_family = "serif"))
+theme_set(mvgam_theme(base_size = 12))
 ```
 
 A count of animals mixes the number present with the chance of
@@ -243,7 +243,7 @@ plot(fc)
 ```
 
 `score()` evaluates the forecast against the held-out counts. The
-[forecast evaluation article](https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html)
+[forecast evaluation article](forecast_evaluation.html)
 compares models on such scores.
 
 ## Checking the fit
@@ -320,11 +320,11 @@ equations.
 
 Related articles:
 
-- [Joint species distribution models](https://nicholasjclark.github.io/mvgam/articles/jsdgam.html)
+- [Joint species distribution models](jsdgam.html)
   share latent factors among many species.
-- [Integrated distribution models](https://nicholasjclark.github.io/mvgam/articles/idm.html)
+- [Integrated distribution models](idm.html)
   combine several survey protocols that observe one population.
-- [Formatting data for mvgam](https://nicholasjclark.github.io/mvgam/articles/data.html)
+- [Formatting data for mvgam](data.html)
   covers the checks `mvgam_data()` runs on closure-unit data.
 
 ## References

@@ -26,20 +26,12 @@
 #' and WAIC. \emph{Statistics and Computing}, 27:1413-1432.
 #' \doi{10.1007/s11222-016-9696-4}
 #'
+#' @template ex-loo-models
 #' @examples
 #' \dontrun{
-#' set.seed(13)
-#' simdat <- sim_mvgam(family = poisson(), n_series = 1L,
-#'                      n_timepoints = 120L, trend_model = AR())
-#'
-#' mod <- mvgam(y ~ s(x),
-#'               trend_formula = ~ AR(p = 1),
-#'               data    = simdat$data_train,
-#'               family  = poisson(),
-#'               chains  = 2, silent = 2)
-#'
 #' # The WAIC estimate of the ELPD, with its effective number of
-#' # parameters p_waic
+#' # parameters p_waic. A p_waic above 0.4 for any observation raises
+#' # a warning that recommends loo()
 #' waic(mod)
 #'
 #' # The PSIS estimate of the same ELPD. Its Pareto k diagnostics mark

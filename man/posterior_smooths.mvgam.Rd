@@ -74,8 +74,14 @@ mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
 # Twenty draws of s(x) over a grid of x
 grid <- data.frame(x = seq(-2, 2, length.out = 50))
 sm <- posterior_smooths(mod, smooth = "s(x)", newdata = grid)
-matplot(grid$x, t(sm[1:20, ]), type = "l", lty = 1, col = "grey60",
-        xlab = "x", ylab = "s(x)")
+draws <- data.frame(x = rep(grid$x, each = 20),
+                    value = as.vector(sm[1:20, ]),
+                    draw = rep(1:20, times = 50))
+library(ggplot2)
+ggplot(draws, aes(x, value, group = draw)) +
+  geom_line(colour = "#8F2727", alpha = 0.4) +
+  labs(y = "s(x)") +
+  mvgam_theme()
 
 # Next, conditional_smooths(mod) summarises every smooth in one call
 }

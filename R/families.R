@@ -405,6 +405,23 @@ tweedie_stan_funs <- function() {
 #'   every `tweedie()` response is checked.
 #' @return Invisible `NULL`. Emits a message on the adequacy of `M`. It
 #'   also emits a warning if `M` looks tight.
+#'
+#' @examples
+#' \dontrun{
+#' set.seed(3)
+#' simdat <- sim_mvgam(family = tweedie(), n_series = 1L,
+#'                     n_timepoints = 120L, trend_model = AR())
+#' mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
+#'              data = simdat$data_train, family = tweedie(),
+#'              chains = 2, silent = 2)
+#'
+#' # The largest Poisson rate the fit implies, against the default M = 30
+#' check_tweedie_truncation(mod)
+#'
+#' # A warning here would call for a refit with a longer series, such
+#' # as family = tweedie(M = 60)
+#' }
+#'
 #' @export
 check_tweedie_truncation <- function(object, resp = NULL) {
   checkmate::assert_class(object, "mvgam")

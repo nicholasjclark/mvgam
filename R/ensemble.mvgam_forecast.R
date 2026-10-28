@@ -58,6 +58,24 @@
 #'   `r mvgam_article("forecast_evaluation", "forecast evaluation article")`
 #'   weights an ensemble by leave-future-out stacking weights.
 #'
+#' @template ex-forecast-models
+#' @templateVar seed 1
+#' @examples
+#' \dontrun{
+#' fc_gam <- forecast(mod_gam, newdata = simdat$data_test)
+#' fc_ar <- forecast(mod_ar, newdata = simdat$data_test)
+#'
+#' # An ensemble that draws 30% of its draws from the GAM
+#' ens <- ensemble(fc_gam, fc_ar, weights = c(0.3, 0.7))
+#' attr(ens, "ndraws_per_model")
+#' plot(ens)
+#'
+#' # The ensemble scored against its components
+#' scores <- compare_scores(fc_gam, fc_ar, ens, score = "drps",
+#'                          model_names = c("GAM", "AR", "Ensemble"))
+#' plot(scores, relative = "GAM")
+#' }
+#'
 #' @family forecasting
 #' @export
 ensemble <- function(object, ...) {

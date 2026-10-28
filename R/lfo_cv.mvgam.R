@@ -742,6 +742,22 @@ summary.mvgam_lfo <- function(object, ...) {
 #' @seealso [lfo_cv()], [loo_model_weights.mvgam_lfo()],
 #'   [compare_elpds()], [plot.mvgam_compare_elpds()]
 #'
+#' @template ex-forecast-models
+#' @templateVar seed 1
+#' @examples
+#' \dontrun{
+#' # Each origin after t = 70 forecasts the next time step. The
+#' # pointwise log densities feed stacking weights
+#' lfo_gam <- lfo_cv(mod_gam, min_t = 70L, save_log_lik = TRUE)
+#' lfo_ar <- lfo_cv(mod_ar, min_t = 70L, save_log_lik = TRUE)
+#'
+#' # The model with the higher summed ELPD comes first
+#' loo_compare(lfo_gam, lfo_ar, model_names = c("GAM", "AR"))
+#'
+#' # Next, compare_elpds() shows where along the series the models
+#' # part ways
+#' }
+#'
 #' @importFrom loo loo_compare
 #' @family model comparison
 #' @method loo_compare mvgam_lfo
@@ -838,6 +854,30 @@ loo_compare.mvgam_lfo <- function(x, ..., model_names = NULL) {
 #' @seealso [loo_compare.mvgam_lfo()], [lfo_cv()],
 #'   [ensemble.mvgam_forecast()], [compare_elpds()],
 #'   [plot.mvgam_compare_elpds()]
+#'
+#' @template ex-forecast-models
+#' @templateVar seed 2
+#' @examples
+#' \dontrun{
+#' # Each origin after t = 70 forecasts the next time step. The
+#' # pointwise log densities feed stacking weights
+#' lfo_gam <- lfo_cv(mod_gam, min_t = 70L, save_log_lik = TRUE)
+#' lfo_ar <- lfo_cv(mod_ar, min_t = 70L, save_log_lik = TRUE)
+#'
+#' # Pseudo-BMA weights come from the summed ELPDs
+#' loo_model_weights(lfo_gam, lfo_ar, model_names = c("GAM", "AR"))
+#'
+#' # Stacking weights come from the pointwise log densities
+#' w <- loo_model_weights(lfo_gam, lfo_ar, method = "stacking",
+#'                        model_names = c("GAM", "AR"))
+#' w
+#'
+#' # The stacking weights combine the two forecasts
+#' fc <- ensemble(forecast(mod_gam, newdata = simdat$data_test),
+#'                forecast(mod_ar, newdata = simdat$data_test),
+#'                weights = w)
+#' plot(fc)
+#' }
 #'
 #' @importFrom loo loo_model_weights
 #' @method loo_model_weights mvgam_lfo

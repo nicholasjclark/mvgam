@@ -65,7 +65,7 @@ jobs:
           cmdstanr::check_cmdstan_toolchain(fix = TRUE)
           cmdstanr::install_cmdstan()
           remotes::install_github('paul-buerkner/brms')
-          remotes::install_version("pkgdown", version = "2.0.9")
+          remotes::install_version("pkgdown", version = "2.2.0")
         shell: Rscript {0}
 
       # pkgdown renders every top-level .md file. CLAUDE.md holds

@@ -251,9 +251,13 @@ compose_linpred_with_noise <- function(obs_mat, trend_mat, trend_noise,
 #'
 #' # The predictor under the fitted trend state tracks the series
 #' lp_state <- posterior_linpred(mod, incl_autocor = TRUE)
-#' plot(log1p(simdat$data_train$y), pch = 16, col = "grey60",
-#'      ylab = "log(1 + count)")
-#' lines(colMeans(lp_state), lwd = 2)
+#' library(ggplot2)
+#' ggplot(simdat$data_train, aes(time, log1p(y))) +
+#'   geom_point(colour = "grey60") +
+#'   geom_line(aes(y = colMeans(lp_state)), colour = "#8F2727",
+#'             linewidth = 1) +
+#'   labs(y = "log(1 + count)") +
+#'   mvgam_theme()
 #'
 #' # Next: posterior_epred() maps the predictor to expected counts
 #' }

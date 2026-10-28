@@ -196,3 +196,23 @@ test_that("the sites are labelled by the fit's own time axis", {
   )
 })
 
+
+
+test_that("label_species labels the longest arrows, every arrow or none", {
+  # Arrow s12 is the longest and s1 the shortest
+  loadings <- cbind(seq(0.1, 1.2, by = 0.1), 0)
+  comp <- list(scores = matrix(0, 3L, 2L), loadings = loadings)
+  sp <- paste0("s", 1:12)
+  labelled <- function(label_species) {
+    p <- mvgam:::ordinate_build_plot(
+      comp, 1:2, biplot = TRUE, label_sites = FALSE,
+      site_names = 1:3, species_names = sp,
+      label_species = label_species
+    )
+    repel <- Filter(function(l) "label" %in% names(l$data), p$layers)
+    repel[[1L]]$data$label
+  }
+  expect_setequal(labelled("longest"), paste0("s", 3:12))
+  expect_identical(labelled("all"), sp)
+  expect_length(labelled("none"), 0L)
+})

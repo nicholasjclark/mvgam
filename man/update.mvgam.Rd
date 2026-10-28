@@ -92,17 +92,18 @@ original call evaluated, including \code{factor_formula}, \code{n_lv},
 }
 \examples{
 \dontrun{
+# A Poisson GAM without a latent trend. PSIS approximates each
+# held-out count of such a model well (see Details of ?loo.mvgam)
 set.seed(13)
 simdat <- sim_mvgam(family = poisson(), n_series = 1L,
-                    n_timepoints = 120L, trend_model = AR())
-mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
-             data   = simdat$data_train,
-             family = poisson(),
-             chains = 2, silent = 2)
-
-# Add a smooth of time to the observation formula. The family,
-# trend, priors, data and sampler settings carry over
-upd <- update(mod, formula. = ~ . + s(time, k = 5))
+                    n_timepoints = 120L, trend_model = "None")
+mod <- mvgam(y ~ s(x), data = simdat$data_train,
+             family = poisson(), chains = 2, silent = 2)
+}
+\dontrun{
+# Swap the family for a negative binomial. The formula, priors, data
+# and sampler settings carry over
+upd <- update(mod, family = negbinomial())
 
 # Compare the two fits by approximate leave-one-out cross-validation.
 # The better model has elpd_diff = 0. A difference smaller than about

@@ -24,6 +24,23 @@ non-linear parameter with a formula and the trend.
 \code{\link[=posterior_smooths.mvgam]{posterior_smooths.mvgam()}} and \code{\link[=conditional_smooths.mvgam]{conditional_smooths.mvgam()}} take
 these labels.
 }
+\examples{
+\dontrun{
+set.seed(13)
+simdat <- sim_mvgam(family = poisson(), n_series = 1L,
+                    n_timepoints = 120L, trend_model = AR())
+mod <- mvgam(y ~ s(x) + s(time, k = 6),
+             trend_formula = ~ AR(p = 1),
+             data = simdat$data_train, family = poisson(),
+             chains = 2, silent = 2)
+
+# The labels posterior_smooths() takes
+smooths(mod)
+
+# Next, posterior_smooths(mod, smooth = "s(x)") draws one of them
+}
+
+}
 \seealso{
 Other posterior summaries: 
 \code{\link{VarCorr.mvgam}()},

@@ -39,6 +39,26 @@
 #'   [plot.mvgam_compare_scores()], [compare_elpds()],
 #'   [forecast.mvgam()], [ensemble.mvgam_forecast()]
 #'
+#' @template ex-forecast-models
+#' @templateVar seed 1
+#' @examples
+#' \dontrun{
+#' fc_gam <- forecast(mod_gam, newdata = simdat$data_test)
+#' fc_ar <- forecast(mod_ar, newdata = simdat$data_test)
+#'
+#' # One row per model and horizon, scored by the discrete ranked
+#' # probability score (lower is better)
+#' scores <- compare_scores(fc_gam, fc_ar, score = "drps",
+#'                          model_names = c("GAM", "AR"))
+#' summary(scores)
+#'
+#' # The AR model's DRPS minus the GAM's. Negative values favour the
+#' # AR model
+#' plot(scores, relative = "GAM")
+#'
+#' # Next, ensemble() combines the two forecasts
+#' }
+#'
 #' @family forecasting
 #' @export
 compare_scores <- function(..., score = "crps", model_names = NULL,
@@ -122,6 +142,26 @@ compare_scores <- function(..., score = "crps", model_names = NULL,
 #' @seealso [lfo_cv()], [loo_compare.mvgam_lfo()],
 #'   [loo_model_weights.mvgam_lfo()],
 #'   [plot.mvgam_compare_elpds()], [compare_scores()]
+#'
+#' @template ex-forecast-models
+#' @templateVar seed 1
+#' @examples
+#' \dontrun{
+#' # Each origin after t = 70 forecasts the next time step. The
+#' # pointwise log densities feed stacking weights
+#' lfo_gam <- lfo_cv(mod_gam, min_t = 70L, save_log_lik = TRUE)
+#' lfo_ar <- lfo_cv(mod_ar, min_t = 70L, save_log_lik = TRUE)
+#'
+#' # One row per model and origin
+#' elpds <- compare_elpds(lfo_gam, lfo_ar, model_names = c("GAM", "AR"))
+#' head(elpds)
+#'
+#' # The running sum of the AR model's ELPD minus the GAM's. Hollow
+#' # points mark the origins where the model was refitted
+#' plot(elpds, relative = "GAM", cumulative = TRUE)
+#'
+#' # Next, loo_compare() sums the ELPDs with a standard error
+#' }
 #'
 #' @family model comparison
 #' @export

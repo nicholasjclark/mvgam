@@ -64,6 +64,35 @@ are its responses. The ensemble is a forecast over those series. On
 a long frame the ensemble keeps one forecast per response. Every
 response takes the same draws.
 }
+\examples{
+\dontrun{
+set.seed(1)
+simdat <- sim_mvgam(family = poisson(), n_series = 1L,
+                    n_timepoints = 120L, trend_model = AR())
+# Two models of one count series: a smooth of x with and without
+# an AR(1) trend
+mod_gam <- mvgam(y ~ s(x), data = simdat$data_train,
+                 family = poisson(), chains = 2, silent = 2)
+mod_ar <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
+                data = simdat$data_train, family = poisson(),
+                chains = 2, silent = 2)
+}
+\dontrun{
+fc_gam <- forecast(mod_gam, newdata = simdat$data_test)
+fc_ar <- forecast(mod_ar, newdata = simdat$data_test)
+
+# An ensemble that draws 30\% of its draws from the GAM
+ens <- ensemble(fc_gam, fc_ar, weights = c(0.3, 0.7))
+attr(ens, "ndraws_per_model")
+plot(ens)
+
+# The ensemble scored against its components
+scores <- compare_scores(fc_gam, fc_ar, ens, score = "drps",
+                         model_names = c("GAM", "AR", "Ensemble"))
+plot(scores, relative = "GAM")
+}
+
+}
 \seealso{
 \code{\link[=score.mvgam_forecast]{score.mvgam_forecast()}} scores the ensemble.
 \code{\link[=loo_model_weights.mvgam_lfo]{loo_model_weights.mvgam_lfo()}} computes weights from forecast

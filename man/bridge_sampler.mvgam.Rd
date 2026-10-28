@@ -61,7 +61,7 @@ multi-response, factor or VAR fits, pass \code{repetitions} above 1 or
 
 \examples{
 \dontrun{
-set.seed(4)
+set.seed(1)
 simdat <- sim_mvgam(family = poisson(), n_series = 1L,
                     n_timepoints = 80L, trend_model = AR())
 

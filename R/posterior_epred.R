@@ -284,11 +284,17 @@ compute_family_variance <- function(mu, family, sigma = NULL,
 #' ep <- posterior_epred(mod)
 #' dim(ep)
 #'
-#' # The covariate surface (red) and the surface that follows the
-#' # fitted trend (black), against the observed counts
-#' plot(simdat$data_train$y, pch = 16, col = "grey60", ylab = "Count")
-#' lines(colMeans(ep), col = "darkred", lwd = 2)
-#' lines(colMeans(posterior_epred(mod, incl_autocor = TRUE)), lwd = 2)
+#' # The covariate surface and the surface that follows the fitted
+#' # trend, against the observed counts
+#' ep_state <- posterior_epred(mod, incl_autocor = TRUE)
+#' library(ggplot2)
+#' ggplot(simdat$data_train, aes(time, y)) +
+#'   geom_point(colour = "grey60") +
+#'   geom_line(aes(y = colMeans(ep), colour = "Covariates")) +
+#'   geom_line(aes(y = colMeans(ep_state), colour = "Fitted trend")) +
+#'   scale_colour_manual(values = c("#DCBCBC", "#8F2727"), name = NULL) +
+#'   labs(y = "Count") +
+#'   mvgam_theme()
 #'
 #' # Sampling trend innovations raises a log-link mean by the Jensen
 #' # correction

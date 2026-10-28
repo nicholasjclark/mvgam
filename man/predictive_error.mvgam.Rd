@@ -64,6 +64,27 @@ The errors are those \code{\link[=residuals.mvgam]{residuals.mvgam()}} returns w
 trend state the model inferred at that time. A prediction for
 \code{newdata} integrates over the trend dynamics.
 }
+\examples{
+\dontrun{
+set.seed(13)
+simdat <- sim_mvgam(family = poisson(), n_series = 1L,
+                    n_timepoints = 120L, trend_model = AR())
+mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
+             data = simdat$data_train, family = poisson(),
+             chains = 2, silent = 2)
+
+# Observed minus predicted counts, one row per draw
+err <- predictive_error(mod, draw_ids = 1:200)
+dim(err)
+
+# The three observations with the largest mean absolute error
+mae <- colMeans(abs(err))
+simdat$data_train[order(mae, decreasing = TRUE)[1:3], c("time", "y")]
+
+# Next: residuals(mod) returns randomised quantile residuals
+}
+
+}
 \seealso{
 \code{\link[brms:predictive_error.brmsfit]{brms::predictive_error.brmsfit()}}, \code{\link[=residuals.mvgam]{residuals.mvgam()}},
 \code{\link[=posterior_predict.mvgam]{posterior_predict.mvgam()}}, \code{\link[=posterior_epred.mvgam]{posterior_epred.mvgam()}}.

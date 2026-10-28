@@ -35,6 +35,41 @@ spread weight more evenly. Each result needs the pointwise
 matrix that \code{lfo_cv(save_log_lik = TRUE)} stores.
 }
 }
+\examples{
+\dontrun{
+set.seed(2)
+simdat <- sim_mvgam(family = poisson(), n_series = 1L,
+                    n_timepoints = 120L, trend_model = AR())
+# Two models of one count series: a smooth of x with and without
+# an AR(1) trend
+mod_gam <- mvgam(y ~ s(x), data = simdat$data_train,
+                 family = poisson(), chains = 2, silent = 2)
+mod_ar <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
+                data = simdat$data_train, family = poisson(),
+                chains = 2, silent = 2)
+}
+\dontrun{
+# Each origin after t = 70 forecasts the next time step. The
+# pointwise log densities feed stacking weights
+lfo_gam <- lfo_cv(mod_gam, min_t = 70L, save_log_lik = TRUE)
+lfo_ar <- lfo_cv(mod_ar, min_t = 70L, save_log_lik = TRUE)
+
+# Pseudo-BMA weights come from the summed ELPDs
+loo_model_weights(lfo_gam, lfo_ar, model_names = c("GAM", "AR"))
+
+# Stacking weights come from the pointwise log densities
+w <- loo_model_weights(lfo_gam, lfo_ar, method = "stacking",
+                       model_names = c("GAM", "AR"))
+w
+
+# The stacking weights combine the two forecasts
+fc <- ensemble(forecast(mod_gam, newdata = simdat$data_test),
+               forecast(mod_ar, newdata = simdat$data_test),
+               weights = w)
+plot(fc)
+}
+
+}
 \references{
 Yao, Y., Vehtari, A., Simpson, D., Gelman, A. (2018). Using
 stacking to average Bayesian predictive distributions.

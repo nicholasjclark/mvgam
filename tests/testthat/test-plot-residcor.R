@@ -24,6 +24,9 @@ test_that("matrix_panel keeps every cell or the lower triangle", {
   kept <- mvgam:::matrix_panel(m, lower_only = TRUE)
   expect_identical(paste0(kept$Var1, kept$Var2), c("ba", "ca", "cb"))
   expect_identical(kept$value, c(2L, 3L, 6L))
+  # The triangle's axes hold no empty row or column
+  expect_identical(levels(kept$Var1), c("b", "c"))
+  expect_identical(levels(kept$Var2), c("a", "b"))
 })
 
 test_that("cluster_cormat reorders a scrambled chain", {

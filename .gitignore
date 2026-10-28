@@ -40,3 +40,6 @@ tests/local/postfit_sweep_results.tsv
 
 # pkgdown builds the site here. GitHub Pages serves it from gh-pages.
 docs/
+
+# knitr cache of the README fits
+README_cache/

@@ -24,7 +24,7 @@ knitr::opts_chunk$set(
 )
 library(mvgam)
 library(ggplot2)
-theme_set(mvgam_theme(base_size = 12, base_family = "serif"))
+theme_set(mvgam_theme(base_size = 12))
 ```
 
 Species are often monitored by several protocols at once. A structured
@@ -44,7 +44,7 @@ process. One `trend_formula` describes the log-intensity they share.
 This article simulates three protocols observing one species, then
 compares how well the joint model and each protocol alone recover the
 species' response to an environmental gradient. The article on
-[one latent process with several observation models](https://nicholasjclark.github.io/mvgam/articles/mvbf.html)
+[one latent process with several observation models](mvbf.html)
 covers the same machinery from the angle of the latent state.
 
 ## The data
@@ -186,8 +186,9 @@ fe_cover <- c("Neither interval covers its constant.",
 The simulated constants are $\log 0.25 = -1.39$ and $-0.8$.
 `r fe_cover` Neither constant was given to the model.
 
-`pp_check()` draws one panel per protocol, with bars for the binary
-occupancy record:
+`pp_check()` draws one panel per protocol. Rootograms compare the
+frequency of each count. Bars give the share of each outcome of the
+binary occupancy record:
 
 ```{r ppc, fig.asp = 1, fig.cap = "Posterior predictive checks for each protocol."}
 pp_check(mod_joint, ndraws = 50)
@@ -361,13 +362,13 @@ paragraph for a fitted model. `methods_md()` writes out its equations.
 
 Related articles:
 
-- [One latent process, several observation models](https://nicholasjclark.github.io/mvgam/articles/mvbf.html)
+- [One latent process, several observation models](mvbf.html)
   compares the latent state recovered by joint and separate fits.
-- [N-mixture models](https://nicholasjclark.github.io/mvgam/articles/nmix.html)
+- [N-mixture models](nmix.html)
   estimate detection from repeated visits within one protocol.
-- [Joint species distribution models](https://nicholasjclark.github.io/mvgam/articles/jsdgam.html)
+- [Joint species distribution models](jsdgam.html)
   share latent factors among many species.
-- [Forecast evaluation](https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html)
+- [Forecast evaluation](forecast_evaluation.html)
   covers scoring rules and leave-future-out cross-validation.
 
 ## References
