@@ -209,6 +209,15 @@ test_that("brms's matrix-response families point at mvgam's own", {
   expect_true(validate_supported_family(brms::cumulative()))
 })
 
+test_that("com_poisson waits for a brms whose Stan uses the mode", {
+  family <- brms::brmsfamily("com_poisson")
+  if (utils::packageVersion("brms") < "2.23.2") {
+    expect_error(validate_supported_family(family), "brms 2.23.2")
+  } else {
+    expect_true(validate_supported_family(family))
+  }
+})
+
 test_that("ordinal thresholds that vary by group are refused at build", {
   set.seed(5)
   d <- data.frame(

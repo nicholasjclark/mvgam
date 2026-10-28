@@ -297,6 +297,17 @@ test_that("a discrete lower bound excludes the step below it", {
 })
 
 
+test_that("a COM-Poisson log-likelihood takes the package density", {
+  linpred <- matrix(log(c(2, 3, 5, 8)), 2L)
+  shape <- matrix(c(0.6, 1.4, 2, 0.9), 2L)
+  ll <- mvgam:::dispatch_log_lik("com_poisson", "log", linpred, c(1, 6),
+                                 list(shape = shape), NULL)
+  expect_equal(ll, matrix(mvgam:::dcom_poisson_mvgam(
+    rep(c(1, 6), each = 2L), exp(linpred), shape, log = TRUE
+  ), 2L))
+})
+
+
 test_that("a family with no distribution function is refused", {
   expect_null(
     mvgam:::family_dist_spec("cumulative", "logit",
@@ -309,7 +320,7 @@ test_that("a family with no quantile function samples by rejection", {
   # extraDistr has no beta-binomial quantile function. The COM-binomial
   # and Tweedie kernels have none either. `truncated_dist_draws()`
   # samples by rejection when `dist_fun()` returns `NULL`.
-  for (dist in c("bbinom", "cmb", "tweedie")) {
+  for (dist in c("bbinom", "cmb", "com_poisson", "tweedie")) {
     expect_type(mvgam:::dist_fun(dist, "d"), "closure")
     expect_type(mvgam:::dist_fun(dist, "p"), "closure")
     expect_null(mvgam:::dist_fun(dist, "q"))
@@ -335,6 +346,7 @@ test_that("a package distribution function passes a missing value through", {
   args <- list(
     bbinom = list(size = 5, alpha = 2, beta = 2),
     cmb = list(mu = 0.4, nu = 1.5, size = 5),
+    com_poisson = list(mu = 3, shape = 1.2),
     beta_nb = list(mu = 2, shape = 2, mtail = 3),
     tweedie = list(power = 1.5, mu = 2, phi = 1)
   )

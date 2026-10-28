@@ -179,7 +179,8 @@ qqnorm(r1[1, ])
 qqline(r1[1, ])
 
 # Next: plot(mod, type = "residuals") draws the QQ-plot, ACF and
-# residuals against fitted values over many draws
+# residuals against fitted values over many draws. A series observed
+# at unevenly spaced times gets a semivariogram in place of the ACF
 }
 
 }

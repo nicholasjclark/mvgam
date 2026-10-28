@@ -27,7 +27,8 @@
 function named without its prefix, or one of the residual types
 mvgam adds: \code{"resid_hist"}, \code{"resid_hist_grouped"},
 \code{"resid_ribbon"}, \code{"resid_ribbon_grouped"}, \code{"resid_qq"},
-\code{"resid_vs_fitted"}, \code{"resid_acf"} and \code{"resid_pacf"}. Type
+\code{"resid_vs_fitted"}, \code{"resid_acf"}, \code{"resid_pacf"} and
+\code{"resid_variogram"}. Type
 \code{"fit_stat"} serves \code{nmix()} and \code{occ()} fits. The default is
 \code{"bars"} for a bernoulli or ordinal response and \code{"dens_overlay"}
 otherwise. Multi-response families take the defaults under
@@ -68,12 +69,13 @@ axes. \code{FALSE} draws every draw of every observation, which shows the
 posterior spread.}
 
 \item{series}{For the residual types \code{resid_hist}, \code{resid_ribbon},
-\code{resid_qq}, \code{resid_vs_fitted}, \code{resid_acf} and \code{resid_pacf}, the
-one series whose residuals are drawn, as a name or an index. The
-default is the first series. Its residuals are taken in time order.
-\code{resid_acf} keeps missing responses in place. Its lags count time
-steps. \code{resid_pacf} drops them. Its lags count observations. A
-fit with several series names its series in the subtitle.}
+\code{resid_qq}, \code{resid_vs_fitted}, \code{resid_acf}, \code{resid_pacf} and
+\code{resid_variogram}, the one series whose residuals are drawn, as a
+name or an index. The default is the first series. Its residuals
+are taken in time order. \code{resid_acf} keeps missing responses in
+place. Its lags count time steps. \code{resid_pacf} drops them. Its lags
+count observations. A fit with several series names its series in
+the subtitle.}
 
 \item{...}{Further arguments of \code{\link[=posterior_predict.mvgam]{posterior_predict.mvgam()}} and of
 the \pkg{bayesplot} function \code{type} names. Any other name is
@@ -106,6 +108,15 @@ types use every draw. The residual histograms and ribbons default to
 500 draws, the other residual types to 100 and \code{fit_stat} to 500. A
 posterior with fewer draws gives all of them.
 \code{resid_hist} draws one histogram per draw and shows the first eight.
+
+\code{resid_acf} and \code{resid_pacf} count lags in rows. They refuse a series
+observed at unevenly spaced times, such as one a \code{\link[=CAR]{CAR()}} trend
+models. \code{resid_variogram} measures lags in time units. It plots half
+the mean squared difference of two residuals against the time
+between them. Residuals without serial dependence give a flat
+semivariogram at their variance, the dashed line (Diggle et al.
+2002). \code{plot(type = "residuals")} draws it in place of the ACF and pACF for
+such a series.
 
 The \code{\link[bayesplot:PPC-overview]{PPC}} documentation of
 \pkg{bayesplot} describes each \verb{ppc_*} type. A check restricted to
@@ -155,11 +166,19 @@ pp_check(mod, type = "rootogram")
 # shows as serial structure
 pp_check(mod, type = "resid_ribbon")
 
+# Half the mean squared difference of residuals by the time between
+# them. A flat band at the dashed variance shows no dependence left
+pp_check(mod, type = "resid_variogram")
+
 # Next: plot(mod, type = "residuals") shows the residual grid
 }
 
 }
 \references{
+Diggle, P. J., Heagerty, P., Liang, K.-Y. and Zeger, S. L. (2002).
+\emph{Analysis of Longitudinal Data}, 2nd edition. Oxford
+University Press.
+
 Gabry, J., Simpson, D., Vehtari, A., Betancourt, M. and
 Gelman, A. (2019). Visualization in Bayesian workflow.
 \emph{Journal of the Royal Statistical Society A}, 182:389-402.
@@ -171,7 +190,8 @@ assessment of model fitness via realized discrepancies.
 }
 \seealso{
 \code{\link[=residuals.mvgam]{residuals.mvgam()}} returns the residuals the residual types
-plot. \code{\link[=loo.mvgam]{loo.mvgam()}} scores the fit. The
+plot. \code{\link[=CAR]{CAR()}} models series observed at unevenly spaced times.
+\code{\link[=loo.mvgam]{loo.mvgam()}} scores the fit. The
 \href{https://nicholasjclark.github.io/mvgam/articles/mvgam_overview.html}{overview article} explains a
 rootogram. The \href{https://nicholasjclark.github.io/mvgam/articles/nmix.html}{N-mixture article} runs
 the discrepancy check.

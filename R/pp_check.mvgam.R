@@ -20,7 +20,8 @@
 #'   function named without its prefix, or one of the residual types
 #'   mvgam adds: `"resid_hist"`, `"resid_hist_grouped"`,
 #'   `"resid_ribbon"`, `"resid_ribbon_grouped"`, `"resid_qq"`,
-#'   `"resid_vs_fitted"`, `"resid_acf"` and `"resid_pacf"`. Type
+#'   `"resid_vs_fitted"`, `"resid_acf"`, `"resid_pacf"` and
+#'   `"resid_variogram"`. Type
 #'   `"fit_stat"` serves `nmix()` and `occ()` fits. The default is
 #'   `"bars"` for a bernoulli or ordinal response and `"dens_overlay"`
 #'   otherwise. Multi-response families take the defaults under
@@ -36,12 +37,13 @@
 #'   posterior spread.
 #'
 #' @param series For the residual types `resid_hist`, `resid_ribbon`,
-#'   `resid_qq`, `resid_vs_fitted`, `resid_acf` and `resid_pacf`, the
-#'   one series whose residuals are drawn, as a name or an index. The
-#'   default is the first series. Its residuals are taken in time order.
-#'   `resid_acf` keeps missing responses in place. Its lags count time
-#'   steps. `resid_pacf` drops them. Its lags count observations. A
-#'   fit with several series names its series in the subtitle.
+#'   `resid_qq`, `resid_vs_fitted`, `resid_acf`, `resid_pacf` and
+#'   `resid_variogram`, the one series whose residuals are drawn, as a
+#'   name or an index. The default is the first series. Its residuals
+#'   are taken in time order. `resid_acf` keeps missing responses in
+#'   place. Its lags count time steps. `resid_pacf` drops them. Its lags
+#'   count observations. A fit with several series names its series in
+#'   the subtitle.
 #'
 #' @param ... Further arguments of [posterior_predict.mvgam()] and of
 #'   the \pkg{bayesplot} function `type` names. Any other name is
@@ -67,6 +69,15 @@
 #' 500 draws, the other residual types to 100 and `fit_stat` to 500. A
 #' posterior with fewer draws gives all of them.
 #' `resid_hist` draws one histogram per draw and shows the first eight.
+#'
+#' `resid_acf` and `resid_pacf` count lags in rows. They refuse a series
+#' observed at unevenly spaced times, such as one a [CAR()] trend
+#' models. `resid_variogram` measures lags in time units. It plots half
+#' the mean squared difference of two residuals against the time
+#' between them. Residuals without serial dependence give a flat
+#' semivariogram at their variance, the dashed line (Diggle et al.
+#' 2002). `plot(type = "residuals")` draws it in place of the ACF and pACF for
+#' such a series.
 #'
 #' The \code{\link[bayesplot:PPC-overview]{PPC}} documentation of
 #' \pkg{bayesplot} describes each `ppc_*` type. A check restricted to
@@ -96,7 +107,8 @@
 #'   sums.
 #'
 #' @seealso [residuals.mvgam()] returns the residuals the residual types
-#'   plot. [loo.mvgam()] scores the fit. The
+#'   plot. [CAR()] models series observed at unevenly spaced times.
+#'   [loo.mvgam()] scores the fit. The
 #'   `r mvgam_article("mvgam_overview", "overview article")` explains a
 #'   rootogram. The `r mvgam_article("nmix", "N-mixture article")` runs
 #'   the discrepancy check.
@@ -105,6 +117,10 @@
 #' @export pp_check
 #'
 #' @references
+#' Diggle, P. J., Heagerty, P., Liang, K.-Y. and Zeger, S. L. (2002).
+#' \emph{Analysis of Longitudinal Data}, 2nd edition. Oxford
+#' University Press.
+#'
 #' Gabry, J., Simpson, D., Vehtari, A., Betancourt, M. and
 #' Gelman, A. (2019). Visualization in Bayesian workflow.
 #' \emph{Journal of the Royal Statistical Society A}, 182:389-402.
@@ -132,6 +148,10 @@
 #' # Randomised quantile residuals over time. A trend the model missed
 #' # shows as serial structure
 #' pp_check(mod, type = "resid_ribbon")
+#'
+#' # Half the mean squared difference of residuals by the time between
+#' # them. A flat band at the dashed variance shows no dependence left
+#' pp_check(mod, type = "resid_variogram")
 #'
 #' # Next: plot(mod, type = "residuals") shows the residual grid
 #' }
@@ -166,17 +186,16 @@ pp_check.mvgam <- function(
   checkmate::assert_string(type)
   ndraws_given <- !missing(ndraws)
 
-  resid_types <- c(
+  resid_pooled <- c(
     "resid_hist", "resid_hist_grouped", "resid_ribbon",
-    "resid_ribbon_grouped", "resid_acf", "resid_pacf", "resid_qq",
+    "resid_ribbon_grouped"
+  )
+  resid_diagnostic <- c(
+    "resid_acf", "resid_pacf", "resid_variogram", "resid_qq",
     "resid_vs_fitted"
   )
-  resid_pooled <- resid_types[1:4]
-  resid_diagnostic <- resid_types[5:8]
-  resid_by_series <- c(
-    "resid_hist", "resid_ribbon", "resid_acf", "resid_pacf",
-    "resid_qq", "resid_vs_fitted"
-  )
+  resid_types <- c(resid_pooled, resid_diagnostic)
+  resid_by_series <- c("resid_hist", "resid_ribbon", resid_diagnostic)
   closure_unit <- is_closure_unit_family(object$family)
 
   # Residuals are computed on the rows the model was fitted to.
@@ -262,7 +281,7 @@ pp_check.mvgam <- function(
     )), call. = FALSE)
   }
 
-  # The bayesplot kernel that draws this type. `fit_stat` and the four
+  # The bayesplot kernel that draws this type. `fit_stat` and the
   # diagnostic residual types draw themselves.
   bptype <- sub("^resid_hist", "error_hist",
                 sub("^resid_ribbon", "ribbon", type))
@@ -297,7 +316,7 @@ pp_check.mvgam <- function(
       "scatter_avg", "scatter_avg_grouped",
       "error_scatter_avg", "error_scatter_avg_vs_x",
       "error_binned",
-      "resid_acf", "resid_pacf", "resid_vs_fitted",
+      "resid_acf", "resid_pacf", "resid_variogram", "resid_vs_fitted",
       "resid_ribbon", "resid_ribbon_grouped"
     )
     if (type %in% closure_unit_blocked) {
@@ -543,12 +562,15 @@ refuse_closure_unit_series <- function(object, series) {
 #' The diagnostic residual panels of one series
 #'
 #' `pp_check()` draws one of these panels. `plot(type = "residuals")`
-#' draws all four. The randomised quantile residuals are drawn once.
-#' Every panel of the grid then shows the same residual draws.
+#' draws the grid. The randomised quantile residuals are drawn once.
+#' Every panel of the grid then shows the same residual draws. A
+#' series observed at unevenly spaced times refuses the ACF and pACF.
+#' Their lags count rows.
 #'
 #' @param object Fitted `mvgam` object
 #' @param types Character vector of panel types: `"resid_vs_fitted"`,
-#'   `"resid_qq"`, `"resid_acf"` or `"resid_pacf"`
+#'   `"resid_qq"`, `"resid_acf"`, `"resid_pacf"` or
+#'   `"resid_variogram"`
 #' @param draw_ids Integer draw indices, or `NULL` for every draw
 #' @param resp Character response name, or `NULL`
 #' @param series Series name or index, or `NULL`
@@ -560,7 +582,8 @@ resid_diagnostic_panels <- function(object, types, draw_ids = NULL,
                                     per_obs = TRUE) {
   checkmate::assert_class(object, "mvgam")
   checkmate::assert_subset(
-    types, c("resid_vs_fitted", "resid_qq", "resid_acf", "resid_pacf"),
+    types, c("resid_vs_fitted", "resid_qq", "resid_acf", "resid_pacf",
+             "resid_variogram"),
     empty.ok = FALSE
   )
   checkmate::assert_integerish(draw_ids, lower = 1, null.ok = TRUE)
@@ -578,6 +601,15 @@ resid_diagnostic_panels <- function(object, types, draw_ids = NULL,
     series_sel <- resid_series_rows(object, data, series)
     resid <- resid[, series_sel$rows, drop = FALSE]
     observed <- !is.na(data[[response_column(object, resp)]][series_sel$rows])
+    lag_types <- intersect(types, c("resid_acf", "resid_pacf"))
+    if (series_sel$irregular && length(lag_types)) {
+      stop(insight::format_error(c(
+        paste0("'", lag_types[1L], "' needs a series observed at evenly ",
+               "spaced times."),
+        x = "The lags of an ACF count rows. This series has unequal gaps.",
+        i = "Use type = 'resid_variogram'. Its lags are in time units."
+      )), call. = FALSE)
+    }
   }
   # The lag panels keep a missing response in place. Its lags count
   # time steps.
@@ -594,6 +626,9 @@ resid_diagnostic_panels <- function(object, types, draw_ids = NULL,
       resid_acf = ,
       resid_pacf = build_resid_lag_panel(
         resid, lag_type = sub("resid_", "", type)
+      ),
+      resid_variogram = build_resid_variogram_panel(
+        resid, series_sel$times
       ),
       resid_qq = build_resid_qq_panel(resid[, observed, drop = FALSE]),
       resid_vs_fitted = {
@@ -625,9 +660,12 @@ resid_diagnostic_panels <- function(object, types, draw_ids = NULL,
 #' @param object Fitted `mvgam` object
 #' @param data Data frame the residuals are computed on
 #' @param series Series name or index, or `NULL` for the first series
-#' @return List holding the row indices in `rows`, the series name in
-#'   `label` and the number of series in `n_series`. `label` is `NULL`
-#'   for a fit without a series axis.
+#' @return List of the row indices in `rows`, their times in `times`,
+#'   the series name in `label` and the number of series in
+#'   `n_series`. `irregular` is `TRUE` when the gaps between
+#'   consecutive rows differ. `label` is `NULL` for a fit without a
+#'   series axis. A frame without the time column takes row positions
+#'   as times.
 #' @noRd
 resid_series_rows <- function(object, data, series = NULL) {
   checkmate::assert_class(object, "mvgam")
@@ -664,10 +702,14 @@ resid_series_rows <- function(object, data, series = NULL) {
     }
   }
   time_var <- axis_vars(object)$time_var
+  times <- seq_along(rows)
   if (time_var %in% names(data)) {
     rows <- rows[order(data[[time_var]][rows])]
+    times <- as.numeric(data[[time_var]][rows])
   }
-  list(rows = rows, label = label, n_series = length(levs))
+  list(rows = rows, times = times,
+       irregular = length(unique(signif(diff(times), 10L))) > 1L,
+       label = label, n_series = length(levs))
 }
 
 
@@ -763,12 +805,70 @@ closure_unit_pp_check_setup <- function(object, newdata, yrep,
 }
 
 
+#' Nested quantile bands of a residual statistic at each lag
+#'
+#' @param values Numeric matrix `[ndraws, nlags]`, the statistic of
+#'   each draw at each lag
+#' @param lag Numeric lags, one per column of `values`
+#' @return Data frame of `lag` and the 2.5, 10, 25, 75, 90 and 97.5%
+#'   quantiles across draws
+#' @noRd
+resid_lag_bands <- function(values, lag) {
+  checkmate::assert_matrix(values, mode = "numeric")
+  checkmate::assert_numeric(lag, len = ncol(values))
+  q <- function(p) {
+    apply(values, 2L, stats::quantile, probs = p, na.rm = TRUE,
+          names = FALSE)
+  }
+  data.frame(
+    lag = lag,
+    q025 = q(0.025), q975 = q(0.975),
+    q100 = q(0.10),  q900 = q(0.90),
+    q250 = q(0.25),  q750 = q(0.75)
+  )
+}
+
+
+#' A panel of nested quantile segments at each lag
+#'
+#' The ACF, pACF and semivariogram panels share it. A segment marks
+#' each lag. The widest spans 95% of the draws, the narrowest 50%.
+#'
+#' @param bands Data frame from `resid_lag_bands()`
+#' @param reference List of `ggplot2` layers drawn beneath the bands
+#' @param title Character panel title
+#' @param x_label Character x-axis label
+#' @return A `ggplot` object
+#' @noRd
+resid_lag_plot <- function(bands, reference, title, x_label) {
+  checkmate::assert_data_frame(bands)
+  checkmate::assert_list(reference)
+  checkmate::assert_string(title)
+  checkmate::assert_string(x_label)
+  palette <- mvgam_palette()
+  segment <- function(colour, lo, hi) {
+    ggplot2::geom_segment(
+      ggplot2::aes(y = .data[[lo]], yend = .data[[hi]]),
+      colour = colour, linewidth = 1.5
+    )
+  }
+  # The title names the statistic. The residual figure stacks this
+  # panel under the Q-Q panel, where a y title would join the Q-Q one.
+  ggplot2::ggplot(bands, ggplot2::aes(x = .data$lag, xend = .data$lag)) +
+    reference +
+    segment(palette[1L], "q025", "q975") +
+    segment(palette[3L], "q100", "q900") +
+    segment(palette[6L], "q250", "q750") +
+    ggplot2::labs(title = title, x = x_label, y = NULL) +
+    mvgam_theme()
+}
+
+
 #' An ACF or pACF panel of residual draws
 #'
 #' Computes the ACF or pACF of each draw, then summarises across draws
-#' with nested quantile segments at each integer lag. Segments mark the
-#' discrete lags. The dashed band is the asymptotic 95% white-noise
-#' interval `+/- 1.96 / sqrt(n)`.
+#' with nested quantile segments at each integer lag. The dashed band
+#' is the asymptotic 95% white-noise interval `+/- 1.96 / sqrt(n)`.
 #'
 #' @param resid_draws Numeric residual matrix with dimensions
 #'   `[ndraws, nobs]`
@@ -781,69 +881,115 @@ build_resid_lag_panel <- function(
   checkmate::assert_matrix(resid_draws)
   lag_type <- match.arg(lag_type)
   acf_fn <- if (lag_type == "acf") stats::acf else stats::pacf
-  ndraws <- nrow(resid_draws)
   # The ACF estimates each lag from the pairs both observed. A missing
   # value stays in place. Its lags count time steps. The pACF recursion
   # needs an ACF from a complete series. A series with gaps gives
   # partial correlations outside [-1, 1]. The pACF drops the missing
-  # values. Its lags count observations.
-  per_draw <- lapply(seq_len(ndraws), function(d) {
-    x <- resid_draws[d, ]
-    if (lag_type == "pacf") {
-      x <- x[!is.na(x)]
-    }
-    out <- acf_fn(x, plot = FALSE, na.action = stats::na.pass)
-    data.frame(
-      value = out$acf[, , 1L],
-      lag = out$lag[, 1L, 1L],
-      n_used = sum(!is.na(x))
-    )
-  })
-  lag_df <- do.call(rbind, per_draw)
-  lag_df <- lag_df[lag_df$lag > 0, , drop = FALSE]
-
-  by_lag <- split(lag_df$value, lag_df$lag)
-  qfun <- function(p) {
-    vapply(by_lag, stats::quantile, numeric(1L),
-      probs = p, na.rm = TRUE, names = FALSE
-    )
+  # values. Its lags count observations. Every draw misses the same
+  # responses. Each draw then gives the same lags.
+  keep <- if (lag_type == "pacf") {
+    !is.na(resid_draws[1L, ])
+  } else {
+    rep(TRUE, ncol(resid_draws))
   }
-  bands <- data.frame(
-    lag = as.numeric(names(by_lag)),
-    q025 = qfun(0.025), q975 = qfun(0.975),
-    q100 = qfun(0.10),  q900 = qfun(0.90),
-    q250 = qfun(0.25),  q750 = qfun(0.75)
-  )
+  per_draw <- function(d) {
+    acf_fn(resid_draws[d, keep], plot = FALSE, na.action = stats::na.pass)
+  }
+  lag <- per_draw(1L)$lag[, 1L, 1L]
+  values <- matrix(vapply(seq_len(nrow(resid_draws)), function(d) {
+    per_draw(d)$acf[, 1L, 1L]
+  }, numeric(length(lag))), ncol = length(lag), byrow = TRUE)
+  values <- values[, lag > 0, drop = FALSE]
+  lag <- lag[lag > 0]
 
-  n_used <- per_draw[[1L]]$n_used[1L]
-  ci_bound <- stats::qnorm(0.975) / sqrt(n_used)
   palette <- mvgam_palette()
-  # The title names the statistic. The residual figure stacks this
-  # panel under the Q-Q panel, where a y title would join the Q-Q one.
-  title <- if (lag_type == "acf") "ACF" else "pACF"
-
-  ggplot2::ggplot(bands, ggplot2::aes(x = lag)) +
+  ci_bound <- stats::qnorm(0.975) / sqrt(sum(!is.na(resid_draws[1L, ])))
+  reference <- list(
     ggplot2::geom_hline(
       yintercept = c(-1, 1) * ci_bound,
       linetype = "dashed", colour = "black"
-    ) +
+    ),
     ggplot2::geom_hline(
       yintercept = 0, colour = palette[6L], linewidth = 0.25
-    ) +
-    ggplot2::geom_segment(
-      colour = palette[1L], linewidth = 1.5,
-      ggplot2::aes(y = q025, yend = q975)
-    ) +
-    ggplot2::geom_segment(
-      colour = palette[3L], linewidth = 1.5,
-      ggplot2::aes(y = q100, yend = q900)
-    ) +
-    ggplot2::geom_segment(
-      colour = palette[6L], linewidth = 1.5,
-      ggplot2::aes(y = q250, yend = q750)
-    ) +
-    ggplot2::labs(title = title, x = "Lag", y = NULL) +
-    mvgam_theme()
+    )
+  )
+  resid_lag_plot(
+    resid_lag_bands(values, lag), reference,
+    title = if (lag_type == "acf") "ACF" else "pACF",
+    x_label = "Lag"
+  )
+}
+
+
+#' A semivariogram panel of residual draws
+#'
+#' The semivariance at lag `h` is half the mean squared difference of
+#' the residuals observed `h` time units apart. It measures dependence
+#' by the time between observations. An ACF counts rows. On unevenly
+#' spaced times one row lag mixes short and long gaps. Pairs up to
+#' half the observed span enter. Each distinct lag is its own bin when
+#' there are at most `max_bins` of them. Otherwise the pairs fall into
+#' `max_bins` bins of near-equal count, each placed at its mean lag.
+#' Residuals without serial dependence give a flat semivariogram at
+#' their variance, the dashed line. Dependence the model missed shows
+#' as semivariance below it at short lags.
+#'
+#' @param resid_draws Numeric residual matrix with dimensions
+#'   `[ndraws, nobs]`
+#' @param times Numeric observation times, one per column of
+#'   `resid_draws`
+#' @param max_bins Integer maximum number of lag bins
+#' @return A `ggplot` object
+#' @noRd
+build_resid_variogram_panel <- function(resid_draws, times,
+                                        max_bins = 20L) {
+  checkmate::assert_matrix(resid_draws, mode = "numeric")
+  checkmate::assert_numeric(times, len = ncol(resid_draws),
+                            any.missing = FALSE)
+  checkmate::assert_int(max_bins, lower = 2L)
+  # Every draw misses the same responses
+  seen <- !is.na(resid_draws[1L, ])
+  ord <- order(times[seen])
+  resid_draws <- resid_draws[, seen, drop = FALSE][, ord, drop = FALSE]
+  times <- times[seen][ord]
+  n <- length(times)
+  max_lag <- (times[n] - times[1L]) / 2
+  # Each observation pairs with the later ones within `max_lag`
+  n_later <- findInterval(times + max_lag, times) - seq_len(n)
+  if (n < 3L || sum(n_later) == 0L) {
+    stop(insight::format_error(c(
+      "A semivariogram needs observations at three or more times.",
+      x = paste0("The series has ", n, " observed residuals.")
+    )), call. = FALSE)
+  }
+  i <- rep(seq_len(n), n_later)
+  j <- i + sequence(n_later)
+  h <- times[j] - times[i]
+
+  lags <- sort(unique(signif(h, 10L)))
+  if (length(lags) <= max_bins) {
+    bin <- match(signif(h, 10L), lags)
+  } else {
+    breaks <- unique(stats::quantile(
+      h, seq(0, 1, length.out = max_bins + 1L), names = FALSE
+    ))
+    bin <- findInterval(h, breaks, rightmost.closed = TRUE,
+                        all.inside = TRUE)
+    bin <- match(bin, sort(unique(bin)))
+    lags <- as.numeric(rowsum(h, bin)) / tabulate(bin)
+  }
+  n_pairs <- tabulate(bin, nbins = length(lags))
+  values <- matrix(vapply(seq_len(nrow(resid_draws)), function(d) {
+    r <- resid_draws[d, ]
+    as.numeric(rowsum(0.5 * (r[j] - r[i])^2, bin)) / n_pairs
+  }, numeric(length(lags))), ncol = length(lags), byrow = TRUE)
+
+  sill <- stats::median(apply(resid_draws, 1L, stats::var))
+  reference <- list(ggplot2::geom_hline(
+    yintercept = sill, linetype = "dashed", colour = "black"
+  ))
+  resid_lag_plot(resid_lag_bands(values, lags), reference,
+                 title = "Semivariogram", x_label = "Time lag")
 }
 
 
@@ -1109,8 +1255,10 @@ plot.mvgam_ppc_fit_stat <- function(x, ...) {
 #'
 #' `plot.mvgam(x, type = "residuals")` calls it. The grid shows
 #' residuals against fitted values, the Q-Q plot, the ACF and the pACF,
-#' all from one set of draws. A closure-unit family has one residual per
-#' unit and shows the Q-Q panel alone.
+#' all from one set of draws. A series observed at unevenly spaced
+#' times takes the semivariogram in place of the ACF and pACF. A
+#' closure-unit family has one residual per unit and shows the Q-Q
+#' panel alone.
 #'
 #' @param object Fitted `mvgam` object
 #' @param series Series name or index, or `NULL`
@@ -1134,11 +1282,15 @@ mvgam_resid_panel <- function(
   if (!is.null(fan)) return(fan)
   # Every panel takes the same posterior draws.
   draw_ids <- resolve_draw_ids(object, ndraws, NULL)
-  closure_unit <- is_closure_unit_family(object$family)
-  types <- if (closure_unit) {
-    "resid_qq"
-  } else {
-    c("resid_vs_fitted", "resid_qq", "resid_acf", "resid_pacf")
+  series_sel <- NULL
+  types <- "resid_qq"
+  if (!is_closure_unit_family(object$family)) {
+    series_sel <- resid_series_rows(object, object$data, series)
+    types <- c("resid_vs_fitted", "resid_qq", if (series_sel$irregular) {
+      "resid_variogram"
+    } else {
+      c("resid_acf", "resid_pacf")
+    })
   }
   panels <- lapply(
     resid_diagnostic_panels(object, types, draw_ids = draw_ids,
@@ -1146,11 +1298,7 @@ mvgam_resid_panel <- function(
     function(p) p + ggplot2::labs(subtitle = NULL)
   )
   out <- patchwork::wrap_plots(panels, ncol = min(2L, length(panels)))
-  label <- if (closure_unit) {
-    NULL
-  } else {
-    resid_series_rows(object, object$data, series)$label
-  }
+  label <- series_sel$label
   if (is.null(label)) {
     return(out)
   }

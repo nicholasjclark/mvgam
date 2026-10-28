@@ -216,7 +216,10 @@ compute_family_variance <- function(mu, family, sigma = NULL,
 #'   [loo_R2.mvgam()] and [bayes_R2.mvgam()] request this surface. An R^2
 #'   describes the observed series. A row whose time falls outside the
 #'   fitted grid is refused under `TRUE`. [forecast.mvgam()] predicts
-#'   those times.
+#'   those times. An in-sample interval under `TRUE` conditions on
+#'   states estimated from the same observations. It covers them more
+#'   often than its nominal level. Calibration is judged out of sample,
+#'   with [forecast.mvgam()] or [lfo_cv()].
 #'
 #'   The default suits a model whose covariates explain most of the
 #'   signal. When most of the series-level variation lies in the trend,
@@ -1037,69 +1040,6 @@ mean_discrete_weibull <- function(mu, shape, M = 1000, thres = 0.001) {
   out <- 0
   for (y in seq_len(M)) {
     out <- out + mu^y^shape
-  }
-  out
-}
-
-#' Mean of COM-Poisson distribution
-#'
-#' Computes E\[Y\] for Conway-Maxwell-Poisson via series approximation.
-#' Based on brms implementation by Paul-Christian Buerkner.
-#' Uses closed-form approximation when mu^shape >= 1.5 and mu >= 1.5.
-#'
-#' @param mu Location parameter (mode parameterization)
-#' @param shape Positive shape parameter
-#' @param M Maximum series terms to evaluate
-#' @param thres Convergence threshold
-#' @param approx Use closed-form approximation when appropriate
-#' @return Matrix of expected values matching input dimensions
-#' @noRd
-mean_com_poisson <- function(mu, shape, M = 10000, thres = 1e-16,
-                             approx = TRUE) {
-  if (isTRUE(any(shape <= 0))) {
-    stop(insight::format_error("shape must be positive."))
-  }
-  if (isTRUE(any(shape == Inf))) {
-    stop(insight::format_error("shape must be finite."))
-  }
-
-
-  out <- rep(NA, length(mu))
-  dim(out) <- dim(mu)
-
-  # shape == 1 implies Poisson distribution
-  use_poisson <- shape == 1
-  if (any(use_poisson)) {
-    out[use_poisson] <- mu[use_poisson]
-  }
-
-  if (approx) {
-    # Closed-form approximation (doi:10.1007/s10463-017-0629-6)
-    use_approx <- mu^shape >= 1.5 & mu >= 1.5 & is.na(out)
-    if (any(use_approx)) {
-      mu_a <- mu[use_approx]
-      shape_a <- shape[use_approx]
-      term <- 1 - (shape_a - 1) / (2 * shape_a) * mu_a^(-1) -
-        (shape_a^2 - 1) / (24 * shape_a^2) * mu_a^(-2) -
-        (shape_a^2 - 1) / (24 * shape_a^3) * mu_a^(-3)
-      out[use_approx] <- mu_a * term
-    }
-  }
-
-  # Direct series computation for remaining cases
-  use_exact <- is.na(out)
-  if (any(use_exact)) {
-    series <- com_poisson_log_series(
-      log(mu[use_exact]), shape[use_exact], M = M, thres = thres
-    )
-    if (!series$converged) {
-      warn_once(
-        c("Approximating the mean of com_poisson may be inaccurate.",
-          "i" = "Series did not converge within M terms."),
-        "mean_com_poisson_convergence"
-      )
-    }
-    out[use_exact] <- exp(series$log_moment - series$log_z)
   }
   out
 }

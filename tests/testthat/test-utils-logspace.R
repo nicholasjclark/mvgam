@@ -53,21 +53,41 @@ test_that("sample_row_index draws each column at its weight", {
   expect_identical(sample_row_index(one), rep(2L, 50L))
 })
 
-test_that("the COM-Poisson series matches its direct sum", {
-  mu <- c(0.4, 1.2, 3)
-  shape <- c(0.6, 1.5, 2)
-  series <- com_poisson_log_series(log(mu), shape)
-  expect_true(series$converged)
-  k <- 0:200
+test_that("the COM-Poisson normaliser and mean match a brute-force sum", {
+  # Direct sums cover dispersion above and below a Poisson's. The
+  # asymptotic region is covered at mu = 300, shape = 1.7. At mu = 2,
+  # shape = 30 an asymptotic normaliser gave a mass function summing
+  # to 0.48.
+  mu <- c(0.3, 9.5, 2, 300)
+  shape <- c(0.2, 0.5, 30, 1.7)
+  k <- 0:12000
   for (i in seq_along(mu)) {
-    w <- exp(shape[i] * (k * log(mu[i]) - lfactorial(k)))
-    expect_equal(series$log_z[i], log(sum(w)))
-    expect_equal(series$log_moment[i], log(sum(k * w)))
+    lw <- shape[i] * (k * log(mu[i]) - lfactorial(k))
+    log_z <- log_sum_exp(lw)
+    out <- com_poisson_normaliser(mu[i], shape[i])
+    expect_equal(out$log_z, log_z, tolerance = 1e-10)
+    expect_equal(out$mean, sum(k * exp(lw - log_z)), tolerance = 1e-10)
   }
-  # The mean is their ratio. At shape 1 the family is Poisson.
-  expect_equal(mean_com_poisson(1.2, 1), 1.2)
-  expect_equal(
-    mean_com_poisson(1.2, 1.5, approx = FALSE),
-    exp(series$log_moment[2] - series$log_z[2])
-  )
+  expect_true(com_poisson_use_gaunt(log(300), 1.7))
+  expect_identical(mean_com_poisson(1.2, 1), 1.2)
+  expect_error(mean_com_poisson(3, 0), "finite positive 'mu' and 'shape'")
+})
+
+
+test_that("the COM-Poisson mass, distribution and sampler agree", {
+  mu <- 9.5
+  shape <- 0.5
+  k <- 0:400
+  pmf <- dcom_poisson_mvgam(k, mu, shape)
+  expect_equal(sum(pmf), 1, tolerance = 1e-12)
+  expect_equal(pcom_poisson_mvgam(k, mu, shape), cumsum(pmf),
+               tolerance = 1e-12)
+  # The upper tail is summed on its own, accurate where 1 - F(k) is not
+  far <- pcom_poisson_mvgam(150, mu, shape, lower.tail = FALSE, log.p = TRUE)
+  expect_equal(far, log(sum(pmf[k > 150])), tolerance = 1e-10)
+  expect_identical(pcom_poisson_mvgam(c(-1, Inf), mu, shape), c(0, 1))
+  expect_identical(dcom_poisson_mvgam(c(-1, 2.5), mu, shape), c(0, 0))
+  set.seed(3)
+  draws <- rcom_poisson_mvgam(20000L, mu, shape)
+  expect_lt(max(abs(tabulate(draws + 1, length(k)) / 20000 - pmf)), 0.01)
 })

@@ -362,6 +362,9 @@ fit both and compare their scores.
   covariances among series, with their intervals.
 - `?ordinate` describes the biplot. `?active_factors` helps
   choose the number of factors.
+- `how_to_cite()` writes a methods paragraph for a fitted model with
+  the references for its factor structure. `methods_md()` writes out
+  its equations.
 - The
   [forecast evaluation article](https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html)
   covers `lfo_cv()` and `ensemble()` for comparing and combining

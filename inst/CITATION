@@ -19,3 +19,11 @@ bibentry(
   ),
   encoding = "UTF-8"
 )
+
+citFooter(
+  "A fitted model also has its own citations.",
+  "'how_to_cite(fit)' drafts a methods paragraph and lists the references",
+  "for the families, trends and priors that model uses.",
+  "'bibtex()' writes those references to a .bib file.",
+  "'methods_md(fit)' writes the model as equations with its priors."
+)

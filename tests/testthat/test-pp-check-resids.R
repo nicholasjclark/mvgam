@@ -20,6 +20,20 @@ test_that("the pACF of a series with gaps stays a partial correlation", {
   expect_true(all(abs(c(bands$q025, bands$q975)) <= 1))
 })
 
+test_that("the semivariogram bins pairs by the time between them", {
+  # Residuals are 0 up to time 7 and 1 from time 12. A pair on one
+  # side differs by 0 and contributes 0. A pair across the step
+  # contributes 0.5. The missing first value enters no pair.
+  times <- c(0, 1, 3, 4, 7, 12, 13, 15, 16)
+  resid <- matrix(c(NA, 0, 0, 0, 0, 1, 1, 1, 1), nrow = 2L, ncol = 9L,
+                  byrow = TRUE)
+  bands <- mvgam:::build_resid_variogram_panel(resid, times)$data
+  # The observed span 1 to 16 admits lags up to 7.5. Lag 5 holds the
+  # crossing pair (7, 12) alone. Lag 6 holds (1, 7) and (7, 13).
+  expect_identical(bands$lag, c(1, 2, 3, 4, 5, 6))
+  expect_equal(bands$q025, c(0, 0, 0, 0, 0.5, 0.25))
+})
+
 test_that("resid_vs_fitted plots one point per obs or pools the draws", {
   resid_mat <- .make_resid_draws(ndraws = 100L, nobs = 50L)
   fitted_mat <- .make_resid_draws(
@@ -58,5 +72,10 @@ test_that("resid_series_rows takes one series in time order", {
     class = "mvgam"
   )
   expect_identical(mvgam:::resid_series_rows(fit, d)$rows, c(5L, 3L, 1L))
+  # Series "b" at times 1, 2 and 3 is evenly spaced. At 1, 2 and 7 the
+  # ACF would treat gaps of 1 and 5 as one lag.
+  expect_false(mvgam:::resid_series_rows(fit, d)$irregular)
+  d$time[1L] <- 7
+  expect_true(mvgam:::resid_series_rows(fit, d)$irregular)
   expect_error(mvgam:::resid_series_rows(fit, d, "all"), "one series")
 })

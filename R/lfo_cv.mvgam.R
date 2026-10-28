@@ -244,8 +244,8 @@ lfo_cv.mvgam <- function(object,
     )))
   }
 
-  # The arithmetic below is over positions in `all_unique_times`. The
-  # CAR kernel takes the gaps between them from `time_dis`.
+  # The arithmetic below is over positions in `all_unique_times`. A
+  # CAR fit measures the gaps between them itself, as `gap_trend`.
   eval_positions <- seq.int(idx_min_t + 1L,
                               n_times - fc_horizon + 1L)
   eval_timepoints <- all_unique_times[eval_positions]

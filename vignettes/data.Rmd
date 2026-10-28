@@ -165,8 +165,10 @@ Where observations are irregular by design, `CAR()` fits a
 continuous-time AR(1) process whose autocorrelation decays with
 the time elapsed between observations. Its series may be observed
 at their own times, with no rows added for the times a series
-lacks. `ZMVN()` has no time dynamics and accepts any spacing. `?CAR`
-gives a worked example.
+lacks. `ZMVN()` has no time dynamics and accepts any spacing. On
+such a series, `plot(type = "residuals")` checks the residuals with a
+semivariogram, which measures their dependence by the time between
+observations. `?CAR` gives a worked example.
 
 ## Converting time series objects
 

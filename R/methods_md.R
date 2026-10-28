@@ -930,7 +930,10 @@ innovation_glossary <- function(obj) {
   checkmate::assert_class(obj, "mvgam")
   is_factor <- methods_md_has_factor_model(obj)
   tt <- obj$trend_metadata$trend_type
-  if (identical(tt, "PW")) return(character(0L))
+  # A deterministic trend, such as `PW()`, has no innovations
+  if (!is.null(tt) && identical(get_covariance_pattern(tt), "none")) {
+    return(character(0L))
+  }
   sd <- innovation_sd(obj)
   sd_vec <- innovation_sd(obj, vector = TRUE)
   what <- if (is_factor) "factor innovation" else "process innovation"

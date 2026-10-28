@@ -425,6 +425,10 @@ summary(mod)
 # Correlations among the series' latent states
 residual_cor(mod)
 
+# Residual checks. Each series has gaps of differing length. A
+# semivariogram by time lag replaces the ACF
+plot(mod, type = "residuals", series = 2)
+
 # Each series is forecast at its own future times
 plot(forecast(mod, newdata = keep_some(simdat$data_test)),
      series = 2)

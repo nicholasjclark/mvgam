@@ -51,7 +51,10 @@ quantity \code{\link[=hindcast]{hindcast()}} returns. The ELPD is computed from 
 \code{\link[=loo_R2.mvgam]{loo_R2.mvgam()}} and \code{\link[=bayes_R2.mvgam]{bayes_R2.mvgam()}} request this surface. An R^2
 describes the observed series. A row whose time falls outside the
 fitted grid is refused under \code{TRUE}. \code{\link[=forecast.mvgam]{forecast.mvgam()}} predicts
-those times.
+those times. An in-sample interval under \code{TRUE} conditions on
+states estimated from the same observations. It covers them more
+often than its nominal level. Calibration is judged out of sample,
+with \code{\link[=forecast.mvgam]{forecast.mvgam()}} or \code{\link[=lfo_cv]{lfo_cv()}}.
 
 The default suits a model whose covariates explain most of the
 signal. When most of the series-level variation lies in the trend,

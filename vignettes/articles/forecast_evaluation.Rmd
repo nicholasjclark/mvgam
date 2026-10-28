@@ -315,7 +315,9 @@ any forecast.
 ## Where to next
 
 Each function used here has a help page, such as `?score` or
-`?lfo_cv`, with its arguments and output.
+`?lfo_cv`, with its arguments and output. `how_to_cite()` writes a
+methods paragraph for each fitted model. `methods_md()` writes out its
+equations.
 
 Related articles:
 

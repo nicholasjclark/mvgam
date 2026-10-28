@@ -76,7 +76,8 @@ validate_family <- function(family, link = NULL) {
 #' single predictor per row. brms marks each such family with a
 #' special, `"categorical"`, `"multinomial"` or `"simplex"`. The
 #' refusal names the mvgam family that takes the same response in
-#' long format.
+#' long format. Family `com_poisson` needs brms 2.23.2 or later, the
+#' first version whose Stan likelihood takes `mu` as the mode.
 #'
 #' @param family A family or brmsfamily object
 #'
@@ -124,6 +125,21 @@ validate_supported_family <- function(family) {
       paste0("Family '", resolve_family_name(family),
              "' is not supported by mvgam directly."),
       i = unname(hint)
+    )), call. = FALSE)
+  }
+  # Reason: brms before 2.23.2 writes the COM-Poisson likelihood with
+  # weights mu^k / (k!)^shape. The brms R functions take mu as the
+  # mode, with weights (mu^k / k!)^shape, as mvgam's do. A fit would
+  # sample one distribution and predict from another.
+  if (identical(family$family, "com_poisson") &&
+      utils::packageVersion("brms") < "2.23.2") {
+    stop(insight::format_error(c(
+      "Family 'com_poisson' requires brms 2.23.2 or later.",
+      x = paste0("Installed brms: ", utils::packageVersion("brms"), "."),
+      i = paste0("Earlier brms versions parameterise the Stan ",
+                 "likelihood differently from their predictions."),
+      i = paste0("Install brms from GitHub with ",
+                 "'remotes::install_github(\"paul-buerkner/brms\")'.")
     )), call. = FALSE)
   }
   invisible(TRUE)
@@ -2346,7 +2362,6 @@ is.mvgam_trend <- function(x) {
 #' @param data Data frame containing time series
 #' @param time_var Name of time variable (default: "time")
 #' @param series_var Name of series variable (default: "series")
-#' @param trend_type Type of trend model ("CAR" allows irregular intervals)
 #' @param trend_specs Optional trend specification list for added metadata
 #' @param response_vars Response columns named by response key, from
 #'   `response_columns()`
@@ -2354,14 +2369,12 @@ is.mvgam_trend <- function(x) {
 #' @noRd
 extract_time_series_dimensions <- function(data, time_var = "time",
                                            series_var = "series",
-                                           trend_type = NULL,
                                            trend_specs = NULL,
                                            response_vars = NULL) {
 
   checkmate::assert_data_frame(data, min.rows = 1)
   checkmate::assert_string(time_var)
   checkmate::assert_string(series_var)
-  checkmate::assert_string(trend_type, null.ok = TRUE)
   checkmate::assert_list(trend_specs, null.ok = TRUE)
   checkmate::assert_character(response_vars, min.len = 1,
                               any.missing = FALSE, null.ok = TRUE)

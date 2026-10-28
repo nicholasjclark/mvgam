@@ -221,9 +221,9 @@ compute_residual_cor <- function(object, covariance, by_group, partial,
                                                stationary = stationary)
   series_names <- get_residcor_series_names(object, cov_struct)
 
-  if (cov_struct$pattern %in% c("none", "diagonal") ||
-      (cov_struct$pattern == "cholesky_scaled" &&
-       !cov_struct$has_correlations)) {
+  if (effective_covariance_pattern(cov_struct$pattern,
+                                   cov_struct$has_correlations) %in%
+        c("none", "diagonal")) {
     stop(insight::format_error(c(
       "The fitted trend has no correlation between series.",
       i = paste0(
@@ -427,8 +427,9 @@ extract_cov_draws_flat <- function(cov_struct) {
     return(Sigma_arr)
   }
 
-  if (pattern == "diagonal" ||
-      (pattern == "cholesky_scaled" && !isTRUE(cov_struct$has_correlations))) {
+  if (identical(effective_covariance_pattern(
+    pattern, cov_struct$has_correlations
+  ), "diagonal")) {
     # Independent innovations sample no `L_Omega_trend`. The covariance
     # is the diagonal of squared scales. A factor fit still gains a
     # cross-series covariance from it, through loadings that share each

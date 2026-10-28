@@ -21,7 +21,9 @@
 \describe{
 \item{\code{"residuals"} (default)}{Dunn-Smyth residuals of one
 series against the fitted values, their Q-Q plot, ACF and
-partial ACF, as \code{\link[=pp_check.mvgam]{pp_check.mvgam()}} draws them. An \code{\link[=occ]{occ()}} or
+partial ACF, as \code{\link[=pp_check.mvgam]{pp_check.mvgam()}} draws them. A series
+observed at unevenly spaced times shows a semivariogram in
+place of the ACF and partial ACF. An \code{\link[=occ]{occ()}} or
 \code{\link[=nmix]{nmix()}} fit has one residual per closure unit and draws the
 Q-Q plot alone.}
 \item{\code{"smooths"}}{The posterior of each smooth, from

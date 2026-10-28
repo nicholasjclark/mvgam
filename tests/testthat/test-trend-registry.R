@@ -52,7 +52,7 @@ test_that("trend properties are validated", {
   register <- function(...) {
     args <- utils::modifyList(
       list(name = "T", supports_factors = TRUE,
-           covariance_pattern = "diagonal", stationary_source = "none",
+           covariance_pattern = "none", stationary_source = "none",
            requires_regular_intervals = TRUE,
            per_factor_coefficients = FALSE, completes_time_grid = FALSE,
            independent_states = FALSE, shared_innovations = TRUE,

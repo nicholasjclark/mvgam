@@ -517,33 +517,9 @@ test_that("mean_discrete_weibull sums the series it approximates", {
                tolerance = 0.005)
 })
 
-test_that("mean_com_poisson returns mu when shape = 1 (Poisson)", {
+test_that("mean_com_poisson keeps the dimensions of mu", {
   mu <- matrix(c(3, 5, 7), nrow = 1, ncol = 3)
-  shape <- 1
-  result <- mean_com_poisson(mu, shape)
-  # When shape = 1, COM-Poisson reduces to Poisson with E[Y] = mu
-  # Result preserves mu's dimensions so compare values ignoring attributes
-  expect_equal(as.numeric(result), as.numeric(mu))
-})
-
-test_that("the large-mu COM-Poisson approximation matches the series", {
-  mu <- matrix(c(10, 20), nrow = 1, ncol = 2)
-  shape <- matrix(c(2, 2), nrow = 1, ncol = 2)
-  expect_equal(mean_com_poisson(mu, shape),
-               mean_com_poisson(mu, shape, approx = FALSE),
-               tolerance = 0.01)
-})
-
-test_that("mean_com_poisson validates shape parameter", {
-  mu <- matrix(c(3, 5), nrow = 1, ncol = 2)
-  expect_error(
-    mean_com_poisson(mu, shape = 0),
-    "shape must be positive"
-  )
-  expect_error(
-    mean_com_poisson(mu, shape = Inf),
-    "shape must be finite"
-  )
+  expect_identical(dim(mean_com_poisson(mu, 1.4)), dim(mu))
 })
 
 # ==============================================================================

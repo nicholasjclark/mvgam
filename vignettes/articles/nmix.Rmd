@@ -320,6 +320,9 @@ Each function used here has a help page, such as `?nmix` or
 priors of each variant. `pivot_detection_array()` converts detection
 arrays from unmarked, spOccupancy or ubms into the long format used
 here. `occ()` fits occupancy models to the same layout.
+`how_to_cite()` writes a methods paragraph for a fitted model, citing
+the N-mixture variant it used. `methods_md()` writes out its
+equations.
 
 Related articles:
 

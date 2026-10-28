@@ -35,6 +35,7 @@ mvgam now uses 'brms' to build its models. The observation model takes the full 
 * Model comparison: `bridge_sampler()`, `bayes_factor()`, `waic()`, `loo_model_weights()`, `pp_average()`, `compare_scores()`, `compare_elpds()`
 * `threads`, `init = "pathfinder"`, `mvgam_multiple()` for imputed data, and helpers to pivot wide occupancy and species data
 * `methods_md()` writes a model description. `bibtex()` extracts the citation
+* `pp_check(type = "resid_variogram")` checks residuals by time lag. `plot(type = "residuals")` draws it for unevenly spaced series
 * On a hierarchical VAR, `stability()` reports each group and `posterior_transition_matrix()` averages the group matrices. Plots of `irf()` and `fevd()` select processes by name
 
 ## Changed defaults

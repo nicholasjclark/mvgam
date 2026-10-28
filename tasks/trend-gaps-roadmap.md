@@ -78,7 +78,7 @@ dependency and stay out.
 
 ## Order
 
-1. Seasonal state for `LLT()` (1)
+1. Seasonal `LLT()`, the data side (1)
 2. `changepoint_range` documentation and the `loo()` pointer (4, 5c)
 3. Centred prototype and decision (5b)
 4. Calendar helpers (6), heavy-tail example (2a), length-scale prior (5a)

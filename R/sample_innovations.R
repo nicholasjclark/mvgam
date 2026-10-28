@@ -33,8 +33,8 @@ NULL
 #'
 #' @param trend_type A registered trend type name, or `"None"`
 #'
-#' @return Character string: one of "none", "diagonal",
-#'   "cholesky_scaled" or "full_covariance"
+#' @return Character string: one of "none", "cholesky_scaled" or
+#'   "full_covariance"
 #'
 #' @noRd
 get_covariance_pattern <- function(trend_type) {
@@ -375,6 +375,26 @@ covariance_param_specs <- list(
 )
 
 
+#' The covariance pattern a trend's innovations take
+#'
+#' A `"cholesky_scaled"` trend fitted without correlations samples no
+#' `L_Omega_trend`. Its innovations are independent, scaled by
+#' `sigma_trend`: the pattern `"diagonal"`. Every other pattern is the
+#' registered one.
+#'
+#' @param pattern Registered covariance pattern
+#' @param has_correlations Whether the fit samples correlations
+#' @return A single pattern name
+#' @noRd
+effective_covariance_pattern <- function(pattern, has_correlations) {
+  checkmate::assert_string(pattern)
+  if (identical(pattern, "cholesky_scaled") && !isTRUE(has_correlations)) {
+    return("diagonal")
+  }
+  pattern
+}
+
+
 #' Name the covariance structure innovations are drawn from
 #'
 #' A hierarchical trend stores its correlations as a population
@@ -384,8 +404,8 @@ covariance_param_specs <- list(
 #' and the innovation transform both take the structure from this key.
 #'
 #' @param hierarchical Whether the trend is grouped
-#' @param effective_pattern Covariance pattern after the
-#'   no-correlations collapse to `"diagonal"`
+#' @param effective_pattern Pattern from
+#'   `effective_covariance_pattern()`
 #' @return A single key of the form `"hier.cholesky_scaled"`
 #'
 #' @noRd
@@ -500,10 +520,8 @@ get_trend_covariance_structure <- function(object, ndraws = NULL,
   draws_mat <- subset_draws_rows(fit_parameter_draws(object$fit),
                                  ndraws, draw_ids)
 
-  effective_pattern <- pattern
-  if (pattern == "cholesky_scaled" && !has_correlations) {
-    effective_pattern <- "diagonal"
-  }
+  effective_pattern <- effective_covariance_pattern(pattern,
+                                                    has_correlations)
 
   group_info <- if (hierarchical) get_group_info(object$standata) else NULL
   n_series_int <- as.integer(n_series)
@@ -1113,11 +1131,9 @@ draw_innovation_grid <- function(cov_structure, n_times) {
   n_series <- cov_structure$n_series
   checkmate::assert_int(n_series, lower = 1)
 
-  # When cor=FALSE, use diagonal path (independent innovations per series)
-  effective_pattern <- pattern
-  if (pattern == "cholesky_scaled" && !isTRUE(cov_structure$has_correlations)) {
-    effective_pattern <- "diagonal"
-  }
+  effective_pattern <- effective_covariance_pattern(
+    pattern, cov_structure$has_correlations
+  )
 
   # Standardised innovations for the whole (time, series) grid, drawn
   # from the distribution the model was fitted with. The mixing value

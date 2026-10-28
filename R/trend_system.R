@@ -20,9 +20,11 @@ trend_registry <- new.env(parent = emptyenv())
 #'   models (n_lv parameter)
 #' @param covariance_pattern How the innovations are parameterised:
 #'   `"none"` for a deterministic trend with no innovation,
-#'   `"diagonal"` for independent innovations scaled by `sigma_trend`,
 #'   `"cholesky_scaled"` for `diag(sigma_trend) * L_Omega_trend` and
-#'   `"full_covariance"` for a sampled `Sigma_trend`.
+#'   `"full_covariance"` for a sampled `Sigma_trend`. A
+#'   `"cholesky_scaled"` trend fitted without correlations has the
+#'   independent innovations `effective_covariance_pattern()` names
+#'   `"diagonal"`.
 #' @param stationary_source How the covariance a marginal prediction
 #'   integrates over is obtained: `"lift"` raises the innovation
 #'   covariance to the stationary one, `"omega"` takes the stationary
@@ -64,7 +66,7 @@ register_trend_type <- function(name, supports_factors, covariance_pattern,
   checkmate::assert_flag(supports_factors)
   checkmate::assert_choice(
     covariance_pattern,
-    c("none", "diagonal", "cholesky_scaled", "full_covariance")
+    c("none", "cholesky_scaled", "full_covariance")
   )
   checkmate::assert_choice(stationary_source, c("none", "lift", "omega"))
   checkmate::assert_flag(requires_regular_intervals)
@@ -1668,6 +1670,10 @@ print.mvgam_trend <- function(x, ...) {
 #'
 #' # Correlations among the series' latent states
 #' residual_cor(mod)
+#'
+#' # Residual checks. Each series has gaps of differing length. A
+#' # semivariogram by time lag replaces the ACF
+#' plot(mod, type = "residuals", series = 2)
 #'
 #' # Each series is forecast at its own future times
 #' plot(forecast(mod, newdata = keep_some(simdat$data_test)),
