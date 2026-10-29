@@ -43,16 +43,15 @@ print.mvgam <- function(x, ...) {
     cat(printed_trend_label(x), "\n")
   }
 
-  # Section 4: N series
+  # Sections 4 and 5: the sizes of the series and time axes
   counts <- printed_axis_counts(x)
+  nouns <- axis_nouns(x)
   if (!is.null(counts$n_series)) {
-    cat('\n\nN series:\n')
+    cat('\n\nN ', nouns$series, ':\n', sep = "")
     cat(counts$n_series, '\n')
   }
-
-  # Section 5: N timepoints
   if (!is.null(counts$n_timepoints)) {
-    cat('\n\nN timepoints:\n')
+    cat('\n\nN ', nouns$times, ':\n', sep = "")
     cat(counts$n_timepoints, '\n')
   }
 
@@ -110,7 +109,10 @@ print_model_formula <- function(f) {
 #'
 #' Names the order a trend was fitted at, such as `ARMA(1, 1)` for an AR
 #' with a moving-average term, `AR(3)` for three lags or `PW(logistic)`
-#' for logistic growth. A model without a trend prints `None`.
+#' for logistic growth. A model without a trend prints `None`. The
+#' latent factors of a `jsdgam()` fit are its trend, as in
+#' `2 latent factors`. Factors with dynamics name them, as in
+#' `2 latent AR(1) factors`.
 #'
 #' @param x Fitted `mvgam` object
 #' @return Character scalar trend label
@@ -118,7 +120,12 @@ print_model_formula <- function(f) {
 printed_trend_label <- function(x) {
   checkmate::assert_class(x, "mvgam")
   label <- trend_order_label(x)
-  if (nzchar(label)) label else get_trend_type(x)
+  if (!nzchar(label)) label <- get_trend_type(x)
+  n_lv <- detect_factor_n_lv(x)
+  if (!inherits(x, "jsdgam") || is.null(n_lv)) return(label)
+  paste0(n_lv, " latent ",
+         if (!identical(label, "ZMVN")) paste0(label, " "),
+         ngettext(n_lv, "factor", "factors"))
 }
 
 
@@ -137,6 +144,26 @@ printed_axis_counts <- function(x) {
     n_series = axes$series$n,
     n_timepoints = axes$time$n
   )
+}
+
+#' The nouns that name a model's series and time axes
+#'
+#' A `jsdgam()` fit indexes species across sampling units. Every other
+#' fit indexes series through time.
+#'
+#' @param x An `mvgam` or `mvgam_prefit` object
+#' @return List of `series` (singular and plural alike), `time` (one
+#'   point of the time axis), `times` (its count noun) and `index` (what
+#'   `t` indexes)
+#' @noRd
+axis_nouns <- function(x) {
+  checkmate::assert_class(x, "mvgam")
+  if (inherits(x, "jsdgam")) {
+    return(list(series = "species", time = "sampling unit",
+                times = "sampling units", index = "sampling units"))
+  }
+  list(series = "series", time = "time", times = "time points",
+       index = "time")
 }
 
 #' A family whose `family` element holds the name mvgam records

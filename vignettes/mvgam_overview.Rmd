@@ -52,7 +52,9 @@ through time. Temporal structure that the covariates do not explain
 is estimated as part of the latent state. Forecasts carry that
 structure forward. Stan fits the model. The fitted object works
 with the post-processing tools of four packages: `brms`,
-`marginaleffects`, `loo`, `bayesplot`.
+`marginaleffects`, `loo`, `bayesplot`. The
+[cheatsheet](https://github.com/nicholasjclark/mvgam/raw/master/misc/mvgam_cheatsheet.pdf)
+summarises the main functions on one page.
 
 For an observation $y_{i,t}$ on series $i$ at time $t$, with link
 function $g$ and a response distribution $\mathcal{F}$:

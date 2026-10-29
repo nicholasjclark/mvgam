@@ -150,7 +150,9 @@ update.mvgam <- function(object, formula. = NULL, newdata = NULL,
   # call would then inline the whole data frame. The refit's call
   # is the original with the changed arguments written over it. It
   # keeps every symbol the user typed and can be handed to `update()`.
+  # `summary()` and `methods_md()` name the data from it.
   fit$call <- restate_updated_call(getCall(object), match.call())
+  fit$data.name <- call_data_name(fit$call)
   fit
 }
 

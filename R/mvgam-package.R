@@ -1,3 +1,8 @@
+#' @seealso [mvgam()] fits a state-space model and [jsdgam()] a joint
+#'   species distribution model. The
+#'   `r mvgam_cheatsheet("mvgam", "mvgam cheatsheet")` and the
+#'   `r mvgam_cheatsheet("jsdgam", "JSDM cheatsheet")` summarise the
+#'   main functions on one page each.
 #' @keywords internal
 "_PACKAGE"
 

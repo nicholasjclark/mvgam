@@ -422,7 +422,9 @@ scores and compares forecasts. The
 \href{https://nicholasjclark.github.io/mvgam/dev/articles/mvbf.html}{multivariate formula article} fits
 several responses at once. The
 \href{https://nicholasjclark.github.io/mvgam/dev/articles/idm.html}{integrated distribution model article}
-ties several observation families to one latent process.
+ties several observation families to one latent process. The
+\href{https://github.com/nicholasjclark/mvgam/raw/master/misc/mvgam_cheatsheet.pdf}{cheatsheet} summarises the main
+functions on one page.
 
 Other model fitting: 
 \code{\link{check_newdata}()},

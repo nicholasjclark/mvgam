@@ -47,6 +47,8 @@ test_that("the trend line names the order and drops an empty formula", {
   # A formula with an intercept alone names no predictor, and a
   # two-sided one drops its response.
   expect_null(trend_predictors(list(trend_formula = ~1)))
+  # The default 'factor_formula' of jsdgam() holds no term
+  expect_null(trend_predictors(list(trend_formula = ~ -1)))
   expect_identical(trend_predictors(list(trend_formula = y ~ elev)), "~elev")
   # The user's spelling prints, less the constructor. The stored copy
   # holds the series column in place of `lv_axis()`, and a `- 1`.

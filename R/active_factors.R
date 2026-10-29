@@ -242,8 +242,8 @@ active_factor_draws <- function(variance, criterion, threshold) {
 #' @description Bar plot of the posterior probability that each
 #' dimension of the factor covariance is active, largest first, under
 #' the rule [active_factors()] applied. A dashed line marks `prob`.
-#' The subtitle reports the posterior median count with its 95%
-#' credible interval.
+#' `print()` reports the posterior median count with its 95% credible
+#' interval.
 #'
 #' @param x An `mvgam_active_factors` object returned by
 #'   [active_factors()].
@@ -263,10 +263,6 @@ plot.mvgam_active_factors <- function(x, ...) {
   set_color_scheme_local()
   fill_col <- mvgam_colour("dark")
   cutoff <- x$threshold$prob
-  subtitle <- sprintf(
-    "Posterior median active count: %.1f  (95%% CI %.1f, %.1f)",
-    x$count$median, x$count$q025, x$count$q975
-  )
   ggplot2::ggplot(
     data = x$per_factor,
     mapping = ggplot2::aes(x = .data$factor, y = .data$prob_active)
@@ -280,8 +276,7 @@ plot.mvgam_active_factors <- function(x, ...) {
     ggplot2::labs(
       x = "Factor, largest variance first",
       y = "Posterior probability of being active",
-      title = sprintf("Active latent factors (n_lv = %d)", x$n_lv),
-      subtitle = subtitle
+      title = sprintf("Active latent factors (n_lv = %d)", x$n_lv)
     ) +
     mvgam_theme()
 }

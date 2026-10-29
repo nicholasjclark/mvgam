@@ -10,13 +10,11 @@
 Fit Bayesian Dynamic Generalized Additive Models to multivariate observations. Users can build nonlinear State-Space models that can incorporate semiparametric effects in observation and process components, using a wide range of observation families. Estimation is performed using Markov Chain Monte Carlo with Hamiltonian Monte Carlo in the software 'Stan'. References: Clark & Wells (2023) \doi{10.1111/2041-210X.13974}.
 }
 \seealso{
-Useful links:
-\itemize{
-  \item \url{https://github.com/nicholasjclark/mvgam}
-  \item \url{https://nicholasjclark.github.io/mvgam/}
-  \item Report bugs at \url{https://github.com/nicholasjclark/mvgam/issues}
-}
-
+\code{\link[=mvgam]{mvgam()}} fits a state-space model and \code{\link[=jsdgam]{jsdgam()}} a joint
+species distribution model. The
+\href{https://github.com/nicholasjclark/mvgam/raw/master/misc/mvgam_cheatsheet.pdf}{mvgam cheatsheet} and the
+\href{https://github.com/nicholasjclark/mvgam/raw/master/misc/jsdgam_cheatsheet.pdf}{JSDM cheatsheet} summarise the
+main functions on one page each.
 }
 \author{
 \strong{Maintainer}: Nicholas J Clark \email{nicholas.j.clark1214@gmail.com} (\href{https://orcid.org/0000-0001-7131-3301}{ORCID})

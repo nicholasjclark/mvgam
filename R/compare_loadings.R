@@ -212,12 +212,7 @@ compare_loadings <- function(
       title = sprintf(
         "Posterior-median species loadings: %s vs %s",
         labels[1L], labels[2L]
-      ),
-      subtitle = if (align) {
-        "Procrustes-aligned to a shared basis"
-      } else {
-        "Each fit shown with its own factors"
-      }
+      )
     ) +
     mvgam_theme()
 }

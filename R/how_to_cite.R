@@ -836,7 +836,9 @@ extract_sampling_info <- function(object) {
 #'
 #' Names the family and link of each response, then the trend and
 #' whether its innovations are correlated. A model without a trend
-#' takes the family sentence alone.
+#' takes the family sentence alone. `ZMVN()` has no dynamics: its
+#' states are independent over time. A `jsdgam()` fit names its latent
+#' factors, as `printed_trend_label()` labels them.
 #'
 #' @param object Fitted `mvgam` object or prefit
 #' @return Character scalar opening with a space
@@ -857,9 +859,46 @@ model_structure_text <- function(object) {
   }
   trend <- printed_trend_label(object)
   if (identical(trend, "None")) return(out)
+  if (uses_jsdgam(object)) {
+    return(paste0(
+      out, " Residual associations among species were modelled with ",
+      trend, "."
+    ))
+  }
+  if (identical(get_trend_type(object), "ZMVN")) {
+    return(paste0(
+      out, " The latent states were zero-mean multivariate normal and",
+      " independent over time",
+      if (trend_samples_cor(object)) ", with correlations among series",
+      "."
+    ))
+  }
   paste0(
     out, " The latent process followed ", trend, " dynamics",
     if (trend_samples_cor(object)) " with correlated innovations", "."
+  )
+}
+
+#' The sentence naming what a structured loadings prior was built from
+#'
+#' @param object Fitted `mvgam` object or prefit
+#' @return Character scalar opening with a space, or `""` for a fit
+#'   without a loadings kernel
+#' @noRd
+loadings_prior_text <- function(object) {
+  traits <- loadings_spec_traits(
+    first_trend_spec(object)$loadings_prior_spec
+  )
+  if (!traits$kernel) return("")
+  series <- axis_nouns(object)$series
+  sources <- c(
+    if (traits$features) paste0("trait features of the ", series),
+    if (traits$distances) paste0("pairwise distances among the ", series)
+  )
+  paste0(
+    " The loadings prior was matrix normal. Its correlation among the ",
+    series, " was built from ", paste(sources, collapse = " and "),
+    " (Heaps and Jermyn 2024)."
   )
 }
 
@@ -905,6 +944,7 @@ how_to_cite.mvgam <- function(object, ...) {
   # makes new citations a one-line addition.
   identification <- fit_factor_identification(object)
   fixed_Z <- object$trend_metadata$fixed_Z
+  loadings_text <- loadings_prior_text(object)
   rules <- list(
     list(
       detect = grepl("^VAR", trend_model),
@@ -987,9 +1027,8 @@ how_to_cite.mvgam <- function(object, ...) {
       )
     ),
     list(
-      detect = !is.null(detect_factor_n_lv(object)) &&
-               uses_loadings_prior(object),
-      text = " Domain knowledge was encoded into the loadings prior via a structured matrix-normal distribution whose among-row scale was assembled from per-series features and pairwise distance matrices (Heaps and Jermyn 2024).",
+      detect = !is.null(detect_factor_n_lv(object)) && nzchar(loadings_text),
+      text = loadings_text,
       refs = "heaps_jermyn"
     ),
     list(

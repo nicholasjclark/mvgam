@@ -17,7 +17,7 @@ A \code{ggplot} object.
 \description{
 Scatter of \code{T(y_rep, theta)} against \code{T(y_obs, theta)} per
 posterior draw, with the 1:1 reference line and the Bayesian
-p-value annotated in the subtitle.
+p-value printed in the top-left corner.
 }
 \author{
 Nicholas J Clark

@@ -16,11 +16,11 @@ active_factors_stub <- function(prob = 0.5) {
   )
 }
 
-test_that("plot.mvgam_active_factors labels the count and its threshold", {
+test_that("plot.mvgam_active_factors labels the factors and threshold", {
   p <- plot(active_factors_stub(prob = 0.8))
   expect_match(p$labels$title, "n_lv = 5")
-  # The subtitle reports the median and interval of the count
-  expect_match(p$labels$subtitle, "4.0  (95% CI 3.0, 6.0)", fixed = TRUE)
+  # mvgam plots carry no subtitle. print() reports the count.
+  expect_null(p$labels$subtitle)
   # The reference line marks `prob`. A bar must clear it to count.
   hline <- vapply(p$layers, function(l) inherits(l$geom, "GeomHline"),
                   logical(1L))

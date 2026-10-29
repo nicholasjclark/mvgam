@@ -16,8 +16,16 @@ template:
 
 navbar:
   structure:
-    left: [intro, articles, reference, news]
+    left: [intro, articles, reference, cheatsheets, news]
     right: [search, github]
+  components:
+    cheatsheets:
+      text: Cheatsheets
+      menu:
+      - text: mvgam
+        href: https://github.com/nicholasjclark/mvgam/raw/master/misc/mvgam_cheatsheet.pdf
+      - text: Joint species distribution models
+        href: https://github.com/nicholasjclark/mvgam/raw/master/misc/jsdgam_cheatsheet.pdf
 
 articles:
 - title: Getting started

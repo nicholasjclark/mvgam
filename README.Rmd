@@ -54,6 +54,8 @@ Install the released version from `CRAN` with `install.packages("mvgam")`, or th
 ## Cheatsheet
 [![`mvgam` usage cheatsheet](https://github.com/nicholasjclark/mvgam/raw/master/misc/mvgam_cheatsheet.png)](https://github.com/nicholasjclark/mvgam/raw/master/misc/mvgam_cheatsheet.pdf)
 
+[![`jsdgam` cheatsheet for joint species distribution models](https://github.com/nicholasjclark/mvgam/raw/master/misc/jsdgam_cheatsheet.png)](https://github.com/nicholasjclark/mvgam/raw/master/misc/jsdgam_cheatsheet.pdf)
+
 ## A state-space model of rodent captures
 The `portal_data` from [the Portal Project](https://portal.weecology.org/){target="_blank"} hold monthly counts of baited captures for four desert rodent species, with minimum temperature and a 12-month moving average of NDVI (see `?portal_data`). `mvgam_data()` checks that the data suit an observation family and plots each series:
 

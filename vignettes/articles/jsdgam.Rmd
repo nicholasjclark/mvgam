@@ -43,7 +43,9 @@ Australia (Gibb et al.
 [2015](https://doi.org/10.1007/s00442-014-3101-9)) and adds three
 extensions in turn: environmental effects that act through the
 factors, a loadings prior informed by species traits and a prior
-under which the data decide how many factors are active.
+under which the data decide how many factors are active. The
+[JSDM cheatsheet](https://github.com/nicholasjclark/mvgam/raw/master/misc/jsdgam_cheatsheet.pdf)
+summarises the functions on one page.
 
 ## The data
 

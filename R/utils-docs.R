@@ -22,3 +22,22 @@ mvgam_article <- function(name, text) {
          "](https://nicholasjclark.github.io/mvgam/dev/articles/",
          name, ".html)")
 }
+
+
+#' A link to a cheatsheet PDF
+#'
+#' Roxygen calls this in inline R code, as
+#' `` `r mvgam_cheatsheet("mvgam", "the cheatsheet")` ``. The address
+#' of the PDFs is written here once.
+#'
+#' @param name The cheatsheet, `"mvgam"` or `"jsdgam"`
+#' @param text The link text
+#' @return A Markdown link
+#' @noRd
+mvgam_cheatsheet <- function(name, text) {
+  checkmate::assert_choice(name, c("mvgam", "jsdgam"))
+  checkmate::assert_string(text, min.chars = 1L)
+  paste0("[", text,
+         "](https://github.com/nicholasjclark/mvgam/raw/master/misc/",
+         name, "_cheatsheet.pdf)")
+}

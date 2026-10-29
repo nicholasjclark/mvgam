@@ -574,6 +574,13 @@ test_that("loadings_prior features + distances kernel emits kernel rows", {
     paste0("- $d_{\\mathrm{phylo}}$: distances between the series from ",
            "'phylo', with length scale $\\theta_{\\mathrm{phylo}}$")
   ))
+  # The methods paragraph names the sources the kernel was built from
+  expect_match(
+    how_to_cite(mod)$methods_text,
+    paste0("built from trait features of the series and pairwise ",
+           "distances among the series"),
+    fixed = TRUE
+  )
 })
 
 
@@ -1005,6 +1012,35 @@ test_that("mvn() emits MVNormal with a diagonal Sigma", {
     "\\boldsymbol{\\Sigma} &= \\text{diag}(\\boldsymbol{\\Psi}^2)"
   ))
   expect_no_match(out, "LKJ", fixed = TRUE)
+})
+
+test_that("a jsdgam model names species, sampling units and factors", {
+  set.seed(1L)
+  d <- expand.grid(time = 1:6, series = factor(paste0("sp", 1:3)))
+  d$env <- rep(rnorm(6), times = 3)
+  d$y <- rpois(18, 2)
+  mod <- jsdgam(y ~ env, data = d, family = poisson(), n_lv = 2L,
+                run_model = FALSE, silent = 2, backend = "cmdstanr",
+                validate = FALSE)
+  out <- methods_md(mod)
+  expect_match(out, "$S = 3$ species, $T = 6$ sampling units", fixed = TRUE)
+  expect_match(out, "loading of species $i$ on factor $k$", fixed = TRUE)
+  # ZMVN factors have no dynamics. The paragraph names the factors.
+  expect_match(
+    how_to_cite(mod)$methods_text,
+    "Residual associations among species were modelled with 2 latent factors.",
+    fixed = TRUE
+  )
+})
+
+test_that("how_to_cite describes ZMVN states as independent over time", {
+  mod <- make_methods_md_prefit(y ~ x, trend_formula = ~ ZMVN())
+  expect_match(
+    how_to_cite(mod)$methods_text,
+    paste0("The latent states were zero-mean multivariate normal and ",
+           "independent over time, with correlations among series."),
+    fixed = TRUE
+  )
 })
 
 

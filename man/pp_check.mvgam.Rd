@@ -71,7 +71,7 @@ name or an index. The default is the first series. Its residuals
 are taken in time order. \code{resid_acf} keeps missing responses in
 place. Its lags count time steps. \code{resid_pacf} drops them. Its lags
 count observations. A fit with several series names its series in
-the subtitle.}
+the title.}
 
 \item{...}{Further arguments of \code{\link[=posterior_predict.mvgam]{posterior_predict.mvgam()}} and of
 the \pkg{bayesplot} function \code{type} names. Any other name is

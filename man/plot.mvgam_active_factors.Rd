@@ -19,8 +19,8 @@ A \code{ggplot} object.
 Bar plot of the posterior probability that each
 dimension of the factor covariance is active, largest first, under
 the rule \code{\link[=active_factors]{active_factors()}} applied. A dashed line marks \code{prob}.
-The subtitle reports the posterior median count with its 95\%
-credible interval.
+\code{print()} reports the posterior median count with its 95\% credible
+interval.
 }
 \seealso{
 \code{\link[=active_factors]{active_factors()}}

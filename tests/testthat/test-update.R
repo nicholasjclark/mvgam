@@ -333,6 +333,11 @@ test_that("update() refits a jsdgam through jsdgam()", {
   # An override reaches jsdgam() and changes the factor count alone.
   refit <- update(prefit, n_lv = 1L, run_model = FALSE)
   expect_equal(refit$standata$N_lv_trend, 1)
+  # The refit names its data as the original call did. Its
+  # reproduction call writes a literal argument as given.
+  mgp <- update(prefit, loadings_prior = "mgp", run_model = FALSE)
+  expect_identical(mgp$data.name, "dat")
+  expect_match(methods_md(mgp), "loadings_prior += \"mgp\"")
   # The factor count is Stan data. With `recompile = FALSE`, the unchanged
   # program is passed. A family that adds a parameter changes the program.
   expect_s3_class(

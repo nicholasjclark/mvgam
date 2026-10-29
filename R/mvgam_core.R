@@ -624,7 +624,9 @@ mvgam_imputation_forwarded <- c(
 #'   `r mvgam_article("mvbf", "multivariate formula article")` fits
 #'   several responses at once. The
 #'   `r mvgam_article("idm", "integrated distribution model article")`
-#'   ties several observation families to one latent process.
+#'   ties several observation families to one latent process. The
+#'   `r mvgam_cheatsheet("mvgam", "cheatsheet")` summarises the main
+#'   functions on one page.
 #'
 #' @family model fitting
 #' @export

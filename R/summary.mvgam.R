@@ -227,6 +227,8 @@ summary.mvgam <- function(object, probs = c(0.025, 0.975),
   counts <- printed_axis_counts(object)
   out$n_series <- counts$n_series
   out$n_timepoints <- counts$n_timepoints
+  out$series_noun <- axis_nouns(object)$series
+  out$n_lv <- detect_factor_n_lv(object)
 
   # The rows the model was given, or the units of a closure-unit
   # family. On a ragged design this is fewer than series x times.
@@ -642,7 +644,9 @@ print.mvgam_summary <- function(x, digits = 2, ...) {
   }
 
   if (!is.null(x$n_series) && x$n_series > 1) {
-    cat(" Series: ", x$n_series, " \n", sep = "")
+    # The colons align under "Formula: "
+    noun <- tools::toTitleCase(x$series_noun %||% "series")
+    cat(formatC(noun, width = 7L), ": ", x$n_series, " \n", sep = "")
   }
 
   trend_line <- format_trend_line(x)
@@ -837,8 +841,9 @@ trend_predictors <- function(object) {
   } else {
     trend_formula
   }
-  out <- paste(trimws(format(rhs)), collapse = " ")
-  if (grepl("^~\\s*[01]\\s*$", out)) NULL else out
+  # `~0`, `~1` and `~-1` hold no term
+  if (!length(attr(stats::terms(rhs), "term.labels"))) return(NULL)
+  paste(trimws(format(rhs)), collapse = " ")
 }
 
 
@@ -856,6 +861,7 @@ trend_predictors <- function(object) {
 build_next_steps <- function(x) {
   checkmate::assert_list(x)
   has_factors <- !is.null(x$loadings) || !is.null(x$loadings_prior)
+  series <- x$series_noun %||% "series"
   trend_model <- x$trend_model %||% ""
   has_cor_trend <- has_factors || isTRUE(x$trend_has_cor)
   # A covariate may enter either predictor. The observation side
@@ -895,11 +901,15 @@ build_next_steps <- function(x) {
          )),
     list(when = has_factors,
          text = paste0(
-           "`shared_variation(fit)`: ",
-           "factor-implied Delta = Z Sigma Z' (rotation-invariant)"
+           "`shared_variation(fit)`: covariance the factors imply, ",
+           "unchanged by rotation"
          )),
     list(when = has_cor_trend,
-         text = "`residual_cor(fit)`: implied cross-series correlations"),
+         text = paste0("`residual_cor(fit)`: implied correlations among ",
+                       series)),
+    # A biplot needs two factors
+    list(when = isTRUE(x$n_lv >= 2L),
+         text = "`ordinate(fit)`: biplot of the factor scores and loadings"),
     list(when = forecastable,
          text = "`forecast(fit, newdata = ...)`: out-of-sample forecasts"),
     # PSIS-LOO leaves out an observation the latent state was fitted

@@ -231,15 +231,17 @@ describe_predictors <- function(obj) {
 describe_data_dimensions <- function(obj) {
   n_obs <- nrow(obj$data %||% data.frame())
   counts <- printed_axis_counts(obj)
+  nouns <- axis_nouns(obj)
   parts <- character(0L)
   if (n_obs > 0L) {
     parts <- c(parts, paste0("$N = ", n_obs, "$ observations"))
   }
   if (!is.null(counts$n_series)) {
-    parts <- c(parts, paste0("$S = ", counts$n_series, "$ series"))
+    parts <- c(parts, paste0("$S = ", counts$n_series, "$ ", nouns$series))
   }
   if (!is.null(counts$n_timepoints)) {
-    parts <- c(parts, paste0("$T = ", counts$n_timepoints, "$ time points"))
+    parts <- c(parts,
+               paste0("$T = ", counts$n_timepoints, "$ ", nouns$times))
   }
   parts <- c(parts, closure_unit_data_dimensions(obj))
   parts <- c(parts, factor_loadings_data_dimensions(obj))
@@ -839,14 +841,18 @@ model_glossary <- function(obj) {
                is.null(mv_custom_family_kind(obj))) {
     mean_glossary(mu_symbol(obj), response_subscripted(obj), obj$family)
   }
+  nouns <- axis_nouns(obj)
   defs <- c(
-    if (is_multi_season_family(obj$family)) {
-      "- $i$ indexes series, $s$ indexes sites, $t$ indexes seasons"
-    } else if (!is.null(mv_custom_family_kind(obj))) {
-      "- $i$ indexes series, $t$ indexes units"
-    } else {
-      "- $i$ indexes series, $t$ indexes time"
-    },
+    paste0(
+      "- $i$ indexes ", nouns$series, ", ",
+      if (is_multi_season_family(obj$family)) {
+        "$s$ indexes sites, $t$ indexes seasons"
+      } else if (!is.null(mv_custom_family_kind(obj))) {
+        "$t$ indexes units"
+      } else {
+        paste0("$t$ indexes ", nouns$index)
+      }
+    ),
     closure_unit_glossary(obj),
     mv_custom_glossary(obj),
     means,
@@ -868,8 +874,10 @@ trend_glossary <- function(obj) {
   if (!methods_md_has_latent_trend(obj)) return(character(0L))
   is_factor <- methods_md_has_factor_model(obj)
   mu <- trend_mu_symbol(obj)
+  nouns <- axis_nouns(obj)
   defs <- c(
-    "- $\\eta_{i,t}$: latent state at series $i$ time $t$",
+    paste0("- $\\eta_{i,t}$: latent state of ", nouns$series, " $i$ at ",
+           nouns$time, " $t$"),
     if (!is.null(mu)) {
       c(paste0("- $", mu, "$: ",
                if (trend_mu_on_factors(obj)) "factor " else "trend ",
@@ -882,9 +890,10 @@ trend_glossary <- function(obj) {
       defs,
       paste0("- $", trend_eta(obj), "$: latent ", trend_order_label(obj),
              " factor $k = 1, \\ldots, ", obj$trend_metadata$n_lv,
-             "$ at time $t$"),
-      "- $Z_{i,k}$: loading of series $i$ on factor $k$",
-      loadings_glossary(first_trend_spec(obj)$loadings_prior_spec)
+             "$ at ", nouns$time, " $t$"),
+      paste0("- $Z_{i,k}$: loading of ", nouns$series, " $i$ on factor $k$"),
+      loadings_glossary(first_trend_spec(obj)$loadings_prior_spec,
+                        nouns$series)
     )
     a <- obj$standata[c("mgp_a1", "mgp_a2")]
     if (!is.null(a$mgp_a1)) {
@@ -948,13 +957,14 @@ innovation_glossary <- function(obj) {
            trend_symbols(obj)[["sigma_trend"]], "$")
   }
   cov <- innovation_cov_symbol(obj)
+  at <- paste0("s at ", axis_nouns(obj)$time, " $t$")
   out <- switch(form,
     scalar = paste0("- $", trend_eps(obj), "$: ", what, ", ",
                     scale(sd, "SD")),
     diag = paste0("- $", trend_eps(obj, vector = TRUE), "$: ", what,
-                  "s at time $t$, independent with ", scale(sd_vec, "SDs")),
+                  at, ", independent with ", scale(sd_vec, "SDs")),
     cor = paste0("- $", trend_eps(obj, vector = TRUE), "$: ", what,
-                 "s at time $t$, covariance $", cov, "$", sd_entries)
+                 at, ", covariance $", cov, "$", sd_entries)
   )
   # ZMVN draws the states themselves and has no innovations.
   of <- "innovations"
@@ -1570,17 +1580,19 @@ mv_custom_glossary <- function(obj) {
   kind <- mv_custom_family_kind(obj)
   if (is.null(kind)) return(character(0L))
   normal <- kind %in% c("mvn", "mvt")
+  series <- axis_nouns(obj)$series
   c(
     paste0("- $\\mathbf{Y}_t$: response vector of unit $t$, one entry per ",
-           "series"),
+           series),
     if (normal) {
-      c("- $\\mu_{i,t}$: mean of series $i$ at unit $t$",
+      c(paste0("- $\\mu_{i,t}$: mean of ", series, " $i$ at unit $t$"),
         paste0("- $\\boldsymbol{\\Sigma}$: residual covariance, one SD in ",
-               "$\\boldsymbol{\\Psi}$ per series"))
+               "$\\boldsymbol{\\Psi}$ per ", series))
     } else {
-      c(paste0("- $\\mu_{i,t}$: linear predictor of series $i$ at unit $t$, ",
-               "with series 1 the reference"),
-        "- $\\boldsymbol{\\pi}_t$: probabilities of the series at unit $t$")
+      c(paste0("- $\\mu_{i,t}$: linear predictor of ", series,
+               " $i$ at unit $t$, with ", series, " 1 the reference"),
+        paste0("- $\\boldsymbol{\\pi}_t$: probabilities of the ", series,
+               " at unit $t$"))
     },
     switch(kind,
       mvt = "- $\\nu$: degrees of freedom",
@@ -3457,9 +3469,11 @@ kernel_assembly_rows <- function(spec) {
 #' The glossary entries of the loadings kernel
 #'
 #' @param spec The trend's loadings prior spec, or `NULL`
+#' @param series The noun naming the series, from `axis_nouns()`
 #' @return Character vector of Markdown bullets, empty without a kernel
 #' @noRd
-loadings_glossary <- function(spec) {
+loadings_glossary <- function(spec, series) {
+  checkmate::assert_string(series)
   traits <- loadings_spec_traits(spec)
   if (!traits$kernel) return(character(0L))
   dnames <- names(spec$distance_mats) %||% character(0L)
@@ -3467,11 +3481,11 @@ loadings_glossary <- function(spec) {
                if (traits$distances) "distances")
   c(
     paste0("- $\\boldsymbol{\\Phi}$: correlation of each factor's ",
-           "loadings across the series, built from the series' ",
-           paste(sources, collapse = " and ")),
+           "loadings across the ", series, ", built from the ", series,
+           "' ", paste(sources, collapse = " and ")),
     if (length(dnames)) {
       d <- escape_math_text(dnames)
-      paste0("- $d_{", d, "}$: distances between the series from '",
+      paste0("- $d_{", d, "}$: distances between the ", series, " from '",
              dnames, "', with length scale $\\theta_{", d, "}$")
     },
     if (traits$features) {
@@ -3756,7 +3770,10 @@ render_implementation_section <- function(obj) {
     jsdgam_call_args(obj)
   } else {
     c(formula = formula_text(obj$formula),
-      trend_formula = trend_formula_text(obj))
+      trend_formula = trend_formula_text(obj),
+      trend_map = call_arg_text(obj, "trend_map"),
+      loadings_prior = call_arg_text(obj, "loadings_prior"),
+      prior = call_arg_text(obj, "prior"))
   }
   args <- c(
     model_args,
@@ -3881,10 +3898,8 @@ implementation_prose <- function(fn, info) {
 #' `jsdgam()` builds its trend from `factor_formula` and `n_lv`. Its
 #' `trait_slopes` rewrites `formula`. The call gives the arguments the
 #' user passed. A setting equal to its default in `jsdgam()` is left
-#' out. The traits, phylogeny and loadings prior are data objects. The
-#' call names each by the expression the user wrote. A fit built by
-#' `do.call()` holds the object itself, which the call names by its
-#' argument, as it names the data.
+#' out. The traits, phylogeny, loadings prior and priors are data
+#' objects, written by `call_arg_text()`.
 #'
 #' @param obj A `jsdgam` object
 #' @return Named character vector of argument texts
@@ -3896,11 +3911,7 @@ jsdgam_call_args <- function(obj) {
   differs <- function(name, text) {
     if (!identical(text, deparse1(defaults[[name]]))) text
   }
-  written <- function(name) {
-    expr <- obj$call[[name]]
-    if (is.null(expr)) return(NULL)
-    if (is.language(expr)) deparse1(expr) else name
-  }
+  written <- function(name) call_arg_text(obj, name)
   c(
     formula = formula_text(args$formula),
     factor_formula = differs("factor_formula",
@@ -3911,8 +3922,29 @@ jsdgam_call_args <- function(obj) {
     traits = written("traits"),
     trait_slopes = written("trait_slopes"),
     phylo = written("phylo"),
-    loadings_prior = written("loadings_prior")
+    loadings_prior = written("loadings_prior"),
+    # `prior`, the brms spelling, is accepted in `...`
+    priors = written("priors") %||% written("prior")
   )
+}
+
+#' The text of a data argument as the model call wrote it
+#'
+#' An expression the user typed is written as typed. A single string or
+#' number, such as `loadings_prior = "mgp"`, is written as it is. A fit
+#' built by `do.call()` holds the object itself, which the call names
+#' by its argument, as it names the data.
+#'
+#' @param obj An `mvgam` object
+#' @param name The argument's name
+#' @return Character scalar, or `NULL` when the call omits the argument
+#' @noRd
+call_arg_text <- function(obj, name) {
+  checkmate::assert_string(name)
+  expr <- obj$call[[name]]
+  if (is.null(expr)) return(NULL)
+  literal <- is.atomic(expr) && length(expr) == 1L
+  if (is.language(expr) || literal) deparse1(expr) else name
 }
 
 #' A formula as the call to refit the model writes it

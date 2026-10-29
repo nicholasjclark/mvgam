@@ -53,7 +53,7 @@
 #'   are taken in time order. `resid_acf` keeps missing responses in
 #'   place. Its lags count time steps. `resid_pacf` drops them. Its lags
 #'   count observations. A fit with several series names its series in
-#'   the subtitle.
+#'   the title.
 #'
 #' @param ... Further arguments of [posterior_predict.mvgam()] and of
 #'   the \pkg{bayesplot} function `type` names. Any other name is
@@ -750,13 +750,13 @@ resid_series_rows <- function(object, data, series = NULL) {
 }
 
 
-#' A residual plot subtitled with the series it shows
+#' A residual plot titled with the series it shows
 #'
-#' Only fits with more than one series get the subtitle.
+#' Only fits with more than one series get the title.
 #'
 #' @param p A `ggplot` object
 #' @param series_sel List from `resid_series_rows()`, or `NULL`
-#' @return `p`, with a subtitle when the fit has several series
+#' @return `p`, with a title when the fit has several series
 #' @noRd
 label_resid_series <- function(p, series_sel) {
   checkmate::assert_class(p, "ggplot")
@@ -764,7 +764,17 @@ label_resid_series <- function(p, series_sel) {
   if (is.null(series_sel$label) || series_sel$n_series < 2L) {
     return(p)
   }
-  p + ggplot2::labs(subtitle = paste0("Series: ", series_sel$label))
+  p + ggplot2::labs(title = resid_series_title(series_sel$label))
+}
+
+#' The title naming the series a residual plot shows
+#'
+#' @param label Character series label
+#' @return Character scalar
+#' @noRd
+resid_series_title <- function(label) {
+  checkmate::assert_string(label)
+  paste0("Residuals for ", label)
 }
 
 
@@ -1257,7 +1267,7 @@ fit_stat_label <- function(stat) {
 #'
 #' Scatter of `T(y_rep, theta)` against `T(y_obs, theta)` per
 #' posterior draw, with the 1:1 reference line and the Bayesian
-#' p-value annotated in the subtitle.
+#' p-value printed in the top-left corner.
 #'
 #' @param x A `mvgam_ppc_fit_stat` object.
 #' @param ... Unused. Anything passed here is refused.
@@ -1275,13 +1285,16 @@ plot.mvgam_ppc_fit_stat <- function(x, ...) {
     ggplot2::geom_abline(intercept = 0, slope = 1,
                          linetype = 2, colour = "grey40") +
     ggplot2::coord_equal(xlim = rng, ylim = rng) +
+    ggplot2::annotate(
+      "text", x = -Inf, y = Inf, hjust = -0.1, vjust = 1.5,
+      label = paste0("Bayesian p-value = ",
+                     format(round(x$bayes_p, 3), nsmall = 3))
+    ) +
     ggplot2::labs(
       title = paste0(
         "PPC: ", stat_lab,
         " discrepancy (", x$grain, " grain)"
       ),
-      subtitle = paste0("Bayesian p-value = ",
-                        format(round(x$bayes_p, 3), nsmall = 3)),
       x = "T(y_obs, theta)", y = "T(y_rep, theta)"
     ) +
     mvgam_theme()
@@ -1332,13 +1345,13 @@ mvgam_resid_panel <- function(
   panels <- lapply(
     resid_diagnostic_panels(object, types, draw_ids = draw_ids,
                             resp = resp, series = series),
-    function(p) p + ggplot2::labs(subtitle = NULL)
+    function(p) p + ggplot2::labs(title = NULL)
   )
   out <- patchwork::wrap_plots(panels, ncol = min(2L, length(panels)))
   label <- series_sel$label
   if (is.null(label)) {
     return(out)
   }
-  out + patchwork::plot_annotation(title = paste0("Residuals for ", label),
+  out + patchwork::plot_annotation(title = resid_series_title(label),
                                    theme = mvgam_theme())
 }

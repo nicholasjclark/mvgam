@@ -131,7 +131,9 @@
 #'   [methods_md()] writes its equations.
 #'   The `r mvgam_article("jsdgam", "JSDM article")` fits a negative
 #'   binomial model with a trait-informed loadings prior, ordination
-#'   biplots and multiplicative gamma process shrinkage.
+#'   biplots and multiplicative gamma process shrinkage. The
+#'   `r mvgam_cheatsheet("jsdgam", "JSDM cheatsheet")` summarises the
+#'   functions on one page.
 #'
 #' @references
 #' Warton, D. I., Blanchet, F. G., O'Hara, R. B., Ovaskainen, O.,

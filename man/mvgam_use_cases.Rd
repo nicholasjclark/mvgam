@@ -2,7 +2,7 @@
 \alias{mvgam_use_cases}
 \title{Example use cases for \pkg{mvgam}}
 \description{
-New to \pkg{mvgam}? Start with \code{\link{mvgam}}, whose Workflow section lists the steps of an analysis and whose Terms section defines the vocabulary these pages use. \code{\link{mvgam_data}} checks a data frame before fitting. The \href{https://nicholasjclark.github.io/mvgam/dev/articles/mvgam_overview.html}{overview article} walks through a full analysis.
+New to \pkg{mvgam}? Start with \code{\link{mvgam}}, whose Workflow section lists the steps of an analysis and whose Terms section defines the vocabulary these pages use. \code{\link{mvgam_data}} checks a data frame before fitting. The \href{https://nicholasjclark.github.io/mvgam/dev/articles/mvgam_overview.html}{overview article} walks through a full analysis. The \href{https://github.com/nicholasjclark/mvgam/raw/master/misc/mvgam_cheatsheet.pdf}{cheatsheet} summarises the main functions on one page.
 
 \pkg{mvgam} fits dynamic generalized additive models (GAMs) to one or many time series. Smooth functions of covariates sit beside a latent time-series process that carries the autocorrelation the covariates leave behind. Stan samples the posterior. Every prediction and forecast then carries the uncertainty of every parameter.
 
@@ -54,7 +54,7 @@ Cyclic smooths model seasonal patterns. Gaussian processes, monotonic smooths an
 }
 }
 \seealso{
-\code{\link{mvgam}}, \code{\link{mvgam_data}}, \code{\link{trend_constructors}}
+\code{\link{mvgam}}, \code{\link{mvgam_data}}, \code{\link{trend_constructors}}, the \href{https://github.com/nicholasjclark/mvgam/raw/master/misc/mvgam_cheatsheet.pdf}{cheatsheet}
 }
 \author{
 Nicholas J Clark

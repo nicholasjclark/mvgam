@@ -272,7 +272,9 @@ factors. \code{\link[=lv_axis]{lv_axis()}} gives each factor its own covariate e
 \code{\link[=methods_md]{methods_md()}} writes its equations.
 The \href{https://nicholasjclark.github.io/mvgam/dev/articles/jsdgam.html}{JSDM article} fits a negative
 binomial model with a trait-informed loadings prior, ordination
-biplots and multiplicative gamma process shrinkage.
+biplots and multiplicative gamma process shrinkage. The
+\href{https://github.com/nicholasjclark/mvgam/raw/master/misc/jsdgam_cheatsheet.pdf}{JSDM cheatsheet} summarises the
+functions on one page.
 
 Other model fitting: 
 \code{\link{check_newdata}()},
