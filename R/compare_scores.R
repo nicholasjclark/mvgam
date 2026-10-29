@@ -20,7 +20,8 @@
 #'   [score.mvgam_forecast()], such as
 #'   `score_args = list(interval_width = 0.6)`.
 #'
-#' @return A `tibble` of class `mvgam_compare_scores`, with columns:
+#' @return A `tibble` of class `mvgam_compare_scores`. Its `print()`
+#'   method ranks the models by their mean score. Its columns are:
 #' \itemize{
 #'   \item `model`: a factor with one level per forecast.
 #'   \item `series`: a factor of series names, with an `"all_series"`
@@ -445,6 +446,30 @@ summary.mvgam_compare_scores <- function(object, ...) {
   rownames(wide) <- NULL
   class(wide) <- c("tbl_df", "tbl", "data.frame")
   wide
+}
+
+
+#' @rdname compare_scores
+#' @param x An `mvgam_compare_scores` object.
+#' @param digits Integer number of significant digits. Defaults to 2.
+#' @method print mvgam_compare_scores
+#' @export
+print.mvgam_compare_scores <- function(x, digits = 2L, ...) {
+  checkmate::assert_int(digits, lower = 1L)
+  # The `all_series` rows hold the score of every series at each time:
+  # their sum for a univariate score and the joint score otherwise.
+  total <- x$series == "all_series"
+  means <- vapply(split(x$score[total], x$model[total]), mean_measured,
+                  numeric(1L))
+  tab <- data.frame(model = names(means), mean_score = means,
+                    difference = means - min(means, na.rm = TRUE))
+  cat_score_table(
+    paste(score_label(attr(x, "score")), "of", nrow(tab),
+          "models, lower is better"),
+    tab[order(tab$mean_score), ], digits,
+    "'difference' is the gap to the best. plot() shows each horizon."
+  )
+  invisible(x)
 }
 
 

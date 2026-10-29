@@ -2,6 +2,7 @@
 % Please edit documentation in R/score.mvgam_forecast.R
 \name{score.mvgam_forecast}
 \alias{score.mvgam_forecast}
+\alias{print.mvgam_score}
 \title{Proper scoring rules for \code{mvgam_forecast} objects}
 \usage{
 \method{score}{mvgam_forecast}(
@@ -15,6 +16,8 @@
   weights = NULL,
   ...
 )
+
+\method{print}{mvgam_score}(x, digits = 2L, ...)
 }
 \arguments{
 \item{object}{An \code{mvgam_forecast} object whose \code{type} is
@@ -45,10 +48,16 @@ and \code{"variogram"}. Passing \code{TRUE} with any other score is an error.}
 per series, for \code{"variogram"}.}
 
 \item{...}{Unused. Anything passed here is refused.}
+
+\item{x}{An \code{mvgam_score} object returned by \code{score()}.}
+
+\item{digits}{Integer number of significant digits. Defaults to 2.}
 }
 \value{
-A named \code{list} with one data frame per series plus a trailing
-\code{all_series} summary. Each series' data frame has columns \code{score},
+An object of class \code{mvgam_score}: a named list with one data
+frame per series plus a trailing \code{all_series} summary. Its \code{print()}
+method shows the mean score and interval coverage of each series.
+A multivariate model gives one such object per response. Each series' data frame has columns \code{score},
 \code{in_interval}, \code{interval_width}, \code{eval_horizon} and \code{score_type},
 the requested \code{score}. A joint score leaves the per-series \code{score}
 column \code{NA}.

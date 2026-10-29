@@ -328,3 +328,17 @@ test_that("print.mvgam_forecast handles hindcast-only fits", {
   expect_match(blob, "hindcast:  8 timepoints")
   expect_match(blob, "forecast:  0 \\(hindcast only\\)")
 })
+
+test_that("print() of compare_scores ranks the models by mean score", {
+  fcs <- list(make_mock_forecast(seed = 1L), make_mock_forecast(seed = 2L))
+  totals <- vapply(fcs, function(f) {
+    mean(score(f, score = "crps")$all_series$score)
+  }, numeric(1L))
+  # The worse model is passed first. Its row must move below the best.
+  worse <- fcs[[which.max(totals)]]
+  better <- fcs[[which.min(totals)]]
+  out <- compare_scores(Worse = worse, Better = better, score = "crps")
+  rows <- grep("^ *(Worse|Better) ", capture.output(print(out)),
+               value = TRUE)
+  expect_match(rows[1], "^ *Better ")
+})

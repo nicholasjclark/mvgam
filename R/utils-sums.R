@@ -21,3 +21,19 @@ sum_measured <- function(x, dims = 0L) {
   out[rowSums(!is.na(x), dims = dims) == 0L] <- NA_real_
   out
 }
+
+
+#' Average the measured values, missing where none was measured
+#'
+#' The mean counterpart of `sum_measured()`. A plain
+#' `mean(na.rm = TRUE)` returns `NaN` when nothing was measured.
+#'
+#' @param x Numeric vector
+#' @return A number, or `NA` when every value is missing
+#' @noRd
+mean_measured <- function(x) {
+  checkmate::assert_numeric(x)
+  if (all(is.na(x))) return(NA_real_)
+  mean(x, na.rm = TRUE)
+}
+

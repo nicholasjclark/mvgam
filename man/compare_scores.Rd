@@ -2,9 +2,12 @@
 % Please edit documentation in R/compare_scores.R
 \name{compare_scores}
 \alias{compare_scores}
+\alias{print.mvgam_compare_scores}
 \title{Tidy comparison of forecast scores across mvgam models}
 \usage{
 compare_scores(..., score = "crps", model_names = NULL, score_args = list())
+
+\method{print}{mvgam_compare_scores}(x, digits = 2L, ...)
 }
 \arguments{
 \item{...}{Two or more \code{mvgam_forecast} objects from
@@ -21,9 +24,14 @@ forecast. It replaces the names taken from the call.}
 \item{score_args}{Optional named list of further arguments of
 \code{\link[=score.mvgam_forecast]{score.mvgam_forecast()}}, such as
 \code{score_args = list(interval_width = 0.6)}.}
+
+\item{x}{An \code{mvgam_compare_scores} object.}
+
+\item{digits}{Integer number of significant digits. Defaults to 2.}
 }
 \value{
-A \code{tibble} of class \code{mvgam_compare_scores}, with columns:
+A \code{tibble} of class \code{mvgam_compare_scores}. Its \code{print()}
+method ranks the models by their mean score. Its columns are:
 \itemize{
 \item \code{model}: a factor with one level per forecast.
 \item \code{series}: a factor of series names, with an \code{"all_series"}

@@ -114,8 +114,10 @@ score_label <- function(score) {
 #'   per series, for `"variogram"`.
 #' @param ... Unused. Anything passed here is refused.
 #'
-#' @return A named `list` with one data frame per series plus a trailing
-#'   `all_series` summary. Each series' data frame has columns `score`,
+#' @return An object of class `mvgam_score`: a named list with one data
+#'   frame per series plus a trailing `all_series` summary. Its `print()`
+#'   method shows the mean score and interval coverage of each series.
+#'   A multivariate model gives one such object per response. Each series' data frame has columns `score`,
 #'   `in_interval`, `interval_width`, `eval_horizon` and `score_type`,
 #'   the requested `score`. A joint score leaves the per-series `score`
 #'   column `NA`.
@@ -232,20 +234,59 @@ score.mvgam_forecast <- function(object,
 
   series_names <- as.character(object$series_names)
 
-  if (score %in% univariate_forecast_scores) {
-    return(score_univariate(
+  out <- if (score %in% univariate_forecast_scores) {
+    score_univariate(
       object, series_names, score,
       interval_width = interval_width,
       quantile_level = quantile_level, lower = lower,
       upper = upper, log = log
-    ))
+    )
+  } else {
+    score_multivariate(
+      object, series_names, score,
+      interval_width = interval_width,
+      lower = lower, upper = upper, log = log, weights = weights
+    )
   }
+  structure(out, class = "mvgam_score", score = score,
+            interval_width = interval_width)
+}
 
-  score_multivariate(
-    object, series_names, score,
-    interval_width = interval_width,
-    lower = lower, upper = upper, log = log, weights = weights
+
+#' @rdname score.mvgam_forecast
+#' @param x An `mvgam_score` object returned by `score()`.
+#' @param digits Integer number of significant digits. Defaults to 2.
+#' @method print mvgam_score
+#' @export
+print.mvgam_score <- function(x, digits = 2L, ...) {
+  checkmate::assert_int(digits, lower = 1L)
+  score <- attr(x, "score")
+  tab <- data.frame(
+    series = names(x),
+    mean_score = vapply(x, function(d) mean_measured(d$score),
+                        numeric(1L)),
+    # Coverage is missing on the total row and under a joint score
+    coverage = vapply(x, function(d) {
+      mean_measured(d$in_interval %||% NA_real_)
+    }, numeric(1L)),
+    times = vapply(x, nrow, integer(1L))
   )
+  notes <- if (score %in% joint_forecast_scores) {
+    "'all_series' scores the series jointly at each time."
+  } else {
+    "'all_series' sums the series at each time."
+  }
+  if (any(!is.na(tab$coverage))) {
+    notes <- c(notes, paste0("'coverage' is the share inside the ",
+                             round(100 * attr(x, "interval_width")),
+                             "% interval."))
+  }
+  cat_score_table(
+    paste(score_label(score), "of", nrow(tab) - 1L,
+          "forecast series, lower is better"),
+    tab, digits, notes
+  )
+  invisible(x)
 }
 
 
@@ -534,4 +575,32 @@ score_multivariate <- function(object, series_names, score,
     stringsAsFactors = FALSE
   )
   series_score
+}
+
+
+#' Print a table of scores under a title
+#'
+#' Shared by the print methods of `score()` and `compare_scores()`.
+#' Numeric columns print to `digits` significant digits. A missing
+#' cell prints blank.
+#'
+#' @param title Character title line
+#' @param tab Data frame to print
+#' @param digits Integer number of significant digits
+#' @param notes Character vector of lines printed after the table
+#' @return `NULL`, invisibly
+#' @noRd
+cat_score_table <- function(title, tab, digits, notes) {
+  checkmate::assert_string(title)
+  checkmate::assert_data_frame(tab)
+  checkmate::assert_int(digits, lower = 1L)
+  checkmate::assert_character(notes)
+  num <- vapply(tab, is.numeric, logical(1L))
+  tab[num] <- lapply(tab[num], function(v) {
+    ifelse(is.na(v), "", format(signif(v, digits)))
+  })
+  cat(title, "\n\n", sep = "")
+  print(tab, row.names = FALSE, right = FALSE)
+  cat("\n", paste0(notes, "\n"), sep = "")
+  invisible(NULL)
 }

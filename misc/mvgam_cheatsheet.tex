@@ -101,34 +101,29 @@ Trend constructors for \texttt{\color{Orchid} trend\_formula}. Options include (
 
 \item\texttt{\color{Orchid} AR(p = 1, ma = FALSE, cor = FALSE)}: autoregressive
 
-\item\texttt{\color{Orchid} VAR(ma = FALSE)}: vector autoregressive
+\item\texttt{\color{Orchid} VAR(ma = FALSE)}: \href{https://nicholasjclark.github.io/mvgam/dev/articles/var.html}{vector autoregressive}
 
-\item\texttt{\color{Orchid} PW(growth = 'linear')}: piecewise linear
-
-\item\texttt{\color{Orchid} PW(growth = 'logistic')}: piecewise logistic, with max saturation
+\item\texttt{\color{Orchid} PW(growth = 'linear')}: piecewise linear, or \texttt{\color{Orchid} 'logistic'} with saturation
 
 \item\texttt{\color{Orchid} CAR()}: continuous-time autoregressive, for irregular sampling times
 \end{itemize}
-For autoregressive processes (\texttt{\color{Orchid} RW(), AR() or VAR()}), moving average and correlated process errors can also be specified with the \texttt{\color{Orchid} ma} and \texttt{\color{Orchid} cor} arguments
+For autoregressive processes (\texttt{\color{Orchid} RW(), AR() or VAR()}), moving average and correlated process errors can also be specified with the \texttt{\color{Orchid} ma} and \texttt{\color{Orchid} cor} arguments. \texttt{\color{Orchid} n\_lv} sets \href{https://nicholasjclark.github.io/mvgam/dev/articles/dfm.html}{dynamic factors}. \texttt{\color{Orchid} gr} and \texttt{\color{Orchid} subgr} pool \href{https://nicholasjclark.github.io/mvgam/dev/articles/hierarchical_var.html}{hierarchical trends}
 
 \medskip
 \texttt{\color{Orchid} family}: observation distribution. Options include (among others):
 \begin{itemize}
 
-\item\texttt{\color{Orchid} gaussian()}: Gaussian with identity link
+\item Continuous: \texttt{\color{Orchid} gaussian()}, \texttt{\color{Orchid} student()}, \texttt{\color{Orchid} lognormal()}, \texttt{\color{Orchid} Gamma(link = 'log')}, \texttt{\color{Orchid} Beta()}
 
-\item\texttt{\color{Orchid} student()}: Student's T with identity link
+\item Counts: \texttt{\color{Orchid} poisson()}, \texttt{\color{Orchid} negbinomial()}, \texttt{\color{Orchid} beta\_nb()}, \texttt{\color{Orchid} tweedie()}
 
-\item\texttt{\color{Orchid} lognormal()}: LogNormal with identity link
+\item Trials and binary: \texttt{\color{Orchid} binomial()}, \texttt{\color{Orchid} bernoulli()}, \texttt{\color{Orchid} com\_binomial()}
 
-\item\texttt{\color{Orchid} Gamma(link = 'log')}: Gamma with log link
+\item Imperfect detection: \texttt{\color{Orchid} nmix()}, \texttt{\color{Orchid} occ()} (\href{https://nicholasjclark.github.io/mvgam/dev/articles/nmix.html}{N-mixture article})
 
-\item\texttt{\color{Orchid} Beta()}: Beta with logit link
-
-\item\texttt{\color{Orchid} poisson()}: Poisson with log link
-
-\item\texttt{\color{Orchid} negbinomial()}: Negative Binomial with log link
+\item Multi-response: \texttt{\color{Orchid} mvn()}, \texttt{\color{Orchid} mvt()}, \texttt{\color{Orchid} diri()}, \texttt{\color{Orchid} multi()}, \texttt{\color{Orchid} categ()}
 \end{itemize}
+Multivariate models give each response its own family, as in \texttt{\color{Orchid} bf(y1 \textasciitilde{} x, family = poisson()) + bf(y2 \textasciitilde{} x, family = Beta())}. The responses can share one latent process (\href{https://nicholasjclark.github.io/mvgam/dev/articles/mvbf.html}{multivariate} and \href{https://nicholasjclark.github.io/mvgam/dev/articles/idm.html}{integrated data} articles). \texttt{\color{Orchid} jsdgam()} fits \href{https://nicholasjclark.github.io/mvgam/dev/articles/jsdgam.html}{joint species models}
 
 \medskip
 See \href{https://nicholasjclark.github.io/mvgam/dev/articles/mvgam_overview.html}{the introductory vignette} for more guidance on supported families and dynamic processes
@@ -142,7 +137,7 @@ See \href{https://nicholasjclark.github.io/mvgam/dev/articles/mvgam_overview.htm
 
 \item Check the data and plot each series with \texttt{\color{Orchid} mvgam\_data()}
 
-\item Ensure there are no \texttt{\color{Orchid} NA}'s in predictors (though \texttt{\color{Orchid} NA}'s are allowed in response variables). See \href{https://nicholasjclark.github.io/mvgam/dev/articles/data.html}{the data formatting vignette} for guidance on data preparation
+\item Ensure there are no \texttt{\color{Orchid} NA}'s in predictors (though \texttt{\color{Orchid} NA}'s are allowed in response variables)
 
 \item Inspect default priors with \texttt{\color{Orchid} get\_prior()}
 
@@ -209,6 +204,9 @@ Use \texttt{\color{Orchid} as.data.frame(model)}, \texttt{\color{Orchid} as.matr
 The \texttt{S3} \texttt{\color{Orchid} plot()} function applied to models can visualise smooth functions (\texttt{\color{Orchid} type = 'smooths'}), trend estimates (\texttt{\color{Orchid} type = 'trend'}), the observed series (\texttt{\color{Orchid} type = 'series'}), latent factors (\texttt{\color{Orchid} type = 'factors'}) or randomized quantile residual diagnostics (\texttt{\color{Orchid} type = 'residuals'})
 
 \medskip
+\texttt{\color{Orchid} residual\_cor()}, \texttt{\color{Orchid} irf()}, \texttt{\color{Orchid} fevd()}, \texttt{\color{Orchid} ordinate()}: \href{https://nicholasjclark.github.io/mvgam/dev/articles/var.html}{latent dynamics}
+
+\medskip
 \texttt{\color{Orchid} conditional\_effects(model)} gives useful conditional effect plots on either the response or the link scale
 
 \smallskip
@@ -273,40 +271,43 @@ Compute probabilistic forecast scores using proper scoring rules with the \textt
 \begin{knitrout}
 \definecolor{shadecolor}{rgb}{0.969, 0.969, 0.969}\color{fgcolor}\begin{kframe}
 \begin{alltt}
-\hldef{fc} \hlkwb{<-} \hlkwd{forecast}\hldef{(model,} \hlkwc{newdata} \hldef{= simdat}\hlopt{$}\hldef{data_test,} \hlkwc{type} \hldef{=} \hlsng{'response'}\hldef{)}
-\hldef{crps} \hlkwb{<-} \hlkwd{score}\hldef{(fc,} \hlkwc{score} \hldef{=} \hlsng{'crps'}\hldef{)}
-\hldef{dplyr}\hlopt{::}\hlkwd{glimpse}\hldef{(crps}\hlopt{$}\hldef{series_1)}
+\hlkwd{score}\hldef{(fc,} \hlkwc{score} \hldef{=} \hlsng{'drps'}\hldef{)}
 \end{alltt}
-\end{kframe}
-\end{knitrout}
-
-\begin{knitrout}
-\definecolor{shadecolor}{rgb}{0.969, 0.969, 0.969}\color{fgcolor}\begin{kframe}
 \begin{verbatim}
-## Rows: 20
-## Columns: 5
-## $ score          <dbl> 1.120, 1.024, 1.795, 2.88~
-## $ in_interval    <dbl> 1, 1, 1, 1, 1, 1, 0, 1, 1~
-## $ interval_width <dbl> 0.9, 0.9, 0.9, 0.9, 0.9, ~
-## $ eval_horizon   <int> 1, 2, 3, 4, 5, 6, 7, 8, 9~
-## $ score_type     <chr> "crps", "crps", "crps", "~
+## DRPS of 1 forecast series, lower is better
+## 
+##  series     mean_score coverage times
+##  series_1   5.3        0.85     20   
+##  all_series 5.3                 20   
+## 
+## 'all_series' sums the series at each time.
+## 'coverage' is the share inside the 90% interval.
 \end{verbatim}
 \end{kframe}
 \end{knitrout}
-\smallskip
-Available proper scoring rules in the \texttt{\color{Orchid} score()} function include:
-\begin{itemize}
-
-\item \texttt{\color{Orchid} score = 'crps'}: Continuous Rank Probability Score (univariate)
-\item \texttt{\color{Orchid} score = 'drps'}: Discrete Rank Probability Score (univariate)
-\item \texttt{\color{Orchid} score = 'logs'}: Logarithmic Score (univariate)
-\item \texttt{\color{Orchid} score = 'sis'}: Scaled Interval Score (univariate)
-\item \texttt{\color{Orchid} score = 'energy'}: Energy Score (multivariate)
-\item \texttt{\color{Orchid} score = 'variogram'}: Variogram Score (multivariate)
-\end{itemize}
+Rules include \texttt{\color{Orchid} 'crps'}, \texttt{\color{Orchid} 'drps'}, \texttt{\color{Orchid} 'logs'} and \texttt{\color{Orchid} 'sis'} for each series. \texttt{\color{Orchid} 'energy'} and \texttt{\color{Orchid} 'variogram'} score all series jointly
 
 \medskip
-Use \texttt{\color{Orchid} lfo\_cv(model)} for approximate leave-future-out cross-validation with an expanding window training technique (see \href{https://www.tandfonline.com/doi/full/10.1080/00949655.2020.1783262}{Bürkner et al. 2020} for details of the algorithm). This generates expected log predictive density scores at user-specified forecast horizons, which can be used to compare different models
+\texttt{\color{Orchid} compare\_scores()} scores several models with one rule and ranks them:
+\begin{knitrout}
+\definecolor{shadecolor}{rgb}{0.969, 0.969, 0.969}\color{fgcolor}\begin{kframe}
+\begin{alltt}
+\hlkwd{compare_scores}\hldef{(}\hlkwc{GAM} \hldef{= fc_gam,} \hlkwc{RW} \hldef{= fc,} \hlkwc{score} \hldef{=} \hlsng{'drps'}\hldef{)}
+\end{alltt}
+\begin{verbatim}
+## DRPS of 2 models, lower is better
+## 
+##  model mean_score difference
+##  RW    5.3        0.0       
+##  GAM   6.6        1.3       
+## 
+## 'difference' is the gap to the best. plot() shows each horizon.
+\end{verbatim}
+\end{kframe}
+\end{knitrout}
+
+\medskip
+\texttt{\color{Orchid} lfo\_cv(model)} compares models by approximate leave-future-out cross-validation (\href{https://www.tandfonline.com/doi/full/10.1080/00949655.2020.1783262}{Bürkner et al. 2020})
 
 \end{block}
 \end{column}

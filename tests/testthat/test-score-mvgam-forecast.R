@@ -248,3 +248,15 @@ test_that("variogram weights follow the scored series", {
   expect_error(score(fc, "energy", weights = c(1, 1, 1)),
                "'variogram' score only")
 })
+
+test_that("print() of a score shows each series' mean score", {
+  fc <- make_mock_forecast(n_series = 2L, h = 4L)
+  sc <- score(fc, score = "crps")
+  expect_s3_class(sc, "mvgam_score")
+  out <- capture.output(print(sc))
+  # The s1 row prints its mean CRPS over the four horizons, formatted
+  # with the other means of its column
+  means <- vapply(sc, function(d) mean(d$score), numeric(1L))
+  row1 <- grep("^ *s1 ", out, value = TRUE)
+  expect_match(row1, format(signif(means, 2))[["s1"]], fixed = TRUE)
+})
