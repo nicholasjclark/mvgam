@@ -57,9 +57,8 @@ A long \code{data.frame}. Its columns are \code{series} (a factor),
 \code{time} (an integer for regular data), the response and the original
 index (\code{index} for a \code{ts}). Any \code{tsibble} key and covariate columns
 follow, then one season column per period above 1. Rows are ordered
-by time,
-then series. With \code{h} or \code{train_prop}, a list holding \code{data_train}
-and \code{data_test} instead.
+by time, then series. With \code{h} or \code{train_prop}, a list holding
+\code{data_train} and \code{data_test} instead.
 }
 \description{
 Convert a \code{tsibble}, a \code{ts}, \code{mts} or \code{msts} object, or a wide

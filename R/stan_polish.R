@@ -222,7 +222,8 @@ fix_blank_lines <- function(lines) {
 
 #' Update Stan Header with Package Versions
 #'
-#' Replaces the generic brms header with one that includes both mvgam and brms versions.
+#' Replaces the generic brms header with one that includes both mvgam
+#' and brms versions.
 #'
 #' @param lines Character vector of Stan code lines
 #'

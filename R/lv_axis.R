@@ -295,7 +295,7 @@ walk_by_lv <- function(expr, state, depth = 0L) {
 #' @noRd
 translate_lv_axis_labels <- function(priors, target, to = c("user", "brms")) {
   to <- match.arg(to)
-  if (is.null(target) || is.null(priors) || nrow(priors) == 0L) {
+  if (is.null(target) || NROW(priors) == 0L) {
     return(priors)
   }
   checkmate::assert_string(target, min.chars = 1L)

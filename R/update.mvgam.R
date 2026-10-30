@@ -466,7 +466,7 @@ trend_call_names_arg <- function(trend_call, arg) {
 #' @return The same table without its mvgam-sourced rows.
 #' @noRd
 drop_mvgam_sourced_priors <- function(prior) {
-  if (is.null(prior) || nrow(prior) == 0L) return(prior)
+  if (NROW(prior) == 0L) return(prior)
   if (!"source" %in% names(prior)) return(prior)
   keep <- !identical_source(prior$source, "mvgam")
   out <- prior[keep, , drop = FALSE]
@@ -485,8 +485,10 @@ identical_source <- function(source, value) {
 #'
 #' The rule follows `brms::update.brmsfit()`. A new `prior` joins the
 #' rows the user set on the original fit. A new row replaces an old one
-#' with the same `brmsprior_key_cols`. An unbounded row is `NA` from
-#' `prior()` and `""` in a fitted table. The two compare equal.
+#' for the same parameter. Bounds are left out of the match. A fitted
+#' table records the declared bound of a scale as `lb = "0"`. A row
+#' from `prior()` leaves it `NA`. Matching on bounds would send brms
+#' two rows for one parameter, which it refuses as duplicates.
 #'
 #' @param new The `prior` passed to `update()`.
 #' @param old_user The rows the user set on the original fit, or NULL.
@@ -495,11 +497,12 @@ identical_source <- function(source, value) {
 merge_update_priors <- function(new, old_user) {
   checkmate::assert_class(new, "brmsprior")
   checkmate::assert_class(old_user, "brmsprior", null.ok = TRUE)
-  if (is.null(old_user) || nrow(old_user) == 0L) {
+  if (NROW(old_user) == 0L) {
     return(new)
   }
   combined <- bind_brmsprior_rows(list(new, old_user))
-  keys <- brmsprior_row_keys(combined, brmsprior_key_cols)
+  keys <- brmsprior_row_keys(combined,
+                             setdiff(brmsprior_key_cols, c("lb", "ub")))
   structure(combined[!duplicated(keys), , drop = FALSE],
             class = c("brmsprior", "data.frame"))
 }
@@ -522,7 +525,7 @@ merge_update_priors <- function(new, old_user) {
 priors_in_refit <- function(prior, refit_table) {
   checkmate::assert_class(prior, "brmsprior", null.ok = TRUE)
   checkmate::assert_data_frame(refit_table)
-  if (is.null(prior) || nrow(prior) == 0L) {
+  if (NROW(prior) == 0L) {
     return(prior)
   }
   cols <- setdiff(brmsprior_key_cols, c("lb", "ub"))
@@ -841,7 +844,7 @@ mvgam_update_call <- function(object, formula., newdata, dots) {
       old[identical_source(old$source, "user"), , drop = FALSE]
     }
   }
-  if (!is.null(inherited) && nrow(inherited) > 0L) {
+  if (NROW(inherited) > 0L) {
     inherited <- priors_in_refit(inherited,
                                  mvgam_refit_prior_table(resolved))
   }

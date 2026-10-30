@@ -910,4 +910,8 @@ test_that("lfo_cv scores a wide fit by elpd and CRPS", {
 })
 
 
+test_that("the predictor's parts sum to it: each response's own state", {
+  expect_parts_sum(fit, "state")
+})
+
 cat("\nDone.\n")

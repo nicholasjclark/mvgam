@@ -47,9 +47,28 @@ first_trend_spec <- function(object) {
 #'   response and is left out.
 #' @noRd
 response_columns <- function(x) {
-  vapply(response_formulas(x), function(form) {
-    all.vars(strip_addition_terms(form$formula)[[2L]])[1L]
-  }, character(1L))
+  vapply(response_formulas(x), form_response_column, character(1L))
+}
+
+#' The data column one response's formula names
+#'
+#' @param form One response's `brmsformula`
+#' @return Character string
+#' @noRd
+form_response_column <- function(form) {
+  all.vars(strip_addition_terms(form$formula)[[2L]])[1L]
+}
+
+#' Whether one response imputes its missing values
+#'
+#' A response written `x | mi()` keeps its missing rows. The model
+#' samples each missing value.
+#'
+#' @inheritParams form_response_column
+#' @return Logical scalar
+#' @noRd
+form_imputes <- function(form) {
+  length(find_calls(form$formula[[2L]], "mi")) > 0L
 }
 
 #' Each response's own formula, keyed as brms keys it
@@ -78,6 +97,59 @@ response_formulas <- function(x) {
     )), call. = FALSE)
   }
   stats::setNames(forms, keys)
+}
+
+#' Whether each response imputes its missing values
+#'
+#' @inheritParams response_columns
+#' @return Logical vector named by response key
+#' @noRd
+imputed_responses <- function(x) {
+  vapply(response_formulas(x), form_imputes, logical(1L))
+}
+
+#' The rows of the data each response's likelihood covers
+#'
+#' A response covers the rows holding its value. A response that
+#' imputes its missing values covers every row. A `mi(x)` predictor
+#' takes `x` at the rows of the response it predicts. In a model with
+#' one, every response covers the rows where each response that does
+#' not impute holds a value.
+#'
+#' @inheritParams response_columns
+#' @param data The data frame the model is fitted to
+#' @return List of logical vectors along the rows of `data`, named by
+#'   response key
+#' @noRd
+response_rows <- function(x, data) {
+  checkmate::assert_data_frame(data)
+  forms <- response_formulas(x)
+  rows <- lapply(forms, function(form) {
+    if (form_imputes(form)) return(rep(TRUE, nrow(data)))
+    !is.na(data[[form_response_column(form)]])
+  })
+  couples <- vapply(forms, function(form) {
+    "mi" %in% formula_rhs_function_names(form)
+  }, logical(1L))
+  if (any(couples)) {
+    shared <- Reduce(`&`, rows)
+    rows <- lapply(rows, function(r) shared)
+  }
+  rows
+}
+
+#' Refuse a response that no row of the data observes
+#'
+#' @param response The response's column, or its key where the column
+#'   is out of reach
+#' @return Never returns
+#' @noRd
+stop_unobserved_response <- function(response) {
+  checkmate::assert_string(response)
+  stop(insight::format_error(c(
+    paste0("Every value of response '", response, "' is missing."),
+    i = "Each response needs at least one observed row."
+  )), call. = FALSE)
 }
 
 #' The family of each response
@@ -190,6 +262,17 @@ response_suffix <- function(object, resp = NULL) {
 }
 
 
+#' Whether a call asks for one result per response
+#'
+#' @param object A fitted `mvgam` object
+#' @param resp The response's key, or `NULL`
+#' @return `TRUE` for a model with several responses asked for none
+#' @noRd
+asks_each_response <- function(object, resp) {
+  is.null(resp) && length(response_formulas(object)) > 1L
+}
+
+
 #' One response's view of a multivariate model
 #'
 #' The view keeps the prior rows of response `r` and the rows every
@@ -208,7 +291,7 @@ subset_obj_to_response <- function(obj, r) {
   out$family <- model_families(obj, r)
   out$formula <- obj$formula$forms[[r]]
   prior <- obj$prior
-  if (!is.null(prior) && nrow(prior) > 0L) {
+  if (NROW(prior) > 0L) {
     rsp <- prior_field(prior, "resp")
     out$prior <- prior[rsp == r | !nzchar(rsp), , drop = FALSE]
   }
@@ -230,7 +313,7 @@ has_rescor <- function(obj) {
     return(TRUE)
   }
   prior <- obj$prior
-  if (!is.null(prior) && nrow(prior) > 0L) {
+  if (NROW(prior) > 0L) {
     return(any(prior$class == "Lrescor"))
   }
   FALSE

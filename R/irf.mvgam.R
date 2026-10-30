@@ -128,7 +128,8 @@ irf.mvgam <- function(
 }
 
 #### Functions to compute Generalized Impulse Response functions
-# Much of this code is modified from R code generously provided by Clinton Watkins:
+# Much of this code is modified from R code generously provided by
+# Clinton Watkins:
 # https://www.clintonwatkins.com/posts/2021-generalised-impulse-response-function-R/ ####
 
 #' Calculate impulse response functions

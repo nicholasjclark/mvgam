@@ -380,7 +380,9 @@ llt_trend_properties <- function() {
 #'
 #' The level is the stochastic level, `lv_trend` less any season. The
 #' slope is the level's growth per time step, stored as `slope_trend`.
-#' It adds nothing to the trend. The season is `season_trend`. The
+#' It adds nothing to the trend. The season is `season_trend`. Several
+#' periods add one component each, named as `llt_season_periods()`
+#' names them. They part the season and add nothing beyond it. The
 #' predictor is the remainder: the trend formula's effects, `mu_trend`.
 #'
 #' @param spec The parsed `LLT()` specification
@@ -388,6 +390,13 @@ llt_trend_properties <- function() {
 #' @noRd
 trend_components_llt <- function(spec) {
   seasonal <- !is.null(spec$season)
+  periods <- llt_season_periods(spec)
+  per_period <- if (nrow(periods) > 1L) {
+    stats::setNames(
+      lapply(periods$path, function(p) list(path = p, additive = FALSE)),
+      periods$component
+    )
+  }
   c(
     list(
       level = list(path = "lv_trend", additive = TRUE,
@@ -397,6 +406,7 @@ trend_components_llt <- function(spec) {
     if (seasonal) {
       list(season = list(path = "season_trend", additive = TRUE))
     },
+    per_period,
     list(predictor = list(path = NULL, additive = TRUE))
   )
 }
@@ -470,6 +480,40 @@ resolve_llt_season <- function(season, harmonics) {
   list(season = as.numeric(season), harmonics = harmonics)
 }
 
+#' The seasonal periods of a local linear trend, one row each
+#'
+#' A trend with several periods stores the season of each period as
+#' its own path, `season_<p>_trend` for the period's position `p`. A
+#' single period's season is `season_trend`, the sum. The component
+#' names follow `season_period_names()`.
+#'
+#' @param spec The parsed `LLT()` specification
+#' @return Data frame of `period`, `harmonics`, `first` and `last`
+#'   (the period's harmonics within one process's block), `component`
+#'   and `path`. No rows without a season.
+#' @noRd
+llt_season_periods <- function(spec) {
+  if (is.null(spec$season)) {
+    return(data.frame(period = numeric(0), harmonics = integer(0),
+                      first = integer(0), last = integer(0),
+                      component = character(0), path = character(0)))
+  }
+  last <- cumsum(spec$harmonics)
+  several <- length(spec$season) > 1L
+  data.frame(
+    period = spec$season,
+    harmonics = spec$harmonics,
+    first = last - spec$harmonics + 1L,
+    last = last,
+    component = season_period_names(spec$season),
+    path = if (several) {
+      paste0("season_", seq_along(spec$season), "_trend")
+    } else {
+      "season_trend"
+    }
+  )
+}
+
 #' The angular frequency of each seasonal harmonic
 #'
 #' Harmonic `j` of period `s` rotates by `2 pi j / s` per time step.
@@ -528,7 +572,7 @@ validate_data_llt <- function(spec, dimensions, mv_spec) {
   in_formula <- time_var %in% c(
     all.vars(mv_spec$base_formula),
     if (!is.null(mv_spec$obs_formula)) {
-      all.vars(brms::brmsterms(mv_spec$obs_formula)$allvars)
+      all.vars(brms_terms(mv_spec$obs_formula)$allvars)
     }
   )
   if (in_formula) {

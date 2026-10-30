@@ -69,6 +69,77 @@ cached_fit <- function(name, build, key = NULL) {
 }
 
 
+# One side's brms model, given the fit's draws. The combined program
+# holds both sides' parameters. brms selects some of them by pattern:
+# its smooth `s_1_1` also matches the trend's `s_1_1_trend`. The side's
+# own names are kept, the trend's without the `_trend` its own model
+# does not write. Every other name is replaced by a placeholder, which
+# leaves brms the side's parameters alone. `brms:::rename_pars()` is
+# internal to brms. It serves here as an oracle and nowhere in the
+# package.
+#
+# @param fit A fitted mvgam object
+# @param side `"obs"` or `"trend"`
+# @return A brmsfit holding the side's draws under brms's names
+as_brms <- function(fit, side = "obs") {
+  b <- side_model(fit, side)
+  sf <- fit$fit
+  names_now <- sf@sim$fnames_oi
+  own <- if (side == "trend") strip_trend_infix(names_now) else names_now
+  renamed <- ifelse(names_now %in% side_parameters(fit, side), own,
+                    paste0("zzother", seq_along(names_now)))
+  sf@sim$fnames_oi <- renamed
+  for (i in seq_along(sf@sim$samples)) {
+    names(sf@sim$samples[[i]]) <- renamed
+  }
+  b$fit <- sf
+  brms:::rename_pars(b)
+}
+
+
+# The largest gap between each observation predictor mvgam composes and
+# brms's own from the same draws. Each predictor's parts also sum to it.
+# brms uses a fit's latent values only when given no `newdata`. mvgam
+# uses them at each row repeating a fitted row. A frame repeating the
+# fitted rows in order goes to brms as no `newdata`.
+#
+# @param fit A fitted mvgam object
+# @param newdata Rows to predict for
+# @param re_formula As the prediction methods take it
+# @param ids Draw indices
+# @return Named numeric vector, one gap per predictor and per sum
+predictor_gap <- function(fit, newdata, re_formula = NULL, ids = 1:50) {
+  b <- as_brms(fit)
+  fitted <- identical(fitted_row_index(newdata, b$data), seq_len(nrow(b$data)))
+  keys <- names(response_columns(fit$obs_model$formula))
+  several <- length(keys) > 1L
+  gaps <- c()
+  for (key in keys) {
+    resp <- if (several) key
+    family <- model_families(fit, resp)
+    for (component in c("mu", predicted_dpar_names(
+      fit, setdiff(family$dpars, "mu"), resp = resp
+    ))) {
+      args <- list(fit, newdata = newdata, draw_ids = ids, resp = resp,
+                   component = if (component == "mu") "obs" else component,
+                   re_formula = re_formula)
+      mine <- do.call(extract_component_linpred, args)
+      theirs <- brms::posterior_linpred(
+        b, newdata = if (!fitted) newdata,
+        draw_ids = ids, resp = resp,
+        dpar = if (component != "mu") component, re_formula = re_formula
+      )
+      gaps[paste(key, component)] <- max(abs(unname(mine) -
+                                               unname(theirs)))
+      parts <- do.call(extract_component_parts, args)
+      gaps[paste(key, component, "parts")] <- max(abs(Reduce(`+`, parts) -
+                                                        mine))
+    }
+  }
+  gaps
+}
+
+
 # A ggplot is returned whether or not a layer received any data.
 # Building the plot forces the layers to resolve, and the row count
 # says something was drawn.
@@ -97,7 +168,7 @@ expect_tidy_glance <- function(fit, observed = NULL) {
   dm <- posterior::as_draws_matrix(fit)
   cols <- td$term
   fixed <- td$type %in% c("observation_beta", "trend_beta")
-  betas <- grep("^b(s|sp)?_", colnames(dm), value = TRUE)
+  betas <- grep(mvgam:::MVGAM_PAR_FIXEF_PREFIX, colnames(dm), value = TRUE)
   cols[fixed] <- betas[match(td$term[fixed], mvgam:::fixef_name(betas))]
   testthat::expect_identical(setdiff(cols, colnames(dm)), character(0))
   draws <- dm[, cols, drop = FALSE]
@@ -221,4 +292,77 @@ neumann_omega <- function(Sigma, phi, theta = NULL) {
     An <- An %*% An
   }
   (Omega + t(Omega)) / 2
+}
+
+
+# The parts of the conditional linear predictor sum to it in every draw,
+# and the latent parts carry the names given. A model with several
+# responses is checked response by response.
+#
+# @param fit A fitted mvgam object
+# @param latent The names of the latent parts, in order
+# @param newdata Rows at fitted times
+expect_parts_sum <- function(fit, latent, newdata = fit$data) {
+  ids <- 1:10
+  parts <- get_linpred_parts(fit, newdata, draw_ids = ids)
+  whole <- get_combined_linpred(fit, newdata, trend_state = "conditional",
+                                draw_ids = ids)
+  if (length(response_formulas(fit)) == 1L) {
+    parts <- list(parts)
+    whole <- list(whole)
+  }
+  for (i in seq_along(whole)) {
+    expect_identical(names(parts[[i]]$latent), latent)
+    total <- Reduce(`+`, c(parts[[i]]$obs, parts[[i]]$trend,
+                           parts[[i]]$latent))
+    # cmdstanr writes each draw to 6 significant digits. The stored
+    # `trend` and the `Z lv_trend + mu_trend` built from the stored
+    # states then differ by that rounding.
+    expect_equal(total, whole[[i]], tolerance = 1e-6)
+  }
+}
+
+
+# The response-scale parts take the fit's own expectation. The
+# expectation from the whole predictor is posterior_epred()'s from the
+# fitted state, an ordinal response's as its expected level. Given
+# `mean_fn`, the family's mean as a function of the predictor, each
+# part's contribution is that mean of the whole predictor less its mean
+# without the part.
+#
+# @param fit A fitted mvgam object
+# @param mean_fn Function of a predictor matrix, or NULL
+# @param newdata Rows at fitted times
+expect_epred_parts <- function(fit, mean_fn = NULL, newdata = fit$data) {
+  ids <- 1:10
+  link <- get_linpred_parts(fit, newdata, draw_ids = ids)
+  scale <- get_epred_parts(fit, newdata, draw_ids = ids)
+  epred <- posterior_epred(fit, newdata = newdata, incl_autocor = TRUE,
+                           draw_ids = ids)
+  if (length(response_formulas(fit)) == 1L) {
+    link <- list(link)
+    scale <- list(scale)
+    epred <- list(epred)
+  }
+  for (i in seq_along(epred)) {
+    want <- epred[[i]]
+    if (length(dim(want)) == 3L) {
+      want <- ordinal_category_mean(want)
+    }
+    # The stored trend and the one rebuilt from the stored states
+    # differ by cmdstanr's rounding to 6 significant digits
+    expect_equal(scale[[i]]$expected, want, tolerance = 1e-6)
+    if (is.null(mean_fn)) {
+      next
+    }
+    whole <- Reduce(`+`, c(link[[i]]$obs, link[[i]]$trend,
+                           link[[i]]$latent))
+    for (group in c("obs", "trend", "latent")) {
+      for (nm in names(link[[i]][[group]])) {
+        without <- whole - link[[i]][[group]][[nm]]
+        expect_equal(scale[[i]][[group]][[nm]],
+                     mean_fn(whole) - mean_fn(without))
+      }
+    }
+  }
 }

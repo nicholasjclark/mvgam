@@ -52,8 +52,7 @@ get_combined_linpred <- function(mvgam_fit, newdata,
                                  sample_new_levels = "uncertainty",
                                  resp = NULL) {
   trend_state <- match.arg(trend_state)
-  has_trend <- !is.null(mvgam_fit$trend_model) &&
-               !is.null(mvgam_fit$trend_model$formula)
+  has_trend <- has_trend_formula(mvgam_fit)
 
   obs_linpred <- extract_component_linpred(
     mvgam_fit = mvgam_fit,
@@ -81,31 +80,29 @@ get_combined_linpred <- function(mvgam_fit, newdata,
   # fit whose series axis is a column of the frame holds one state that
   # every response takes. The function extracts that state once. The
   # process noise below follows the same rule.
-  #
-  # A deterministic trend (PW, none) stores no `trend[t, s]` draws.
-  # The conditional surface then has no state to take and falls back
-  # to the marginal one.
   per_response <- is_response_keyed(mvgam_fit) &&
     is_per_response(obs_linpred)
-  trend_linpred <- NULL
   trend_noise <- NULL
   if (identical(trend_state, "conditional")) {
-    draws_mat <- subset_draws_rows(fit_draws(mvgam_fit$fit, "trend"),
-                                   draw_ids = draw_ids)
+    draw_idx <- resolve_draw_indices(posterior::ndraws(mvgam_fit), NULL,
+                                     draw_ids)
     state_for <- function(r) {
-      extract_trend_latent_states(
-        mvgam_fit = mvgam_fit, newdata = newdata,
-        full_draws = draws_mat, resp = r
-      )
+      trend_state_rows(mvgam_fit, newdata, draw_idx, resp = r)
     }
     trend_linpred <- if (per_response) {
-      states <- lapply(stats::setNames(nm = names(obs_linpred)), state_for)
-      if (!is.null(states[[1L]])) states
+      lapply(stats::setNames(nm = names(obs_linpred)), state_for)
     } else {
       state_for(resp)
     }
-  }
-  if (is.null(trend_linpred)) {
+    # Every trend writes `trend[t, s]` and every fit keeps it
+    if (is.null(trend_linpred) || any(vapply(trend_linpred, is.null,
+                                             logical(1L)))) {
+      stop_mvgam_fault(
+        "A fit with a trend must hold the fitted 'trend[t, s]' draws.",
+        "The conditional surface is built from the fitted trend."
+      )
+    }
+  } else {
     # The deterministic submodel, plus one sample of the trend's process
     # noise. A trend without a stochastic component, such as `PW()`,
     # takes no noise.
@@ -152,6 +149,137 @@ get_combined_linpred <- function(mvgam_fit, newdata,
 }
 
 
+#' Whether a fit carries a trend model with a formula
+#'
+#' @param mvgam_fit A fitted `mvgam` object
+#' @return A single logical
+#' @noRd
+has_trend_formula <- function(mvgam_fit) {
+  !is.null(mvgam_fit$trend_model$formula)
+}
+
+
+#' Each part of the conditional linear predictor, on the link scale
+#'
+#' The parts are the observation formula's terms, the trend formula's
+#' terms and the latent state, as `latent_trend_parts()` parts it.
+#' Within each draw they sum to
+#' `get_combined_linpred(trend_state = "conditional")`. The latent state
+#' is the fitted one. Every row must fall on a fitted time. An ordinal
+#' response's category-specific terms shift its thresholds. Those
+#' shifts form a fourth group, as `extract_threshold_shifts()` gives
+#' them. They add nothing to the predictor.
+#'
+#' @inheritParams get_combined_linpred
+#' @return A list of `obs`, `trend`, `latent` and `cs`. The first three
+#'   are named lists of `[ndraws x nobs]` matrices. `cs` is a named list
+#'   of `[ndraws x nobs x nthres]` threshold shifts. A fit without a
+#'   trend leaves `trend` and `latent` empty. A response without a
+#'   category-specific term leaves `cs` empty. A multivariate model with
+#'   `resp = NULL` gives one such list per response.
+#' @noRd
+get_linpred_parts <- function(mvgam_fit, newdata, draw_ids = NULL,
+                              re_formula = NULL, allow_new_levels = FALSE,
+                              sample_new_levels = "uncertainty",
+                              resp = NULL) {
+  parts_of <- function(component) {
+    extract_component_parts(
+      mvgam_fit = mvgam_fit, newdata = newdata, component = component,
+      resp = resp, draw_ids = draw_ids, re_formula = re_formula,
+      allow_new_levels = allow_new_levels,
+      sample_new_levels = sample_new_levels
+    )
+  }
+  obs <- parts_of("obs")
+  has_trend <- has_trend_formula(mvgam_fit)
+  # The trend formula has one response, which every response shares
+  trend <- if (has_trend) parts_of("trend") else list()
+  draw_idx <- resolve_draw_indices(posterior::ndraws(mvgam_fit), NULL,
+                                   draw_ids)
+  latent_for <- function(r) {
+    if (has_trend) latent_trend_parts(mvgam_fit, newdata, draw_idx, r)
+    else list()
+  }
+  shifts_for <- function(r) {
+    extract_threshold_shifts(
+      mvgam_fit, newdata, resp = r, draw_ids = draw_ids,
+      re_formula = re_formula, allow_new_levels = allow_new_levels,
+      sample_new_levels = sample_new_levels
+    )
+  }
+  if (!asks_each_response(mvgam_fit, resp)) {
+    return(list(obs = obs, trend = trend, latent = latent_for(resp),
+                cs = shifts_for(resp)))
+  }
+  # A response-keyed fit holds each response's own state. Any other
+  # fit holds one state that every response takes.
+  keyed <- is_response_keyed(mvgam_fit)
+  shared <- if (!keyed) latent_for(NULL)
+  out <- list()
+  for (r in names(obs)) {
+    out[[r]] <- list(obs = obs[[r]], trend = trend,
+                     latent = if (keyed) latent_for(r) else shared,
+                     cs = shifts_for(r))
+  }
+  out
+}
+
+
+#' Each part of the conditional expectation, on the response scale
+#'
+#' A part's contribution is the fit's expectation from the whole
+#' predictor less its expectation from the predictor without that part.
+#' The expectation is the family's own, as `epred_map()` gives it, with
+#' an ordinal response's expected ordered level. A category-specific
+#' term's contribution is the expectation less the expectation with its
+#' threshold shift removed. Under the identity link
+#' of a family whose mean is its predictor, the contributions are the
+#' link-scale parts and sum to the expectation. Under any other link
+#' each contribution holds the others at their fitted values. Those
+#' contributions need not sum to the expectation.
+#'
+#' @inheritParams get_linpred_parts
+#' @return As `get_linpred_parts()`, each part on the response scale,
+#'   with `expected`, the `[ndraws x nobs]` expectation from the whole
+#'   predictor
+#' @noRd
+get_epred_parts <- function(mvgam_fit, newdata, draw_ids = NULL,
+                            re_formula = NULL, allow_new_levels = FALSE,
+                            sample_new_levels = "uncertainty",
+                            resp = NULL) {
+  parts <- get_linpred_parts(
+    mvgam_fit, newdata, draw_ids = draw_ids, re_formula = re_formula,
+    allow_new_levels = allow_new_levels,
+    sample_new_levels = sample_new_levels, resp = resp
+  )
+  on_response <- function(p, r) {
+    whole <- Reduce(`+`, c(p$obs, p$trend, p$latent))
+    expect <- epred_map(
+      mvgam_fit, newdata, draw_ids, r, dim(whole), ordinal = "mean",
+      re_formula = re_formula, allow_new_levels = allow_new_levels,
+      sample_new_levels = sample_new_levels
+    )
+    expected <- expect(whole)
+    contribution <- function(part) expected - expect(whole - part)
+    shift <- if (length(p$cs)) Reduce(`+`, p$cs)
+    shift_contribution <- function(part) {
+      expected - expect(whole, shift = shift - part)
+    }
+    list(
+      expected = expected,
+      obs = lapply(p$obs, contribution),
+      trend = lapply(p$trend, contribution),
+      latent = lapply(p$latent, contribution),
+      cs = lapply(p$cs, shift_contribution)
+    )
+  }
+  if (!asks_each_response(mvgam_fit, resp)) {
+    return(on_response(parts, resp))
+  }
+  Map(on_response, parts, names(parts))
+}
+
+
 #' The observation and trend linear predictors summed per draw
 #'
 #' Adds the marginal trend-noise sample when one is supplied. A shape
@@ -174,16 +302,10 @@ compose_linpred_with_noise <- function(obs_mat, trend_mat, trend_noise,
   checkmate::assert_matrix(trend_noise, null.ok = TRUE)
   checkmate::assert_string(resp_name, null.ok = TRUE)
   what <- if (is.null(resp_name)) "" else paste0(" of '", resp_name, "'")
-  if (!identical(dim(trend_mat), dim(obs_mat))) {
-    stop_shape_fault(paste0("The trend predictor", what), dim(trend_mat),
-                     dim(obs_mat))
-  }
+  assert_dims(trend_mat, paste0("The trend predictor", what), dim(obs_mat))
   out <- obs_mat + trend_mat
   if (!is.null(trend_noise)) {
-    if (!identical(dim(trend_noise), dim(out))) {
-      stop_shape_fault(paste0("The trend noise", what), dim(trend_noise),
-                       dim(out))
-    }
+    assert_dims(trend_noise, paste0("The trend noise", what), dim(out))
     out <- out + trend_noise
   }
   out
@@ -225,6 +347,12 @@ compose_linpred_with_noise <- function(obs_mat, trend_mat, trend_noise,
 #' deviation at each time and series, on the link scale.
 #' [posterior_epred.mvgam()] and [posterior_predict.mvgam()] apply the
 #' family's mean and noise to that same predictor.
+#'
+#' An ordinal response's category-specific `cs()` terms give each
+#' threshold its own shift. The predictor holds the terms every
+#' threshold shares. [posterior_epred.mvgam()] and
+#' [posterior_predict.mvgam()] subtract the shifts from the thresholds,
+#' as brms does.
 #'
 #' @template prediction-trend-state
 #'

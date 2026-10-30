@@ -409,7 +409,7 @@ addition_term_values <- function(form, family, frame) {
   checkmate::assert_list(family)
   checkmate::assert_data_frame(frame)
   form$family <- family
-  adforms <- brms::brmsterms(form)$adforms
+  adforms <- brms_terms(form)$adforms
   env <- environment(form$formula) %||% globalenv()
   # brms's `resp_*()` constructors record each argument as a string.
   term_spec <- function(term) {

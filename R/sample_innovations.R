@@ -352,28 +352,6 @@ sample_process_errors <- function(object, ndraws = NULL, newdata = NULL,
 }
 
 
-#' Posterior parameter names required by each covariance pattern
-#'
-#' Defines which posterior parameters are needed for each pattern type.
-#'
-#' @noRd
-covariance_param_specs <- list(
-  cholesky_scaled = list(
-    simple = c("sigma_trend", "L_Omega_trend"),
-    hierarchical = c("L_Omega_global_trend", "L_deviation_group_trend",
-                     "alpha_cor_trend", "sigma_group_trend")
-  ),
-  full_covariance = list(
-    simple = c("Sigma_trend"),
-    hierarchical = c("Sigma_group_trend")
-  ),
-  diagonal = list(
-    simple = c("sigma_trend")
-  ),
-  none = list(simple = character(0), hierarchical = character(0))
-)
-
-
 #' The covariance pattern a trend's innovations take
 #'
 #' A `"cholesky_scaled"` trend fitted without correlations samples no
@@ -525,11 +503,8 @@ get_trend_covariance_structure <- function(object, ndraws = NULL,
   group_info <- if (hierarchical) get_group_info(object$standata) else NULL
   n_series_int <- as.integer(n_series)
 
-  # Multi-index parameters (Cholesky factors, full covariance) are
-  # looked up by explicit column name. `extract_named_params()` sorts
-  # by the first index alone. The order of the later indices would
-  # then depend on the storage convention. The fallback covers
-  # single-index patterns such as the simple diagonal `sigma_trend`.
+  # Each extractor looks up its parameters by column name. The diagonal
+  # structure scales independent innovations by `sigma_trend`.
   # A hierarchical VAR (`VAR(gr = ..., subgr = ..., cor = TRUE)`) emits
   # the population and deviation parameters of the hierarchical
   # Cholesky-scaled case: `alpha_cor_trend`, `L_Omega_global_trend`,
@@ -549,12 +524,20 @@ get_trend_covariance_structure <- function(object, ndraws = NULL,
     "flat.full_covariance" = extract_simple_full_cov_params(
       draws_mat, n_series_int
     ),
-    {
-      param_names <- covariance_param_specs[[effective_pattern]][[
-        if (hierarchical) "hierarchical" else "simple"
-      ]]
-      extract_named_params(draws_mat, param_names)
-    }
+    "flat.diagonal" = ,
+    "hier.diagonal" = {
+      cols <- param_draw_columns(colnames(draws_mat), "sigma_trend")
+      if (length(cols) == 0L) {
+        stop_missing_draws("sigma_trend", c("sigma_trend", "sigma_trend[s]"))
+      }
+      list(sigma_trend = as.matrix(draws_mat[, cols, drop = FALSE]))
+    },
+    "flat.none" = ,
+    "hier.none" = list(),
+    stop_mvgam_fault(
+      "The covariance structure is unknown.",
+      paste0("Got '", dispatch_key, "'.")
+    )
   )
 
   # A marginal prediction integrates over the spread of the state. The
@@ -660,7 +643,7 @@ fit_draws <- function(fit, pars) {
 #' The draws of every parameter of a fit and the named states
 #'
 #' For a reader whose columns are many and fixed by the trend's
-#' structure. The states in `MVGAM_STATE_PARAMS` make up most of a
+#' structure. The states `is_state_param()` names make up most of a
 #' trend fit's saved quantities. Only those in `states` are converted.
 #'
 #' @param fit A stanfit, or any object `posterior::as_draws_matrix()`
@@ -673,7 +656,8 @@ fit_parameter_draws <- function(fit, states = character(0L)) {
   if (!inherits(fit, "stanfit")) {
     return(posterior::as_draws_matrix(fit))
   }
-  fit_draws(fit, c(setdiff(fit@model_pars, MVGAM_STATE_PARAMS), states))
+  pars <- fit@model_pars
+  fit_draws(fit, c(pars[!is_state_param(pars)], states))
 }
 
 
@@ -750,59 +734,6 @@ resolve_draw_indices <- function(total_draws, ndraws, draw_ids) {
   }
 
   seq_len(total_draws)
-}
-
-
-#' Draws of each named parameter, located by name
-#'
-#' @param draws_mat Draws matrix of the fit
-#' @param param_names Character vector of parameter names
-#' @return Named list of draws matrices, one per parameter
-#' @noRd
-extract_named_params <- function(draws_mat, param_names) {
-  checkmate::assert_matrix(draws_mat)
-  checkmate::assert_character(param_names, any.missing = FALSE)
-  all_cols <- colnames(draws_mat)
-  params <- lapply(param_names, function(name) {
-    extract_posterior_param(draws_mat, all_cols, name)
-  })
-  names(params) <- param_names
-  params
-}
-
-
-#' Draws of one parameter, indexed or scalar
-#'
-#' Indexed columns are ordered by their first index.
-#'
-#' @param draws_mat Draws matrix of the fit
-#' @param all_cols Character vector of the column names of `draws_mat`
-#' @param param_name Character parameter name
-#' @return Draws matrix with one column per element
-#' @noRd
-extract_posterior_param <- function(draws_mat, all_cols, param_name) {
-  checkmate::assert_matrix(draws_mat)
-  checkmate::assert_character(all_cols)
-  checkmate::assert_string(param_name)
-  # Match indexed params (param[...]) or scalar (param)
-  indexed_pattern <- paste0("^", param_name, "\\[")
-  scalar_pattern <- paste0("^", param_name, "$")
-
-  indexed_cols <- grep(indexed_pattern, all_cols, value = TRUE)
-
-  if (length(indexed_cols) > 0) {
-    # Sort by numeric index for consistent ordering
-    idx_nums <- as.integer(gsub(".*\\[(\\d+).*", "\\1", indexed_cols))
-    indexed_cols <- indexed_cols[order(idx_nums)]
-    return(as.matrix(draws_mat[, indexed_cols, drop = FALSE]))
-  }
-
-  scalar_cols <- grep(scalar_pattern, all_cols, value = TRUE)
-  if (length(scalar_cols) > 0) {
-    return(as.matrix(draws_mat[, scalar_cols[1], drop = FALSE]))
-  }
-
-  stop_missing_draws(param_name, c(param_name, paste0(param_name, "[...]")))
 }
 
 
@@ -940,10 +871,9 @@ extract_simple_full_cov_params <- function(draws_mat, n_series) {
 
 #' Hierarchical Cholesky parameters as per-draw arrays
 #'
-#' Builds named arrays by direct column-name lookup.
-#' `extract_named_params()` sorts by the first index alone. This
-#' extractor keeps the multi-index order. Downstream code then indexes
-#' `arr\[d, g, i, j\]` directly.
+#' Builds named arrays by direct column-name lookup, which keeps the
+#' multi-index order. Downstream code then indexes `arr\[d, g, i, j\]`
+#' directly.
 #'
 #' @param draws_mat Draws matrix of the fit
 #' @param group_info Group information from `get_group_info()`
@@ -1204,81 +1134,6 @@ draw_innovation_grid <- function(cov_structure, n_times) {
 }
 
 
-#' The parameter pattern of a factor model's loadings
-#'
-#' A fit identified by the QR rotation stores its reported loadings
-#' and factor paths as `Z_tilde[i, j]` and `lv_trend_tilde[t, k]`.
-#' Every other factor fit reports `Z[i, j]` and `lv_trend[t, k]`. A
-#' fit whose factors take their own coefficients relabels them after
-#' sampling. A `trend_map` fit stores them as declared.
-#' `factor_identification()` decides which applies.
-#' `extract_Z_loadings()`, `extract_lv_trend_matrices()`,
-#' `match_z_loadings()` and `categorize_mvgam_parameters()` select
-#' through these helpers.
-#'
-#' @param pars Parameter names from the fit.
-#' @param basis `"identified"` for the loadings a report or plot
-#'   shows. `"model"` for the `Z` the model sampled. A caller
-#'   combining loadings with `sigma_trend`, `Sigma_trend` or
-#'   `Omega_trend` needs `"model"`: the model estimated those
-#'   parameters with the sampled `Z`. The two differ only in a
-#'   rotated fit.
-#' @return Regular expression matching the loading columns
-#' @noRd
-factor_loading_param_pattern <- function(pars,
-                                         basis = c("identified",
-                                                   "model")) {
-  checkmate::assert_character(pars)
-  basis <- match.arg(basis)
-  if (identical(basis, "model")) return("^Z\\[")
-  if (has_identified_loadings(pars)) "^Z_tilde\\[" else "^Z\\["
-}
-
-
-#' Does this fit store QR-rotated loadings?
-#'
-#' A fit identified by rotation stores `Z_tilde` as well as the `Z`
-#' it sampled. Every caller asking whether a fit was rotated tests
-#' for that parameter here.
-#'
-#' @param pars Character vector of parameter names
-#' @return A single logical
-#'
-#' @noRd
-has_identified_loadings <- function(pars) {
-  checkmate::assert_character(pars)
-  any(grepl("^Z_tilde\\[", pars))
-}
-
-
-#' Does this fit store QR-rotated factor paths?
-#'
-#' As `has_identified_loadings()`, for the factor paths the loadings
-#' multiply.
-#'
-#' @param pars Character vector of parameter names
-#' @return A single logical
-#'
-#' @noRd
-has_identified_factor_states <- function(pars) {
-  checkmate::assert_character(pars)
-  any(grepl("^lv_trend_tilde\\[", pars))
-}
-
-#' The parameter pattern of a factor model's paths
-#'
-#' @param pars Character vector of parameter names
-#' @return Regular expression matching the factor path columns
-#' @noRd
-factor_state_param_pattern <- function(pars) {
-  checkmate::assert_character(pars)
-  if (has_identified_factor_states(pars)) {
-    "^lv_trend_tilde\\["
-  } else {
-    "^lv_trend\\["
-  }
-}
-
 #' The pattern of the parameters the default view hides
 #'
 #' The summary and tidy classifiers hide each parameter that is a
@@ -1378,86 +1233,6 @@ filter_hidden_pars <- function(pars) {
   pars[!is_hidden_par(pars)]
 }
 
-#' Factor-loading draws from the posterior
-#'
-#' `factor_loading_param_pattern()` selects `Z_tilde` or `Z`. The array
-#' follows the column-major order Stan stores the loading matrix in.
-#' `resolve_factor_loadings()` also covers a fully fixed `trend_map`
-#' fit, whose loadings are data.
-#'
-#' @param draws_mat Numeric draws matrix with parameter column names
-#' @param n_obs_series Integer number of observed series
-#' @param n_lv Integer number of latent factors
-#' @param basis Character loading basis, `"identified"` for the
-#'   QR-identified loadings or `"model"` for the sampled ones
-#' @return Numeric array with dimensions `[ndraws, n_obs_series, n_lv]`
-#' @noRd
-extract_Z_loadings <- function(draws_mat, n_obs_series, n_lv,
-                               basis = c("identified", "model")) {
-  checkmate::assert_matrix(draws_mat)
-  checkmate::assert_int(n_obs_series, lower = 1L)
-  checkmate::assert_int(n_lv, lower = 1L)
-  basis <- match.arg(basis)
-  ndraws <- nrow(draws_mat)
-  pattern <- factor_loading_param_pattern(colnames(draws_mat), basis)
-  param_name <- if (pattern == "^Z_tilde\\[") "Z_tilde" else "Z"
-  cols <- grep(pattern, colnames(draws_mat), value = TRUE)
-  expected_cols <- n_obs_series * n_lv
-  if (length(cols) != expected_cols) {
-    stop_mvgam_fault(
-      paste0("Expected ", expected_cols, " ", param_name,
-             " loading columns, found ", length(cols), "."),
-      paste0("A factor model stores ", param_name, "[s, lv] for s in 1..",
-             n_obs_series, " and lv in 1..", n_lv, ".")
-    )
-  }
-  # Stan stores the loading matrix column-major:
-  # [1,1], [2,1], ..., [N_series,1], [1,2], ...
-  array(
-    as.numeric(draws_mat[, cols, drop = FALSE]),
-    dim = c(ndraws, n_obs_series, n_lv)
-  )
-}
-
-
-#' A time-by-factor grid of every draw projected onto the series
-#'
-#' For draw `d`, time `t` and series `s` the output holds
-#' `sum_lv Z[d, s, lv] * grid[d, t + (lv - 1) * n_times]` in column
-#' `t + (s - 1) * n_times`. Time varies fastest within each factor on
-#' input. That is the order of a Stan `matrix[N_time, N_lv]` and of
-#' `transform_diagonal_innovations()`. Time varies fastest within each
-#' series on output, the order of a `matrix[N_time, N_series]`. The
-#' grid can hold innovations or a state path.
-#'
-#' @param grid Numeric matrix with dimensions `[ndraws, n_times * n_lv]`
-#' @param Z Numeric loading array with dimensions
-#'   `[ndraws, n_obs_series, n_lv]`
-#' @param n_times Integer number of time points
-#' @param n_lv Integer number of latent factors
-#' @param n_obs_series Integer number of observed series
-#' @return Numeric matrix with dimensions
-#'   `[ndraws, n_times * n_obs_series]`
-#' @noRd
-project_lv_grid <- function(grid, Z, n_times, n_lv, n_obs_series) {
-  checkmate::assert_int(n_times, lower = 1L)
-  checkmate::assert_int(n_lv, lower = 1L)
-  checkmate::assert_int(n_obs_series, lower = 1L)
-  checkmate::assert_matrix(grid, ncols = n_times * n_lv)
-  checkmate::assert_array(Z, d = 3L)
-  ndraws <- nrow(grid)
-  out <- matrix(0, ndraws, n_times * n_obs_series)
-  for (d in seq_len(ndraws)) {
-    # A single factor would drop `Z[d, , ]` to a vector. The reshape
-    # keeps the `[n_obs_series, n_lv]` matrix.
-    Z_d <- matrix(Z[d, , ], nrow = n_obs_series, ncol = n_lv)
-    lv_d <- matrix(grid[d, ], nrow = n_times, ncol = n_lv)
-    out[d, ] <- as.numeric(tcrossprod(lv_d, Z_d))
-  }
-  out
-}
-
-
 #' Diagonal-pattern innovation transform
 #'
 #' For models with independent innovations per series (RW, AR, ZMVN
@@ -1533,28 +1308,11 @@ transform_cholesky_innovations <- function(z, params, n_times, n_series,
   L_omega_arr <- params$L_Omega_trend
 
   checkmate::assert_matrix(sigma, nrows = ndraws, ncols = n_series)
-  expected <- c(ndraws, n_series, n_series)
-  if (!identical(dim(L_omega_arr), as.integer(expected))) {
-    stop_shape_fault("'L_Omega_trend'", dim(L_omega_arr), expected)
-  }
-
-  # Pre-allocate result matrix
-  result <- matrix(0, ndraws, n_times * n_series)
-
-  for (d in seq_len(ndraws)) {
-    L_omega <- L_omega_arr[d, , ]
-
-    # L_Sigma = diag(sigma) %*% L_Omega via row scaling
-    L_sigma <- L_omega * as.numeric(sigma[d, ])
-
-    # Reshape z for this draw: [n_times x n_series]
-    z_d <- matrix(z[d, ], n_times, n_series, byrow = FALSE)
-
-    # Transform: x = z %*% t(L) gives MVN with cov L %*% t(L)
-    result[d, ] <- as.vector(z_d %*% t(L_sigma))
-  }
-
-  result
+  assert_dims(L_omega_arr, "'L_Omega_trend'", c(ndraws, n_series, n_series))
+  # L_Sigma = diag(sigma) %*% L_Omega via row scaling
+  apply_lower_factor(z, n_times, n_series, function(d) {
+    L_omega_arr[d, , ] * as.numeric(sigma[d, ])
+  })
 }
 
 
@@ -1588,28 +1346,32 @@ transform_full_cov_innovations <- function(z, params, n_times, n_series,
   checkmate::assert_list(params)
 
   Sigma_arr <- params$Sigma_trend
-  expected <- c(ndraws, n_series, n_series)
-  if (!identical(dim(Sigma_arr), as.integer(expected))) {
-    stop_shape_fault("'Sigma_trend'", dim(Sigma_arr), expected)
+  assert_dims(Sigma_arr, "'Sigma_trend'", c(ndraws, n_series, n_series))
+  # R's chol() returns the upper factor, transposed here to the lower
+  apply_lower_factor(z, n_times, n_series, function(d) {
+    t(chol(Sigma_arr[d, , ]))
+  })
+}
+
+
+#' Correlate each draw's innovations by its own lower factor
+#'
+#' `z L'` has covariance `L L'` in each row of the draw's
+#' `[n_times x n_series]` grid.
+#'
+#' @param z Matrix `[ndraws x (n_times * n_series)]` of standard normals,
+#'   each series a block of `n_times` columns
+#' @param n_times,n_series Dimensions of each draw's grid
+#' @param factor_of Function of a draw index returning its
+#'   `[n_series x n_series]` lower factor
+#' @return Matrix of the same dimensions as `z`
+#' @noRd
+apply_lower_factor <- function(z, n_times, n_series, factor_of) {
+  out <- matrix(0, nrow(z), ncol(z))
+  for (d in seq_len(nrow(z))) {
+    out[d, ] <- matrix(z[d, ], n_times, n_series) %*% t(factor_of(d))
   }
-
-  # Pre-allocate result matrix
-  result <- matrix(0, ndraws, n_times * n_series)
-
-  for (d in seq_len(ndraws)) {
-    Sigma_d <- Sigma_arr[d, , ]
-
-    # R's chol() returns upper triangular; transpose for lower.
-    L_d <- t(chol(Sigma_d))
-
-    # Reshape z for this draw
-    z_d <- matrix(z[d, ], n_times, n_series, byrow = FALSE)
-
-    # Transform
-    result[d, ] <- as.vector(z_d %*% t(L_d))
-  }
-
-  result
+  out
 }
 
 
@@ -1951,26 +1713,18 @@ transform_hierarchical_cholesky_innovations <- function(z, params, n_times,
   sigma_arr <- params$sigma_group_trend
 
   checkmate::assert_numeric(alpha, len = ndraws, any.missing = FALSE)
-  # dim() returns integers and the expected shape is compared as integers
-  check_dims <- function(arr, name, expected) {
-    if (!identical(dim(arr), as.integer(expected))) {
-      stop_shape_fault(paste0("'", name, "'"), dim(arr), expected)
-    }
-  }
 
   # L_Omega_global: [ndraws, n_sub, n_sub]
   checkmate::assert_array(
     L_glob_arr, d = 3,
     any.missing = FALSE
   )
-  check_dims(L_glob_arr, "L_Omega_global_trend",
-             c(ndraws, n_sub, n_sub))
+  assert_dims(L_glob_arr, "'L_Omega_global_trend'", c(ndraws, n_sub, n_sub))
   # L_deviation_group: [ndraws, n_groups, n_sub, n_sub]
-  check_dims(L_dev_arr, "L_deviation_group_trend",
-             c(ndraws, n_groups, n_sub, n_sub))
+  assert_dims(L_dev_arr, "'L_deviation_group_trend'",
+              c(ndraws, n_groups, n_sub, n_sub))
   # sigma_group: [ndraws, n_groups, n_sub]
-  check_dims(sigma_arr, "sigma_group_trend",
-             c(ndraws, n_groups, n_sub))
+  assert_dims(sigma_arr, "'sigma_group_trend'", c(ndraws, n_groups, n_sub))
 
   # The columns of `z` and of the result holding one group's series,
   # `[n_times, n_sub]` with column k the group's k-th member. Series

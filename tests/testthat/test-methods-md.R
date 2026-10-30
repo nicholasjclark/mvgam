@@ -348,6 +348,53 @@ test_that("Monotonic mo(x) renders beta^{(mo)}_x m_x + Dirichlet simplex", {
   expect_no_match(out, "mox", fixed = TRUE)
 })
 
+test_that("each special coefficient renders its own parts", {
+  set.seed(1L)
+  dat <- data.frame(
+    time = rep(1:30, 4),
+    series = factor(rep(paste0("s", 1:4), each = 30)),
+    z = rnorm(120), x = rnorm(120), sdx = 0.1,
+    m = factor(sample(1:4, 120, replace = TRUE), ordered = TRUE),
+    f = factor(rep(c("hi", "lo"), 60)), g = factor(rep(letters[1:3], 40)),
+    y = rpois(120, 3)
+  )
+  # `mo(m):f` takes the indicator of the level its coefficient names.
+  # Each coefficient has its own simplex. The varying slope multiplies
+  # the same transform as its population term.
+  mod <- make_methods_md_prefit(
+    y ~ mo(m):z + mo(m):f + me(x, sdx):mo(m) + (mo(m) | g) + mo(m),
+    data = dat
+  )
+  rows <- md_rows(methods_md(mod))
+  expect_contains(rows, paste0(
+    "\\log \\mu_{i,t} &= \\alpha + ",
+    "\\beta^{(\\text{mo})}_{m} \\, m_{m}(m_{i,t}) + ",
+    "\\beta^{(\\text{mo})}_{m:z} \\, m_{m:z}(m_{i,t}) \\, z_{i,t} + ",
+    "\\beta^{(\\text{mo})}_{m:f[\\mathrm{lo}]} \\, ",
+    "m_{m:f[\\mathrm{lo}]}(m_{i,t}) \\, \\mathbb{1}[f_{i,t} = \\mathrm{lo}] + ",
+    "\\beta^{(\\text{sp})}_{m:x} \\, m_{m:x}(m_{i,t}) \\, \\tilde{x}_{i,t} + ",
+    "\\alpha_{g[i]} + \\beta^{(g)}_{m, g[i]} m_{m}(m_{i,t})"
+  ))
+  expect_contains(rows, "\\boldsymbol{\\zeta}_{m:x} &\\sim \\text{Dirichlet}(1)")
+
+  # A factor's varying slope takes the indicator of its level
+  mod <- make_methods_md_prefit(y ~ z + (1 + f | g), data = dat)
+  out <- methods_md(mod)
+  expect_match(out, paste0("\\beta^{(g)}_{f[\\mathrm{lo}], g[i]} ",
+                           "\\mathbb{1}[f_{i,t} = \\mathrm{lo}]"), fixed = TRUE)
+  expect_match(out, "- $f$: factor with 2 levels", fixed = TRUE)
+
+  # A grouped measurement-error term has one latent value per level
+  dat$x <- c(-1, 0, 1)[as.integer(dat$g)]
+  mod <- make_methods_md_prefit(y ~ me(x, sdx, gr = g), data = dat)
+  expect_contains(md_rows(methods_md(mod)), c(
+    paste0("\\log \\mu_{i,t} &= \\alpha + ",
+           "\\beta^{(\\text{me})}_{x} \\, \\tilde{x}_{g[i]}"),
+    paste0("\\tilde{x}_{g} &\\sim \\text{Normal}\\!\\left(",
+           "\\mu^{(\\text{me})}_{x}, \\sigma^{(\\text{me})}_{x}\\right)")
+  ))
+})
+
 test_that("dpar second-formula renders its own linear predictor", {
   set.seed(1L)
   dat <- data.frame(
@@ -417,6 +464,19 @@ test_that("Group-level RE renders alpha_{grp[i]} + hyperprior shape", {
   ))
   expect_true(any(startsWith(rows, "\\sigma_{\\mathrm{grp}} &\\sim")))
   expect_no_match(out, "\\sigma_{j}", fixed = TRUE)
+  # A block without an intercept adds none. A block written with `||`
+  # has independent coefficients.
+  rows <- md_rows(methods_md(make_methods_md_prefit(y ~ (0 + x | grp))))
+  expect_contains(rows, paste0(
+    "\\log \\mu_{i,t} &= \\alpha + ",
+    "\\beta^{(\\mathrm{grp})}_{x, \\mathrm{grp}[i]} x_{i,t}"
+  ))
+  rows <- md_rows(methods_md(make_methods_md_prefit(y ~ (1 + x || grp))))
+  expect_contains(rows, paste0(
+    "\\beta^{(\\mathrm{grp})}_{x, \\mathrm{grp}} &\\sim ",
+    "\\text{Normal}(0, \\sigma^{(\\beta_{x})}_{\\mathrm{grp}})"
+  ))
+  expect_false(any(grepl("MVNormal", rows, fixed = TRUE)))
 })
 
 test_that("methods_md(file = path) writes the markdown to disk", {
@@ -960,10 +1020,56 @@ test_that("Ordinal Intercept rows render as theta_{k} thresholds", {
            "(\\boldsymbol{\\theta}, \\mu_{i,t})"),
     "\\mu_{i,t} &= \\beta_{x} x_{i,t}",
     paste0("- $\\mu_{i,t}$: latent score of $\\mathrm{yord}_{i,t}$, with ",
-           "$P(\\mathrm{yord}_{i,t} \\le c) = F(\\theta_c - \\mu_{i,t})$ ",
+           "$P(\\mathrm{yord}_{i,t} \\le c) = F(\\theta_{c} - \\mu_{i,t})$ ",
            "and $F$ the inverse of the logit link")
   ))
   expect_true(any(startsWith(rows, "\\theta_{4} &\\sim")))
+})
+
+test_that("ordinal thresholds render their shifts, groups and scale", {
+  set.seed(1L)
+  d <- data.frame(
+    time = rep(1:30, 4), series = factor(rep(1:4, each = 30)),
+    x = rnorm(120), g = factor(rep(letters[1:3], 40)),
+    gs = factor(rep(c("p", "q"), 60)),
+    yord = factor(sample(1:4, 120, replace = TRUE), ordered = TRUE)
+  )
+  d$yg <- pmin(as.integer(d$yord), ifelse(d$gs == "q", 3L, 4L))
+  rows_of <- function(formula, family) {
+    md_rows(methods_md(mvgam(formula, data = d, family = family,
+                             run_model = FALSE, silent = 2,
+                             validate = FALSE)))
+  }
+  # Each `cs()` term shifts every threshold by its own amount. brms
+  # repeats its advisory on cumulative `cs()` terms at each parse.
+  rows <- without_brms_fit_advisories(
+    rows_of(bf(yord ~ cs(x) + (cs(1) | g)), cumulative())
+  )
+  expect_contains(rows, c(
+    paste0("\\mathrm{yord}_{i,t} &\\sim \\text{OrderedCumulative}",
+           "(\\boldsymbol{\\theta}_{i,t}, \\mu_{i,t})"),
+    paste0("\\theta_{i,t,c} &= \\theta_{c} - (\\beta_{x,c} x_{i,t} + ",
+           "\\alpha_{g[i],c})"),
+    "- $\\beta_{x,c}$: population effect of $x$ on threshold $c$"
+  ))
+  expect_true(any(startsWith(rows, "\\sigma^{(\\alpha)}_{g,3} &\\sim")))
+  # Each level of `gs` has thresholds of its own. Its header row
+  # repeats their prior and is not shown.
+  rows <- rows_of(bf(yg | thres(gr = gs) ~ x), cumulative())
+  expect_contains(rows, paste0(
+    "\\mathrm{yg}_{i,t} &\\sim \\text{OrderedCumulative}",
+    "(\\boldsymbol{\\theta}_{\\mathrm{gs}[i]}, \\mu_{i,t})"
+  ))
+  expect_true(any(startsWith(rows, "\\theta_{\\mathrm{q},2} &\\sim")))
+  expect_false(any(startsWith(rows, "\\alpha &\\sim")))
+  # A predicted discrimination scales each cut. The hurdle family's zero
+  # is its hurdle.
+  rows <- rows_of(bf(yord ~ 1, disc ~ x), cumulative())
+  expect_match(rows, "F(\\mathrm{disc}_{i,t} \\, (\\theta_{c} - \\mu_{i,t}))",
+               fixed = TRUE, all = FALSE)
+  rows <- rows_of(bf(yg ~ x), hurdle_cumulative())
+  expect_match(rows, "\\text{Hurdle-OrderedCumulative}(\\boldsymbol{\\theta}",
+               fixed = TRUE, all = FALSE)
 })
 
 test_that("mvbind rescor priors carry response superscripts", {

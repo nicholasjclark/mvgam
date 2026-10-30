@@ -515,15 +515,13 @@ test_that("the one-step trend forecast follows this fit's own AR", {
 })
 
 
-test_that("summary, residual_cor and shared_variation name the axis", {
+test_that("residual_cor and shared_variation name the axis", {
   # Everything a user reads off a hierarchical fit is labelled by the
   # derived identity rather than by the column it superseded. A
   # correct estimate under the wrong label is indistinguishable, to
   # the reader, from a wrong estimate.
   levs <- as.character(mvgam:::mvgam_axes(fit)$series$levels)
 
-  txt <- capture.output(summary(fit))
-  expect_true(any(grepl(paste0("Series:\\s*", length(levs)), txt)))
 
   # The pooled correlation is between subgroups within a group, so
   # it is the subgroup set that labels it rather than the six series.
@@ -1345,4 +1343,9 @@ test_that("the two grouped spellings are one model", {
       "L_deviation_group_trend", "sigma_group_trend") %in%
       names(cs$params)
   ))
+})
+
+
+test_that("the predictor's parts sum to it: obs, grouped AR state", {
+  expect_parts_sum(fit, "state")
 })

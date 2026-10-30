@@ -382,7 +382,7 @@ build_mvgam_smooth_plot <- function(df, label) {
     )
   # One line per draw, in the columns `build_spaghetti_data()` writes.
   spaghetti_df <- attr(df, "spaghetti")
-  if (!is.null(spaghetti_df) && nrow(spaghetti_df) > 0L) {
+  if (NROW(spaghetti_df) > 0L) {
     gg <- gg + ggplot2::geom_line(
       data = spaghetti_df,
       ggplot2::aes(
@@ -463,13 +463,10 @@ smooths <- function(x) {
 # ------------------------------------------------------------------
 
 
-#' Every smooth term of a fit, as brms numbers it
+#' Every smooth term of a fit, with its smooth objects
 #'
-#' The Stan data brms writes for the fitted frame records each
-#' predictor's terms and their `by` levels on `attr(Xs, "bylevels")`.
-#' A term with a `by` factor holds one smooth object per level. Any
-#' other term holds one. The objects are numbered in order across the
-#' predictor's terms.
+#' The Stan data of the fitted frame records each predictor's smooth
+#' terms. `smooth_term_objects()` numbers their objects.
 #'
 #' @param x A fitted `mvgam` object or a prefit
 #' @return A list with one entry per term of each predictor, observation
@@ -488,45 +485,84 @@ mvgam_smooth_terms <- function(x) {
     if (is.null(model)) {
       next
     }
-    sdata <- brms::standata(model, internal = TRUE)
+    sdata <- without_brms_fit_advisories(
+      brms::standata(model, internal = TRUE)
+    )
     for (predictor in model_predictors(model$formula)) {
       Xs <- sdata[[paste0("Xs", predictor$suffix)]]
-      if (is.null(Xs)) {
-        next
-      }
+      objects <- smooth_term_objects(Xs)
+      labels <- names(objects)
       bylevels <- attr(Xs, "bylevels")
-      labels <- names(bylevels)
-      counts <- vapply(bylevels, function(lv) max(1L, length(lv)),
-                       integer(1L))
-      if (length(labels) == 0L ||
-          sum(counts) != length(attr(Xs, "smcols"))) {
-        stop_mvgam_fault(
-          "A predictor's smooth terms do not match its smooth objects.",
-          paste0("Got terms ", paste(labels, collapse = ", "), " for ",
-                 length(attr(Xs, "smcols")), " smooth objects.")
-        )
-      }
-      specs <- mgcv::interpret.gam(
-        stats::reformulate(labels, response = ".y")
-      )$smooth.spec
-      checkmate::assert_list(specs, len = length(labels))
-      last <- cumsum(counts)
+      specs <- smooth_term_specs(labels)
       for (i in seq_along(labels)) {
-        by_var <- specs[[i]]$by
         out[[length(out) + 1L]] <- c(
           list(term = labels[i], side = side),
           predictor[c("resp", "dpar", "nlpar")],
-          list(
-            objects = seq.int(last[i] - counts[i] + 1L, last[i]),
-            covars = specs[[i]]$term,
-            by_var = if (identical(by_var, "NA")) NA_character_ else by_var,
-            bylevels = if (length(bylevels[[i]])) bylevels[[i]]
-          )
+          list(objects = objects[[i]]),
+          specs[[i]],
+          list(bylevels = if (length(bylevels[[i]])) bylevels[[i]])
         )
       }
     }
   }
   out
+}
+
+
+#' The smooth objects of each smooth term of one predictor
+#'
+#' `attr(Xs, "bylevels")` holds each term's `by` levels. A
+#' term with a `by` factor holds one smooth object per level. Any other
+#' term holds one. The objects are numbered in order across the terms.
+#'
+#' @param Xs The predictor's `Xs` entry of the internal Stan data, or
+#'   `NULL` for a predictor without smooths
+#' @return Named list, one integer vector of object numbers per term,
+#'   named by the term as the formula writes it
+#' @noRd
+smooth_term_objects <- function(Xs) {
+  if (is.null(Xs)) return(list())
+  bylevels <- attr(Xs, "bylevels")
+  labels <- names(bylevels)
+  counts <- vapply(bylevels, function(lv) max(1L, length(lv)), integer(1L))
+  if (length(labels) == 0L || sum(counts) != length(attr(Xs, "smcols"))) {
+    stop_mvgam_fault(
+      "A predictor's smooth terms must account for its smooth objects.",
+      paste0("Got terms ", paste(labels, collapse = ", "), " for ",
+             length(attr(Xs, "smcols")), " smooth objects.")
+    )
+  }
+  last <- cumsum(counts)
+  stats::setNames(
+    lapply(seq_along(labels), function(i) {
+      seq.int(last[i] - counts[i] + 1L, last[i])
+    }),
+    labels
+  )
+}
+
+
+#' The covariates and `by` variable of each smooth term
+#'
+#' mgcv parses the `s()` and `t2()` terms as `gam()` does.
+#'
+#' @param labels Smooth term labels as the formula writes them, or
+#'   `NULL` for none
+#' @return List along `labels`. Each entry holds `covars`, the
+#'   variables the term smooths. It also holds `by_var`, the term's `by`
+#'   variable or `NA`.
+#' @noRd
+smooth_term_specs <- function(labels) {
+  checkmate::assert_character(labels, any.missing = FALSE, null.ok = TRUE)
+  if (length(labels) == 0L) return(list())
+  specs <- mgcv::interpret.gam(
+    stats::reformulate(labels, response = ".y")
+  )$smooth.spec
+  checkmate::assert_list(specs, len = length(labels))
+  lapply(specs, function(spec) {
+    list(covars = spec$term,
+         by_var = if (identical(spec$by, "NA")) NA_character_ else spec$by)
+  })
 }
 
 
@@ -650,7 +686,8 @@ mvgam_smooth_eta <- function(object, hit, newdata, draw_ids = NULL) {
     brmsfit = side_model(object, hit$side),
     newdata = newdata %||% mvgam_side_data(object, hit$side),
     re_formula = NA,
-    req_vars = setdiff(c(hit$covars, hit$by_var), NA_character_)
+    req_vars = setdiff(c(hit$covars, hit$by_var), NA_character_),
+    trend = identical(hit$side, "trend")
   )
   smooth_pred(
     as_plain_matrix(prep$draws), prep$sdata,

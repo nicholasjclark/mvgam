@@ -186,9 +186,11 @@ describe_predictors <- function(obj) {
   data <- obj$data %||% data.frame()
   if (nrow(data) == 0L) return(character(0L))
   resp_cols <- unname(response_columns(obj))
-  # Only the terms of a linear predictor are listed. Trial counts,
-  # offsets and grouping factors are left out.
-  used_vars <- mvgam_term_list(obj)$conditional
+  # Only the covariates of a linear predictor are listed, a varying
+  # slope's among them. Trial counts, offsets and grouping factors are
+  # left out.
+  terms <- mvgam_term_list(obj)
+  used_vars <- c(terms$conditional, terms$slopes)
   # The dimensions line counts the response, time and series columns
   vars <- axis_vars(obj)
   skip <- unique(c(resp_cols, vars$time_var, vars$series_var))
@@ -215,7 +217,7 @@ describe_predictors <- function(obj) {
     } else {
       paste0(class(col)[[1L]], " covariate")
     }
-    out <- c(out, paste0("- $", escape_math_text(nm), "$: ", desc))
+    out <- c(out, gloss(escape_math_text(nm), desc))
   }
   out
 }
@@ -397,25 +399,24 @@ render_model_section <- function(obj) {
 #' @return List of statements
 #' @noRd
 likelihood_rows <- function(obj) {
-  responses <- names(response_columns(obj))
-  if (length(responses) > 1L) {
-    views <- lapply(responses, subset_obj_to_response, obj = obj)
-    tags <- escape_math_text(responses)
-    mus <- paste0("\\mu^{(", tags, ")}_{i,t}")
+  if (length(response_columns(obj)) > 1L) {
+    views <- response_views(obj)
+    sym <- response_mean_symbols(obj)
+    mus <- sym$mu
     link_rows <- Map(function(view, mu) {
       list(lhs = predictor_lhs(view$family, mu), op = "=",
            rhs = linear_predictor_rhs(view))
     }, views, mus)
     if (!has_rescor(obj)) {
-      return(unlist(Map(function(view, mu, r, link_row) {
-        list(list(lhs = paste0(r, "_{i,t}"), op = "\\sim",
+      return(unlist(Map(function(view, mu, y, link_row) {
+        list(list(lhs = y, op = "\\sim",
                   rhs = family_distribution_text(
                     resolve_family_name(view$family), mu, view
                   )),
              link_row)
-      }, views, mus, tags, link_rows), recursive = FALSE))
+      }, views, mus, sym$y, link_rows), recursive = FALSE))
     }
-    sigmas <- paste0("\\sigma^{(", tags, ")}", collapse = ", ")
+    sigmas <- paste0("\\sigma^{(", sym$tag, ")}", collapse = ", ")
     return(c(list(
       list(lhs = "\\mathbf{Y}_{i,t}", op = "\\sim",
            rhs = paste0("\\text{MVNormal}\\!\\left((",
@@ -451,7 +452,7 @@ likelihood_rows <- function(obj) {
 #' @return List of statements, empty without trend formula terms
 #' @noRd
 trend_predictor_rows <- function(obj) {
-  if (!methods_md_has_latent_trend(obj)) return(list())
+  if (!has_latent_trend(obj)) return(list())
   mu <- trend_mu_symbol(obj)
   if (is.null(mu)) return(list())
   view <- trend_side_view(obj)
@@ -478,7 +479,7 @@ trend_predictor_rows <- function(obj) {
 #' @noRd
 sub_predictor_views <- function(obj) {
   prior <- obj$prior
-  if (is.null(prior) || nrow(prior) == 0L) return(list())
+  if (NROW(prior) == 0L) return(list())
   preds <- Filter(function(lp) !is.null(lp$dpar) || !is.null(lp$nlpar),
                   model_predictors(side_model(obj, "obs")$formula))
   lapply(preds, function(lp) {
@@ -496,8 +497,8 @@ sub_predictor_views <- function(obj) {
     view <- obj
     view$prior <- rows
     view$trend_metadata <- NULL
-    visit <- closure_unit_spec(obj)$visit
-    view$methods_md_index <- paste0("_", visit %||% "{i,t}")
+    view$methods_md_index <- closure_unit_spec(obj)$visit_index %||%
+      c("i", "t")
     view$methods_md_pred <- lp[c("resp", "dpar", "nlpar")]
     view$methods_md_tag <- paste(
       escape_math_text(c(if (nzchar(resp)) resp, lp$dpar %||% lp$nlpar)),
@@ -596,6 +597,20 @@ nl_top_linpred_rhs <- function(obj) {
   paste(c(rhs_src, trend_linpred_terms(obj)), collapse = " + ")
 }
 
+#' The symbols of each response of a multivariate model
+#'
+#' Each response and its mean carry the response's brms key.
+#'
+#' @param obj An `mvgam` object with several responses
+#' @return List of character vectors along the responses: the key as a
+#'   `tag`, the response `y` and its mean `mu`
+#' @noRd
+response_mean_symbols <- function(obj) {
+  tag <- unname(escape_math_text(names(response_columns(obj))))
+  list(tag = tag, y = paste0(tag, "_{i,t}"),
+       mu = paste0("\\mu^{(", tag, ")}_{i,t}"))
+}
+
 #' One view per response of a multivariate model, or the model
 #'
 #' @param obj An `mvgam` object
@@ -637,24 +652,25 @@ family_glossary <- function(obj) {
     },
     phi = "precision", kappa = "precision",
     hu = "hurdle probability", zi = "zero-inflation probability",
+    disc = "discrimination, scaling each cut of the latent score",
     mphi = "dispersion", mtheta = "power, in (1, 2)",
     mtail = "tail index, with the negative binomial as its limit"
   )
   dpars <- intersect(names(what), obj$family$dpars %||% character(0L))
+  # brms fixes `disc` at 1 unless a formula predicts it
+  if (!has_dpar_formula(obj, "disc")) dpars <- setdiff(dpars, "disc")
   # `bf(y ~ x, quantile = 0.25)` fixes a parameter at a value
   fixed <- obj$formula$pfix %||% list()
   c(
     if (fam %in% binomial_family_names()) {
-      paste0("- $", indexed(obj, "n"), "$: number of trials")
+      gloss(indexed(obj, "n"), "number of trials")
     },
     vapply(dpars, function(dp) {
       value <- if (!is.null(fixed[[dp]])) paste0(" = ", fixed[[dp]])
-      paste0("- $", dpar_aware_param(dp, obj), value, "$: ", what[[dp]],
-             if (!is.null(value)) ", fixed")
+      gloss(paste0(dpar_aware_param(dp, obj), value), what[[dp]],
+            if (!is.null(value)) ", fixed")
     }, character(1L), USE.NAMES = FALSE),
-    if (is_ordinal_family(obj$family)) {
-      "- $\\boldsymbol{\\theta}$: ordered thresholds between categories"
-    }
+    threshold_glossary(obj)
   )
 }
 
@@ -666,6 +682,144 @@ binomial_family_names <- function() {
   c("binomial", "zero_inflated_binomial", "com_binomial", "beta_binomial")
 }
 
+#' The names the likelihood gives the ordinal families
+#'
+#' @return Named character vector, named by family
+#' @noRd
+ordinal_family_labels <- function() {
+  c(cumulative = "OrderedCumulative", sratio = "OrderedStoppingRatio",
+    cratio = "OrderedContinuationRatio", acat = "OrderedAdjacentCategory",
+    hurdle_cumulative = "Hurdle-OrderedCumulative")
+}
+
+#' The discrimination of an ordinal family, when a formula predicts it
+#'
+#' brms scales each cut of the latent score by `disc`, fixed at 1
+#' unless `bf(..., disc ~ ...)` predicts it.
+#'
+#' @param obj An `mvgam` object or a view of one response
+#' @return Character LaTeX symbol, or `NULL` for a fixed `disc`
+#' @noRd
+ordinal_disc <- function(obj) {
+  if (has_dpar_formula(obj, "disc")) dpar_aware_param("disc", obj)
+}
+
+#' The probability an ordinal family's link gives a threshold
+#'
+#' brms cuts the latent score at `disc (theta_c - mu)` for the
+#' cumulative and stopping-ratio families and at `disc (mu - theta_c)`
+#' for the continuation-ratio and adjacent-category families
+#' (`brms:::dcumulative()` and its siblings). A hurdle family's zero is
+#' the hurdle. Its other categories follow the cumulative law.
+#'
+#' @param fam Character ordinal family name
+#' @param y,mu,theta Character LaTeX symbols of the response, the
+#'   latent score and threshold `c`
+#' @param disc Character LaTeX symbol of the discrimination, or `NULL`
+#' @return Character LaTeX expression
+#' @noRd
+ordinal_link_law <- function(fam, y, mu, theta, disc = NULL) {
+  cut <- function(a, b) {
+    diff <- paste0(a, " - ", b)
+    paste0("F(", if (is.null(disc)) diff else {
+      paste0(disc, " \\, (", diff, ")")
+    }, ")")
+  }
+  switch(fam,
+    cumulative = paste0("P(", y, " \\le c) = ", cut(theta, mu)),
+    hurdle_cumulative = paste0("P(", y, " \\le c \\mid ", y, " > 0) = ",
+                               cut(theta, mu)),
+    sratio = paste0("P(", y, " = c \\mid ", y, " \\ge c) = ",
+                    cut(theta, mu)),
+    cratio = paste0("P(", y, " > c \\mid ", y, " \\ge c) = ",
+                    cut(mu, theta)),
+    acat = paste0("P(", y, " = c + 1 \\mid ", y, " \\in \\{c, c + 1\\}) = ",
+                  cut(mu, theta))
+  )
+}
+
+#' The variable whose levels take thresholds of their own
+#'
+#' `bf(y | thres(gr = g) ~ x)` gives each level of `g` its own set.
+#'
+#' @param obj An `mvgam` object or a view of one response
+#' @return Character variable name, or `NULL` for one set
+#' @noRd
+ordinal_threshold_group <- function(obj) {
+  resp <- obj$methods_md_resp
+  frames <- Filter(function(f) {
+    is.null(resp) || identical(null_if_blank(f$resp), resp)
+  }, response_frames(brms_terms(side_model(obj, "obs")$formula)))
+  thres <- frames[[1L]]$adforms$thres
+  if (is.null(thres)) return(NULL)
+  args <- call_args_as_written(thres[[2L]])
+  pos <- args$positional
+  gr <- args$named("gr", if (length(pos) >= 2L) pos[[2L]] else NA_character_)
+  if (!is.na(gr) && nzchar(gr)) gr
+}
+
+#' The thresholds of an ordinal mean, as the equations write them
+#'
+#' One set of thresholds `\boldsymbol{\theta}` serves every
+#' observation. Under `thres(gr = g)` each level of `g` has its own set.
+#' Category-specific terms shift each observation's thresholds, as
+#' `\theta_{i,t,c} = \theta_c - \beta_{x,c} x_{i,t}`. brms refuses the
+#' two together.
+#'
+#' @param obj An `mvgam` object or a view of one response
+#' @return Named character vector of LaTeX. `vec` is the set, `elem`
+#'   threshold `c` of an observation and `base` the unshifted threshold.
+#' @noRd
+threshold_symbols <- function(obj) {
+  gr <- ordinal_threshold_group(obj)
+  at <- if (!is.null(gr)) paste0(escape_math_text(gr), "[i]")
+  out <- if (length(category_specific_rhs(obj))) {
+    c(vec = indexed(obj, "\\boldsymbol{\\theta}"),
+      elem = indexed(obj, "\\theta", "c"))
+  } else if (!is.null(at)) {
+    c(vec = paste0("\\boldsymbol{\\theta}_{", at, "}"),
+      elem = paste0("\\theta_{", at, ",c}"))
+  } else {
+    c(vec = "\\boldsymbol{\\theta}", elem = "\\theta_{c}")
+  }
+  out[["base"]] <- "\\theta_{c}"
+  stats::setNames(response_symbol(obj, out), names(out))
+}
+
+#' The symbol of a threshold's prior row
+#'
+#' @param group Character level of the `thres(gr = )` variable, or `""`
+#' @param coef Character threshold number
+#' @return Character LaTeX symbols
+#' @noRd
+threshold_prior_symbol <- function(group, coef) {
+  level <- ifelse(nzchar(group), paste0(math_upright(group), ","), "")
+  paste0("\\theta_{", level, coef, "}")
+}
+
+#' The glossary entries of an ordinal mean's thresholds
+#'
+#' @param obj An `mvgam` object or a view of one response
+#' @return Character vector of Markdown bullets, empty for any other
+#'   family
+#' @noRd
+threshold_glossary <- function(obj) {
+  if (!is_ordinal_mean(obj)) return(character(0L))
+  sym <- threshold_symbols(obj)
+  gr <- ordinal_threshold_group(obj)
+  if (!is.null(gr)) {
+    level <- response_symbol(obj, "\\boldsymbol{\\theta}_{u}")
+    return(gloss(level, "ordered thresholds between the ",
+                 "categories of level $u$ of $", escape_math_text(gr), "$"))
+  }
+  if (identical(sym[["elem"]], sym[["base"]])) {
+    return(gloss(sym[["vec"]], "ordered thresholds between categories"))
+  }
+  c(gloss(sym[["base"]], "ordered thresholds between categories"),
+    gloss(sym[["elem"]], "threshold $c$ less the ",
+          "category-specific terms of the observation"))
+}
+
 #' The glossary entry of a response's mean
 #'
 #' A binomial family's mean is the success probability of each trial.
@@ -675,22 +829,17 @@ binomial_family_names <- function() {
 #'
 #' @param mu Character LaTeX symbol of the mean
 #' @param y Character LaTeX symbol of the response
-#' @param family The response's `family`
+#' @param obj An `mvgam` object or a view of one response
 #' @return Character Markdown bullet
 #' @noRd
-mean_glossary <- function(mu, y, family) {
+mean_glossary <- function(mu, y, obj) {
+  family <- obj$family
   fam <- resolve_family_name(family)
-  ordinal <- c(
-    cumulative = "P(%y \\le c) = F(\\theta_c - %mu)",
-    sratio = "P(%y = c \\mid %y \\ge c) = F(\\theta_c - %mu)",
-    cratio = "P(%y > c \\mid %y \\ge c) = F(%mu - \\theta_c)",
-    acat = "P(%y = c + 1 \\mid %y \\in \\{c, c + 1\\}) = F(%mu - \\theta_c)"
-  )
-  if (fam %in% names(ordinal)) {
-    law <- gsub("%mu", mu, gsub("%y", y, ordinal[[fam]], fixed = TRUE),
-                fixed = TRUE)
-    return(paste0(
-      "- $", mu, "$: latent score of $", y, "$, with $", law,
+  if (fam %in% names(ordinal_family_labels())) {
+    law <- ordinal_link_law(fam, y, mu, threshold_symbols(obj)[["elem"]],
+                            ordinal_disc(obj))
+    return(gloss(
+      mu, "latent score of $", y, "$, with $", law,
       "$ and $F$ the inverse of the ", family$link, " link"
     ))
   }
@@ -701,7 +850,7 @@ mean_glossary <- function(mu, y, family) {
   } else {
     "conditional mean of"
   }
-  paste0("- $", mu, "$: ", what, " $", y, "$")
+  gloss(mu, what, " $", y, "$")
 }
 
 #' The glossary entries of the terms of one linear predictor
@@ -721,22 +870,25 @@ term_glossary <- function(obj) {
     } else if (identical(obj$methods_md_tag, "\\eta")) {
       " of the trend predictor"
     }
-    defs <- c(defs, paste0(
-      "- $", response_symbol(obj, "\\alpha"), "$: population intercept", of
+    defs <- c(defs, gloss(
+      response_symbol(obj, "\\alpha"), "population intercept", of
     ))
   }
-  for (spec in fixed_term_specs(obj, setdiff(classes$fixed, "Intercept"))) {
-    defs <- c(defs, paste0(
-      "- $", response_symbol(obj, paste0("\\beta_{", spec$sub, "}")),
-      "$: ", spec$gloss
-    ))
+  for (category in c(FALSE, TRUE)) {
+    coefs <- if (category) classes$cs else setdiff(classes$fixed, "Intercept")
+    for (spec in fixed_term_specs(obj, coefs)) {
+      defs <- c(defs, gloss(
+        response_symbol(obj, fixed_symbol(spec$sub, category)),
+        spec$gloss, if (category) " on threshold $c$"
+      ))
+    }
   }
   for (spec in classes$smooth) {
     sym <- term_symbols("smooth", spec, obj)
     key <- spec_key(spec)
     if (is_re_basis(spec)) {
-      defs <- c(defs, paste0(
-        "- $", sym[["f"]], "$: random effect smooth, one coefficient ",
+      defs <- c(defs, gloss(
+        sym[["f"]], "random effect smooth, one coefficient ",
         "per level of $", spec_subscript(spec), "$ with SD $", sym[["sd"]],
         "$"
       ))
@@ -750,8 +902,8 @@ term_glossary <- function(obj) {
     } else {
       paste0("$K_{", key, "}$ (mgcv default)")
     }
-    defs <- c(defs, paste0(
-      "- $", sym[["f"]], "$: ", basis_label(spec$bs, spec$fname),
+    defs <- c(defs, gloss(
+      sym[["f"]], basis_label(spec$bs, spec$fname),
       " in $", paste(escape_math_text(spec$vars), collapse = "$, $"),
       "$", by_clause(spec), ", basis size ",
       k_label, ", smoothing SD $", sym[["sd"]], "$"
@@ -764,62 +916,86 @@ term_glossary <- function(obj) {
     } else {
       ", exact (full covariance kernel)"
     }
-    defs <- c(defs, paste0(
-      "- $", sym[["f"]], "$: Gaussian process in $",
+    defs <- c(defs, gloss(
+      sym[["f"]], "Gaussian process in $",
       spec_subscript(spec), "$", by_clause(spec), " with ",
       gp_kernel_names(spec$cov)[["label"]], " kernel, length scale $",
       sym[["rho"]], "$ and marginal SD $", sym[["sd"]], "$", k_text
     ))
   }
+  for (s in classes$sp) {
+    defs <- c(defs, gloss(response_symbol(obj, s$beta),
+                          "population effect of $", s$value, "$"))
+  }
   for (s in classes$mo) {
     v <- escape_math_text(s$var)
     sym <- term_symbols("mo", s, obj)
-    defs <- c(defs, paste0(
-      "- $", sym[["m"]], "(", v, ")$: monotonic step transform of ",
+    defs <- c(defs, gloss(
+      paste0(sym[["m"]], "(", v, ")"), "monotonic step transform of ",
       "ordinal $", v, "$, built from a Dirichlet simplex $", sym[["zeta"]],
-      "$ over the $D_{", v, "} - 1$ step increments and scaled by ",
-      "population effect $", sym[["beta"]], "$"
+      "$ over the $D_{", v, "} - 1$ step increments"
     ))
   }
   for (s in classes$me) {
     v <- escape_math_text(s$var)
     sym <- term_symbols("me", s, obj)
-    defs <- c(defs, paste0(
-      "- $", indexed(obj, paste0("\\tilde{", v, "}")), "$: latent true ",
+    defs <- c(defs, gloss(
+      me_latent_symbol(obj, s), "latent true ",
       "covariate underlying noisy observation $", indexed(obj, v),
       "$, with known per-observation measurement-error SD $",
       indexed(obj, sym[["sdx"]]), "$, population hyper-mean $",
-      sym[["mu"]], "$ and hyper-SD $", sym[["sd"]], "$, entering with ",
-      "effect $", sym[["beta"]], "$"
+      sym[["mu"]], "$ and hyper-SD $", sym[["sd"]], "$"
+    ))
+  }
+  for (v in classes$mi) {
+    defs <- c(defs, gloss(
+      indexed(obj, escape_math_text(v)), "covariate $",
+      escape_math_text(v), "$, each missing value imputed from its own ",
+      "model"
     ))
   }
   for (s in classes$re) {
-    grp <- escape_math_text(s$group)
     sym <- term_symbols("re", s, obj)
-    if (!s$has_slope) {
-      defs <- c(defs, paste0(
-        "- $", sym[["alpha_i"]], "$: varying intercept across levels of $",
-        grp, "$ with hyper-SD $", sym[["sd"]], "$"
-      ))
-      next
-    }
-    defs <- c(defs, paste0(
-      "- $", paste(c(sym[["alpha_i"]], sym[paste0("slope_i:", s$slopes)]),
-                   collapse = "$, $"),
-      "$: correlated varying intercept and slopes across levels of $",
-      grp, "$, jointly distributed as MVNormal with covariance $",
-      sym[["Sigma"]], "$ built from per-coefficient SDs and correlation ",
-      "matrix $", sym[["Omega"]], "$"
+    cf <- re_coef_symbols(s, obj)
+    var <- unique(s$coefs$var)
+    n_slopes <- sum(var != "Intercept")
+    what <- paste(c(if ("Intercept" %in% var) "intercept",
+                    if (n_slopes) if (n_slopes == 1L) "slope" else "slopes"),
+                  collapse = " and ")
+    defs <- c(defs, gloss(
+      paste(unique(cf$coef_i), collapse = "$, $"),
+      if (s$cor) "correlated " else if (nrow(cf) > 1L) "independent ",
+      "varying ", what, if (s$cs) " of each threshold $c$",
+      " across levels of $", escape_math_text(s$group), "$",
+      if (s$cor) {
+        paste0(", jointly distributed as MVNormal with covariance $",
+               sym[["Sigma"]], "$ built from per-coefficient SDs and ",
+               "correlation matrix $", sym[["Omega"]], "$")
+      } else if (nrow(cf) > 1L) {
+        ", each with its own hyper-SD"
+      } else {
+        paste0(" with hyper-SD $", cf$sd, "$")
+      }
     ))
   }
   offsets <- obs_offset_symbols(obj)
   if (length(offsets)) {
-    defs <- c(defs, paste0(
-      "- $", offsets, "$: offset `", names(offsets),
+    defs <- c(defs, gloss(
+      offsets, "offset `", names(offsets),
       "`, with its coefficient fixed at one"
     ))
   }
   defs
+}
+
+#' One glossary bullet: a symbol and what it is
+#'
+#' @param sym Character LaTeX symbol
+#' @param ... Pieces of the definition, pasted together
+#' @return Character Markdown bullet
+#' @noRd
+gloss <- function(sym, ...) {
+  paste0("- $", sym, "$: ", ...)
 }
 
 #' The glossary of the Model section
@@ -831,15 +1007,13 @@ term_glossary <- function(obj) {
 #' @return Markdown string
 #' @noRd
 model_glossary <- function(obj) {
-  keys <- names(response_columns(obj))
-  means <- if (length(keys) > 1L) {
-    tags <- escape_math_text(keys)
-    unlist(Map(mean_glossary, paste0("\\mu^{(", tags, ")}_{i,t}"),
-               paste0(tags, "_{i,t}"), model_families(obj)),
+  means <- if (length(response_columns(obj)) > 1L) {
+    sym <- response_mean_symbols(obj)
+    unlist(Map(mean_glossary, sym$mu, sym$y, response_views(obj)),
            use.names = FALSE)
   } else if (is.null(closure_unit_family_kind(obj)) &&
                is.null(mv_custom_family_kind(obj))) {
-    mean_glossary(mu_symbol(obj), response_subscripted(obj), obj$family)
+    mean_glossary(mu_symbol(obj), response_subscripted(obj), obj)
   }
   nouns <- axis_nouns(obj)
   defs <- c(
@@ -871,27 +1045,26 @@ model_glossary <- function(obj) {
 #' @return Character vector of Markdown bullets, empty without a trend
 #' @noRd
 trend_glossary <- function(obj) {
-  if (!methods_md_has_latent_trend(obj)) return(character(0L))
+  if (!has_latent_trend(obj)) return(character(0L))
   is_factor <- methods_md_has_factor_model(obj)
   mu <- trend_mu_symbol(obj)
   nouns <- axis_nouns(obj)
   defs <- c(
-    paste0("- $\\eta_{i,t}$: latent state of ", nouns$series, " $i$ at ",
-           nouns$time, " $t$"),
+    gloss("\\eta_{i,t}", "latent state of ", nouns$series, " $i$ at ",
+          nouns$time, " $t$"),
     if (!is.null(mu)) {
-      c(paste0("- $", mu, "$: ",
-               if (trend_mu_on_factors(obj)) "factor " else "trend ",
-               "predictor from 'trend_formula'"),
+      c(gloss(mu, if (trend_mu_on_factors(obj)) "factor " else "trend ",
+              "predictor from 'trend_formula'"),
         term_glossary(trend_side_view(obj)))
     }
   )
   if (is_factor) {
     defs <- c(
       defs,
-      paste0("- $", trend_eta(obj), "$: latent ", trend_order_label(obj),
-             " factor $k = 1, \\ldots, ", obj$trend_metadata$n_lv,
-             "$ at ", nouns$time, " $t$"),
-      paste0("- $Z_{i,k}$: loading of ", nouns$series, " $i$ on factor $k$"),
+      gloss(trend_eta(obj), "latent ", trend_order_label(obj),
+            " factor $k = 1, \\ldots, ", obj$trend_metadata$n_lv,
+            "$ at ", nouns$time, " $t$"),
+      gloss("Z_{i,k}", "loading of ", nouns$series, " $i$ on factor $k$"),
       loadings_glossary(first_trend_spec(obj)$loadings_prior_spec,
                         nouns$series)
     )
@@ -916,15 +1089,15 @@ trend_glossary <- function(obj) {
   sym <- trend_symbols(obj)
   c(
     defs,
-    paste0(
-      "- $", group_matrix_symbol("Omega", gr), "$: innovation correlation ",
+    gloss(
+      group_matrix_symbol("Omega", gr), "innovation correlation ",
       "within each level of $", gr, "$, pooling a shared matrix $",
       sym[["L_Omega_global_trend"]], "$ and a level's own matrix $",
       sym[["L_deviation_group_trend"]], "$ with weight $",
       sym[["alpha_cor_trend"]], "$"
     ),
-    paste0("- $", sym[["sigma_group_trend"]], "$: innovation SDs within ",
-           "each level of $", gr, "$")
+    gloss(sym[["sigma_group_trend"]], "innovation SDs within ",
+          "each level of $", gr, "$")
   )
 }
 
@@ -959,18 +1132,17 @@ innovation_glossary <- function(obj) {
   cov <- innovation_cov_symbol(obj)
   at <- paste0("s at ", axis_nouns(obj)$time, " $t$")
   out <- switch(form,
-    scalar = paste0("- $", trend_eps(obj), "$: ", what, ", ",
-                    scale(sd, "SD")),
-    diag = paste0("- $", trend_eps(obj, vector = TRUE), "$: ", what,
-                  at, ", independent with ", scale(sd_vec, "SDs")),
-    cor = paste0("- $", trend_eps(obj, vector = TRUE), "$: ", what,
-                 at, ", covariance $", cov, "$", sd_entries)
+    scalar = gloss(trend_eps(obj), what, ", ", scale(sd, "SD")),
+    diag = gloss(trend_eps(obj, vector = TRUE), what,
+                 at, ", independent with ", scale(sd_vec, "SDs")),
+    cor = gloss(trend_eps(obj, vector = TRUE), what,
+                at, ", covariance $", cov, "$", sd_entries)
   )
   # ZMVN draws the states themselves and has no innovations.
   of <- "innovations"
   if (identical(tt, "ZMVN")) {
     out <- if (identical(form, "cor") && !is.null(sd_entries)) {
-      paste0("- $", cov, "$: covariance of the latent states", sd_entries)
+      gloss(cov, "covariance of the latent states", sd_entries)
     }
     of <- "latent states"
   }
@@ -978,8 +1150,8 @@ innovation_glossary <- function(obj) {
     of <- "shocks over an instant"
   }
   if (identical(form, "cor") && is.null(gr)) {
-    out <- c(out, paste0(
-      "- $\\boldsymbol{\\Omega}$: correlation matrix of the ", of
+    out <- c(out, gloss(
+      "\\boldsymbol{\\Omega}", "correlation matrix of the ", of
     ))
   }
   out
@@ -1009,10 +1181,9 @@ trend_has_ma <- function(obj) {
 #' @noRd
 ma_glossary <- function(obj) {
   if (!trend_has_ma(obj)) return(character(0L))
-  paste0(
-    "- $", lag_symbol("\\theta", "l", trend_process_index(obj)),
-    "$: moving-average coefficient at lag $l$"
-  )
+  gloss(
+    lag_symbol("\\theta", "l", trend_process_index(obj)),
+    "moving-average coefficient at lag $l$")
 }
 
 #' The glossary entries of a random walk: its moving-average part
@@ -1034,8 +1205,8 @@ glossary_zmvn <- function(obj) {
 #' @return Character vector of Markdown bullets
 #' @noRd
 glossary_var <- function(obj) {
-  out <- paste0(
-    "- $\\boldsymbol{\\Phi}_l$: autoregressive coefficient matrix at ",
+  out <- gloss(
+    "\\boldsymbol{\\Phi}_l", "autoregressive coefficient matrix at ",
     "lag $l$, mapped into the stationary region from an unconstrained ",
     "matrix $\\mathbf{A}_l$"
   )
@@ -1047,8 +1218,8 @@ glossary_var <- function(obj) {
     ))
   }
   if (trend_has_ma(obj)) {
-    out <- c(out, paste0(
-      "- $\\boldsymbol{\\Theta}_l$: moving-average coefficient matrix ",
+    out <- c(out, gloss(
+      "\\boldsymbol{\\Theta}_l", "moving-average coefficient matrix ",
       "at lag $l$, mapped into the invertible region from an ",
       "unconstrained matrix $\\mathbf{D}_l$ whose entries take normal ",
       "priors with means $\\mu^{(D)}$ and precisions $\\omega^{(D)}$"
@@ -1063,15 +1234,15 @@ glossary_var <- function(obj) {
 #' @return Character vector of Markdown bullets
 #' @noRd
 glossary_car <- function(obj) {
-  out <- paste0(
-    "- $", trend_symbols(obj)[["ar1_trend"]],
-    "$: autocorrelation over a gap of one, and $", car_gap_symbol,
+  out <- gloss(
+    trend_symbols(obj)[["ar1_trend"]],
+    "autocorrelation over a gap of one, and $", car_gap_symbol,
     "$ the time between occasions $t - 1$ and $t$ in units of the ",
     "median gap between a series' observations"
   )
   if (trend_samples_cor(obj)) {
-    out <- c(out, paste0(
-      "- $", group_matrix_symbol("Sigma"), "$: innovation covariance over ",
+    out <- c(out, gloss(
+      group_matrix_symbol("Sigma"), "innovation covariance over ",
       "a gap of one, and $\\lambda_i = -\\log \\rho_i$"
     ))
   }
@@ -1088,11 +1259,11 @@ glossary_ar <- function(obj) {
   idx <- ar_coef_index(obj)
   phi <- lag_symbol("\\phi", "l", idx)
   of <- if (ar_coefs_shared(obj)) " shared by every series" else ""
-  out <- paste0("- $", phi, "$: autoregressive coefficient at lag $l$", of)
+  out <- gloss(phi, "autoregressive coefficient at lag $l$", of)
   pacf <- any(grepl("_pacf_trend$", classes))
   if (pacf) {
-    out <- c(out, paste0(
-      "- $", lag_symbol("\\psi", "l", idx), "$: partial autocorrelation ",
+    out <- c(out, gloss(
+      lag_symbol("\\psi", "l", idx), "partial autocorrelation ",
       "at lag $l$, which fixes the coefficients $", phi, "$ inside the ",
       "stationary region"
     ))
@@ -1335,11 +1506,24 @@ family_par_symbol <- function(dp) {
 #' @return Character LaTeX symbol
 #' @noRd
 dpar_aware_param <- function(name, obj) {
-  prior <- obj$prior
-  has_dpar <- !is.null(prior) && nrow(prior) > 0L &&
-    any(prior_field(prior, "dpar") == name)
   base <- family_par_symbol(name)
-  response_symbol(obj, if (has_dpar) paste0(base, "_{i,t}") else base)
+  response_symbol(obj, if (has_dpar_formula(obj, name)) {
+    indexed(obj, base)
+  } else {
+    base
+  })
+}
+
+#' Whether a formula of its own predicts a family parameter
+#'
+#' @param obj An `mvgam` object or a view of one response
+#' @param name Character parameter name
+#' @return Logical scalar
+#' @noRd
+has_dpar_formula <- function(obj, name) {
+  prior <- obj$prior
+  NROW(prior) > 0L &&
+    any(prior_field(prior, "dpar") == name)
 }
 
 #' The likelihood of one response, in LaTeX
@@ -1362,6 +1546,13 @@ family_distribution_text <- function(fam_name, mu, obj) {
   hu <- par("hu")
   zi <- par("zi")
   trials <- indexed(obj, "n")
+  labels <- ordinal_family_labels()
+  if (fam_name %in% names(labels)) {
+    args <- c(threshold_symbols(obj)[["vec"]], mu, ordinal_disc(obj),
+              if (identical(fam_name, "hurdle_cumulative")) hu)
+    return(paste0("\\text{", labels[[fam_name]], "}(",
+                  paste(args, collapse = ", "), ")"))
+  }
   switch(
     fam_name,
     poisson     = paste0("\\text{Poisson}(", mu, ")"),
@@ -1410,18 +1601,6 @@ family_distribution_text <- function(fam_name, mu, obj) {
     zero_inflated_binomial = paste0(
       "\\text{ZIBinomial}(", trials, ", ", mu, ", ", zi, ")"
     ),
-    cumulative  = paste0(
-      "\\text{OrderedCumulative}(\\boldsymbol{\\theta}, ", mu, ")"
-    ),
-    sratio      = paste0(
-      "\\text{OrderedStoppingRatio}(\\boldsymbol{\\theta}, ", mu, ")"
-    ),
-    cratio      = paste0(
-      "\\text{OrderedContinuationRatio}(\\boldsymbol{\\theta}, ", mu, ")"
-    ),
-    acat        = paste0(
-      "\\text{OrderedAdjacentCategory}(\\boldsymbol{\\theta}, ", mu, ")"
-    ),
     paste0("\\text{", gsub("_", "\\\\_", fam_name), "}(", mu, ")")
   )
 }
@@ -1466,8 +1645,10 @@ closure_unit_spec <- function(obj) {
   kind <- closure_unit_family_kind(obj)
   if (is.null(kind)) return(NULL)
   occ <- identical(kind, "occ")
-  unit <- if (is_multi_season_family(obj$family)) "{i,s,t}" else "{i,t}"
-  visit <- sub("\\}$", ",j}", unit)
+  unit_index <- c("i", if (is_multi_season_family(obj$family)) "s", "t")
+  visit_index <- c(unit_index, "j")
+  unit <- index_braces(unit_index)
+  visit <- index_braces(visit_index)
   latent <- paste0(if (occ) "z" else "N", "_", unit)
   state <- paste0(if (occ) "\\psi" else "\\lambda", "_", unit)
   p <- paste0("p_", visit)
@@ -1475,6 +1656,8 @@ closure_unit_spec <- function(obj) {
     kind = kind,
     unit = unit,
     visit = visit,
+    unit_index = unit_index,
+    visit_index = visit_index,
     latent = latent,
     state = state,
     link = if (occ) "logit" else "log",
@@ -1582,22 +1765,22 @@ mv_custom_glossary <- function(obj) {
   normal <- kind %in% c("mvn", "mvt")
   series <- axis_nouns(obj)$series
   c(
-    paste0("- $\\mathbf{Y}_t$: response vector of unit $t$, one entry per ",
-           series),
+    gloss("\\mathbf{Y}_t", "response vector of unit $t$, one entry per ",
+          series),
     if (normal) {
-      c(paste0("- $\\mu_{i,t}$: mean of ", series, " $i$ at unit $t$"),
-        paste0("- $\\boldsymbol{\\Sigma}$: residual covariance, one SD in ",
-               "$\\boldsymbol{\\Psi}$ per ", series))
+      c(gloss("\\mu_{i,t}", "mean of ", series, " $i$ at unit $t$"),
+        gloss("\\boldsymbol{\\Sigma}", "residual covariance, one SD in ",
+              "$\\boldsymbol{\\Psi}$ per ", series))
     } else {
-      c(paste0("- $\\mu_{i,t}$: linear predictor of ", series,
-               " $i$ at unit $t$, with ", series, " 1 the reference"),
-        paste0("- $\\boldsymbol{\\pi}_t$: probabilities of the ", series,
-               " at unit $t$"))
+      c(gloss("\\mu_{i,t}", "linear predictor of ", series,
+              " $i$ at unit $t$, with ", series, " 1 the reference"),
+        gloss("\\boldsymbol{\\pi}_t", "probabilities of the ", series,
+              " at unit $t$"))
     },
     switch(kind,
-      mvt = "- $\\nu$: degrees of freedom",
-      diri = "- $\\phi$: Dirichlet precision",
-      multi = "- $N_t$: number of trials at unit $t$"
+      mvt = gloss("\\nu", "degrees of freedom"),
+      diri = gloss("\\phi", "Dirichlet precision"),
+      multi = gloss("N_t", "number of trials at unit $t$")
     )
   )
 }
@@ -1644,8 +1827,7 @@ linear_predictor_rhs <- function(obj) {
     render_fixed_inline(classes$fixed, obj),
     render_function_inline("smooth", classes$smooth, obj),
     render_function_inline("gp", classes$gp, obj),
-    render_mo_inline(classes$mo, obj),
-    render_me_inline(classes$me, obj),
+    render_sp_inline(classes$sp, obj),
     render_re_inline(classes$re, obj),
     unname(obs_offset_symbols(obj)),
     trend_linpred_terms(obj)
@@ -1659,18 +1841,26 @@ linear_predictor_rhs <- function(obj) {
 #' prefit alike.
 #'
 #' @param obj An `mvgam` object or a view of one predictor
-#' @return List with elements `fixed`, `smooth`, `gp`, `mo`, `me` and
-#'   `re`
+#' @return List with elements `fixed`, `cs` (the category-specific
+#'   coefficients), `smooth`, `gp`, `sp` (the special-term
+#'   coefficients), `mo`, `me`, `mi` and `re`. `mo`, `me` and `mi` hold
+#'   the distinct parts of the special terms.
 #' @noRd
 classify_obs_parameters <- function(obj) {
   prior <- obj$prior
+  sp <- obs_sp_specs(obj)
+  parts <- function(name) unique(unlist(lapply(sp, `[[`, name),
+                                        recursive = FALSE))
   list(
     fixed  = obs_fixed_terms_from_prior(obj),
+    cs     = mean_b_coefs(obj, "cs"),
     smooth = obs_smooth_specs_from_prior(prior),
     gp     = obs_gp_specs(obj),
-    mo     = obs_mo_specs_from_prior(obj),
-    me     = obs_me_specs(obj),
-    re     = obs_re_specs_from_prior(prior)
+    sp     = sp,
+    mo     = parts("mo"),
+    me     = parts("me"),
+    mi     = parts("mi"),
+    re     = obs_re_specs(obj)
   )
 }
 
@@ -1686,6 +1876,34 @@ mean_predictor_rows <- function(prior) {
   !nzchar(prior_field(prior, "dpar")) & !nzchar(prior_field(prior, "nlpar"))
 }
 
+#' The coefficient rows of one class in the mean's own predictor
+#'
+#' A view of one predictor clears its rows' response. A row with no
+#' response then belongs to every response.
+#'
+#' @param prior A brms prior table
+#' @param class Character prior class, such as `"sd"`
+#' @param resp Response key the rows belong to, or `NULL` for any
+#' @return Logical vector, one entry per row
+#' @noRd
+coef_rows <- function(prior, class, resp = NULL) {
+  prior$class == class & mean_predictor_rows(prior) & nzchar(prior$coef) &
+    (is.null(resp) | prior_field(prior, "resp") %in% c("", resp))
+}
+
+#' Whether a view describes the latent score of an ordinal response
+#'
+#' The trend view and a distributional predictor's view keep the
+#' model's family. Neither predicts the score.
+#'
+#' @param obj An `mvgam` object or a view of one predictor
+#' @return Logical scalar
+#' @noRd
+is_ordinal_mean <- function(obj) {
+  is_ordinal_family(obj$family) && is.null(obj$methods_md_pred) &&
+    !identical(obj$methods_md_tag, "\\eta")
+}
+
 #' The intercept and the population effects of a linear predictor
 #'
 #' The `Intercept` rows of an ordinal mean are its thresholds. That
@@ -1696,47 +1914,50 @@ mean_predictor_rows <- function(prior) {
 #' @noRd
 obs_fixed_terms_from_prior <- function(obj) {
   prior <- obj$prior
-  if (is.null(prior) || nrow(prior) == 0L) return(character(0L))
-  own <- mean_predictor_rows(prior)
-  ordinal_mean <- is.null(obj$methods_md_pred) &&
-    is_ordinal_family(obj$family)
-  has_int <- !ordinal_mean && any(prior$class == "Intercept" & own)
-  b_rows <- prior$class == "b" & own & nzchar(prior$coef)
-  coefs <- unique(prior$coef[b_rows])
-  # A smooth's unpenalised columns and the special terms each render
-  # through their own block.
-  terms <- coefs[is.na(obs_term_coef_kinds(obj, coefs))]
+  if (NROW(prior) == 0L) return(character(0L))
+  has_int <- !is_ordinal_mean(obj) &&
+    any(prior$class == "Intercept" & mean_predictor_rows(prior))
+  terms <- mean_b_coefs(obj)
   if (has_int) c("Intercept", terms) else terms
+}
+
+#' The `b` coefficients of a predictor that one kind of term owns
+#'
+#' A smooth's unpenalised columns and each special term render through
+#' their own block.
+#'
+#' @param obj An `mvgam` object or a view of one predictor
+#' @param kind A kind `obs_term_coef_kinds()` gives, or `NA` for the
+#'   population effects
+#' @return Character vector of coefficient names
+#' @noRd
+mean_b_coefs <- function(obj, kind = NA_character_) {
+  prior <- obj$prior
+  if (NROW(prior) == 0L) return(character(0L))
+  coefs <- unique(prior$coef[coef_rows(prior, "b")])
+  coefs[obs_term_coef_kinds(obj, coefs) %in% kind]
 }
 
 #' The kind of term that owns each observation-mean `b` coefficient
 #'
-#' brms names a special term's coefficient after the term, `mo(x)` as
-#' `mox`. It names a smooth's unpenalised columns after its label and
-#' column, `s(x)` as `sx_1`. A covariate named `month` or `size_2`
-#' takes the same shape. The formula's terms decide ownership.
+#' Each coefficient takes the name of its design column. A covariate
+#' named `month` or `size_2` takes the shape of a smooth's unpenalised
+#' column `sx_1`. The designs decide ownership: a smooth's `Xs`, the
+#' category-specific `Xcs` and the special terms'.
 #'
 #' @param obj An `mvgam` object.
 #' @param coefs Coefficient names from its prior table.
-#' @return Character vector along `coefs` of `"mo"`, `"me"`, `"mi"` or
-#'   `"sm"`. A population effect takes `NA`.
+#' @return Character vector along `coefs` of `"sp"`, `"sm"` or `"cs"`.
+#'   A population effect takes `NA`.
 #' @noRd
 obs_term_coef_kinds <- function(obj, coefs) {
   out <- rep(NA_character_, length(coefs))
   for (lp in view_predictors(obj)) {
-    sp <- formula_term_labels(lp$pred[["sp"]])
-    kind <- ifelse(grepl("\\bmo\\(", sp), "mo",
-                   ifelse(grepl("\\bme\\(", sp), "me", "mi"))
-    hit <- match(coefs, brms_rename(sp))
-    out[!is.na(hit)] <- kind[hit[!is.na(hit)]]
-    # A smooth's columns take its function and covariates, then the
-    # `by` level after a colon: `sx_1`, `t2xz_1`, `stime:seriessp_1_1`.
-    for (term in formula_term_labels(lp$pred[["sm"]])) {
-      sm <- eval(str2lang(term), list(s = mgcv::s, t2 = mgcv::t2))
-      stem <- brms_smooth_labels(list(term = term, covars = sm$term,
-                                      by_var = NA))
-      out[startsWith(coefs, stem) & grepl("_[0-9]+$", coefs)] <- "sm"
-    }
+    cs <- names(design_columns(lp$pred[["cs"]], obj$data))
+    out[coefs %in% setdiff(cs, "Intercept")] <- "cs"
+    out[coefs %in% special_term_frame(lp$pred, obj$data)$coef] <- "sp"
+    Xs <- obj$standata[[paste0("Xs", lp$suffix)]]
+    out[coefs %in% colnames(Xs)] <- "sm"
   }
   out
 }
@@ -1768,10 +1989,9 @@ view_predictors <- function(obj) {
 #' @return List of calls
 #' @noRd
 view_term_calls <- function(obj, part, fname) {
-  labels <- unlist(lapply(view_predictors(obj), function(lp) {
-    formula_term_labels(lp$pred[[part]])
-  }), use.names = FALSE)
-  calls <- lapply(labels, str2lang)
+  calls <- unlist(lapply(view_predictors(obj), function(lp) {
+    formula_term_calls(lp$pred[[part]])
+  }), recursive = FALSE, use.names = FALSE)
   Filter(function(e) identical(as.character(e[[1L]]), fname), calls)
 }
 
@@ -1802,44 +2022,136 @@ obs_offset_symbols <- function(obj) {
   stats::setNames(sym, exprs)
 }
 
-#' The measurement-error terms of the predictors a view describes
-#'
-#' brms names the effect of `me(x, sdx)` `mexsdx`.
+#' The special-term coefficients of the predictors a view describes
 #'
 #' @param obj An `mvgam` object or a view of one predictor
-#' @return List of specs holding the covariate `var`, its known SD
-#'   `sdvar` and the brms coefficient `coef`
+#' @return List of `sp_coef_spec()` specs, one per coefficient
 #' @noRd
-obs_me_specs <- function(obj) {
-  lapply(view_term_calls(obj, "sp", "me"), function(e) {
-    args <- call_args_as_written(e)
-    pos <- args$positional
-    var <- args$named("x", pos[1L])
-    sdvar <- args$named("sdx",
-                        if (length(pos) >= 2L) pos[[2L]] else NA_character_)
-    list(var = var, sdvar = sdvar,
-         coef = paste0("me", var, if (!is.na(sdvar)) sdvar))
+obs_sp_specs <- function(obj) {
+  unlist(lapply(view_predictors(obj), predictor_sp_specs, obj = obj),
+         recursive = FALSE)
+}
+
+#' The special-term coefficients of one predictor
+#'
+#' @param obj An `mvgam` object or a view of one predictor
+#' @param lp One entry of `model_predictors()`
+#' @return List of `sp_coef_spec()` specs, one per coefficient
+#' @noRd
+predictor_sp_specs <- function(obj, lp) {
+  special <- special_term_frame(lp$pred, obj$data)
+  lapply(seq_len(NROW(special)), function(j) {
+    sp_coef_spec(obj, special, j)
   })
 }
 
-#' The monotonic terms of the predictors a view describes
+#' One special-term coefficient, as the equations write it
 #'
-#' One `b` row per `mo()` term carries the scale of its effect. Its
-#' simplex of step increments has class `simo`.
+#' A coefficient multiplies the product of its term's parts. A `mo(x)`
+#' part is its step transform `m(x)`. A `me(x, sdx)` part is the latent
+#' covariate `\tilde{x}` and a `mi(x)` part the covariate with its
+#' missing values imputed. Any other part is a covariate or a factor
+#' level, as in `mo(x):z`. Each `mo()` part has its own simplex unless
+#' its `id` shares one.
 #'
 #' @param obj An `mvgam` object or a view of one predictor
-#' @return List of specs holding the covariate `var` and the brms
-#'   coefficient `coef`
+#' @param special A predictor's `special_term_frame()`
+#' @param j The coefficient's row of `special`
+#' @return List holding the brms `coef`, its formula term `label`, its
+#'   `kind` (`"mo"`, `"me"`,
+#'   `"mi"` or `"sp"` for several parts), its subscript `key`, its
+#'   symbol `beta`, the LaTeX `value` it multiplies and its parts: `mo`
+#'   (each with the transform's subscript `sub`, ordinal `var` and
+#'   `simo` prior label), `me` (each `me_call_spec()`) and `mi` (the
+#'   imputed variables)
 #' @noRd
-obs_mo_specs_from_prior <- function(obj) {
-  prior <- obj$prior
-  if (is.null(prior) || nrow(prior) == 0L) return(list())
-  coefs <- unique(prior$coef[prior$class == "b" & nzchar(prior$coef) &
-                               mean_predictor_rows(prior)])
-  coefs <- coefs[obs_term_coef_kinds(obj, coefs) %in% "mo"]
-  lapply(coefs, function(c) {
-    list(var = sub("^mo", "", c), coef = c)
+sp_coef_spec <- function(obj, special, j) {
+  call_var <- function(call) {
+    args <- call_args_as_written(str2lang(call))
+    args$named("x", args$positional[1L])
+  }
+  coef <- special$coef[[j]]
+  calls_mo <- special$calls_mo[[j]]
+  mo_vars <- vapply(calls_mo, call_var, character(1L), USE.NAMES = FALSE)
+  me <- lapply(special$calls_me[[j]], function(call) {
+    me_call_spec(str2lang(call))
   })
+  mi <- vapply(special$calls_mi[[j]], call_var, character(1L),
+               USE.NAMES = FALSE)
+  pieces <- strsplit(special$term[[j]], ":", fixed = TRUE)[[1L]]
+  is_special <- vapply(pieces, function(p) {
+    length(find_calls(str2lang(p), c("mo", "me", "mi"))) > 0L
+  }, logical(1L))
+  plain <- if (!all(is_special)) {
+    fixed_term_specs(obj, paste(brms_rename(pieces[!is_special]),
+                                collapse = ":"))[[1L]]
+  }
+  key <- paste(c(escape_math_text(c(mo_vars, vapply(me, `[[`, "", "var"),
+                                    mi)),
+                 plain$sub), collapse = ":")
+  n_parts <- length(mo_vars) + length(me) + length(mi)
+  kind <- if (n_parts > 1L) {
+    "sp"
+  } else {
+    c("mo", "me", "mi")[lengths(list(mo_vars, me, mi)) > 0L]
+  }
+  mo <- lapply(seq_along(calls_mo), function(k) {
+    id <- special$ids_mo[[j]][[k]]
+    sub <- if (!is.na(id)) {
+      escape_math_text(id)
+    } else if (length(calls_mo) == 1L) {
+      key
+    } else {
+      paste0(key, ",", escape_math_text(mo_vars[[k]]))
+    }
+    list(sub = sub, var = mo_vars[[k]],
+         simo = if (is.na(id)) paste0(coef, k) else id)
+  })
+  values <- c(
+    vapply(mo, function(t) {
+      paste0(term_symbols("mo", t, obj)[["m"]], "(",
+             indexed(obj, escape_math_text(t$var)), ")")
+    }, character(1L)),
+    vapply(me, me_latent_symbol, character(1L), obj = obj),
+    if (length(mi)) indexed(obj, escape_math_text(mi)),
+    plain$covariate
+  )
+  list(coef = coef, label = special$label[[j]], kind = kind, key = key,
+       beta = paste0("\\beta^{(\\text{", kind, "})}_{", key, "}"),
+       value = paste(values, collapse = " \\, "), mo = mo, me = me, mi = mi)
+}
+
+#' One measurement-error call's covariate and known SD
+#'
+#' @param e A `me()` call
+#' @return List holding the covariate `var`, its known SD `sdvar` and
+#'   the grouping factor `gr` its latent values vary by, each `NA` when
+#'   the call names none
+#' @noRd
+me_call_spec <- function(e) {
+  args <- call_args_as_written(e)
+  pos <- args$positional
+  list(var = args$named("x", pos[1L]),
+       sdvar = args$named("sdx",
+                          if (length(pos) >= 2L) pos[[2L]] else NA_character_),
+       gr = args$named("gr", NA_character_))
+}
+
+#' The latent true covariate of a measurement-error term
+#'
+#' A term with a grouping factor `gr` has one latent value per level,
+#' indexed as a varying intercept is.
+#'
+#' @param obj An `mvgam` object or a view of one predictor
+#' @param s A `me_call_spec()` spec
+#' @param level Whether to index a grouped term's value at a level `g`
+#'   in place of the level `g[i]` of observation `i`
+#' @return Character LaTeX symbol
+#' @noRd
+me_latent_symbol <- function(obj, s, level = FALSE) {
+  latent <- paste0("\\tilde{", escape_math_text(s$var), "}")
+  if (is.na(s$gr)) return(indexed(obj, latent))
+  paste0(latent, "_{", escape_math_text(s$gr), if (!level) "[i]", "}")
 }
 
 
@@ -1852,7 +2164,7 @@ obs_mo_specs_from_prior <- function(obj) {
 #' @return List of `parse_smooth_coef()` specs
 #' @noRd
 obs_smooth_specs_from_prior <- function(prior) {
-  if (is.null(prior) || nrow(prior) == 0L) return(list())
+  if (NROW(prior) == 0L) return(list())
   sds_rows <- prior$class == "sds" & nzchar(prior$coef) &
     mean_predictor_rows(prior)
   specs <- lapply(prior$coef[sds_rows], parse_smooth_coef)
@@ -1861,26 +2173,6 @@ obs_smooth_specs_from_prior <- function(prior) {
     paste(c(s$vars, stats::na.omit(s$by)), collapse = ":")
   }, character(1L))
   specs[!duplicated(keys)]
-}
-
-#' The arguments of a term's call, as the user wrote them
-#'
-#' @param call A call such as `s(x, k = 5)` or `gp(x, by = g)`
-#' @return List of two elements. `positional` holds the text of each
-#'   unnamed argument. `named(name, default)` returns the text of a
-#'   named argument, or `default` when the call omits it.
-#' @noRd
-call_args_as_written <- function(call) {
-  checkmate::assert_class(call, "call")
-  args <- as.list(call)[-1L]
-  arg_names <- names(args) %||% rep("", length(args))
-  list(
-    positional = unname(vapply(args[arg_names == ""], formula_arg_text,
-                               character(1L))),
-    named = function(name, default) {
-      if (name %in% arg_names) formula_arg_text(args[[name]]) else default
-    }
-  )
 }
 
 #' The smooth term a brms `sds` label names
@@ -1956,35 +2248,143 @@ basis_label <- function(bs, fname) {
 }
 
 
-#' The group-level terms of a linear predictor, from their `sd` rows
+#' The group-level blocks of a linear predictor
 #'
-#' A group's slopes are the coefficients of its `sd` rows other than
-#' `Intercept`. brms writes an `L` row for a group whose intercept and
-#' slopes are correlated.
+#' Each `( | )` term is a block, as `brmsterms()` lists them. Blocks
+#' sharing a group and an ID are one block. A block has one coefficient
+#' per column of its design, which brms names as `design_columns()`
+#' does: `Intercept` and `x` for `(1 + x | g)`. A category-specific
+#' block, `(cs(1 + x) | g)`, has one per column and threshold, which
+#' brms names `Intercept[1]`, `x[1]`, `Intercept[2]`, ... A block's
+#' coefficients are correlated unless it is written with `||`.
 #'
-#' @param prior Rows of a brms prior table
-#' @return List of specs holding `group`, `slopes`, `has_slope` and
-#'   `has_corr`
+#' @param obj An `mvgam` object or a view of one predictor
+#' @return List of specs, one per block, holding `group`, `resp` (the
+#'   response key of its prior rows), `cor`, `cs`, `lone` (whether the
+#'   group's one coefficient is its intercept) and `coefs`, a data frame
+#'   of each coefficient's brms `name`, design column `var`, `threshold`
+#'   (`NA` outside a category-specific block), subscript `sub` and the
+#'   LaTeX `covariate` it multiplies (empty for an intercept)
 #' @noRd
-obs_re_specs_from_prior <- function(prior) {
-  if (is.null(prior) || nrow(prior) == 0L) return(list())
-  own <- mean_predictor_rows(prior) & nzchar(prior$group)
-  sd_rows <- prior$class == "sd" & own
-  if (!any(sd_rows)) return(list())
-  groups <- unique(prior$group[sd_rows])
-  l_groups <- prior$group[prior$class == "L" & own]
-  lapply(groups, function(g) {
-    g_rows <- sd_rows & prior$group == g & nzchar(prior$coef)
-    coefs <- prior$coef[g_rows]
-    slopes <- setdiff(coefs, "Intercept")
-    list(
-      group = g,
-      slopes = slopes,
-      has_slope = length(slopes) > 0L,
-      has_corr = g %in% l_groups
-    )
+obs_re_specs <- function(obj) {
+  prior <- obj$prior
+  if (NROW(prior) == 0L) return(list())
+  specs <- lapply(view_predictors(obj), function(lp) {
+    blocks <- lp$pred[["re"]]
+    if (NROW(blocks) == 0L) return(list())
+    resp <- lp$resp %||% ""
+    own <- coef_rows(prior, "sd", resp)
+    special <- predictor_sp_specs(obj, lp)
+    special <- stats::setNames(special, vapply(special, `[[`, "", "coef"))
+    id <- ifelse(is.na(blocks$id), paste0("gn", blocks$gn), blocks$id)
+    key <- paste(blocks$group, id, sep = "\x1f")
+    lapply(unique(key), function(k) {
+      rows <- blocks[key == k, , drop = FALSE]
+      group <- rows$group[[1L]]
+      cs <- identical(blank_if_na(rows$type[[1L]]), "cs")
+      # A special slope takes the coefficient names of its population
+      # term, which every special slope has
+      var <- unique(unlist(lapply(seq_len(nrow(rows)), function(r) {
+        form <- rows$form[[r]]
+        if (!identical(blank_if_na(rows$type[[r]]), "sp")) {
+          return(names(design_columns(form, obj$data)))
+        }
+        labels <- formula_term_labels(form)
+        hit <- Filter(function(s) s$label %in% labels, special)
+        if (length(hit) == 0L) {
+          stop_mvgam_fault(
+            "A special slope must have a population special term.",
+            paste0("Slope terms: ", paste(labels, collapse = ", "), ".")
+          )
+        }
+        names(hit)
+      })))
+      coefs <- if (cs) {
+        cs_coef_frame(var, obj$standata[[paste0("nthres", lp$suffix)]])
+      } else {
+        data.frame(var = var, threshold = NA_integer_, name = var)
+      }
+      terms <- re_coef_terms(obj, unique(coefs$var), special)
+      coefs$sub <- terms$sub[match(coefs$var, terms$var)]
+      coefs$covariate <- terms$covariate[match(coefs$var, terms$var)]
+      list(group = group, resp = resp, coefs = coefs,
+           cor = all(rows$cor) && nrow(coefs) > 1L, cs = cs,
+           lone = identical(prior$coef[own & prior$group == group],
+                            "Intercept"))
+    })
   })
+  unlist(specs, recursive = FALSE)
 }
+
+
+#' The subscript and covariate of each column of a group-level block
+#'
+#' A slope takes its covariate as the population effects write it,
+#' with a factor level as its indicator. A special slope multiplies the
+#' special term's value.
+#'
+#' @param obj An `mvgam` object or a view of one predictor
+#' @param var The block's design columns
+#' @param special The predictor's `sp_coef_spec()` specs, named by
+#'   coefficient
+#' @return Data frame along `var` of `var`, `sub` and `covariate`, both
+#'   empty for the intercept
+#' @noRd
+re_coef_terms <- function(obj, var, special) {
+  out <- data.frame(var = var, sub = "", covariate = "")
+  for (i in which(var != "Intercept")) {
+    s <- special[[var[[i]]]]
+    if (is.null(s)) {
+      s <- fixed_term_specs(obj, var[[i]])[[1L]]
+      out$sub[[i]] <- s[["sub"]]
+      out$covariate[[i]] <- s[["covariate"]]
+    } else {
+      out$sub[[i]] <- s[["key"]]
+      out$covariate[[i]] <- s[["value"]]
+    }
+  }
+  out
+}
+
+#' The symbols of each coefficient of a group-level block
+#'
+#' A varying intercept is `\alpha_{g}` and a varying slope on `x` is
+#' `\beta^{(g)}_{x, g}`. A category-specific coefficient adds its
+#' threshold: `k` in a row listing each threshold, `c` in a row written
+#' once for every threshold. A group whose one coefficient is its
+#' intercept has the one SD `\sigma_{g}`.
+#'
+#' @param spec An `obs_re_specs()` spec
+#' @param obj The `mvgam` object or view whose predictor holds the
+#'   block, or `NULL` for untagged symbols
+#' @return Data frame along `spec$coefs`. Each row holds the
+#'   coefficient's `name`, its symbol `coef` at a level `g`, its symbol
+#'   `coef_i` at the level `g[i]` of observation `i` and its SD `sd`.
+#' @noRd
+re_coef_symbols <- function(spec, obj = NULL) {
+  g <- escape_math_text(spec$group)
+  cf <- spec$coefs
+  intercept <- cf$var == "Intercept"
+  v <- cf$sub
+  k <- ifelse(is.na(cf$threshold), "", paste0(",", cf$threshold))
+  at_c <- ifelse(is.na(cf$threshold), "", ",c")
+  coef_at <- function(at, idx) {
+    ifelse(intercept, paste0("\\alpha_{", at, idx, "}"),
+           paste0("\\beta^{(", g, ")}_{", v, ", ", at, idx, "}"))
+  }
+  sd <- if (isTRUE(spec$lone)) {
+    term_symbols("re", spec)[["sd"]]
+  } else {
+    paste0(ifelse(intercept, "\\sigma^{(\\alpha)}",
+                  paste0("\\sigma^{(\\beta_{", v, "})}")),
+           "_{", g, k, "}")
+  }
+  tag <- function(x) if (is.null(obj)) x else response_symbol(obj, x)
+  data.frame(name = cf$name, coef = tag(coef_at(g, k)),
+             coef_i = tag(coef_at(paste0(g, "[i]"), at_c)),
+             sd = tag(rep_len(sd, nrow(cf))))
+}
+
 
 #' The Gaussian process terms of the predictors a view describes
 #'
@@ -1997,32 +2397,6 @@ obs_gp_specs <- function(obj) {
   unique(lapply(view_term_calls(obj, "gp", "gp"), gp_call_to_spec))
 }
 
-#' The settings of a `gp()` term, as written
-#'
-#' A setting left out takes brms's default.
-#'
-#' @param call A `gp()` call
-#' @return List holding `vars`, `k`, `by`, `cov` and the brms
-#'   coefficient stem `coef`
-#' @noRd
-gp_call_to_spec <- function(call) {
-  args <- call_args_as_written(call)
-  vars <- args$positional
-  if (length(vars) == 0L) {
-    stop(insight::format_error(c(
-      "A 'gp()' term needs at least one variable.",
-      x = paste0("Got '", deparse1(call), "'.")
-    )), call. = FALSE)
-  }
-  list(
-    vars = vars,
-    k = args$named("k", NA_character_),
-    by = args$named("by", NA_character_),
-    cov = args$named("cov", "exp_quad"),
-    coef = paste0("gp", paste(vars, collapse = ""))
-  )
-}
-
 #' The population intercept and effects of a linear predictor
 #'
 #' @param terms Character vector of `"Intercept"` and covariate names
@@ -2030,15 +2404,35 @@ gp_call_to_spec <- function(call) {
 #' @return Character LaTeX expression, or an empty vector
 #' @noRd
 render_fixed_inline <- function(terms, obj) {
-  specs <- fixed_term_specs(obj, setdiff(terms, "Intercept"))
-  bits <- c(
-    if ("Intercept" %in% terms) response_symbol(obj, "\\alpha"),
-    vapply(specs, function(s) {
-      paste(c(response_symbol(obj, paste0("\\beta_{", s$sub, "}")),
-              s$covariate), collapse = " ")
-    }, character(1L))
-  )
+  bits <- c(if ("Intercept" %in% terms) response_symbol(obj, "\\alpha"),
+            fixed_inline_terms(obj, setdiff(terms, "Intercept")))
   if (length(bits)) paste(bits, collapse = " + ") else character(0L)
+}
+
+#' Population or category-specific effects, each times its covariate
+#'
+#' @param obj An `mvgam` object or a view of one predictor
+#' @param coefs Character coefficient names
+#' @param category Whether the effects are category-specific
+#' @return Character vector of LaTeX terms
+#' @noRd
+fixed_inline_terms <- function(obj, coefs, category = FALSE) {
+  vapply(fixed_term_specs(obj, coefs), function(s) {
+    paste(c(response_symbol(obj, fixed_symbol(s$sub, category)),
+            s$covariate), collapse = " ")
+  }, character(1L))
+}
+
+#' The symbol of a population effect
+#'
+#' A category-specific effect has one coefficient per threshold `c`.
+#'
+#' @param sub Character subscript from `fixed_term_specs()`
+#' @param category Logical, along `sub`: whether each is category-specific
+#' @return Character LaTeX symbols
+#' @noRd
+fixed_symbol <- function(sub, category = FALSE) {
+  paste0("\\beta_{", sub, ifelse(category, ",c", ""), "}")
 }
 
 #' The population effects of a linear predictor, as the equations set
@@ -2211,9 +2605,10 @@ term_symbols <- function(kind, spec, obj = NULL) {
         sd = paste0("\\sigma^{(\\text{gp})}_{", sub, "}"))
     },
     mo = {
-      v <- escape_math_text(spec$var)
-      c(beta = paste0("\\beta^{(\\text{mo})}_{", v, "}"),
-        m = paste0("m_{", v, "}"),
+      # A transform's subscript names its coefficient, `x:z` for
+      # `mo(x):z`
+      v <- spec$sub %||% escape_math_text(spec$var)
+      c(m = paste0("m_{", v, "}"),
         zeta = paste0("\\boldsymbol{\\zeta}_{", v, "}"),
         zeta_j = paste0("\\zeta_{", v, ",j}"))
     },
@@ -2222,29 +2617,16 @@ term_symbols <- function(kind, spec, obj = NULL) {
       # The priors section names a term by its variable alone.
       sdvar <- spec$sdvar %||% NA_character_
       sdx <- escape_math_text(if (is.na(sdvar)) "se" else sdvar)
-      c(beta = paste0("\\beta^{(\\text{me})}_{", v, "}"),
-        sdx = sdx,
+      c(sdx = sdx,
         mu = paste0("\\mu^{(\\text{me})}_{", v, "}"),
         sd = paste0("\\sigma^{(\\text{me})}_{", v, "}"))
     },
     re = {
-      # brms's slope names key the symbols. The symbols print them
-      # escaped.
+      # Per-coefficient symbols come from `re_coef_symbols()`
       g <- escape_math_text(spec$group)
-      sl_key <- spec$slopes %||% character(0L)
-      sl <- escape_math_text(sl_key)
-      c(alpha = paste0("\\alpha_{", g, "}"),
-        alpha_i = paste0("\\alpha_{", g, "[i]}"),
-        sd = paste0("\\sigma_{", g, "}"),
-        sd_alpha = paste0("\\sigma^{(\\alpha)}_{", g, "}"),
+      c(sd = paste0("\\sigma_{", g, "}"),
         Sigma = paste0("\\boldsymbol{\\Sigma}_{", g, "}"),
-        Omega = paste0("\\boldsymbol{\\Omega}_{", g, "}"),
-        stats::setNames(paste0("\\beta^{(", g, ")}_{", sl, ", ", g, "}"),
-                        paste0("slope:", sl_key)),
-        stats::setNames(paste0("\\beta^{(", g, ")}_{", sl, ", ", g, "[i]}"),
-                        paste0("slope_i:", sl_key)),
-        stats::setNames(paste0("\\sigma^{(\\beta_{", sl, "})}_{", g, "}"),
-                        paste0("sd_slope:", sl_key)))
+        Omega = paste0("\\boldsymbol{\\Omega}_{", g, "}"))
     }
   )
   if (is.null(obj)) return(out)
@@ -2259,22 +2641,31 @@ term_symbols <- function(kind, spec, obj = NULL) {
 #' predictor.
 #'
 #' @param obj An `mvgam` object or a view of one predictor
-#' @return Character LaTeX subscript, such as `"_{i,t}"`
+#' @return Character vector of index entries, such as `c("i", "t")`
 #' @noRd
 term_index <- function(obj) {
-  if (!is.null(obj$methods_md_index)) return(obj$methods_md_index)
-  spec <- closure_unit_spec(obj)
-  if (is.null(spec)) "_{i,t}" else paste0("_", spec$unit)
+  obj$methods_md_index %||% closure_unit_spec(obj)$unit_index %||% c("i", "t")
+}
+
+#' Index entries in braces, as `{i,t}`
+#'
+#' @param entries Character vector of index entries
+#' @return Character LaTeX
+#' @noRd
+index_braces <- function(entries) {
+  paste0("{", paste(entries, collapse = ","), "}")
 }
 
 #' Symbols indexed as a predictor's covariates are
 #'
 #' @param obj An `mvgam` object or a view of one predictor
 #' @param x Character LaTeX symbols
-#' @return `x` with `term_index()` appended
+#' @param extra Character index entry after the covariates', such as
+#'   the threshold `c`, or `NULL`
+#' @return `x` subscripted by `term_index()`
 #' @noRd
-indexed <- function(obj, x) {
-  paste0(x, term_index(obj))
+indexed <- function(obj, x, extra = NULL) {
+  paste0(x, "_", index_braces(c(term_index(obj), extra)))
 }
 
 #' The terms of one kind, joined into one sum
@@ -2302,37 +2693,20 @@ render_function_inline <- function(kind, specs, obj) {
   })
 }
 
-#' Measurement-error terms of a linear predictor
+#' Special-term coefficients of a linear predictor
 #'
-#' A term `me(x, sdx)` enters through the latent true covariate
+#' Each coefficient enters times its parts. A `mo(x)` part is `m_x(x)`,
+#' a cumulative step transform from a Dirichlet simplex (Burkner and
+#' Charpentier 2020). A `me(x, sdx)` part is the latent true covariate
 #' `\tilde{x}`.
 #'
-#' @param specs List of `obs_me_specs()` specs
+#' @param specs List of `sp_coef_spec()` specs
 #' @param obj An `mvgam` object or a view of one predictor
 #' @return Character LaTeX expression, or an empty vector
 #' @noRd
-render_me_inline <- function(specs, obj) {
+render_sp_inline <- function(specs, obj) {
   compose_inline_terms(specs, function(s) {
-    paste0(term_symbols("me", s, obj)[["beta"]], " \\, ",
-           indexed(obj, paste0("\\tilde{", escape_math_text(s$var), "}")))
-  })
-}
-
-#' Monotonic terms of a linear predictor
-#'
-#' Each `mo(x)` term enters as its effect times `m_x(x)`, a cumulative
-#' step transform from a Dirichlet simplex (Burkner and Charpentier
-#' 2020).
-#'
-#' @param specs List of `obs_mo_specs_from_prior()` specs
-#' @param obj An `mvgam` object or a view of one predictor
-#' @return Character LaTeX expression, or an empty vector
-#' @noRd
-render_mo_inline <- function(specs, obj) {
-  compose_inline_terms(specs, function(s) {
-    sym <- term_symbols("mo", s, obj)
-    paste0(sym[["beta"]], " \\, ", sym[["m"]], "(",
-           indexed(obj, escape_math_text(s$var)), ")")
+    paste0(response_symbol(obj, s$beta), " \\, ", s$value)
   })
 }
 
@@ -2409,22 +2783,49 @@ by_clause <- function(spec) {
 
 #' Group-level terms of a linear predictor
 #'
-#' Each group adds its varying intercept, `\alpha_{g[i]}`. Each of its
-#' varying slopes enters times its covariate.
+#' Each varying intercept enters as `\alpha_{g[i]}`, each varying slope
+#' times its covariate. A category-specific block shifts the thresholds
+#' and enters `category_specific_rhs()` instead.
 #'
-#' @param specs List of `obs_re_specs_from_prior()` specs
+#' @param specs List of `obs_re_specs()` specs
 #' @param obj An `mvgam` object or a view of one predictor
 #' @return Character LaTeX expression, or an empty vector
 #' @noRd
 render_re_inline <- function(specs, obj) {
-  compose_inline_terms(specs, function(s) {
-    sym <- term_symbols("re", s, obj)
-    slopes <- if (length(s$slopes)) {
-      paste0(sym[paste0("slope_i:", s$slopes)], " ",
-             indexed(obj, escape_math_text(s$slopes)))
-    }
-    paste(c(sym[["alpha_i"]], slopes), collapse = " + ")
+  compose_inline_terms(Filter(function(s) !s$cs, specs), function(s) {
+    paste(re_inline_terms(s, obj), collapse = " + ")
   })
+}
+
+#' The terms one group-level block adds to a predictor
+#'
+#' A category-specific block's coefficients of one covariate are one
+#' term, indexed by the threshold `c`.
+#'
+#' @param spec An `obs_re_specs()` spec
+#' @param obj An `mvgam` object or a view of one predictor
+#' @return Character vector of LaTeX terms
+#' @noRd
+re_inline_terms <- function(spec, obj) {
+  covariate <- spec$coefs$covariate
+  covariate <- ifelse(nzchar(covariate), paste0(" ", covariate), "")
+  unique(paste0(re_coef_symbols(spec, obj)$coef_i, covariate))
+}
+
+#' The threshold shifts of an ordinal mean's category-specific terms
+#'
+#' brms shifts threshold `c` by `\beta_{x,c} x` for `cs(x)` and by the
+#' group's own amount for `(cs(1) | g)`.
+#'
+#' @param obj An `mvgam` object or a view of one response
+#' @return Character vector of LaTeX terms, empty without any
+#' @noRd
+category_specific_rhs <- function(obj) {
+  if (!is_ordinal_mean(obj)) return(character(0L))
+  classes <- classify_obs_parameters(obj)
+  c(fixed_inline_terms(obj, classes$cs, category = TRUE),
+    unlist(lapply(Filter(function(s) s$cs, classes$re), re_inline_terms,
+                  obj = obj)))
 }
 
 #' The equations defining each term of a linear predictor
@@ -2477,33 +2878,39 @@ term_definition_rows <- function(obj) {
   me <- unlist(lapply(classes$me, function(s) {
     v <- escape_math_text(s$var)
     sym <- term_symbols("me", s, obj)
-    latent <- indexed(obj, paste0("\\tilde{", v, "}"))
     list(
       row(indexed(obj, v), "\\sim",
-          paste0("\\text{Normal}\\!\\left(", latent, ", ",
+          paste0("\\text{Normal}\\!\\left(", me_latent_symbol(obj, s), ", ",
                  indexed(obj, sym[["sdx"]]), "\\right)")),
-      row(latent, "\\sim",
+      row(me_latent_symbol(obj, s, level = TRUE), "\\sim",
           paste0("\\text{Normal}\\!\\left(", sym[["mu"]], ", ", sym[["sd"]],
                  "\\right)"))
     )
   }), recursive = FALSE)
   re <- unlist(lapply(classes$re, function(s) {
     sym <- term_symbols("re", s, obj)
-    if (!s$has_slope) {
-      return(list(row(sym[["alpha"]], "\\sim",
-                      paste0("\\text{Normal}(0, ", sym[["sd"]], ")"))))
+    cf <- re_coef_symbols(s, obj)
+    if (!s$cor) {
+      return(Map(function(coef, sd) {
+        row(coef, "\\sim", paste0("\\text{Normal}(0, ", sd, ")"))
+      }, cf$coef, cf$sd))
     }
-    coefs <- c(sym[["alpha"]], sym[paste0("slope:", s$slopes)])
-    sds <- paste(c(sym[["sd_alpha"]], sym[paste0("sd_slope:", s$slopes)]),
-                 collapse = ", ")
     list(
-      row(paste0("(", paste(coefs, collapse = ", "), ")^\\top"), "\\sim",
+      row(paste0("(", paste(cf$coef, collapse = ", "), ")^\\top"), "\\sim",
           paste0("\\text{MVNormal}\\!\\left(\\mathbf{0}, ", sym[["Sigma"]],
                  "\\right)")),
-      row(sym[["Sigma"]], "=", scaled_cor_text(sds, sym[["Omega"]]))
+      row(sym[["Sigma"]], "=",
+          scaled_cor_text(paste(cf$sd, collapse = ", "), sym[["Omega"]]))
     )
   }), recursive = FALSE)
-  c(smooth, gp, mo, me, re)
+  shifts <- category_specific_rhs(obj)
+  thres <- if (length(shifts)) {
+    sym <- threshold_symbols(obj)
+    shift <- paste(shifts, collapse = " + ")
+    if (length(shifts) > 1L) shift <- paste0("(", shift, ")")
+    list(row(sym[["elem"]], "=", paste0(sym[["base"]], " - ", shift)))
+  }
+  c(thres, smooth, gp, mo, me, re)
 }
 
 #' Whether a model has a latent trend
@@ -2511,7 +2918,7 @@ term_definition_rows <- function(obj) {
 #' @param obj An `mvgam` object or a view of one predictor
 #' @return Logical scalar
 #' @noRd
-methods_md_has_latent_trend <- function(obj) {
+has_latent_trend <- function(obj) {
   tt <- obj$trend_metadata$trend_type
   !is.null(tt) && !identical(tt, "None") && !identical(tt, "none")
 }
@@ -2533,11 +2940,11 @@ trend_side_view <- function(obj) {
   out$formula <- obj$trend_model$formula
   out$obs_model <- obj$trend_model
   out$methods_md_tag <- "\\eta"
-  out$methods_md_index <- if (trend_mu_on_factors(obj)) "_{t}" else "_{i,t}"
+  out$methods_md_index <- if (trend_mu_on_factors(obj)) "t" else c("i", "t")
   out$trend_metadata <- NULL
   out$prior <- NULL
   prior <- obj$prior
-  if (is.null(prior) || nrow(prior) == 0L) return(out)
+  if (NROW(prior) == 0L) return(out)
   prior <- prior[grepl("_trend$", prior$class), , drop = FALSE]
   bare <- sub("_trend$", "", prior$class)
   brms_classes <- setdiff(
@@ -2555,7 +2962,7 @@ trend_side_view <- function(obj) {
 #' @return Character LaTeX terms, empty without a trend
 #' @noRd
 trend_linpred_terms <- function(obj) {
-  if (!methods_md_has_latent_trend(obj)) return(character(0L))
+  if (!has_latent_trend(obj)) return(character(0L))
   c(if (!trend_mu_on_factors(obj)) trend_mu_symbol(obj), "\\eta_{i,t}")
 }
 
@@ -2579,7 +2986,7 @@ trend_mu_on_factors <- function(obj) {
 #' @return Character LaTeX symbol, or `NULL` without trend formula terms
 #' @noRd
 trend_mu_symbol <- function(obj) {
-  if (!methods_md_has_latent_trend(obj) ||
+  if (!has_latent_trend(obj) ||
         !has_linear_terms(trend_side_view(obj))) {
     return(NULL)
   }
@@ -3053,7 +3460,7 @@ ma_terms <- function(obj) {
 #' @return List of statements, empty without a trend
 #' @noRd
 latent_dynamics_rows <- function(obj) {
-  if (!methods_md_has_latent_trend(obj)) {
+  if (!has_latent_trend(obj)) {
     return(list())
   }
   trend_method(obj$trend_metadata$trend_type,
@@ -3258,20 +3665,17 @@ llt_slope_shock_row <- function(obj, zeta) {
 glossary_llt <- function(obj) {
   sym <- trend_symbols(obj)
   out <- c(
-    paste0("- $", llt_slope(obj), "$: slope, the level's growth from ",
-           "$t$ to $t + 1$"),
-    paste0("- $", sym[["sigma_slope_trend"]], "$: SD of the slope shocks",
-           if (trend_samples_cor(obj)) {
-             ", which take the correlation of the level shocks"
-           })
+    gloss(llt_slope(obj), "slope, the level's growth from ",
+          "$t$ to $t + 1$"),
+    gloss(sym[["sigma_slope_trend"]], "SD of the slope shocks",
+          if (trend_samples_cor(obj)) {
+            ", which take the correlation of the level shocks"
+          })
   )
   if ("ar1_slope_trend" %in% obj$prior$class) {
-    out <- c(out, paste0(
-      "- $", sym[["ar1_slope_trend"]], "$: slope damping"
-    ))
+    out <- c(out, gloss(sym[["ar1_slope_trend"]], "slope damping"))
   }
-  out <- c(out, paste0("- $", sym[["init_slope_trend"]],
-                       "$: initial slope, estimated"))
+  out <- c(out, gloss(sym[["init_slope_trend"]], "initial slope, estimated"))
   spec <- first_trend_spec(obj)
   if (is.null(spec$season)) {
     return(out)
@@ -3280,17 +3684,17 @@ glossary_llt <- function(obj) {
                     spec$season, collapse = "; ")
   c(
     out,
-    paste0("- $", trend_state_symbol(obj, "\\ell"), "$: level"),
-    paste0("- $", llt_season(obj), "$: season, the sum of the first ",
-           "states of $K = ", sum(spec$harmonics), "$ harmonics"),
+    gloss(trend_state_symbol(obj, "\\ell"), "level"),
+    gloss(llt_season(obj), "season, the sum of the first ",
+          "states of $K = ", sum(spec$harmonics), "$ harmonics"),
     paste0("- $", llt_season(obj, "first"), ", ",
            llt_season(obj, "second"), "$: state pair of harmonic $j$"),
-    paste0("- $\\lambda_j$: frequency of harmonic $j$, ",
-           "$2 \\pi j / s$ radians per time step for ", periods),
-    paste0("- $", sym[["sigma_season_trend"]], "$: SD of the seasonal ",
-           "shocks, shared by every harmonic"),
-    paste0("- $", sym[["init_season_trend"]], "$: starting state pair, ",
-           "estimated")
+    gloss("\\lambda_j", "frequency of harmonic $j$, ",
+          "$2 \\pi j / s$ radians per time step for ", periods),
+    gloss(sym[["sigma_season_trend"]], "SD of the seasonal ",
+          "shocks, shared by every harmonic"),
+    gloss(sym[["init_season_trend"]], "starting state pair, ",
+          "estimated")
   )
 }
 
@@ -3345,18 +3749,18 @@ render_latent_pw <- function(obj) {
 #' @noRd
 glossary_pw <- function(obj) {
   out <- c(
-    "- $k_i$: base growth rate of series $i$",
-    paste0(
-      "- $\\boldsymbol{\\delta}_i$: changes in growth rate at the ",
+    gloss("k_i", "base growth rate of series $i$"),
+    gloss(
+      "\\boldsymbol{\\delta}_i", "changes in growth rate at the ",
       "changepoints $\\mathbf{s}$, and $\\mathbf{a}(t)$ flags the ",
       "changepoints reached by time $t$"
     )
   )
   if (!pw_is_logistic(obj$trend_metadata)) return(out)
   c(out,
-    "- $m_i$: offset that places the logistic curve along time",
-    paste0(
-      "- $C_{i,t}$: carrying capacity, and $\\boldsymbol{\\gamma}_i$ ",
+    gloss("m_i", "offset that places the logistic curve along time"),
+    gloss(
+      "C_{i,t}", "carrying capacity, and $\\boldsymbol{\\gamma}_i$ ",
       "the offset adjustments that keep the curve continuous"
     )
   )
@@ -3480,9 +3884,9 @@ loadings_glossary <- function(spec, series) {
   sources <- c(if (traits$features) "trait features",
                if (traits$distances) "distances")
   c(
-    paste0("- $\\boldsymbol{\\Phi}$: correlation of each factor's ",
-           "loadings across the ", series, ", built from the ", series,
-           "' ", paste(sources, collapse = " and ")),
+    gloss("\\boldsymbol{\\Phi}", "correlation of each factor's ",
+          "loadings across the ", series, ", built from the ", series,
+          "' ", paste(sources, collapse = " and ")),
     if (length(dnames)) {
       d <- escape_math_text(dnames)
       paste0("- $d_{", d, "}$: distances between the ", series, " from '",
@@ -3520,7 +3924,7 @@ mgp_shrinkage_rows <- function() {
 #' @noRd
 render_priors_section <- function(obj) {
   prior <- obj$prior
-  if (is.null(prior) || nrow(prior) == 0L) {
+  if (NROW(prior) == 0L) {
     return("## Priors\n\n(no prior table on this fit)")
   }
   # Each view gives its predictor's rows the names the mean's term
@@ -3563,7 +3967,7 @@ render_priors_section <- function(obj) {
 #' @return A list of `align_block()` rows, possibly empty.
 #' @noRd
 prior_align_rows <- function(obj, prior, symbols) {
-  if (is.null(prior) || nrow(prior) == 0L) return(list())
+  if (NROW(prior) == 0L) return(list())
   prior <- label_prior_terms(obj, backfill_umbrella_priors(prior))
   prior <- prior[!is.na(prior$prior) & nzchar(prior$prior), , drop = FALSE]
   prior <- cor_rows_by_response(obj, drop_shadowed_priors(prior))
@@ -3612,8 +4016,8 @@ cor_rows_by_response <- function(obj, prior) {
   if (length(views) < 2L || !any(shared)) return(prior)
   for (i in which(shared)) {
     owners <- Filter(function(v) {
-      any(vapply(obs_re_specs_from_prior(v$prior), function(s) {
-        s$has_slope && identical(s$group, prior$group[[i]])
+      any(vapply(obs_re_specs(v), function(s) {
+        s$cor && identical(s$group, prior$group[[i]])
       }, logical(1L)))
     }, views)
     if (length(owners) == 1L) prior$resp[[i]] <- owners[[1L]]$methods_md_resp
@@ -3641,7 +4045,7 @@ prior_scope <- function(prior) {
 #' @return `prior`, with each inherited prior filled in
 #' @noRd
 backfill_umbrella_priors <- function(prior) {
-  if (is.null(prior) || nrow(prior) == 0L) return(prior)
+  if (NROW(prior) == 0L) return(prior)
   text <- prior_field(prior, "prior")
   has_text <- !is.na(text) & nzchar(text) & text != "(flat)"
   umbrella <- has_text & !nzchar(prior_field(prior, "coef")) &
@@ -3657,12 +4061,12 @@ backfill_umbrella_priors <- function(prior) {
 #'
 #' Each `b` row of the mean learns the kind of term that owns it. A
 #' smooth's unpenalised columns, such as `sx_1`, take the smooth's
-#' prior through its `sds` row. Their own rows are dropped. brms names
-#' a measurement-error effect `me<x><sdx>`, which the page shortens to
-#' `me<x>`. A population effect and a GP's hyperparameters take the
-#' symbols the equations give them in a `tex` column. brms names a GP's
-#' hyperparameters by term, `gpxhabA` for level `A` of
-#' `gp(x, by = hab)`.
+#' prior through its `sds` row. Their own rows are dropped. A
+#' population, category-specific or special-term effect, a monotonic
+#' simplex, a measurement-error hyperparameter, a group-level SD, an
+#' ordinal threshold and a GP's hyperparameters take the symbols the
+#' equations give them in a `tex` column. A GP's hyperparameters are
+#' named by term, `gpxhabA` for level `A` of `gp(x, by = hab)`.
 #'
 #' @param obj The `mvgam` object, or a view of it
 #' @param prior Rows of its prior table
@@ -3674,16 +4078,36 @@ label_prior_terms <- function(obj, prior) {
   obs_b <- prior$class == "b" & mean_predictor_rows(prior)
   prior$term_kind[obs_b] <- obs_term_coef_kinds(obj, prior$coef[obs_b])
   prior <- prior[!prior$term_kind %in% "sm", , drop = FALSE]
-  for (s in obs_me_specs(obj)) {
-    if (is.na(s$sdvar)) next
-    hit <- prior$class == "b" & prior$coef == paste0("me", s$var, s$sdvar)
-    prior$coef[hit] <- paste0("me", s$var)
+  for (s in obs_sp_specs(obj)) {
+    prior$tex[coef_rows(prior, "b") & prior$coef == s$coef] <- s$beta
+    for (t in s$mo) {
+      hit <- coef_rows(prior, "simo") & prior$coef == t$simo
+      prior$tex[hit] <- term_symbols("mo", t)[["zeta"]]
+    }
   }
-  fixed <- prior$class == "b" & mean_predictor_rows(prior) &
-    nzchar(prior$coef) & is.na(prior$term_kind)
+  me <- me_term_frame(side_model(obj, "obs")$formula, obj$data)
+  for (k in seq_len(NROW(me))) {
+    sym <- term_symbols("me", me_call_spec(str2lang(me$term[[k]])))
+    for (cls in c("meanme", "sdme")) {
+      hit <- coef_rows(prior, cls) & prior$coef == me$coef[[k]]
+      prior$tex[hit] <- sym[[if (cls == "meanme") "mu" else "sd"]]
+    }
+  }
+  fixed <- coef_rows(prior, "b") & prior$term_kind %in% c(NA, "cs")
   for (spec in fixed_term_specs(obj, unique(prior$coef[fixed]))) {
-    prior$tex[fixed & prior$coef %in% spec$coefs] <-
-      paste0("\\beta_{", spec$sub, "}")
+    hit <- fixed & prior$coef %in% spec$coefs
+    prior$tex[hit] <- fixed_symbol(spec$sub, prior$term_kind[hit] %in% "cs")
+  }
+  for (spec in obs_re_specs(obj)) {
+    cf <- re_coef_symbols(spec)
+    hit <- coef_rows(prior, "sd", spec$resp) & prior$group == spec$group &
+      prior$coef %in% cf$name
+    prior$tex[hit] <- cf$sd[match(prior$coef[hit], cf$name)]
+  }
+  for (view in Filter(is_ordinal_mean, response_views(obj))) {
+    hit <- coef_rows(prior, "Intercept", view$methods_md_resp %||% "")
+    prior$tex[hit] <- threshold_prior_symbol(prior$group[hit],
+                                             prior$coef[hit])
   }
   for (sp in obs_gp_specs(obj)) {
     base <- paste0("gp", brms_rename(paste(sp$vars, collapse = "")),
@@ -3704,10 +4128,9 @@ label_prior_terms <- function(obj, prior) {
 #' Drop the prior rows another row states more precisely
 #'
 #' A class row repeats the prior of the coefficient rows in its scope,
-#' under a placeholder symbol. A group's `sd` row and its coefficient
-#' rows describe the same SDs. A group with only an intercept SD needs
-#' no superscript to tell its SDs apart. Its row takes the group's
-#' plain symbol.
+#' under a placeholder symbol. A group's row repeats the prior of its
+#' coefficient rows. A group's `sd` row covers its SDs. A group's
+#' `Intercept` row covers the thresholds of one level of `thres(gr = )`.
 #'
 #' @param prior A brms prior table
 #' @return `prior` without the repeated rows
@@ -3717,24 +4140,18 @@ drop_shadowed_priors <- function(prior) {
     "Intercept", "b", "sd", "sds", "L", "cor",
     "sdgp", "lscale", "meanme", "sdme", "simo"
   )
-  scope <- prior_scope(prior)
-  general <- !nzchar(prior$coef) & !nzchar(prior$group)
   vec <- prior$class %in% vec_classes
-  prior <- prior[!(vec & general & scope %in% scope[vec & !general]), ,
-                 drop = FALSE]
-  group_sd <- function(p) {
-    list(key = paste(prior_scope(p), p$group, sep = "\x1f"),
-         is_sd = p$class == "sd" & nzchar(p$group))
-  }
-  g <- group_sd(prior)
-  per_coef <- g$is_sd & nzchar(prior$coef)
-  prior <- prior[!(g$is_sd & !per_coef & g$key %in% g$key[per_coef]), ,
-                 drop = FALSE]
-  g <- group_sd(prior)
-  lone <- g$is_sd & prior$coef == "Intercept" &
-    !g$key %in% g$key[duplicated(g$key)]
-  prior$coef[lone] <- ""
-  prior
+  has_coef <- nzchar(prior$coef)
+  has_group <- nzchar(prior$group)
+  scope <- prior_scope(prior)
+  group_scope <- paste(scope, prior$group, sep = "\x1f")
+  general <- !has_coef & !has_group
+  group_row <- !has_coef & has_group
+  shadowed <- vec & (
+    (general & scope %in% scope[vec & !general]) |
+      (group_row & group_scope %in% group_scope[vec & has_coef])
+  )
+  prior[!shadowed, , drop = FALSE]
 }
 
 #' The Implementation section: the call that refits the model
@@ -4119,55 +4536,31 @@ format_parameter_symbol_base <- function(row) {
   cls <- row$class %||% ""
   coef <- row$coef %||% ""
   group <- row$group %||% ""
-  if (identical(cls, "Intercept")) {
-    # An ordinal family's thresholds are `Intercept` rows numbered in
-    # `coef`.
-    if (grepl("^[0-9]+$", coef)) return(paste0("\\theta_{", coef, "}"))
-    return("\\alpha")
-  }
+  # `label_prior_terms()` names an ordinal family's thresholds
+  if (identical(cls, "Intercept")) return("\\alpha")
   if (identical(cls, "b")) {
     if (nzchar(coef)) {
-      kind <- row$term_kind %||% NA_character_
-      if (kind %in% c("mo", "me")) {
-        # `label_prior_terms()` names a measurement-error effect
-        # `me<x>`.
-        spec <- list(var = sub("^m[oe]", "", coef))
-        return(term_symbols(kind, spec)[["beta"]])
-      }
       return(paste0("\\beta_{", escape_math_text(coef), "}"))
     }
     return("\\boldsymbol{\\beta}")
   }
+  # A class row covers every term's parameters, indexed by `j`
   if (identical(cls, "simo")) {
-    bare <- if (nzchar(coef)) {
-      sub("[0-9]+$", "", sub("^mo", "", coef))
-    } else "j"
-    return(term_symbols("mo", list(var = bare))[["zeta"]])
+    return(term_symbols("mo", list(var = "j"))[["zeta"]])
   }
   if (cls %in% c("meanme", "sdme")) {
-    bare <- if (nzchar(coef)) sub("^me", "", coef) else "j"
-    sym <- term_symbols("me", list(var = bare))
+    sym <- term_symbols("me", list(var = "j"))
     return(if (identical(cls, "meanme")) sym[["mu"]] else sym[["sd"]])
   }
   if (cls %in% setdiff(names(family_par_symbols()), "mu")) {
     return(family_par_symbol(cls))
   }
   if (cls %in% c("sd", "L", "cor")) {
-    grp <- if (nzchar(group)) group else "j"
-    # Intercept and slope SDs of one group are told apart by the
-    # coefficient they scale. brms places a correlation prior on the
-    # Cholesky factor of the correlation matrix the equations name.
-    sym <- term_symbols("re", list(group = grp, slopes = coef))
-    key <- if (!identical(cls, "sd")) {
-      "Omega"
-    } else if (!nzchar(coef)) {
-      "sd"
-    } else if (identical(coef, "Intercept")) {
-      "sd_alpha"
-    } else {
-      paste0("sd_slope:", coef)
-    }
-    return(sym[[key]])
+    # `label_prior_terms()` names each coefficient's SD. A row for the
+    # group is its one SD, or the correlation matrix whose Cholesky
+    # factor brms places the prior on.
+    sym <- term_symbols("re", list(group = if (nzchar(group)) group else "j"))
+    return(sym[[if (identical(cls, "sd")) "sd" else "Omega"]])
   }
   if (identical(cls, "sds")) {
     spec <- if (nzchar(coef)) parse_smooth_coef(coef) else list(vars = "j")

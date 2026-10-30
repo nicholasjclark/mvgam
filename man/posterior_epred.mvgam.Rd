@@ -109,12 +109,13 @@ the response scale. \code{\link[=posterior_predict.mvgam]{posterior_predict.mvga
 noise around these means.
 }
 \details{
-For most families the mean is the inverse link of the predictor. A binomial mean is
-\code{trials * p}, with the trials taken from the \code{trials()} term
-evaluated against \code{newdata}. A zero-inflated or hurdle mean scales
-the base mean by the probability of a non-zero draw. A lognormal mean
-carries the correction \code{exp(mu + sigma^2 / 2)}. A \code{trunc()} term
-gives the mean of the distribution truncated to its bounds.
+For most families the mean is the inverse link of the predictor. A
+binomial mean is \code{trials * p}, with the trials taken from the
+\code{trials()} term evaluated against \code{newdata}. A zero-inflated or
+hurdle mean scales the base mean by the probability of a non-zero
+draw. A lognormal mean carries the correction
+\code{exp(mu + sigma^2 / 2)}. A \code{trunc()} term gives the mean of the
+distribution truncated to its bounds.
 
 The mean of an \code{nmix()} or \code{occ()} visit thins the latent abundance
 or occupancy by that visit's detection probability. A composition

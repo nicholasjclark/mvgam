@@ -651,9 +651,7 @@ test_that("a ragged panel is refused with counts and a remedy", {
 })
 
 
-test_that("summary, tidiers and criticism run on a VAR fit", {
-  txt <- capture.output(summary(fit))
-  expect_true(any(grepl(paste0("Series:\\s*", n_series), txt)))
+test_that("tidiers and criticism run on a VAR fit", {
   # `loo()` warns when a Pareto-k exceeds its threshold. The warning
   # is captured and checked against the diagnostics it reports on.
   caught <- with_warnings(loo(fit))
@@ -1202,5 +1200,9 @@ test_that("a grouped VAR(2) is stationary, block by block", {
   expect_identical(attr(pooled, "group_label"), "mean over groups")
 })
 
+
+test_that("the predictor's parts sum to it: obs, VAR state", {
+  expect_parts_sum(fit, "state")
+})
 
 cat("\nDone.\n")

@@ -351,18 +351,11 @@ has_analytic_pit <- function(family_obj) {
 #' @return List holding the `lower` and `upper` bound matrices, or
 #'   `NULL` for a family without a distribution spec. `NULL` sends the
 #'   family to the empirical PIT.
+#' @details `compute_quantile_residuals()`, its one caller, checks the
+#'   arguments.
 #' @noRd
 analytic_pit_bounds <- function(object, y, pp_args, d,
                                 draw_ids = NULL, resp = NULL) {
-  checkmate::assert_class(object, "mvgam")
-  checkmate::assert_numeric(y)
-  checkmate::assert_list(pp_args)
-  checkmate::assert(
-    checkmate::check_data_frame(d),
-    checkmate::check_list(d)
-  )
-  checkmate::assert_integerish(draw_ids, lower = 1, null.ok = TRUE)
-  checkmate::assert_string(resp, null.ok = TRUE)
   family_obj <- model_families(object, resp)
   family_name <- resolve_family_name(family_obj)
   # Checked before the predictor is computed, which the empirical
@@ -383,7 +376,9 @@ analytic_pit_bounds <- function(object, y, pp_args, d,
     return(ordinal_pit_bounds(
       ordinal_category_probs(
         object, linpred, family_obj, draw_ids = draw_ids, newdata = d,
-        resp = resp
+        resp = resp, re_formula = pp_args$re_formula,
+        allow_new_levels = pp_args$allow_new_levels %||% FALSE,
+        sample_new_levels = pp_args$sample_new_levels %||% "uncertainty"
       ),
       y
     ))

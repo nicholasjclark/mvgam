@@ -23,6 +23,8 @@
 #      shocks correlated within each region (0.7 and -0.4)
 #   F: 2 series, poisson, a twelve-month season of two harmonics whose
 #      shape drifts
+#   G: 3 series on 2 factors, poisson, a seven-step season of one
+#      harmonic and a twelve-step season of two
 #
 # Run with:
 #   testthat::test_file("tests/local/test-trend-llt.R")
@@ -181,6 +183,31 @@ fit_f <- cached_fit(
           warmup = 500L, silent = 2, backend = "cmdstanr")
   },
   key = truth_f
+)
+
+# Two periods on two factors. Each period's season is stored as its own
+# path, rotated with the factors.
+set.seed(63L)
+truth_g <- list(
+  level = sim_llt(84L, 2L, 0.05, 0.003, 1, slope0 = c(0.01, -0.01))$level,
+  week = sim_season(84L, 2L, 7, 1L, 0.02, 0.3),
+  year = sim_season(84L, 2L, 12, 2L, 0.02, 0.3)
+)
+Z_g <- matrix(c(0.9, 0.5, 0.1, 0.1, 0.6, 1), 3L)
+dat_g <- long_frame((truth_g$level + truth_g$week + truth_g$year) %*% t(Z_g),
+                    c("s1", "s2", "s3"))
+dat_g$y <- rpois(nrow(dat_g), exp(2 + dat_g$eta))
+train_g <- dat_g[dat_g$time <= 72L, ]
+fit_g <- cached_fit(
+  "val_mvgam_llt_two_seasons.rds",
+  function() {
+    mvgam(y ~ 1,
+          trend_formula = ~ LLT(season = c(7, 12), harmonics = c(1, 2),
+                                n_lv = 2),
+          data = train_g, family = poisson(), chains = 2L, iter = 1000L,
+          warmup = 500L, silent = 2, backend = "cmdstanr")
+  },
+  key = truth_g
 )
 
 cells <- function(name, nr, nc) {
@@ -666,12 +693,125 @@ test_that("the season's forecast turns its last pairs forward", {
 })
 
 
+test_that("each period's season follows its own harmonics", {
+  # The program sums each period's rotated shocks within each factor.
+  # The reference steps the three pairs one turn at a time and sums the
+  # pairs of each period.
+  dm <- as_draws_matrix(fit_g$fit)
+  lam <- 2 * pi * c(1 / 7, 1 / 12, 2 / 12)
+  rows <- list(1L, 2:3)
+  worst <- 0
+  for (r in round(seq(1, nrow(dm), length.out = 6))) {
+    # The factors share one season scale
+    sig <- rep(as.numeric(dm[r, "sigma_season_trend[1]"]), 2L)
+    init <- block(dm, r, "init_season_trend", 6L, 2L)
+    shocks <- block(dm, r, "innovations_season_trend", 71L, 12L)
+    g <- init[1:3, ]
+    g_star <- init[4:6, ]
+    by_period <- list(matrix(0, 72L, 2L), matrix(0, 72L, 2L))
+    for (t in 1:72) {
+      if (t > 1L) {
+        w <- matrix(shocks[t - 1L, 1:6], 3L) * rep(sig, each = 3L)
+        w_star <- matrix(shocks[t - 1L, 7:12], 3L) * rep(sig, each = 3L)
+        g_last <- g
+        g <- cos(lam) * g_last + sin(lam) * g_star + w
+        g_star <- cos(lam) * g_star - sin(lam) * g_last + w_star
+      }
+      for (p in 1:2) {
+        by_period[[p]][t, ] <- colSums(g[rows[[p]], , drop = FALSE])
+      }
+    }
+    worst <- max(
+      worst,
+      abs(by_period[[1L]] - block(dm, r, "season_1_trend", 72L, 2L)),
+      abs(by_period[[2L]] - block(dm, r, "season_2_trend", 72L, 2L)),
+      abs(by_period[[1L]] + by_period[[2L]] -
+            block(dm, r, "season_trend", 72L, 2L))
+    )
+  }
+  expect_lt(worst, 1e-5)
+})
+
+
+test_that("the periods part the season in hindcasts and forecasts", {
+  ids <- 1:40
+  hc <- function(cmp) {
+    hindcast(fit_g, type = "trend", component = cmp,
+             draw_ids = ids)$hindcasts
+  }
+  season <- hc("season")
+  periods <- hc(c("season_7", "season_12"))
+  # Stan writes each stored path to six significant digits
+  for (k in 1:3) expect_equal(periods[[k]], season[[k]], tolerance = 1e-6)
+
+  fc <- function(cmp) {
+    set.seed(5L)
+    forecast(fit_g, newdata = future_frame(train_g, 12L), type = "trend",
+             component = cmp, draw_ids = ids)$forecasts
+  }
+  season_fc <- fc("season")
+  periods_fc <- fc(c("season_7", "season_12"))
+  for (k in 1:3) {
+    expect_equal(periods_fc[[k]], season_fc[[k]], tolerance = 1e-6)
+  }
+})
+
+
+test_that("seasonality() measures each cycle from the season draws", {
+  ids <- 1:50
+  s <- seasonality(fit_f, newdata = future_frame(train_f, 12L),
+                   draw_ids = ids)
+  # Cycle 2 of series s2 is times 13 to 24, positions 1 to 12
+  dm <- as_draws_matrix(fit_f$fit)[ids, ]
+  x <- matrix(as.numeric(dm[, sprintf("season_trend[%d,2]", 13:24)]),
+              length(ids))
+  el <- season_cycle_draws(s)$season$s2
+  expect_equal(unname(el$amplitude[, "2"]),
+               (apply(x, 1L, max) - apply(x, 1L, min)) / 2)
+  expect_equal(unname(el$peak[, "2"]),
+               as.numeric(max.col(x, ties.method = "first")))
+  # The twelve forecast times make cycle 9, the last summarised
+  amp <- summary(s)$amplitude
+  expect_identical(as.character(amp$horizon[amp$cycle == 9L]),
+                   c("forecast", "forecast"))
+  # The profile draws the first and last fitted cycles and the forecast
+  # cycle, in each series' panel
+  prof <- ggplot2::ggplot_build(plot(s))$data[[2L]]
+  expect_identical(as.integer(table(prof$PANEL)), c(36L, 36L))
+  # One panel per month. The forecast bands start from the last fitted
+  # cycle.
+  pos <- ggplot2::ggplot_build(plot(s, type = "positions", series = "s2"))
+  expect_identical(nlevels(pos$data[[1L]]$PANEL), 12L)
+  bands <- vapply(pos$data, function(d) min(d$x), numeric(1L))
+  expect_true(all(c(1, 8) %in% bands))
+  # Each period takes its own cycles
+  layouts <- seasonality(fit_g, draw_ids = ids)$layouts
+  expect_identical(layouts$season_7$cycle[1:15], rep(1:3, c(7L, 7L, 1L)))
+  expect_identical(layouts$season_12$cycle[1:13], rep(1:2, c(12L, 1L)))
+})
+
+
 test_that("the write-up and citations name the local linear trend", {
   cite <- how_to_cite(fit_a)
   expect_match(paste(format(cite), collapse = "\n"), "Harvey", fixed = TRUE)
   expect_match(paste(format(cite), collapse = "\n"), "Gardner", fixed = TRUE)
   md <- paste(methods_md(fit_a), collapse = "\n")
   expect_match(md, "\\beta_{i,t}", fixed = TRUE)
+})
+
+test_that("the predictor's parts sum to it: the LLT level and season", {
+  # The slope and the per-period seasons add nothing beyond the level
+  # and the season. A factor fit parts each by factor.
+  expect_parts_sum(fit_a, "level")
+  expect_parts_sum(fit_b, c("level (Factor 1)", "level (Factor 2)"))
+  expect_parts_sum(fit_f, c("level", "season"))
+  expect_parts_sum(fit_g, c("level (Factor 1)", "level (Factor 2)",
+                            "season (Factor 1)", "season (Factor 2)"))
+})
+
+test_that("each part's response-scale share is the fit's own: poisson LLT", {
+  expect_epred_parts(fit_b, exp)
+  expect_epred_parts(fit_g, exp)
 })
 
 cat("\nDone.\n")

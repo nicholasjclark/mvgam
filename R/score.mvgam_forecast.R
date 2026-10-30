@@ -117,9 +117,10 @@ score_label <- function(score) {
 #' @return An object of class `mvgam_score`: a named list with one data
 #'   frame per series plus a trailing `all_series` summary. Its `print()`
 #'   method shows the mean score and interval coverage of each series.
-#'   A multivariate model gives one such object per response. Each series' data frame has columns `score`,
-#'   `in_interval`, `interval_width`, `eval_horizon` and `score_type`,
-#'   the requested `score`. A joint score leaves the per-series `score`
+#'   A multivariate model gives one such object per response. Each
+#'   series' data frame has columns `score`, `in_interval`,
+#'   `interval_width`, `eval_horizon` and `score_type`, which names the
+#'   requested `score`. A joint score leaves the per-series `score`
 #'   column `NA`.
 #'
 #'   For a univariate score, `all_series` sums the scores over the

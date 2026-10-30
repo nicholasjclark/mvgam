@@ -77,7 +77,7 @@ test_that("mvgam_band_layer rejects duplicate probs", {
     mvgam:::mvgam_band_layer(
       mat, seq_len(ncol(mat)), probs = c(0.5, 0.5, 0.8)
     ),
-    "unique"
+    "duplicated"
   )
 })
 

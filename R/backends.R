@@ -387,29 +387,9 @@ fit_model <- function(model, backend, ...) {
         c(args) <- nlist(chains, cores)
         out <- brms::do_call(rstan::sampling, args)
       } else {
-        if (cores > 1L) {
-          insight::format_warning(
-            "Argument 'cores' is ignored when using 'future'."
-          )
-        }
-        args$chains <- 1L
-        out <- futures <- vector("list", chains)
-        for (i in seq_len(chains)) {
-          args$chain_id <- i
-          if (is.list(init)) {
-            args$init <- init[i]
-          }
-          futures[[i]] <- future::future(
-            brms::do_call(rstan::sampling, args),
-            packages = "rstan",
-            seed = TRUE
-          )
-        }
-        for (i in seq_len(chains)) {
-          out[[i]] <- future::value(futures[[i]])
-        }
-        out <- rstan::sflist2stanfit(out)
-        rm(futures)
+        out <- rstan::sflist2stanfit(run_future_chains(
+          rstan::sampling, args, chains, cores, init, "chain_id", "rstan"
+        ))
       }
     } else {
       c(args) <- nlist(chains, cores)
@@ -541,31 +521,8 @@ fit_model <- function(model, backend, ...) {
       if (!future_available()) {
         out <- brms::do_call(model$sample, args)
       } else {
-        if (cores > 1L) {
-          insight::format_warning(
-            "Argument 'cores' is ignored when using 'future'."
-          )
-        }
-        args$chains <- 1L
-        out <- futures <- vector("list", chains)
-        for (i in seq_len(chains)) {
-          args$chain_ids <- i
-          # Only list inits are split per chain. A Pathfinder init is
-          # an R6 fit object. cmdstanr resamples one starting value per
-          # chain from it internally. Every chain receives it whole.
-          if (is.list(init)) {
-            args$init <- init[i]
-          }
-          futures[[i]] <- future::future(
-            brms::do_call(model$sample, args),
-            packages = "cmdstanr",
-            seed = TRUE
-          )
-        }
-        for (i in seq_len(chains)) {
-          out[[i]] <- future::value(futures[[i]])
-        }
-        rm(futures)
+        out <- run_future_chains(model$sample, args, chains, cores, init,
+                                 "chain_ids", "cmdstanr")
       }
     } else {
       out <- brms::do_call(model$sample, args)
@@ -637,6 +594,38 @@ fit_model <- function(model, backend, ...) {
 
   out
 }
+
+
+#' Run each chain as a future of its own
+#'
+#' Each chain runs alone, with its own chain number. Only list inits
+#' are split per chain. A Pathfinder init is an R6 fit object. cmdstanr
+#' resamples one starting value per chain from it internally. Every
+#' chain receives it whole.
+#'
+#' @param run The backend's sampling function
+#' @param args Named list of its arguments
+#' @param chains,cores,init As the fit takes them
+#' @param chain_arg The name the backend gives the chain number
+#' @param package The package each future loads
+#' @return List of the chains' fits
+#' @noRd
+run_future_chains <- function(run, args, chains, cores, init, chain_arg,
+                              package) {
+  if (cores > 1L) {
+    insight::format_warning("Argument 'cores' is ignored when using 'future'.")
+  }
+  args$chains <- 1L
+  futures <- lapply(seq_len(chains), function(i) {
+    args[[chain_arg]] <- i
+    if (is.list(init)) {
+      args$init <- init[i]
+    }
+    future::future(brms::do_call(run, args), packages = package, seed = TRUE)
+  })
+  lapply(futures, future::value)
+}
+
 
 #' Fit a Stan model with the mock backend
 #' @description

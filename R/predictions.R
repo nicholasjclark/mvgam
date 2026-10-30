@@ -202,6 +202,159 @@ extract_component_linpred <- function(mvgam_fit, newdata, component = "obs",
                                       re_formula = NULL,
                                       allow_new_levels = FALSE,
                                       sample_new_levels = "uncertainty") {
+  prepared <- prepare_component(
+    mvgam_fit, newdata, component, resp, draw_ids, re_formula,
+    allow_new_levels, sample_new_levels
+  )
+  finish_component(prepared, extract_linpred_from_prep(
+    prepared$prep, resp = prepared$resp, dpar = prepared$dpar
+  ))
+}
+
+
+#' Each formula term's part of one component's linear predictor
+#'
+#' The parts sum to `extract_component_linpred()` with the same
+#' arguments.
+#'
+#' @inheritParams extract_component_linpred
+#' @return A named list of `[ndraws x nobs]` matrices, one per term as
+#'   `linear_terms_parts()` names them, or a list of them named by
+#'   response
+#' @noRd
+extract_component_parts <- function(mvgam_fit, newdata, component = "obs",
+                                    resp = NULL, draw_ids = NULL,
+                                    re_formula = NULL,
+                                    allow_new_levels = FALSE,
+                                    sample_new_levels = "uncertainty") {
+  prepared <- prepare_component(
+    mvgam_fit, newdata, component, resp, draw_ids, re_formula,
+    allow_new_levels, sample_new_levels
+  )
+  finish_component(prepared, extract_parts_from_prep(
+    prepared$prep, resp = prepared$resp, dpar = prepared$dpar
+  ))
+}
+
+
+#' The prepared observation data an ordinal response's thresholds need
+#'
+#' One set of thresholds and no category-specific term need none. A
+#' category-specific term shifts each threshold by the prediction's own
+#' design. Thresholds that vary by group, `thres(gr = )`, take each
+#' row's set from the prediction data's `Jthres`.
+#'
+#' @inheritParams extract_component_linpred
+#' @return What `prepare_component()` gives, or `NULL`
+#' @noRd
+ordinal_threshold_prep <- function(mvgam_fit, newdata, resp = NULL,
+                                   draw_ids = NULL, re_formula = NULL,
+                                   allow_new_levels = FALSE,
+                                   sample_new_levels = "uncertainty") {
+  checkmate::assert_class(mvgam_fit, "mvgam")
+  # A model with one response names its predictors without a key
+  key <- if (length(response_formulas(mvgam_fit)) > 1L) resp
+  sfx <- predictor_suffix(key)
+  sdata <- mvgam_fit$standata
+  ranef <- side_model(mvgam_fit, "obs")$ranef
+  needed <- (sdata[[paste0("Kcs", sfx)]] %||% 0L) > 0L ||
+    !is.null(sdata[[paste0("ngrthres", sfx)]]) ||
+    any(blank_if_na(ranef$type) == "cs" &
+          blank_if_na(ranef$resp) == (key %||% ""))
+  if (!needed) {
+    return(NULL)
+  }
+  prepare_component(
+    mvgam_fit, newdata, "obs", key, draw_ids, re_formula,
+    allow_new_levels, sample_new_levels
+  )
+}
+
+
+#' Each category-specific term's shift of the ordinal thresholds
+#'
+#' The linear predictor holds one value per draw and row. These shifts
+#' hold one per threshold as well. `ordinal_probs()` subtracts their
+#' sum from the thresholds.
+#'
+#' @inheritParams extract_component_linpred
+#' @return Named list of `[ndraws x nobs x nthres]` arrays, as
+#'   `category_specific_parts()` gives, empty for a response without a
+#'   category-specific term
+#' @noRd
+extract_threshold_shifts <- function(mvgam_fit, newdata, resp = NULL,
+                                     draw_ids = NULL, re_formula = NULL,
+                                     allow_new_levels = FALSE,
+                                     sample_new_levels = "uncertainty") {
+  threshold_shifts_of(ordinal_threshold_prep(
+    mvgam_fit, newdata, resp = resp, draw_ids = draw_ids,
+    re_formula = re_formula, allow_new_levels = allow_new_levels,
+    sample_new_levels = sample_new_levels
+  ))
+}
+
+
+#' The category-specific shifts a prepared ordinal response holds
+#'
+#' @param prepared What `ordinal_threshold_prep()` gives
+#' @return As `extract_threshold_shifts()`
+#' @noRd
+threshold_shifts_of <- function(prepared) {
+  if (is.null(prepared)) {
+    return(list())
+  }
+  prep <- prepared$prep
+  category_specific_parts(
+    prep, as_plain_matrix(posterior::as_draws_matrix(prep$draws)),
+    prepared$resp, predictor_nobs(prep, prepared$resp)
+  )
+}
+
+
+#' The set of thresholds each prediction row takes
+#'
+#' brms writes `Jthres`, the first and last index of each row's set in
+#' the merged thresholds. `nthres` holds the size of each set. A row's
+#' first index opens its set.
+#'
+#' @param prepared What `ordinal_threshold_prep()` gives
+#' @param n_sets Number of sets `ordinal_thresholds()` returns
+#' @param n_obs Number of prediction rows
+#' @return Integer vector, one set per row
+#' @noRd
+threshold_row_sets <- function(prepared, n_sets, n_obs) {
+  checkmate::assert_count(n_sets, positive = TRUE)
+  if (n_sets == 1L) {
+    return(rep(1L, n_obs))
+  }
+  sdata <- prepared$prep$sdata
+  sfx <- predictor_suffix(prepared$resp)
+  J <- sdata_entry(sdata, paste0("Jthres", sfx))
+  sizes <- as.integer(sdata_entry(sdata, paste0("nthres", sfx)))
+  starts <- cumsum(c(1L, utils::head(sizes, -1L)))
+  out <- match(as.integer(J[, 1L]), starts)
+  if (length(out) != n_obs || anyNA(out) || length(sizes) != n_sets) {
+    stop_mvgam_fault(
+      "Each prediction row must open one set of thresholds.",
+      paste0(n_sets, " sets, ", length(sizes), " sizes, ", length(out),
+             " rows for ", n_obs, ".")
+    )
+  }
+  out
+}
+
+
+#' The prepared data and draws of one component's linear predictor
+#'
+#' @inheritParams extract_component_linpred
+#' @return A list: `prep`, the `mvgam_prep`; `resp` and `dpar`, the
+#'   predictor as the composer takes it; and `projection`, `NULL`, or
+#'   what `project_factor_rows()` takes for a trend under
+#'   `by = lv_axis()`
+#' @noRd
+prepare_component <- function(mvgam_fit, newdata, component, resp, draw_ids,
+                              re_formula, allow_new_levels,
+                              sample_new_levels) {
   checkmate::assert_class(mvgam_fit, "mvgam")
   checkmate::assert_data_frame(newdata, min.rows = 1)
   checkmate::assert_string(component)
@@ -256,7 +409,7 @@ extract_component_linpred <- function(mvgam_fit, newdata, component = "obs",
   component_draws <- side_draws(full_draws, pars, side)
 
   if (by_lv) {
-    return(compose_by_lv_trend_linpred(
+    return(prepare_by_lv_trend(
       mvgam_fit = mvgam_fit,
       newdata = newdata,
       full_draws = full_draws,
@@ -271,47 +424,59 @@ extract_component_linpred <- function(mvgam_fit, newdata, component = "obs",
   if (is_trend) {
     newdata <- derived_series_column(mvgam_fit, newdata)
   }
-
-  # The trend's brms model has one response, shared by every response
-  # of the observation model.
-  use_resp <- if (!is_trend) resp
-  dpar <- if (!component %in% c("obs", "trend")) component
   prep <- prepare_linpred_data(
     draws = component_draws,
     brmsfit = brms_model,
     newdata = newdata,
     re_formula = re_formula,
     allow_new_levels = allow_new_levels,
-    sample_new_levels = sample_new_levels
+    sample_new_levels = sample_new_levels,
+    trend = is_trend
   )
-  linpred <- extract_linpred_from_prep(prep, resp = use_resp, dpar = dpar)
-
-  # A `draws_matrix` keeps its class through subsetting and arithmetic.
-  # Whether a predictor composed from one carries the class depends on
-  # the terms the model has. The class is dropped on the way out, where
-  # the predictor stops being posterior draws and becomes a value. An S4
-  # slot declared to hold a plain matrix rejects the classed one.
-  if (is_per_response(linpred)) {
-    return(lapply(linpred, as_plain_matrix))
-  }
-  as_plain_matrix(linpred)
+  # The trend's brms model has one response, shared by every response
+  # of the observation model.
+  list(prep = prep, resp = if (!is_trend) resp,
+       dpar = if (!component %in% c("obs", "trend")) component,
+       projection = NULL)
 }
 
 
-#' The trend's mean on a fit whose trend runs at the factor grain
+#' A component's composed draws, as a prediction returns them
+#'
+#' A trend under `by = lv_axis()` is composed per factor and projected
+#' onto each row's series. A `draws_matrix` keeps its class through
+#' subsetting and arithmetic. Whether a predictor composed from one
+#' carries the class depends on the terms the model has. The class is
+#' dropped on the way out, where the predictor stops being posterior
+#' draws and becomes a value. An S4 slot declared to hold a plain matrix
+#' rejects the classed one.
+#'
+#' @param prepared What `prepare_component()` gives
+#' @param x A matrix, or a list of them at any depth
+#' @return `x`, each matrix projected and plain
+#' @noRd
+finish_component <- function(prepared, x) {
+  if (!is.matrix(x)) {
+    return(lapply(x, finish_component, prepared = prepared))
+  }
+  if (!is.null(prepared$projection)) {
+    x <- project_factor_rows(x, prepared$projection)
+  }
+  as_plain_matrix(x)
+}
+
+
+#' The trend's data on a fit whose trend runs at the factor grain
 #'
 #' Under `by = lv_axis()` the trend's brms model is written over
 #' `(time, .trend)`, one row per latent factor. Stan computes
-#' `trend[t, s] = dot(Z[s, ], lv_trend[t, ] + mu_factor[t, ])`. This
-#' function composes the `dot(Z, mu_factor)` half. `mu_factor` is the
-#' trend model's predictor on a grid holding each row of `newdata` once
-#' per factor. `Z` is the loadings matrix, indexed by series. What comes
-#' back is `linpred[d, i] = sum_k Z[d, series_i, k] * mu_factor[d, i, k]`.
-#' The
-#' `lv_trend` half is the latent state. A prediction receives it as the
-#' marginal envelope that `sample_process_errors()` adds. On the hindcast
-#' and forecast paths, `extract_trend_latent_states()` supplies it per
-#' draw.
+#' `trend[t, s] = dot(Z[s, ], lv_trend[t, ] + mu_factor[t, ])`. The
+#' composer gives `mu_factor` on a grid holding each row of `newdata`
+#' once per factor. `project_factor_rows()` gives the
+#' `dot(Z, mu_factor)` half. The `lv_trend` half is the latent state. A
+#' prediction receives it as the marginal envelope that
+#' `sample_process_errors()` adds. On the hindcast and forecast paths,
+#' `extract_trend_latent_states()` supplies it per draw.
 #'
 #' @param mvgam_fit A fitted `mvgam` object whose trend has `by =
 #'   lv_axis()`
@@ -324,13 +489,11 @@ extract_component_linpred <- function(mvgam_fit, newdata, component = "obs",
 #' @param re_formula,allow_new_levels,sample_new_levels As
 #'   `validate_group_level_args()` takes them
 #' @param resp The response's key on a model with several, or `NULL`
-#' @return A `[ndraws x nrow(newdata)]` matrix
+#' @return What `prepare_component()` gives
 #' @noRd
-compose_by_lv_trend_linpred <- function(mvgam_fit, newdata, full_draws,
-                                        trend_draws, re_formula,
-                                        allow_new_levels,
-                                        sample_new_levels,
-                                        resp = NULL) {
+prepare_by_lv_trend <- function(mvgam_fit, newdata, full_draws,
+                                trend_draws, re_formula, allow_new_levels,
+                                sample_new_levels, resp = NULL) {
   checkmate::assert_class(mvgam_fit, "mvgam")
   checkmate::assert_data_frame(newdata, min.rows = 1L)
   checkmate::assert_class(full_draws, "draws_matrix")
@@ -345,6 +508,7 @@ compose_by_lv_trend_linpred <- function(mvgam_fit, newdata, full_draws,
       "The trend prediction needs both counts."
     )
   }
+  trend_model <- side_model(mvgam_fit, "trend")
 
   obs_struct <- get_observation_structure(mvgam_fit, newdata = newdata,
                                           resp = resp)
@@ -357,57 +521,66 @@ compose_by_lv_trend_linpred <- function(mvgam_fit, newdata, full_draws,
       paste0("Series indices run 1 to ", n_series, ".")
     )
   }
-  n_rows <- nrow(newdata)
 
   # Per-row by per-factor grid: each newdata row repeated for each
   # factor. A grid collapsed to one row per (time, .trend) would drop
   # the rows of a marginaleffects grid that share a time and differ
   # in a covariate. `expand_grid()` iterates `.trend` fastest: each
-  # consecutive block of `n_lv` columns in `mu_factor_long` belongs to
-  # one newdata row, which `byrow = TRUE` keeps in the reshape below.
+  # consecutive block of `n_lv` columns of the composed predictor
+  # belongs to one newdata row.
   trend_vars <- mvgam_fit$trend_metadata$covariates %||% character(0)
   attach_cols <- intersect(
     unique(c(trend_vars, axis_vars(mvgam_fit)$time_var)),
     colnames(newdata)
   )
-  lv_newdata <- expand_factor_axis(n_lv, .row_id = seq_len(n_rows))
+  lv_newdata <- expand_factor_axis(n_lv, .row_id = seq_len(nrow(newdata)))
   for (col in attach_cols) {
     lv_newdata[[col]] <- newdata[[col]][lv_newdata$.row_id]
   }
 
   prep <- prepare_linpred_data(
-    draws = trend_draws, brmsfit = side_model(mvgam_fit, "trend"),
+    draws = trend_draws, brmsfit = trend_model,
     newdata = lv_newdata, re_formula = re_formula,
     allow_new_levels = allow_new_levels,
-    sample_new_levels = sample_new_levels
+    sample_new_levels = sample_new_levels, trend = TRUE
   )
-  mu_factor_long <- extract_linpred_from_prep(prep, resp = NULL)
-  if (is_per_response(mu_factor_long)) {
-    stop(insight::format_error(
-      "'by = lv_axis()' does not support a multivariate trend formula."
-    ), call. = FALSE)
-  }
-  checkmate::assert_matrix(mu_factor_long, ncols = n_rows * n_lv)
+  # `mu_factor` is the per-factor predictor over the latent axis. It
+  # belongs to the `Z` the model sampled. Stan folds it inside the
+  # projection for these fits. The basis is named explicitly. The two
+  # halves cannot drift apart.
+  Z <- extract_Z_loadings(full_draws, n_obs_series = n_series, n_lv = n_lv,
+                          basis = "model")
+  list(prep = prep, resp = NULL, dpar = NULL,
+       projection = list(Z = Z, series = s_idx, n_lv = n_lv))
+}
 
-  # `mu_factor` is the per-factor smooth over the latent axis. It belongs
-  # to the `Z` the model sampled. Stan folds it inside the projection for
-  # these fits. The basis is named explicitly. The two halves cannot
-  # drift apart.
-  Z_arr <- extract_Z_loadings(full_draws,
-                              n_obs_series = n_series, n_lv = n_lv,
-                              basis = "model")
 
-  ndraws_used <- nrow(full_draws)
-  linpred_mat <- matrix(NA_real_, nrow = ndraws_used, ncol = n_rows)
-  for (d in seq_len(ndraws_used)) {
-    mu_d <- matrix(mu_factor_long[d, ],
-                   nrow = n_rows, ncol = n_lv, byrow = TRUE)
-    Z_d <- matrix(Z_arr[d, , ], nrow = n_series, ncol = n_lv)
+#' A per-factor predictor projected onto each row's series
+#'
+#' `out[d, i] = sum_k Z[d, series_i, k] * mu_factor[d, i, k]`, where
+#' the columns of `mu_factor` hold each row's `n_lv` factors in turn.
+#'
+#' @param mu_factor A `[ndraws x (nrows * n_lv)]` matrix
+#' @param projection List: `Z`, the `[ndraws, n_series, n_lv]`
+#'   loadings; `series`, each row's series index; `n_lv`
+#' @return A `[ndraws x nrows]` matrix
+#' @noRd
+project_factor_rows <- function(mu_factor, projection) {
+  checkmate::assert_names(names(projection),
+                          must.include = c("Z", "series", "n_lv"))
+  n_lv <- projection$n_lv
+  s_idx <- projection$series
+  n_rows <- length(s_idx)
+  checkmate::assert_matrix(mu_factor, ncols = n_rows * n_lv)
+  n_series <- dim(projection$Z)[2L]
+  out <- matrix(NA_real_, nrow = nrow(mu_factor), ncol = n_rows)
+  for (d in seq_len(nrow(mu_factor))) {
+    mu_d <- matrix(mu_factor[d, ], nrow = n_rows, ncol = n_lv, byrow = TRUE)
+    Z_d <- matrix(projection$Z[d, , ], nrow = n_series, ncol = n_lv)
     # Per row i: dot(Z_d[series_i, :], mu_d[i, :])
-    linpred_mat[d, ] <- rowSums(Z_d[s_idx, , drop = FALSE] * mu_d)
+    out[d, ] <- rowSums(Z_d[s_idx, , drop = FALSE] * mu_d)
   }
-
-  linpred_mat
+  out
 }
 
 
@@ -511,8 +684,7 @@ extract_trend_latent_states <- function(mvgam_fit, newdata, full_draws,
   checkmate::assert_string(state)
 
   par_names <- colnames(full_draws)
-  trend_cols <- grep(paste0("^", state, "\\["), par_names, value = TRUE)
-  if (length(trend_cols) == 0L) {
+  if (!any(startsWith(par_names, paste0(state, "[")))) {
     return(NULL)
   }
 

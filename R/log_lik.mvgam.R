@@ -289,7 +289,9 @@ log_lik_single_response <- function(object, newdata, linpred, resp,
     ll <- ordinal_log_lik(
       ordinal_category_probs(
         object, linpred, family_obj, draw_ids = draw_ids,
-        newdata = newdata, resp = resp
+        newdata = newdata, resp = resp, re_formula = re_formula,
+        allow_new_levels = allow_new_levels,
+        sample_new_levels = sample_new_levels
       ),
       y
     )

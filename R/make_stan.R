@@ -240,16 +240,11 @@ build_stan_components <- function(formula, data, family = gaussian(),
     checkmate::assert_class(mv_spec$base_formula, "formula")
     trend_priors <- filter_priors_by_side(prior, "trend")
 
-    # Each response's column, named by the key brms suffixes its data
-    # and parameters with. The frame takes the column names. The
-    # program takes the keys.
-    response_vars <- response_columns(obs_formula)
-
     # The axes are resolved here once.
     # `extract_and_validate_trend_components()` stores the dimensions
     # they give on the spec.
     components <- extract_and_validate_trend_components(
-      data, mv_spec, response_vars, family = family
+      data, mv_spec, obs_formula, family = family
     )
     trend_data <- components$trend_data
     mv_spec <- components$enhanced_mv_spec
@@ -286,7 +281,7 @@ build_stan_components <- function(formula, data, family = gaussian(),
   # response axis of a wide frame from them.
   if (!mv_spec$has_trends) {
     trend_metadata <- trendless_trend_metadata(
-      data, "time", "series", response_columns(obs_formula)
+      data, "time", "series", obs_formula
     )
   }
 

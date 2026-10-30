@@ -179,6 +179,13 @@ loo.mvgam <- function(x, ...,
   logliks <- log_lik(x, incl_autocor = incl_autocor, resp = resp)
   logliks <- clean_ll(logliks)
 
+  # Details explains why PSIS often fails for a fit with a trend.
+  if (has_latent_trend(x)) {
+    inform_once(c(
+      "PSIS-LOO is often unreliable for a fit with a latent trend.",
+      i = "'lfo_cv()' compares state-space models by their forecasts."
+    ), id = "mvgam_loo_trend")
+  }
   releffs <- mvgam_r_eff_log_lik(x, logliks)
   if (isTRUE(by_series)) {
     return(per_series_ic(x, logliks, criterion = "loo"))

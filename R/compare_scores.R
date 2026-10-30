@@ -443,9 +443,7 @@ summary.mvgam_compare_scores <- function(object, ...) {
   # `reshape()` names the new columns "score_<model>". The prefix is
   # dropped to name each column by its model.
   names(wide) <- sub("^score_", "", names(wide))
-  rownames(wide) <- NULL
-  class(wide) <- c("tbl_df", "tbl", "data.frame")
-  wide
+  tibble::as_tibble(wide)
 }
 
 

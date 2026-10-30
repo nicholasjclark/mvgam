@@ -144,7 +144,7 @@ by_par_stem <- function(pars, classify) {
 #' | `loading` | `Z`, `Z_tilde` | the factor buckets |
 #' | `loadings_prior` | `theta_features`, `theta_dist_*`, `Psi_diag` | `summary()` |
 #' | `beta` | `b_*`, `b[k]` | the parameter buckets |
-#' | `basis` | `bs_*`, `bsp_*` | `coef()`, `fixef()`, `vcov()`, with `beta` |
+#' | `basis` | `bs_*`, `bsp_*`, `bcs_*` | `coef()`, `fixef()`, `vcov()`, with `beta` |
 #' | `simplex` | `simo_*` | `summary()`; the parameter buckets, with `beta` |
 #' | `intercept` | brms's centred `Intercept` | the parameter buckets, with `beta` |
 #' | `smooth_sd` | `sds_*` | the `smooth_params` keyword, `summary()` |
@@ -153,6 +153,8 @@ by_par_stem <- function(pars, classify) {
 #' | `gp_coef` | `zgp_*` | `tidy()`'s `ran_vals`, with `smooth_coef` |
 #' | `ranef_sd` | `sd_*`, `cor_*` | `tidy()`'s `ran_pars` |
 #' | `ranef_coef` | `r_*` | `tidy()`'s `ran_vals` |
+#' | `measurement` | `meanme_*`, `sdme_*`, `Corme_*` | nothing |
+#' | `latent` | `Xme_*`, `Ymi_*`, `Yl_*` | the prediction routes |
 #' | `family` | `sigma`, `shape`, `nu`, ... | `obs_params` |
 #' | `dynamics` | trend-side leftovers | `trend_params` |
 #' | `bookkeeping` | `lprior`, `lp__` | nothing; no summary claims them |
@@ -213,6 +215,8 @@ par_stem_kind <- function(pars) {
   take(grepl(MVGAM_PAR_GP_COEF_PATTERN, pars), "gp_coef")
   take(grepl(MVGAM_PAR_RANEF_SD_PATTERN, pars), "ranef_sd")
   take(grepl(MVGAM_PAR_RANEF_COEF_PATTERN, pars), "ranef_coef")
+  take(grepl(MVGAM_PAR_MEASUREMENT_PATTERN, pars), "measurement")
+  take(grepl(MVGAM_PAR_LATENT_PATTERN, pars), "latent")
 
   # The population block proper, the smooth and special-term
   # coefficients brms reports with it, the monotonic simplexes and the
@@ -251,10 +255,11 @@ par_stem_kind <- function(pars) {
 #' @noRd
 mvgam_par_order <- function(pars) {
   checkmate::assert_character(pars)
-  # An intercept opens its own class, as brms reports it. Stan's two
-  # accumulators have an order of their own. Every other name keeps
-  # the order the program declares it in.
-  intercept_last <- !grepl("_Intercept(_[0-9]+)?$", pars)
+  # An intercept opens its own class, as brms reports it. brms tests
+  # the parameter's name, which an ordinal fit's thresholds share as
+  # `b_Intercept[k]`. Stan's two accumulators have an order of their
+  # own. Every other name keeps the order the program declares it in.
+  intercept_last <- !grepl("_Intercept(_[0-9]+)?\\[?$", par_stem(pars))
   within_kind <- match(pars, MVGAM_PAR_BOOKKEEPING_ORDER, nomatch = 0L)
   class_rank <- match(sub("[_[].*$", "", pars), MVGAM_PAR_CLASS_ORDER,
                       nomatch = 0L)
@@ -269,18 +274,22 @@ mvgam_par_order <- function(pars) {
 #'@noRd
 MVGAM_PAR_KIND_ORDER <- c(
   "beta", "basis", "ranef_sd", "smooth_sd", "gp", "family", "intercept",
-  "simplex", "ranef_coef", "smooth_coef", "gp_coef", "loading",
-  "loadings_prior", "dynamics", "state", "internal", "other", "bookkeeping"
+  "simplex", "ranef_coef", "smooth_coef", "gp_coef", "latent", "measurement",
+  "loading", "loadings_prior", "dynamics", "state", "internal", "other",
+  "bookkeeping"
 )
 
 
 # The brms classes that share a kind, in the order
 # `brms:::reorder_pars()` gives them. The unpenalised smooth
-# coefficients precede the special-term ones. The group-level standard
+# coefficients precede the special-term ones, which precede the
+# category-specific ones. The group-level standard
 # deviations precede their correlations. A Gaussian process's marginal
-# deviation precedes its length-scale.
+# deviation precedes its length-scale. A response's imputed values
+# precede its latent values, which precede the noise-free covariates.
 #'@noRd
-MVGAM_PAR_CLASS_ORDER <- c("bs", "bsp", "sd", "cor", "sdgp", "lscale")
+MVGAM_PAR_CLASS_ORDER <- c("bs", "bsp", "bcs", "sd", "cor", "sdgp",
+                           "lscale", "Ymi", "Yl", "Xme")
 
 
 # The name patterns, written once. A trend-side name matches the
@@ -329,8 +338,21 @@ MVGAM_PAR_INTERNAL_PATTERN <- paste0(
   "L_Omega_group_trend|L_deviation_group_trend|L_group_trend|",
   "Z_cols|Z_raw|varrho_inv|Phi_loadings|L_Phi_loadings|",
   "sigma_slope_raw_trend|sigma_season_raw_trend)\\[",
-  "|^(z|L|Cor)_[0-9]+(_[0-9]+)*(_trend)?\\["
+  "|^(z|L|Cor)_[0-9]+(_[0-9]+)*(_trend)?\\[",
+  "|^(zme|Lme)_[0-9]+(_trend)?\\["
 )
+
+# The hyperparameters of the measurement-error terms. Each latent
+# covariate has a population mean and SD. A group of them has a
+# correlation matrix.
+#'@noRd
+MVGAM_PAR_MEASUREMENT_PATTERN <- "^(meanme|sdme|Corme)_"
+
+# The values a special term takes at each fitted row: the noise-free
+# covariate of `me()`, the imputed values of a `mi()` response and the
+# latent response of one observed with noise.
+#'@noRd
+MVGAM_PAR_LATENT_PATTERN <- "^(Xme|Ymi|Yl)_"
 
 # The trend's latent states and the variates they are built from.
 # Their sampling statements are the trend equation and its
@@ -349,10 +371,30 @@ MVGAM_STATE_PARAMS <- c(
   "season_state_trend", "innovations_season_trend"
 )
 
+# The season of each period of a local linear trend with several, in
+# both bases. Their number follows the trend's periods.
+#'@noRd
+MVGAM_PERIOD_SEASON_PATTERN <- "season_[0-9]+_trend(_tilde)?"
+
 #'@noRd
 MVGAM_PAR_STATE_PATTERN <- paste0(
-  "^(", paste(MVGAM_STATE_PARAMS, collapse = "|"), ")\\["
+  "^(", paste(c(MVGAM_STATE_PARAMS, MVGAM_PERIOD_SEASON_PATTERN),
+              collapse = "|"), ")\\["
 )
+
+
+#' Whether each name is one of the trend's latent states
+#'
+#' Takes base names, as `fit@model_pars` holds them, without indices.
+#'
+#' @param nm Character vector of parameter names
+#' @return Logical vector
+#' @noRd
+is_state_param <- function(nm) {
+  checkmate::assert_character(nm)
+  nm %in% MVGAM_STATE_PARAMS |
+    grepl(paste0("^", MVGAM_PERIOD_SEASON_PATTERN, "$"), nm)
+}
 
 # The per-cell matrix arrays a correlated or hierarchical trend
 # derives. A high-dimensional fit has hundreds of their cells.
@@ -372,12 +414,16 @@ MVGAM_PAR_MATRIX_PATTERN <- paste0(
 #'@noRd
 MVGAM_PAR_SYMMETRIC_PATTERN <- "^(Sigma_group_trend|Sigma_trend|Omega_trend)\\["
 
+# The class prefix `b<type>_` of each type of coefficient
+# `brms::fixef()` reports, as `brms:::fixef_pars()` writes it.
+#'@noRd
+MVGAM_PAR_FIXEF_PREFIX <- "^b(s|cs|sp|mo|me|mi|m)?_"
+
 # The name `brms::fixef()` gives a population-level coefficient: its
-# class prefix `b_`, `bs_` or `bsp_` dropped, as `brms:::fixef_pars()`
-# drops it.
+# class prefix dropped.
 #'@noRd
 fixef_name <- function(pars) {
-  sub("^b(s|sp)?_", "", pars)
+  sub(MVGAM_PAR_FIXEF_PREFIX, "", pars)
 }
 
 # `b[k]` is the positional form the population block takes before
@@ -385,11 +431,11 @@ fixef_name <- function(pars) {
 #'@noRd
 MVGAM_PAR_BETA_PATTERN <- "^(b_|b\\[)"
 
-# `bs` / `bsp` are the unpenalised smooth coefficients and the
-# special-term coefficients, which brms reports with the population
-# block.
+# `bs`, `bsp` and `bcs` are the unpenalised smooth coefficients, the
+# special-term coefficients and the category-specific coefficients,
+# which brms reports with the population block.
 #'@noRd
-MVGAM_PAR_BASIS_PATTERN <- "^(bs_|bs\\[|bsp_|bsp\\[)"
+MVGAM_PAR_BASIS_PATTERN <- "^(bs_|bs\\[|bsp_|bsp\\[|bcs_|bcs\\[)"
 
 # The simplex of each monotonic effect, which brms reports in a block
 # of its own.
@@ -425,8 +471,9 @@ MVGAM_PAR_GP_COEF_PATTERN <- "^zgp_"
 # pattern matches the standard deviations and the correlation vector.
 # The second matches the scaled effects they govern. The workspace
 # those are built from carries a bare `L_` or `z_` prefix. The
-# internal pattern above claims it. Matching either prefix here would take the trend's own
-# innovation Cholesky (`L_Omega_trend`) for a group-level effect.
+# internal pattern above claims it. Matching either prefix here would
+# take the trend's own innovation Cholesky (`L_Omega_trend`) for a
+# group-level effect.
 #'@noRd
 MVGAM_PAR_RANEF_SD_PATTERN <- "^(sd_|cor_)"
 #'@noRd

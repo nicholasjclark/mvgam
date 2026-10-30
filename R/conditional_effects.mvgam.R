@@ -439,7 +439,7 @@ as.data.frame.mvgam_conditional_effects <- function(x,
       as.data.frame.mvgam_conditional_effects(entry)
     } else {
       d <- entry$data
-      if (is.null(d) || nrow(d) == 0L) return(data.frame())
+      if (NROW(d) == 0L) return(data.frame())
       d$rowid <- NULL
       # brms names the estimate and its interval with a trailing
       # double underscore, as `conditional_smooths.mvgam()` does. The

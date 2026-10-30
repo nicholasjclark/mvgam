@@ -2247,7 +2247,8 @@ refuse_trend_formula_offset <- function(terms_obj) {
 #' Validate a trend formula
 #'
 #' Refuses a response, an offset, brms autocorrelation and addition
-#' terms, `mi()`, more than one trend constructor and an exact `gp()`.
+#' terms, `mi()`, `cs()`, more than one trend constructor and an exact
+#' `gp()`.
 #' The checks walk the formula's calls. A variable such as `se_x` or
 #' `weights` is no call. None of the checks refuses it.
 #'
@@ -2280,6 +2281,15 @@ validate_trend_formula <- function(formula) {
       "'mi()' is not supported in 'trend_formula'.",
       x = "brms imputes a 'mi()' predictor as a response of the model.",
       i = "Impute missing trend covariates before fitting."
+    )), call. = FALSE)
+  }
+
+  if (length(find_calls(rhs, "cs")) > 0L) {
+    stop(insight::format_error(c(
+      "'cs()' is not supported in 'trend_formula'.",
+      x = "A category-specific effect shifts an ordinal response's thresholds.",
+      x = "The latent trend has no thresholds.",
+      i = "Write 'cs()' in the observation 'formula' of an ordinal family."
     )), call. = FALSE)
   }
 
@@ -2363,21 +2373,20 @@ is.mvgam_trend <- function(x) {
 #' @param time_var Name of time variable (default: "time")
 #' @param series_var Name of series variable (default: "series")
 #' @param trend_specs Optional trend specification list for added metadata
-#' @param response_vars Response columns named by response key, from
-#'   `response_columns()`
+#' @param obs_formula The observation formula, which names the
+#'   responses and the rows each covers, or `NULL` for a frame alone
 #' @return List with time series dimensions and optional added metadata
 #' @noRd
 extract_time_series_dimensions <- function(data, time_var = "time",
                                            series_var = "series",
                                            trend_specs = NULL,
-                                           response_vars = NULL) {
+                                           obs_formula = NULL) {
 
   checkmate::assert_data_frame(data, min.rows = 1)
   checkmate::assert_string(time_var)
   checkmate::assert_string(series_var)
   checkmate::assert_list(trend_specs, null.ok = TRUE)
-  checkmate::assert_character(response_vars, min.len = 1,
-                              any.missing = FALSE, null.ok = TRUE)
+  response_vars <- if (!is.null(obs_formula)) response_columns(obs_formula)
 
   # Core dimensions from the attribute-based accessors
   time_vals <- get_time_for_grouping(data)
@@ -2523,16 +2532,16 @@ extract_time_series_dimensions <- function(data, time_var = "time",
 
   # Observation-to-trend mappings when response variables are given.
   # They are built here, with the dimensions they index.
-  if (!is.null(response_vars)) {
+  if (!is.null(obs_formula)) {
     dimensions$mappings <- list()
+    rows <- response_rows(obs_formula, data)
 
     # Keyed by the name brms suffixes each response's data with. Each
-    # mapping takes the values of the response's own column.
+    # mapping takes the rows the response's likelihood covers.
     for (key in names(response_vars)) {
-      column <- response_vars[[key]]
       dimensions$mappings[[key]] <- generate_obs_trend_mapping(
         data = data,
-        response_var = column,
+        rows = rows[[key]],
         response_key = key,
         time_var = time_var,
         series_var = series_var,
@@ -2553,12 +2562,13 @@ extract_time_series_dimensions <- function(data, time_var = "time",
 #' Generate the observation-to-trend mapping
 #'
 #' @description
-#' Creates mapping arrays that align each observation in brms-ordered
-#' data to its position in the trend matrix. brms excludes NA
-#' observations and provides no obs_ind array.
+#' Creates mapping arrays that align each row of a response's
+#' likelihood to its position in the trend matrix. brms keeps the rows
+#' `response_rows()` gives and provides no obs_ind array.
 #'
 #' @param data Data frame with observations (may include NAs)
-#' @param response_var Name of response column to check for missing values
+#' @param rows Logical vector along the rows of `data`: the rows the
+#'   response's likelihood covers, from `response_rows()`
 #' @param response_key The response's key, as `response_columns()` names
 #'   it, which is what a response-keyed series axis holds
 #' @param time_var Name of time variable
@@ -2567,37 +2577,24 @@ extract_time_series_dimensions <- function(data, time_var = "time",
 #'   series structure
 #' @return List containing obs_trend_time and obs_trend_series arrays for Stan
 #' @noRd
-generate_obs_trend_mapping <- function(data, response_var,
-                                       response_key = response_var,
+generate_obs_trend_mapping <- function(data, rows, response_key,
                                        time_var = "time",
                                        series_var = "series",
                                        dimensions) {
   checkmate::assert_data_frame(data, min.rows = 1)
-  checkmate::assert_string(response_var)
+  checkmate::assert_logical(rows, any.missing = FALSE, len = nrow(data))
   checkmate::assert_string(response_key)
   checkmate::assert_string(time_var)
   checkmate::assert_string(series_var)
   checkmate::assert_list(dimensions)
 
-  # The caller checks the response column. The time column is checked
-  # where the time index is built. Neither is checked again here.
-
-  # Identify non-missing observations. mvgam keeps each response on its
-  # own valid-row set. The shared latent state then takes information
-  # at every time point at which this response was observed. The
-  # multi-response standata is expanded per response to match (see
-  # `expand_per_response_standata` in R/stan_assembly.R).
-  non_missing_idx <- which(!is.na(data[[response_var]]))
-
-  # Handle edge case where all observations are missing
-  if (length(non_missing_idx) == 0) {
-    stop(insight::format_error(c(
-      cli::format_inline(
-        "All observations are missing for response variable ",
-        "{.field {response_var}}."
-      ),
-      x = "Cannot create observation mappings without any valid data."
-    )), call. = FALSE)
+  # The time column is checked where the time index is built. mvgam
+  # keeps each response on its own rows. The shared latent state then
+  # takes information at every time point this response covers. The
+  # multi-response standata is expanded per response to match.
+  non_missing_idx <- which(rows)
+  if (length(non_missing_idx) == 0L) {
+    stop_unobserved_response(response_key)
   }
 
   # Extract time and series indices for non-missing observations
@@ -3683,11 +3680,13 @@ frame_names_an_axis <- function(data, time_var, series_var,
 #' @param data Data frame the model was given
 #' @param time_var Time column name
 #' @param series_var Series column name
-#' @param response_vars Response columns named by key
+#' @param obs_formula The observation formula, which names the
+#'   responses and the rows each covers, or `NULL` for a frame alone
 #' @return A metadata list, or `NULL` where the frame names no axis
 #' @noRd
 trendless_trend_metadata <- function(data, time_var, series_var,
-                                     response_vars = NULL) {
+                                     obs_formula = NULL) {
+  response_vars <- if (!is.null(obs_formula)) response_columns(obs_formula)
   if (!frame_names_an_axis(data, time_var, series_var, response_vars)) {
     return(NULL)
   }
@@ -3696,7 +3695,7 @@ trendless_trend_metadata <- function(data, time_var, series_var,
     series_var = series_var, response_vars = response_vars
   )
   axis_record(extract_time_series_dimensions(
-    prepared, time_var, series_var, response_vars = response_vars
+    prepared, time_var, series_var, obs_formula = obs_formula
   ))
 }
 
@@ -3869,13 +3868,13 @@ remove_mvgam_variables <- function(data) {
 #' @param data Data frame containing time series data
 #' @param mv_spec Multivariate specification object with base_formula and
 #'   trend_specs
-#' @param response_vars Response columns named by response key, or
-#'   `NULL`
+#' @param obs_formula The observation formula, which names the
+#'   responses and the rows each covers
 #' @param family The observation family, or `NULL`
 #' @return List with `trend_data`, `enhanced_mv_spec` and `metadata`
 #' @noRd
 extract_and_validate_trend_components <- function(data, mv_spec,
-                                                  response_vars,
+                                                  obs_formula,
                                                   family = NULL) {
   checkmate::assert_data_frame(data, min.rows = 1)
   checkmate::assert_list(mv_spec)
@@ -3886,7 +3885,7 @@ extract_and_validate_trend_components <- function(data, mv_spec,
   if (length(missing_fields) > 0L) {
     stop_missing_fields("The parsed model specification", missing_fields)
   }
-  checkmate::assert_character(response_vars, min.len = 1, null.ok = TRUE)
+  response_vars <- response_columns(obs_formula)
   if (!isTRUE(mv_spec$has_trends)) {
     stop_mvgam_fault(
       "Trend components were requested for a trendless model.",
@@ -3973,7 +3972,7 @@ extract_and_validate_trend_components <- function(data, mv_spec,
     time_var,
     series_var,
     trend_specs = mv_spec$trend_specs,
-    response_vars = response_vars
+    obs_formula = obs_formula
   )
 
   # The grain travels on the dimensions to the stanvar emission, which
@@ -4002,7 +4001,6 @@ extract_and_validate_trend_components <- function(data, mv_spec,
   }
   # The trend formula's covariates. A response may not be one. Each has
   # to be constant within a trend cell.
-  # each has to be constant within a trend cell.
   covariates <- trend_formula_covariates(mv_spec$base_formula)
   offending_vars <- intersect(covariates, response_vars)
   if (length(offending_vars) > 0) {
@@ -4100,7 +4098,7 @@ trend_formula_covariates <- function(base_formula) {
   # brms refuses a call as a grouping factor. The parse runs after each
   # `lv_axis()` is replaced. The axis columns are carried separately.
   base_formula <- detect_and_rewrite_by_lv(base_formula)$formula
-  bterms <- brms::brmsterms(rlang::new_formula(
+  bterms <- brms_terms(rlang::new_formula(
     quote(.mvgam_lhs), rlang::f_rhs(base_formula)
   ))
   setdiff(trend_covariate_names(all.vars(bterms$allvars)),
@@ -4876,6 +4874,54 @@ formula_arg_text <- function(arg) {
 }
 
 
+#' The arguments of a term's call, as the user wrote them
+#'
+#' @param call A call such as `s(x, k = 5)` or `gp(x, by = g)`
+#' @return List of two elements. `positional` holds the text of each
+#'   unnamed argument. `named(name, default)` returns the text of a
+#'   named argument, or `default` when the call omits it.
+#' @noRd
+call_args_as_written <- function(call) {
+  checkmate::assert_class(call, "call")
+  args <- as.list(call)[-1L]
+  arg_names <- names(args) %||% rep("", length(args))
+  list(
+    positional = unname(vapply(args[arg_names == ""], formula_arg_text,
+                               character(1L))),
+    named = function(name, default) {
+      if (name %in% arg_names) formula_arg_text(args[[name]]) else default
+    }
+  )
+}
+
+
+#' The settings of a `gp()` term, as written
+#'
+#' A setting left out takes brms's default.
+#'
+#' @param call A `gp()` call
+#' @return List holding `vars`, `k`, `by`, `cov` and the brms
+#'   coefficient stem `coef`
+#' @noRd
+gp_call_to_spec <- function(call) {
+  args <- call_args_as_written(call)
+  vars <- args$positional
+  if (length(vars) == 0L) {
+    stop(insight::format_error(c(
+      "A 'gp()' term needs at least one variable.",
+      x = paste0("Got '", deparse1(call), "'.")
+    )), call. = FALSE)
+  }
+  list(
+    vars = vars,
+    k = args$named("k", NA_character_),
+    by = args$named("by", NA_character_),
+    cov = args$named("cov", "exp_quad"),
+    coef = paste0("gp", paste(vars, collapse = ""))
+  )
+}
+
+
 #' Locate an addition term in a model formula
 #'
 #' Addition terms belong to the response side. Only the left-hand side
@@ -4899,57 +4945,6 @@ find_aterm_call <- function(formula, aterm) {
   lhs <- if (length(inner) >= 3L) inner[[2L]] else inner
   calls <- formula_calls(lhs, aterm)
   if (length(calls)) calls[[1L]] else NULL
-}
-
-
-#' Report each distinct warning raised under an expression once
-#'
-#' Several mvgam entry points run an inner routine more than once. The
-#' code generator makes three passes through brms. The residual panel
-#' calls `pp_check()` once per panel. Each pass raises the warnings of
-#' the last one again. A single user-facing call could then repeat one
-#' warning several times over. This keeps the first occurrence of each
-#' distinct message and drops the repeats. A second, different warning
-#' still shows.
-#'
-#' @param expr Expression to evaluate
-#' @return The value of `expr`
-#'
-#' @noRd
-warn_once_per_call <- function(expr) {
-  seen <- character()
-  withCallingHandlers(expr, warning = function(w) {
-    msg <- conditionMessage(w)
-    if (msg %in% seen) {
-      invokeRestart("muffleWarning")
-    }
-    seen <<- c(seen, msg)
-  })
-}
-
-
-#' Compute an effective sample size without the capping notice
-#'
-#' `posterior` caps an ESS estimate at `S * log10(S)` whenever a
-#' parameter's autocorrelation sum falls below `1 / log10(S)`. It warns
-#' each time it caps one. Anticorrelated draws put an estimate above
-#' that bound. The capped figure is the conservative one and the figure
-#' mvgam reports. The notice gives the user nothing to act on. Every
-#' mvgam method reporting an ESS runs its computation through here.
-#' The decision about showing the notice is then made in one place.
-#' The match is on the message. Every other warning the computation
-#' raises stays visible.
-#'
-#' @param expr Expression computing one or more ESS values
-#' @return The value of `expr`
-#'
-#' @noRd
-without_ess_cap_notice <- function(expr) {
-  withCallingHandlers(expr, warning = function(w) {
-    if (grepl("ESS has been capped", conditionMessage(w), fixed = TRUE)) {
-      invokeRestart("muffleWarning")
-    }
-  })
 }
 
 

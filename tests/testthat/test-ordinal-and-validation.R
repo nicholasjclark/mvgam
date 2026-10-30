@@ -142,10 +142,10 @@ test_that("every brms ordinal family is recognised as ordinal", {
 # Thresholds, read from a fit's draws
 # -------------------------------------------------------------------------
 
-ordinal_fit_stub <- function(draws, formula) {
+ordinal_fit_stub <- function(draws, formula, standata) {
   structure(
     list(fit = posterior::as_draws_matrix(draws), formula = formula,
-         family = brms::cumulative()),
+         family = brms::cumulative(), standata = standata),
     class = "mvgam"
   )
 }
@@ -159,10 +159,10 @@ test_that("thresholds cut the uncentred predictor mvgam builds", {
     `b_Intercept[1]` = c(-4, -4.1), `b_Intercept[2]` = c(-2, -2.1),
     disc = c(1, 1)
   )
-  stub <- ordinal_fit_stub(draws, brms::bf(y ~ x))
-  expect_equal(ordinal_thresholds(stub), unname(draws[, 3:4]))
+  stub <- ordinal_fit_stub(draws, brms::bf(y ~ x), list(nthres = 2L))
+  expect_equal(ordinal_thresholds(stub), list(unname(draws[, 3:4])))
   expect_equal(ordinal_thresholds(stub, draw_ids = 2L),
-               unname(draws[2L, 3:4, drop = FALSE]))
+               list(unname(draws[2L, 3:4, drop = FALSE])))
 
   eta <- matrix(c(0.2, -0.4), nrow = 2L)
   expect_equal(
@@ -180,11 +180,12 @@ test_that("thresholds are read in index order and per response", {
   stub <- ordinal_fit_stub(
     draws,
     brms::bf(y ~ x, family = brms::cumulative()) +
-      brms::bf(c ~ x, family = brms::cumulative())
+      brms::bf(c ~ x, family = brms::cumulative()),
+    list(nthres_y = 10L, nthres_c = 1L)
   )
-  expect_equal(as.numeric(ordinal_thresholds(stub, resp = "y")),
+  expect_equal(as.numeric(ordinal_thresholds(stub, resp = "y")[[1L]]),
                as.numeric(thres))
-  expect_equal(as.numeric(ordinal_thresholds(stub, resp = "c")), 9)
+  expect_equal(as.numeric(ordinal_thresholds(stub, resp = "c")[[1L]]), 9)
 })
 
 
@@ -218,23 +219,48 @@ test_that("com_poisson waits for a brms whose Stan uses the mode", {
   }
 })
 
-test_that("ordinal thresholds that vary by group are refused at build", {
+test_that("thresholds that vary by group cut each row by its own set", {
+  # `thres(gr = g)` samples one set per group, of its own size. Each
+  # row takes its group's set. A category its group lacks holds
+  # probability zero.
+  draws <- cbind(
+    `b_Intercept_1[1]` = -1, `b_Intercept_1[2]` = 0, `b_Intercept_1[3]` = 1,
+    `b_Intercept_2[1]` = -0.5, `b_Intercept_2[2]` = 0.5
+  )
+  stub <- ordinal_fit_stub(draws, brms::bf(y | thres(gr = g) ~ x),
+                           list(ngrthres = 2L, nthres = c(3L, 2L)))
+  sets <- ordinal_thresholds(stub)
+  expect_equal(sets, list(unname(draws[, 1:3, drop = FALSE]),
+                          unname(draws[, 4:5, drop = FALSE])))
+
+  # brms's `Jthres` opens group 1 at index 1 and group 2 at index 4
+  prepared <- list(prep = list(sdata = list(
+    Jthres = cbind(c(1, 4, 1), c(3, 5, 3)), nthres = c(3L, 2L)
+  )), resp = NULL)
+  row_sets <- threshold_row_sets(prepared, 2L, 3L)
+  expect_identical(row_sets, c(1L, 2L, 1L))
+
+  eta <- matrix(c(0.3, -0.2, 0.8), nrow = 1L)
+  probs <- ordinal_group_probs(eta, sets, row_sets, brms::cumulative())
+  expect_identical(dimnames(probs)[[3L]], as.character(1:4))
+  expect_equal(probs[, 1, ],
+               ordinal_probs(eta[, 1, drop = FALSE], sets[[1L]],
+                             brms::cumulative())[, 1, ])
+  expect_equal(unname(probs[, 2, ]),
+               c(unname(ordinal_probs(eta[, 2, drop = FALSE], sets[[2L]],
+                                      brms::cumulative())[, 1, ]), 0))
+})
+
+test_that("thresholds that vary by group build", {
   set.seed(5)
   d <- data.frame(
     y = sample(1:4, 40, TRUE), x = stats::rnorm(40),
     g = factor(rep(c("u", "v"), 20)),
     time = rep(1:20, 2), series = factor(rep(c("a", "b"), each = 20))
   )
-  expect_error(
-    stancode(mvgam_formula(y | thres(gr = g) ~ x), data = d,
-             family = cumulative(), validate = FALSE),
-    "vary by group"
-  )
-  # A shared threshold count is one set for every observation.
-  expect_no_error(
-    stancode(mvgam_formula(y | thres(3) ~ x), data = d,
-             family = cumulative(), validate = FALSE)
-  )
+  code <- stancode(mvgam_formula(y | thres(gr = g) ~ x), data = d,
+                   family = cumulative(), validate = FALSE)
+  expect_match(code, "merged_Intercept", fixed = TRUE)
 })
 
 

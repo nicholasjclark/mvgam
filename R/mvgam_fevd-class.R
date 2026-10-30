@@ -101,8 +101,8 @@ summary.mvgam_fevd <- function(object, probs = c(0.025, 0.975), ...) {
 #'Plot forecast error variance decompositions from an `mvgam_fevd` object
 #'
 #'This function takes an \code{mvgam_fevd} object and produces
-#'a plot of the posterior median contributions to forecast variance for each series
-#'in the fitted Vector Autoregression
+#'a plot of the posterior median contributions to forecast variance for
+#'each series in the fitted Vector Autoregression
 #'
 #'@importFrom ggplot2 ggplot aes geom_bar facet_wrap labs
 #'

@@ -371,7 +371,21 @@ registry, a method added without the guard fails here.
 term type under every brms suffix: a distributional parameter, a
 response of an `mvbf()` model and a non-linear parameter. Each linear
 predictor mvgam composes from the Stan data is held against the one
-brms computes from the same draws.
+brms computes from the same draws. Two more fits hold the special
+terms. The first carries `mo()` times a covariate and times a factor,
+`me()` times `mo()` and a varying `(mo() | g)` slope. It saves its
+latents, which gives brms and mvgam the same noise-free values at the
+fitted rows. The second imputes a missing covariate through `mi()`.
+Three ordinal fits follow. Two carry
+category-specific `cs()` terms, which shift each threshold by its own
+amount. A cumulative family subtracts the shift where an
+adjacent-category family adds it, which tests both directions. The
+cumulative fit also holds a group-level `(cs(1) | g)` and a trend. The
+third fit gives each group its own thresholds, `thres(gr = )`, of
+unequal number, which leaves some groups without the top category. The
+category probabilities and the likelihood of all three are held
+against brms's. The same file holds each prediction's parts, term by
+term, against the whole predictor on every fit.
 
 **test-newdata-guards.R** fits one model with a single series and one
 with several. A prediction frame without its time column, or without

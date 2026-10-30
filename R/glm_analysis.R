@@ -207,7 +207,9 @@ response_glm_call <- function(code_lines, resp) {
     return(NULL)
   }
   span <- seq.int(model$start_idx, model$end_idx)
-  pattern <- paste0(stan_density_call_pattern("_glm"), "\\(Y",
+  # A response written `y | mi()` is scored as `Yl`, its observed values
+  # with the missing ones imputed
+  pattern <- paste0(stan_density_call_pattern("_glm"), "\\(Yl?",
                     predictor_suffix(resp), " \\|")
   at <- span[grepl(pattern, code_lines[span])]
   if (!length(at)) {

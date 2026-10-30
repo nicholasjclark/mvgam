@@ -92,12 +92,8 @@ inform_once <- function(message, id) {
 #' @return The value of `expr`
 #' @noRd
 with_pareto_k_handled <- function(expr) {
-  withCallingHandlers(expr, warning = function(w) {
-    if (grepl("Pareto k diagnostic|Not enough tail samples",
-              conditionMessage(w))) {
-      invokeRestart("muffleWarning")
-    }
-  })
+  without_warnings_matching(expr,
+                            "Pareto k diagnostic|Not enough tail samples")
 }
 
 
@@ -138,4 +134,108 @@ did_you_mean <- function(name, candidates) {
     return(NULL)
   }
   c(i = paste0("Did you mean '", candidate, "'?"))
+}
+
+
+#' Evaluate a brms call without its fit-time advisories
+#'
+#' brms warns that some terms are experimental, as `cs()` is under most
+#' ordinal families. The warning concerns convergence while sampling.
+#' `mvgam()` shows it once, from brms's own parse of the formula as it
+#' builds the program. Every later parse would repeat it, each
+#' prediction several times over. Every other warning still shows.
+#'
+#' @param expr A call into brms
+#' @return The value of `expr`
+#' @noRd
+without_brms_fit_advisories <- function(expr) {
+  without_warnings_matching(expr, "should be considered experimental",
+                            fixed = TRUE)
+}
+
+
+#' The brms terms of a formula, without brms's fit-time advisories
+#'
+#' @param formula What `brms::brmsterms()` takes
+#' @return What `brms::brmsterms()` gives
+#' @noRd
+brms_terms <- function(formula) {
+  without_brms_fit_advisories(brms::brmsterms(formula))
+}
+
+
+#' The `brmsterms` of each response of a model
+#'
+#' @param bterms What `brms_terms()` gives
+#' @return List of `brmsterms`, one per response
+#' @noRd
+response_frames <- function(bterms) {
+  if (inherits(bterms, "mvbrmsterms")) bterms$terms else list(bterms)
+}
+
+
+#' Evaluate an expression with the warnings one pattern matches muffled
+#'
+#' Every warning the pattern leaves unmatched still shows.
+#'
+#' @param expr Expression to evaluate
+#' @param pattern Pattern the muffled warnings' messages match
+#' @param fixed Whether `pattern` is a fixed string
+#' @return The value of `expr`
+#' @noRd
+without_warnings_matching <- function(expr, pattern, fixed = FALSE) {
+  checkmate::assert_string(pattern)
+  checkmate::assert_flag(fixed)
+  withCallingHandlers(expr, warning = function(w) {
+    if (grepl(pattern, conditionMessage(w), fixed = fixed)) {
+      invokeRestart("muffleWarning")
+    }
+  })
+}
+
+
+#' Report each distinct warning raised under an expression once
+#'
+#' Several mvgam entry points run an inner routine more than once. The
+#' code generator makes three passes through brms. The residual panel
+#' calls `pp_check()` once per panel. Each pass raises the warnings of
+#' the last one again. A single user-facing call could then repeat one
+#' warning several times over. This keeps the first occurrence of each
+#' distinct message and drops the repeats. A second, different warning
+#' still shows.
+#'
+#' @param expr Expression to evaluate
+#' @return The value of `expr`
+#'
+#' @noRd
+warn_once_per_call <- function(expr) {
+  seen <- character()
+  withCallingHandlers(expr, warning = function(w) {
+    msg <- conditionMessage(w)
+    if (msg %in% seen) {
+      invokeRestart("muffleWarning")
+    }
+    seen <<- c(seen, msg)
+  })
+}
+
+
+#' Compute an effective sample size without the capping notice
+#'
+#' `posterior` caps an ESS estimate at `S * log10(S)` whenever a
+#' parameter's autocorrelation sum falls below `1 / log10(S)`. It warns
+#' each time it caps one. Anticorrelated draws put an estimate above
+#' that bound. The capped figure is the conservative one and the figure
+#' mvgam reports. The notice gives the user nothing to act on. Every
+#' mvgam method reporting an ESS runs its computation through here.
+#' The decision about showing the notice is then made in one place.
+#' The match is on the message. Every other warning the computation
+#' raises stays visible.
+#'
+#' @param expr Expression computing one or more ESS values
+#' @return The value of `expr`
+#'
+#' @noRd
+without_ess_cap_notice <- function(expr) {
+  without_warnings_matching(expr, "ESS has been capped", fixed = TRUE)
 }

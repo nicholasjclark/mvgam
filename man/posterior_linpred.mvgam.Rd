@@ -127,6 +127,12 @@ terms of \code{trend_formula}. \code{process_error = TRUE} adds a sampled
 deviation at each time and series, on the link scale.
 \code{\link[=posterior_epred.mvgam]{posterior_epred.mvgam()}} and \code{\link[=posterior_predict.mvgam]{posterior_predict.mvgam()}} apply the
 family's mean and noise to that same predictor.
+
+An ordinal response's category-specific \code{cs()} terms give each
+threshold its own shift. The predictor holds the terms every
+threshold shares. \code{\link[=posterior_epred.mvgam]{posterior_epred.mvgam()}} and
+\code{\link[=posterior_predict.mvgam]{posterior_predict.mvgam()}} subtract the shifts from the thresholds,
+as brms does.
 }
 \section{Trend state}{
 

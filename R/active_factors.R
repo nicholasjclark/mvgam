@@ -307,23 +307,3 @@ print.mvgam_active_factors <- function(x, ...) {
 }
 
 
-#' Count the series a factor model's loadings span
-#'
-#' The axis record counts the series. A fit without one takes the
-#' count of its fitted series levels.
-#'
-#' @param object An `mvgam` model object
-#' @return Integer count of series
-#'
-#' @noRd
-loading_series_count <- function(object) {
-  # The rows of `Z` are the series axis. The axis record counts
-  # them. A column's declared levels can include a level with zero
-  # rows, which would size every loadings surface one series too
-  # wide.
-  n <- mvgam_axes(object)$series$n
-  if (!is.null(n)) {
-    return(as.integer(n))
-  }
-  as.integer(length(fitted_series_levels(object)))
-}

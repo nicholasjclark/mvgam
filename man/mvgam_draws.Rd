@@ -49,7 +49,7 @@ parameter names, or (when \code{regex = TRUE}) a vector of regular
 expressions. Recognised keywords:
 \itemize{
 \item \code{"betas"}: population-level coefficients, the set
-\code{\link[brms:fixef.brmsfit]{brms::fixef()}} reports (\verb{b_*}, \verb{bs_*} and \verb{bsp_*}).
+\code{\link[brms:fixef.brmsfit]{brms::fixef()}} reports (\verb{b_*}, \verb{bs_*}, \verb{bsp_*} and \verb{bcs_*}).
 \item \code{"obs_params"}: observation-family distributional
 parameters (\code{sigma}, \code{phi}, \code{shape}, ...).
 \item \code{"smooth_params"}: smooth-term standard deviations

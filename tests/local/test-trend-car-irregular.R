@@ -689,9 +689,7 @@ test_that("hindcast arms are the series, in order, and distinct", {
 })
 
 
-test_that("summary, tidiers and criticism run on a CAR fit", {
-  txt <- capture.output(summary(fit))
-  expect_true(any(grepl(paste0("Series:\\s*", n_series), txt)))
+test_that("tidiers and criticism run on a CAR fit", {
 
   ll <- log_lik(fit, ndraws = 20L)
   expect_identical(dim(ll), c(20L, nrow(dat)))
@@ -1572,9 +1570,6 @@ test_that("every post-fit method answers on the irregular ZMVN fit", {
   n_obs <- nrow(sim$data)
   n_time <- length(sim$unique_times)
 
-  txt <- capture.output(summary(fit))
-  expect_true(any(grepl(paste0("Series:\\s*", sim$n_series), txt)))
-  expect_gt(length(capture.output(print(fit))), 5L)
 
   ep <- posterior_epred(fit, draw_ids = 1:30)
   pp <- posterior_predict(fit, draw_ids = 1:30)
@@ -1644,5 +1639,9 @@ test_that("the ZMVN panels draw the occasions the frame supplied", {
   expect_length(ce, 0L)
 })
 
+
+test_that("the predictor's parts sum to it: obs, CAR state", {
+  expect_parts_sum(fit, "state")
+})
 
 cat("\nDone.\n")

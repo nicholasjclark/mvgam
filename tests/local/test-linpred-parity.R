@@ -27,7 +27,8 @@
 # parameter; a hurdle model whose `hu` has a random effect; a model
 # whose mean has three smooths, one split by a factor, beside a smooth
 # in `sigma`; a latent trend whose own formula has a smooth, a slope
-# and a random effect; and a latent trend with an intercept alone.
+# and a random effect; and a latent trend with an intercept alone. Two
+# ordinal fits further down carry category-specific terms.
 #
 # Run with:
 #   testthat::test_file("tests/local/test-linpred-parity.R")
@@ -38,12 +39,16 @@ suppressMessages({
 })
 
 
+# brms advises at fit time that cumulative `cs()` terms are
+# experimental. The fixtures fit them on purpose.
 fit_cached <- function(name, formula, family = gaussian(), ...) {
   cached_fit(paste0("val_linpred_", name, ".rds"), function() {
-    mvgam(formula, family = family, data = parity_data, chains = 2L,
-          iter = 600L, warmup = 300L, silent = 2,
-          backend = "cmdstanr", seed = 1L, ...)
-  })
+    without_brms_fit_advisories(
+      mvgam(formula, family = family, data = parity_data, chains = 2L,
+            iter = 600L, warmup = 300L, silent = 2,
+            backend = "cmdstanr", seed = 1L, ...)
+    )
+  }, key = parity_data)
 }
 
 parity_data <- local({
@@ -73,6 +78,12 @@ parity_data <- local({
   out$gs <- factor(sample(c("p", "q", "r"), n, replace = TRUE))
   out$ys <- sin(2 * x) + ifelse(out$gs == "q", cos(z), 0) +
     stats::rnorm(n, 0, exp(-1 + 0.3 * z))
+  # An ordered count whose groups reach different top levels: group
+  # `p` takes four levels and the others three. Each group then takes
+  # its own number of thresholds.
+  out$yg <- as.integer(cut(x + stats::rnorm(n, 0, 0.7),
+                           c(-Inf, -1, 0, 1, Inf)))
+  out$yg <- pmin(out$yg, ifelse(out$gs == "p", 4L, 3L))
   out
 })
 
@@ -109,56 +120,7 @@ fits <- list(
   )
 )
 
-# One side's brms model, given the fit's draws. The combined program
-# holds both sides' parameters, and brms reads some of them by pattern:
-# its reader of the smooth `s_1_1` also takes the trend's
-# `s_1_1_trend`. The side's own names are kept, the trend's stripped of
-# the `_trend` its own model does not write, and every other name is
-# moved aside, which leaves brms reading that side alone.
-as_brms <- function(fit, side = "obs") {
-  b <- side_model(fit, side)
-  sf <- fit$fit
-  names_now <- sf@sim$fnames_oi
-  own <- if (side == "trend") strip_trend_infix(names_now) else names_now
-  renamed <- ifelse(names_now %in% side_parameters(fit, side), own,
-                    paste0("zzother", seq_along(names_now)))
-  sf@sim$fnames_oi <- renamed
-  for (i in seq_along(sf@sim$samples)) {
-    names(sf@sim$samples[[i]]) <- renamed
-  }
-  b$fit <- sf
-  brms:::rename_pars(b)
-}
-
 ids <- 1:50
-
-# Every predictor of one fit, against brms, under one `re_formula`.
-predictor_gap <- function(fit, newdata, re_formula) {
-  b <- as_brms(fit)
-  keys <- names(response_columns(fit$obs_model$formula))
-  several <- length(keys) > 1L
-  gaps <- c()
-  for (key in keys) {
-    resp <- if (several) key
-    family <- model_families(fit, resp)
-    for (component in c("mu", predicted_dpar_names(
-      fit, setdiff(family$dpars, "mu"), resp = resp
-    ))) {
-      mine <- extract_component_linpred(
-        fit, newdata = newdata, draw_ids = ids, resp = resp,
-        component = if (component == "mu") "obs" else component,
-        re_formula = re_formula
-      )
-      theirs <- brms::posterior_linpred(
-        b, newdata = newdata, draw_ids = ids, resp = resp,
-        dpar = if (component != "mu") component, re_formula = re_formula
-      )
-      gaps[paste(key, component)] <- max(abs(unname(mine) -
-                                               unname(theirs)))
-    }
-  }
-  gaps
-}
 
 
 for (nm in names(fits)) {
@@ -254,6 +216,11 @@ test_that("the trend's predictor and its smooth are brms's own", {
     theirs <- brms::posterior_linpred(b, newdata = frame, draw_ids = ids,
                                       incl_autocor = FALSE)
     expect_lt(max(abs(unname(mine) - unname(theirs))), 1e-8)
+    parts <- extract_component_parts(fit, fit$data, component = "trend",
+                                     draw_ids = ids)
+    expect_lt(max(abs(Reduce(`+`, parts) - extract_component_linpred(
+      fit, fit$data, component = "trend", draw_ids = ids
+    ))), 1e-8)
     expect_identical(dim(posterior_epred(fit, draw_ids = ids)),
                      c(length(ids), nrow(fit$data)))
   }
@@ -289,6 +256,86 @@ test_that("the mean and the likelihood follow the predictors", {
       unname(brms::log_lik(b, draw_ids = ids)),
       tolerance = 1e-8
     )
+  }
+})
+
+test_that("the predictor's parts sum to it: trend formula terms and state", {
+  for (nm in c("trend", "trend_intercept")) {
+    expect_parts_sum(fits[[nm]], "state")
+  }
+})
+
+test_that("each part's response-scale share uses the fit's expectation", {
+  # A gaussian mean is its predictor. A hurdle mean is checked whole.
+  for (nm in setdiff(names(fits), "hurdle")) {
+    expect_epred_parts(fits[[nm]], identity)
+  }
+  expect_epred_parts(fits$hurdle)
+})
+
+# Two ordinal fits with category-specific terms. Each `cs()` term shifts
+# every threshold by its own amount. A cumulative family cuts at
+# `thres - eta` and an adjacent-category family at `eta - thres`, which
+# checks the shift in both directions. The trend of the first has no
+# terms. Its marginal prediction is then the observation model's own.
+cs_fits <- list(
+  cumulative = fit_cached(
+    "cs_cumulative", bf(ord ~ z + cs(x) + (cs(1) | g)), cumulative(),
+    trend_formula = ~ AR()
+  ),
+  acat = fit_cached("cs_acat", bf(ord ~ cs(x) + s(z, k = 5)), acat())
+)
+
+# Thresholds that vary by group, three for `p` and two for the others
+grouped_fit <- fit_cached("thres_gr", bf(yg | thres(gr = gs) ~ x),
+                          cumulative())
+
+test_that("grouped thresholds predict as brms predicts them", {
+  # The categories a group lacks hold probability zero, as brms's own
+  # expectation pads them
+  b <- as_brms(grouped_fit)
+  expect_equal(unname(posterior_epred(grouped_fit, draw_ids = ids)),
+               unname(brms::posterior_epred(b, draw_ids = ids)),
+               tolerance = 1e-8)
+  expect_equal(unname(log_lik(grouped_fit, draw_ids = ids)),
+               unname(brms::log_lik(b, draw_ids = ids)),
+               tolerance = 1e-8)
+  expect_epred_parts(grouped_fit)
+})
+
+test_that("category-specific terms predict as brms predicts them", {
+  # brms repeats its fit-time advisory on `cs()` at every parse
+  for (fit in cs_fits) {
+    theirs <- without_brms_fit_advisories(
+      brms::posterior_epred(as_brms(fit), draw_ids = ids)
+    )
+    expect_equal(unname(posterior_epred(fit, draw_ids = ids)),
+                 unname(theirs), tolerance = 1e-8)
+  }
+  # Without a trend the likelihood is the observation model's as well
+  theirs <- without_brms_fit_advisories(
+    brms::log_lik(as_brms(cs_fits$acat), draw_ids = ids)
+  )
+  expect_equal(unname(log_lik(cs_fits$acat, draw_ids = ids)),
+               unname(theirs), tolerance = 1e-8)
+})
+
+test_that("each category-specific term is a threshold shift of its own", {
+  parts <- get_linpred_parts(cs_fits$cumulative, cs_fits$cumulative$data,
+                             draw_ids = ids)
+  expect_identical(names(parts$cs), c("cs(x)", "(cs(1) | g)"))
+  # Threshold k of row i moves by `bcs[1, k] * x[i]`
+  bcs <- as_plain_matrix(subset_draws_rows(
+    fit_draws(cs_fits$cumulative$fit, "bcs"), draw_ids = ids
+  ))
+  x <- cs_fits$cumulative$data$x
+  for (k in 1:2) {
+    expect_equal(parts$cs[["cs(x)"]][, , k],
+                 outer(unname(bcs[, paste0("bcs[1,", k, "]")]), x))
+  }
+  expect_parts_sum(cs_fits$cumulative, "state")
+  for (fit in cs_fits) {
+    expect_epred_parts(fit)
   }
 })
 

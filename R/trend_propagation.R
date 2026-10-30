@@ -259,7 +259,7 @@ propagate_pw <- function(trend_model, params, h, n_series, last_state,
   if (is.null(fc_times) || length(fc_times) != h) {
     stop_shape_fault("'fc_times'", length(fc_times), h)
   }
-  if (is.null(training_times) || length(training_times) == 0L) {
+  if (length(training_times) == 0L) {
     stop_mvgam_fault(
       "PW propagation needs the training times.",
       "The caller passed an empty 'training_times'."
@@ -409,7 +409,8 @@ sample_horizon_changepoints <- function(delta_train_s, t_change_train,
 #' @param context Unused, for the shared propagator signature
 #' @return Numeric matrix `[h, n_series]` of the level plus any season.
 #'   Its `components` attribute holds a `level` path equal to the
-#'   returned matrix, the slope path and any season path, keyed as
+#'   returned matrix, the slope path, any season path and, with
+#'   several periods, the season of each, keyed as
 #'   `trend_components_llt()` names them. The level path includes any
 #'   season, as `lv_trend` does.
 #' @noRd
@@ -463,6 +464,14 @@ propagate_llt <- function(trend_model, params, h, n_series, last_state,
   out <- matrix(NA_real_, nrow = h, ncol = n_series)
   slopes <- out
   seasons <- out
+  # Several periods each sum their own harmonics. One period's season
+  # is the sum itself.
+  periods <- llt_season_periods(trend_model)
+  if (nrow(periods) < 2L) {
+    periods <- periods[0L, ]
+  }
+  by_period <- lapply(stats::setNames(nm = periods$component),
+                      function(nm) out)
   for (step in seq_len(h)) {
     level <- level + slope + level_shocks[step, ]
     slope <- phi * slope + slope_shocks[step, ]
@@ -474,11 +483,16 @@ propagate_llt <- function(trend_model, params, h, n_series, last_state,
       g_star <- cos(freq) * g_star - sin(freq) * g_last + pair(shock_sd)
       seasons[step, ] <- colSums(g)
       out[step, ] <- level + seasons[step, ]
+      for (p in seq_len(nrow(periods))) {
+        rows <- periods$first[p]:periods$last[p]
+        by_period[[p]][step, ] <- colSums(g[rows, , drop = FALSE])
+      }
     }
   }
   attr(out, "components") <- c(
     list(level = out, slope = slopes),
-    if (n_harm > 0L) list(season = seasons)
+    if (n_harm > 0L) list(season = seasons),
+    by_period
   )
   out
 }

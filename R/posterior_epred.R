@@ -96,11 +96,7 @@ compute_family_variance <- function(mu, family, sigma = NULL,
       )
     }
     checkmate::assert_matrix(value)
-    if (nrow(value) != nrow(mu) || ncol(value) != ncol(mu)) {
-      stop_shape_fault(paste0("Parameter '", dpar_name, "'"),
-                       dim(value), dim(mu))
-    }
-    value
+    assert_dims(value, paste0("Parameter '", dpar_name, "'"), dim(mu))
   }
 
   switch(
@@ -259,12 +255,13 @@ compute_family_variance <- function(mu, family, sigma = NULL,
 #'   `resp = NULL` gives a named list, one element per response.
 #'
 #' @details
-#' For most families the mean is the inverse link of the predictor. A binomial mean is
-#' `trials * p`, with the trials taken from the `trials()` term
-#' evaluated against `newdata`. A zero-inflated or hurdle mean scales
-#' the base mean by the probability of a non-zero draw. A lognormal mean
-#' carries the correction `exp(mu + sigma^2 / 2)`. A `trunc()` term
-#' gives the mean of the distribution truncated to its bounds.
+#' For most families the mean is the inverse link of the predictor. A
+#' binomial mean is `trials * p`, with the trials taken from the
+#' `trials()` term evaluated against `newdata`. A zero-inflated or
+#' hurdle mean scales the base mean by the probability of a non-zero
+#' draw. A lognormal mean carries the correction
+#' `exp(mu + sigma^2 / 2)`. A `trunc()` term gives the mean of the
+#' distribution truncated to its bounds.
 #'
 #' The mean of an `nmix()` or `occ()` visit thins the latent abundance
 #' or occupancy by that visit's detection probability. A composition
@@ -362,11 +359,10 @@ posterior_epred.mvgam <- function(object, newdata = NULL,
 }
 
 
-#' Each response's expectation as `posterior_epred()` reports it
+#' Each response's expectation, from its link-scale predictor
 #'
-#' An ordinal response's expectation is the probability of each
-#' category. Every other family reports its mean. A model with several
-#' responses returns one result per response when `resp` is `NULL`.
+#' A model with several responses returns one result per response when
+#' `resp` is `NULL`. Each response takes its own `epred_map()`.
 #'
 #' @param object A fitted `mvgam` object.
 #' @param linpred `[ndraws x nobs]` link-scale predictor, or a named
@@ -374,39 +370,36 @@ posterior_epred.mvgam <- function(object, newdata = NULL,
 #' @param newdata Data the predictor was built for.
 #' @param draw_ids Draws the predictor was taken at, or `NULL` for all.
 #' @param resp The response's key, or `NULL`.
-#' @return A matrix, an `[ndraws x nobs x ncat]` array for an ordinal
-#'   response, or a named list of them.
+#' @param ordinal As `epred_map()` takes it. `posterior_epred()`
+#'   reports the category probabilities.
+#' @return A matrix, an `[ndraws x nobs x ncat]` array of an ordinal
+#'   response's category probabilities, or a named list of them.
 #' @noRd
 response_epred <- function(object, linpred, newdata, draw_ids, resp,
                            re_formula = NULL,
                            allow_new_levels = FALSE,
-                           sample_new_levels = "uncertainty") {
+                           sample_new_levels = "uncertainty",
+                           ordinal = "probs") {
   if (is_per_response(linpred)) {
     return(lapply(stats::setNames(nm = names(linpred)), function(r) {
       response_epred(object, linpred[[r]], newdata, draw_ids, resp = r,
                      re_formula = re_formula,
                      allow_new_levels = allow_new_levels,
-                     sample_new_levels = sample_new_levels)
+                     sample_new_levels = sample_new_levels,
+                     ordinal = ordinal)
     }))
   }
-  family <- model_families(object, resp)
-  if (is_ordinal_family(family)) {
-    return(ordinal_category_probs(
-      object, linpred, family, draw_ids = draw_ids, newdata = newdata,
-      resp = resp
-    ))
-  }
-  expected_from_linpred(
-    object, linpred, newdata = newdata, draw_ids = draw_ids, resp = resp,
+  epred_map(
+    object, newdata, draw_ids, resp, dim(linpred), ordinal = ordinal,
     re_formula = re_formula, allow_new_levels = allow_new_levels,
     sample_new_levels = sample_new_levels
-  )
+  )(linpred)
 }
 
 
-#' The family's mean for a linear predictor already on the link scale
+#' The fit's expectation of one response, as a function of its predictor
 #'
-#' The inverse link gives this mean only for a family whose expectation
+#' The inverse link gives the mean only for a family whose expectation
 #' is its predictor. A binomial mean is `trials * p`. A zero-inflated
 #' mean is `(1 - zi) * mu`. A surface that applies the inverse link alone
 #' reports a probability where a count was asked for, or a rate before
@@ -422,57 +415,62 @@ response_epred <- function(object, linpred, newdata, draw_ids, resp,
 #' A closure-unit family's mean depends on sibling rows. An occupancy is
 #' thinned by the visit's detection probability. A composition normalises
 #' across the K rows of its site. Neither is a function of one row's
-#' predictor. Each has a dedicated kernel. This function passes the
-#' predictor to that kernel. The inverse link alone would give the raw
-#' predictor for a composition and the occupancy without its
-#' detection.
+#' predictor. Each has a dedicated kernel, which takes the predictor.
 #'
-#' An ordinal response's mean is its expected ordered level, on the
-#' scale that `posterior_predict()` draws from. `posterior_epred()`
-#' reports the category probabilities through `response_epred()`.
+#' An ordinal response's expectation is the probability of each
+#' category, or its expected ordered level, on the scale that
+#' `posterior_predict()` draws from.
 #'
 #' Each response uses its own family, trials and parameters. A response
 #' of a model with several responses stores its parameters under its own
 #' key, `hu_count` for `hu`. Looking them up without that scope returns
 #' none.
 #'
-#' @param object A fitted `mvgam` object.
-#' @param linpred `[ndraws x nobs]` link-scale predictor, or a named
-#'   list of them for a multivariate fit.
-#' @param newdata Data the predictor was built for. The function looks up
-#'   trials and any per-observation parameter in it.
-#' @param draw_ids Draws the predictor was taken at. The extra parameters
-#'   are taken at the same iterations.
-#' @param resp The response's key, or `NULL`.
-#' @return Matrix of expected values, or a named list of them.
+#' Everything but the predictor is resolved once. The function returned
+#' then maps any predictor at the same draws and rows, as the whole
+#' predictor and each of its parts are.
+#'
+#' @inheritParams response_epred
+#' @param dims `c(ndraws, nobs)` of the predictors the map takes
+#' @param ordinal `"probs"` for an ordinal response's category
+#'   probabilities, `"mean"` for its expected ordered level
+#' @return A function of one `[ndraws x nobs]` predictor, giving a
+#'   matrix of expected values or an `[ndraws x nobs x ncat]` array of
+#'   category probabilities. An ordinal response's map also takes
+#'   `shift`, as `ordinal_probs_map()` does.
 #' @noRd
-expected_from_linpred <- function(object, linpred, newdata = NULL,
-                                  draw_ids = NULL, resp = NULL,
-                                  re_formula = NULL,
-                                  allow_new_levels = FALSE,
-                                  sample_new_levels = "uncertainty") {
-  if (is_per_response(linpred)) {
-    return(lapply(stats::setNames(nm = names(linpred)), function(r) {
-      expected_from_linpred(
-        object, linpred[[r]], newdata = newdata, draw_ids = draw_ids,
-        resp = r, re_formula = re_formula,
-        allow_new_levels = allow_new_levels,
-        sample_new_levels = sample_new_levels
-      )
-    }))
-  }
+epred_map <- function(object, newdata, draw_ids, resp, dims,
+                      ordinal = c("probs", "mean"), re_formula = NULL,
+                      allow_new_levels = FALSE,
+                      sample_new_levels = "uncertainty") {
+  checkmate::assert_integerish(dims, len = 2L, lower = 1L)
+  ordinal <- match.arg(ordinal)
   family <- model_families(object, resp)
+  checked <- function(f) {
+    function(linpred, ...) {
+      checkmate::assert_matrix(linpred, nrows = dims[1L], ncols = dims[2L])
+      f(linpred, ...)
+    }
+  }
   if (uses_closure_unit_layout(family)) {
     epred_fn <- dispatch_closure_unit_method(family, "epred")
-    return(epred_fn(
-      object, newdata = newdata, draw_ids = draw_ids,
-      linpred = linpred
-    ))
+    return(checked(function(linpred) {
+      epred_fn(object, newdata = newdata, draw_ids = draw_ids,
+               linpred = linpred)
+    }))
   }
   if (is_ordinal_family(family)) {
-    return(ordinal_category_mean(ordinal_category_probs(
-      object, linpred, family, draw_ids = draw_ids, newdata = newdata,
-      resp = resp
+    probs <- ordinal_probs_map(
+      object, family, draw_ids, newdata, resp, dims,
+      re_formula = re_formula, allow_new_levels = allow_new_levels,
+      sample_new_levels = sample_new_levels
+    )
+    return(checked(switch(
+      ordinal,
+      probs = probs,
+      mean = function(linpred, ...) {
+        ordinal_category_mean(probs(linpred, ...))
+      }
     )))
   }
   # A `trunc()` term's mean needs every parameter of the distribution.
@@ -488,8 +486,8 @@ expected_from_linpred <- function(object, linpred, newdata = NULL,
     } else {
       epred_extra_dpars(family)
     },
-    ndraws = nrow(linpred),
-    nobs = ncol(linpred),
+    ndraws = dims[1L],
+    nobs = dims[2L],
     draw_ids = draw_ids,
     newdata = newdata,
     resp = resp,
@@ -498,11 +496,13 @@ expected_from_linpred <- function(object, linpred, newdata = NULL,
     sample_new_levels = sample_new_levels
   )
   trials <- extract_trials_for_family(object, family, newdata, resp)
-  if (truncated) {
-    return(truncated_family_mean(family, linpred, family_pars, trials,
-                                 bounds$lb, bounds$ub))
-  }
-  compute_family_epred(linpred, family, trials, family_pars)
+  checked(function(linpred) {
+    if (truncated) {
+      return(truncated_family_mean(family, linpred, family_pars, trials,
+                                   bounds$lb, bounds$ub))
+    }
+    compute_family_epred(linpred, family, trials, family_pars)
+  })
 }
 
 
@@ -633,10 +633,7 @@ family_mean_from_kernel <- function(family_name, mu, family_pars,
   for (dpar in needed) {
     value <- family_pars[[dpar]]
     checkmate::assert_matrix(value)
-    if (!identical(dim(value), dim(mu))) {
-      stop_shape_fault(paste0("Parameter '", dpar, "'"), dim(value),
-                       dim(mu))
-    }
+    assert_dims(value, paste0("Parameter '", dpar, "'"), dim(mu))
   }
 
   prep <- list(
@@ -1173,28 +1170,31 @@ ordinal_category_variance <- function(epred) {
 #' that brms writes in generated quantities. The two differ by the slopes
 #' times the covariate means. Using the first set shifts every category
 #' probability by that much. A response of a model with several responses
-#' uses its own, `b_<resp>_Intercept[k]`.
+#' uses its own, `b_<resp>_Intercept[k]`. Thresholds that vary by group,
+#' `thres(gr = g)`, come as one set per group, `b_Intercept_<g>[k]`, in
+#' the order brms numbers the groups.
 #'
 #' @param object A fitted `mvgam` object
 #' @param draw_ids Draws the predictor was taken at, or `NULL` for all
 #' @param resp The response's key, or `NULL`
-#' @return Matrix `[ndraws x nthres]`, thresholds in increasing index
+#' @return List of `[ndraws x nthres]` matrices, one per set of
+#'   thresholds, each in increasing index
 #' @noRd
 ordinal_thresholds <- function(object, draw_ids = NULL, resp = NULL) {
   checkmate::assert_class(object, "mvgam")
-  prefix <- paste0("b", response_suffix(object, resp), "_Intercept")
-  draws <- fit_draws(object$fit, prefix)
-  pattern <- paste0("^", prefix, "\\[([0-9]+)\\]$")
-  cols <- grep(pattern, colnames(draws), value = TRUE)
-  if (length(cols) == 0L) {
-    stop(insight::format_error(paste0(
-      "The fit lacks ordinal thresholds '", prefix, "[k]'."
-    )))
+  sfx <- response_suffix(object, resp)
+  prefix <- paste0("b", sfx, "_Intercept")
+  n_sets <- object$standata[[paste0("ngrthres", sfx)]]
+  sets <- if (is.null(n_sets)) prefix else {
+    paste0(prefix, "_", seq_len(n_sets))
   }
-  cols <- cols[order(as.integer(sub(pattern, "\\1", cols)))]
-  thres <- matrix(as.numeric(draws[, cols, drop = FALSE]),
-                  ncol = length(cols))
-  subset_draws_rows(thres, draw_ids = draw_ids)
+  # One count per set of thresholds
+  nthres <- sdata_entry(object$standata, paste0("nthres", sfx))
+  draws <- as_plain_matrix(fit_draws(object$fit, sets))
+  Map(function(set, n) {
+    thres <- draw_columns(draws, paste0(set, "[", seq_len(n), "]"))
+    subset_draws_rows(thres, draw_ids = draw_ids)
+  }, sets, nthres, USE.NAMES = FALSE)
 }
 
 
@@ -1216,27 +1216,68 @@ ordinal_thresholds <- function(object, draw_ids = NULL, resp = NULL) {
 #' @param draw_ids Draws `linpred` was taken at, or `NULL` for all
 #' @param newdata Data `linpred` was built for
 #' @param resp The response's key, or `NULL`
+#' @param re_formula,allow_new_levels,sample_new_levels The group-level
+#'   settings `linpred` was built with, which a category-specific
+#'   group-level term's threshold shifts take as well
 #' @return Array `[ndraws x nobs x ncat]`, as `ordinal_probs()` gives
 #' @noRd
 ordinal_category_probs <- function(object, linpred, family,
                                    draw_ids = NULL, newdata = NULL,
-                                   resp = NULL) {
+                                   resp = NULL, re_formula = NULL,
+                                   allow_new_levels = FALSE,
+                                   sample_new_levels = "uncertainty") {
+  ordinal_probs_map(
+    object, family, draw_ids, newdata, resp, dim(linpred),
+    re_formula = re_formula, allow_new_levels = allow_new_levels,
+    sample_new_levels = sample_new_levels
+  )(linpred)
+}
+
+
+#' Category probabilities of an ordinal response, as a function of its
+#' predictor
+#'
+#' The thresholds, `disc`, `hu`, the shift the category-specific terms
+#' give each threshold and the set of thresholds each row takes are
+#' resolved once.
+#'
+#' @inheritParams ordinal_category_probs
+#' @param dims `c(ndraws, nobs)` of the predictors the map takes
+#' @return A function of one `[ndraws x nobs]` predictor of `mu` and a
+#'   threshold shift, by default the fit's own, giving what
+#'   `ordinal_probs()` gives
+#' @noRd
+ordinal_probs_map <- function(object, family, draw_ids, newdata, resp,
+                              dims, re_formula = NULL,
+                              allow_new_levels = FALSE,
+                              sample_new_levels = "uncertainty") {
   pars <- resolve_family_pars(
     object,
     dpar_names = setdiff(family$dpars, "mu"),
-    ndraws = nrow(linpred),
-    nobs = ncol(linpred),
+    ndraws = dims[1L],
+    nobs = dims[2L],
     draw_ids = draw_ids,
     newdata = newdata,
-    resp = resp
+    resp = resp,
+    re_formula = re_formula,
+    allow_new_levels = allow_new_levels,
+    sample_new_levels = sample_new_levels
   )
-  ordinal_probs(
-    eta = linpred,
-    thres = ordinal_thresholds(object, draw_ids = draw_ids, resp = resp),
-    family = family,
-    disc = pars$disc,
-    hu = pars$hu
+  sets <- ordinal_thresholds(object, draw_ids = draw_ids, resp = resp)
+  prepared <- ordinal_threshold_prep(
+    object, prediction_frame(object, newdata), resp = resp,
+    draw_ids = draw_ids, re_formula = re_formula,
+    allow_new_levels = allow_new_levels,
+    sample_new_levels = sample_new_levels
   )
+  shifts <- threshold_shifts_of(prepared)
+  fitted_shift <- if (length(shifts)) Reduce(`+`, shifts)
+  row_sets <- threshold_row_sets(prepared, length(sets), dims[2L])
+  function(linpred, shift = fitted_shift) {
+    ordinal_group_probs(eta = linpred, sets = sets, row_sets = row_sets,
+                        family = family, disc = pars$disc, hu = pars$hu,
+                        shift = shift)
+  }
 }
 
 
@@ -1258,11 +1299,15 @@ ordinal_category_probs <- function(object, linpred, family,
 #'   fixed value of one
 #' @param hu `[ndraws x nobs]` hurdle probability, used only by a family
 #'   marked `"extra_cat"`
+#' @param shift `[ndraws x nobs x nthres]` shift of each threshold by
+#'   the category-specific terms, subtracted as brms subtracts `mucs`,
+#'   or `NULL` for none
 #' @return Array `[ndraws x nobs x ncat]` whose third margin is named by
 #'   the ordered level each category represents: `1..K`, with `0` first
 #'   for the hurdle category
 #' @noRd
-ordinal_probs <- function(eta, thres, family, disc = NULL, hu = NULL) {
+ordinal_probs <- function(eta, thres, family, disc = NULL, hu = NULL,
+                          shift = NULL) {
   checkmate::assert_matrix(eta, mode = "numeric")
   ndraws <- nrow(eta)
   nobs <- ncol(eta)
@@ -1277,6 +1322,11 @@ ordinal_probs <- function(eta, thres, family, disc = NULL, hu = NULL) {
   # One cell per draw, observation and threshold
   eta3 <- array(eta, c(ndraws, nobs, nthres))
   thres3 <- aperm(array(thres, c(ndraws, nthres, nobs)), c(1L, 3L, 2L))
+  if (!is.null(shift)) {
+    checkmate::assert_array(shift, d = 3L)
+    checkmate::assert_true(identical(dim(shift), dim(thres3)))
+    thres3 <- thres3 - shift
+  }
   offset <- if ("eta_minus_thres" %in% family$specials) {
     eta3 - thres3
   } else {
@@ -1290,14 +1340,69 @@ ordinal_probs <- function(eta, thres, family, disc = NULL, hu = NULL) {
     acat = inv_link_acat(x, family$link),
     inv_link_cumulative(x, family$link)
   )
-  levels <- seq_len(nthres + 1L)
   if ("extra_cat" %in% family$specials) {
     checkmate::assert_matrix(hu, nrows = ndraws, ncols = nobs)
     probs <- abind::abind(hu, probs * as.vector(1 - hu), along = 3L)
-    levels <- c(0L, levels)
   }
-  dimnames(probs) <- list(NULL, NULL, levels)
+  dimnames(probs) <- list(NULL, NULL, ordinal_level_values(nthres, family))
   probs
+}
+
+
+#' The ordered level each category of an ordinal family represents
+#'
+#' @param nthres Number of thresholds
+#' @param family An ordinal brms family
+#' @return Integer vector `1..(nthres + 1)`, with `0` first for the
+#'   hurdle category of a family marked `"extra_cat"`
+#' @noRd
+ordinal_level_values <- function(nthres, family) {
+  checkmate::assert_count(nthres, positive = TRUE)
+  levels <- seq_len(nthres + 1L)
+  if ("extra_cat" %in% family$specials) c(0L, levels) else levels
+}
+
+
+#' Category probabilities of rows whose thresholds come in sets
+#'
+#' `thres(gr = g)` gives each group its own thresholds, possibly a
+#' different number of them. Each row takes its group's set. The
+#' categories a group lacks hold probability zero, as
+#' `brms:::posterior_epred_ordinal()` sets them under every link but
+#' the identity.
+#'
+#' @inheritParams ordinal_probs
+#' @param sets List of `[ndraws x nthres]` threshold matrices, as
+#'   `ordinal_thresholds()` gives
+#' @param row_sets The set each row takes, as `threshold_row_sets()`
+#'   gives
+#' @return Array `[ndraws x nobs x ncat]`, `ncat` the widest set's
+#' @noRd
+ordinal_group_probs <- function(eta, sets, row_sets, family, disc = NULL,
+                                hu = NULL, shift = NULL) {
+  checkmate::assert_list(sets, types = "matrix", min.len = 1L)
+  if (length(sets) == 1L) {
+    return(ordinal_probs(eta, sets[[1L]], family, disc, hu, shift))
+  }
+  checkmate::assert_integerish(row_sets, len = ncol(eta), lower = 1L,
+                               upper = length(sets), any.missing = FALSE)
+  # brms refuses category-specific terms with thresholds that vary by
+  # group
+  checkmate::assert_null(shift)
+  levels <- ordinal_level_values(max(vapply(sets, ncol, integer(1L))),
+                                 family)
+  out <- array(0, c(nrow(eta), ncol(eta), length(levels)),
+               dimnames = list(NULL, NULL, levels))
+  rows_of <- function(m, rows) if (!is.null(m)) m[, rows, drop = FALSE]
+  for (g in unique(row_sets)) {
+    rows <- which(row_sets == g)
+    probs <- ordinal_probs(
+      eta[, rows, drop = FALSE], sets[[g]], family,
+      disc = rows_of(disc, rows), hu = rows_of(hu, rows)
+    )
+    out[, rows, seq_len(dim(probs)[3L])] <- probs
+  }
+  out
 }
 
 
@@ -1382,8 +1487,8 @@ ordinal_draws <- function(probs) {
 
 # --- Ordinal link inverses, adapted from brms::distributions.R ---
 # Each takes `x`, an array `[ndraws x nobs x nthres]` of the threshold
-# offsets that `ordinal_probs()` forms. It returns `[ndraws x nobs x ncat]`
-# category probabilities.
+# offsets that `ordinal_probs()` forms and checks. It returns
+# `[ndraws x nobs x ncat]` category probabilities.
 
 #' Inverse Link for Cumulative Models
 #'
@@ -1394,15 +1499,8 @@ ordinal_draws <- function(probs) {
 #' @return Array `[ndraws x nobs x ncat]` of category probabilities
 #' @noRd
 inv_link_cumulative <- function(x, link) {
-  checkmate::assert_array(x, mode = "numeric", d = 3L)
-  checkmate::assert_string(link)
-
   x <- inv_link(x, link)
-  ndim <- length(dim(x))
-  dim_noncat <- dim(x)[-ndim]
-  ones_arr <- array(1, dim = c(dim_noncat, 1))
-  zeros_arr <- array(0, dim = c(dim_noncat, 1))
-  abind::abind(x, ones_arr) - abind::abind(zeros_arr, x)
+  abind::abind(x, category_slab(x, 1)) - abind::abind(category_slab(x, 0), x)
 }
 
 #' Inverse Link for Sequential Ratio Models
@@ -1413,21 +1511,9 @@ inv_link_cumulative <- function(x, link) {
 #' @return Array `[ndraws x nobs x ncat]` of category probabilities
 #' @noRd
 inv_link_sratio <- function(x, link) {
-  checkmate::assert_array(x, mode = "numeric", d = 3L)
-  checkmate::assert_string(link)
-
   x <- inv_link(x, link)
-  ndim <- length(dim(x))
-  dim_noncat <- dim(x)[-ndim]
-  nthres <- dim(x)[ndim]
-  marg_noncat <- seq_along(dim(x))[-ndim]
-  ones_arr <- array(1, dim = c(dim_noncat, 1))
-  dim_t <- c(nthres, dim_noncat)
-  Sx_cumprod <- aperm(
-    array(apply(1 - x, marg_noncat, cumprod), dim = dim_t),
-    perm = c(marg_noncat + 1, 1)
-  )
-  abind::abind(x, ones_arr) * abind::abind(ones_arr, Sx_cumprod)
+  ones <- category_slab(x, 1)
+  abind::abind(x, ones) * abind::abind(ones, cumprod_thresholds(1 - x))
 }
 
 #' Inverse Link for Continuation Ratio Models
@@ -1438,66 +1524,50 @@ inv_link_sratio <- function(x, link) {
 #' @return Array `[ndraws x nobs x ncat]` of category probabilities
 #' @noRd
 inv_link_cratio <- function(x, link) {
-  checkmate::assert_array(x, mode = "numeric", d = 3L)
-  checkmate::assert_string(link)
-
   x <- inv_link(x, link)
-  ndim <- length(dim(x))
-  dim_noncat <- dim(x)[-ndim]
-  nthres <- dim(x)[ndim]
-  marg_noncat <- seq_along(dim(x))[-ndim]
-  ones_arr <- array(1, dim = c(dim_noncat, 1))
-  dim_t <- c(nthres, dim_noncat)
-  x_cumprod <- aperm(
-    array(apply(x, marg_noncat, cumprod), dim = dim_t),
-    perm = c(marg_noncat + 1, 1)
-  )
-  abind::abind(1 - x, ones_arr) * abind::abind(ones_arr, x_cumprod)
+  ones <- category_slab(x, 1)
+  abind::abind(1 - x, ones) * abind::abind(ones, cumprod_thresholds(x))
 }
 
 #' Inverse Link for Adjacent Category Models
 #'
-#' `P(Y = k + 1 | Y in {k, k + 1}) = F(x_k)`.
+#' `P(Y = k + 1 | Y in {k, k + 1}) = F(x_k)`. Under the logit link the
+#' odds of each step are `exp(x_k)`.
 #'
 #' @inheritParams inv_link_cumulative
 #' @return Array `[ndraws x nobs x ncat]` of category probabilities
 #' @noRd
 inv_link_acat <- function(x, link) {
-  checkmate::assert_array(x, mode = "numeric", d = 3L)
-  checkmate::assert_string(link)
-
-  ndim <- length(dim(x))
-  dim_noncat <- dim(x)[-ndim]
-  nthres <- dim(x)[ndim]
-  marg_noncat <- seq_along(dim(x))[-ndim]
-  ones_arr <- array(1, dim = c(dim_noncat, 1))
-  dim_t <- c(nthres, dim_noncat)
-
-  if (link == "logit") {
-    # Faster evaluation for logit link
-    exp_x_cumprod <- aperm(
-      array(apply(exp(x), marg_noncat, cumprod), dim = dim_t),
-      perm = c(marg_noncat + 1, 1)
-    )
-    out <- abind::abind(ones_arr, exp_x_cumprod)
+  ones <- category_slab(x, 1)
+  out <- if (link == "logit") {
+    abind::abind(ones, cumprod_thresholds(exp(x)))
   } else {
     x <- inv_link(x, link)
-    x_cumprod <- aperm(
-      array(apply(x, marg_noncat, cumprod), dim = dim_t),
-      perm = c(marg_noncat + 1, 1)
-    )
-    Sx_cumprod_rev <- apply(
-      1 - x[, , rev(seq_len(nthres)), drop = FALSE],
-      marg_noncat, cumprod
-    )
-    Sx_cumprod_rev <- aperm(
-      array(Sx_cumprod_rev, dim = dim_t),
-      perm = c(marg_noncat + 1, 1)
-    )
-    Sx_cumprod_rev <- Sx_cumprod_rev[, , rev(seq_len(nthres)), drop = FALSE]
-    out <- abind::abind(ones_arr, x_cumprod) *
-      abind::abind(Sx_cumprod_rev, ones_arr)
+    rev_k <- rev(seq_len(dim(x)[3L]))
+    later <- cumprod_thresholds(1 - x[, , rev_k, drop = FALSE])
+    abind::abind(ones, cumprod_thresholds(x)) *
+      abind::abind(later[, , rev_k, drop = FALSE], ones)
   }
-  catsum <- array(apply(out, marg_noncat, sum), dim = dim_noncat)
-  sweep(out, marg_noncat, catsum, "/")
+  out / array(rowSums(out, dims = 2L), dim(out))
+}
+
+#' Cumulative products along the threshold margin
+#'
+#' @param x Array `[ndraws x nobs x nthres]`
+#' @return Array of the same dimensions
+#' @noRd
+cumprod_thresholds <- function(x) {
+  d <- dim(x)
+  out <- apply(x, c(1L, 2L), cumprod)
+  aperm(array(out, c(d[3L], d[1L], d[2L])), c(2L, 3L, 1L))
+}
+
+#' A single category of one value, shaped to bind to `x`
+#'
+#' @param x Array `[ndraws x nobs x nthres]`
+#' @param value Numeric value of every cell
+#' @return Array `[ndraws x nobs x 1]`
+#' @noRd
+category_slab <- function(x, value) {
+  array(value, c(dim(x)[1:2], 1L))
 }

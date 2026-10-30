@@ -154,19 +154,24 @@ validate_draw_selectors <- function(ndraws, draw_ids) {
 #'   every variable the model uses. brms fills each one left out from
 #'   the first row of the fitted data. That suits a prediction that
 #'   uses some of the terms and ignores the rest.
-#' @return A `mvgam_prep`: the Stan data, the draws, the formula, the
-#'   frame and its row count, the fit's table of group-level terms and
-#'   the `re_formula` the data was built under
+#' @param trend Whether `brmsfit` is the trend's model. Its rows are
+#'   the trend's cells. Its response is a placeholder without data.
+#' @return A `mvgam_prep`: the Stan data, the draws, the formula and
+#'   its `model_predictors()`, the frame and its row count, the fit's
+#'   table of group-level terms, the `re_formula` the data was built
+#'   under, the fitted data and the fitted row each prediction row
+#'   repeats
 #' @noRd
 prepare_linpred_data <- function(draws, brmsfit, newdata,
                                  re_formula = NULL,
                                  allow_new_levels = FALSE,
                                  sample_new_levels = "uncertainty",
-                                 req_vars = NULL) {
+                                 req_vars = NULL, trend = FALSE) {
   checkmate::assert_class(draws, "draws_matrix")
   checkmate::assert_class(brmsfit, "brmsfit")
   checkmate::assert_data_frame(newdata, min.rows = 1L)
   checkmate::assert_character(req_vars, any.missing = FALSE, null.ok = TRUE)
+  checkmate::assert_flag(trend)
   validate_group_level_args(re_formula, allow_new_levels, sample_new_levels)
 
   # brms evaluates the response to build the data. It refuses a
@@ -174,13 +179,18 @@ prepare_linpred_data <- function(draws, brmsfit, newdata,
   # response absent or `NA` takes a value its family accepts. No
   # prediction uses that value. An ordinal response is a factor, where
   # a numeric value would land outside the levels and stay `NA`. It
-  # takes its first level instead.
+  # takes its first level instead. A response written `y | mi()` keeps
+  # its missing values, which the model imputes.
   filled <- newdata
-  columns <- response_columns(brmsfit$formula)
+  forms <- response_formulas(brmsfit$formula)
   families <- formula_families(brmsfit$formula, brmsfit$family)
-  for (key in names(columns)) {
-    column <- columns[[key]]
+  for (key in names(forms)) {
+    column <- form_response_column(forms[[key]])
     existing <- filled[[column]]
+    if (form_imputes(forms[[key]])) {
+      if (is.null(existing)) filled[[column]] <- NA_real_
+      next
+    }
     value <- if (is.factor(existing)) {
       levels(existing)[1L]
     } else {
@@ -200,7 +210,7 @@ prepare_linpred_data <- function(draws, brmsfit, newdata,
   # carries `trials = 0` against a filled response of 1. brms would
   # refuse the whole frame with "Number of trials is smaller than the
   # number of events".
-  sdata <- brms::standata(
+  sdata <- without_brms_fit_advisories(brms::standata(
     brmsfit,
     newdata = filled,
     re_formula = re_formula,
@@ -208,21 +218,238 @@ prepare_linpred_data <- function(draws, brmsfit, newdata,
     check_response = FALSE,
     req_vars = req_vars,
     internal = TRUE
-  )
+  ))
 
-  # `ranef` names each group-level term's correlation block and place
-  # in it, which is how brms names its design and coefficients. Under
-  # `re_formula = NA` brms writes no group-level data at all.
+  predictors <- lapply(model_predictors(brmsfit$formula), function(p) {
+    p$special <- special_term_frame(p$pred, brmsfit$data)
+    p
+  })
+  sdata <- restore_fixed_assign(sdata, predictors, brmsfit$data)
+
+  # `ranef` gives each group-level term's block `id` and place `cn`,
+  # which name its design and coefficients. `me` numbers the model's
+  # `me()` terms as `Xn_<k>` and `Xme_<k>` take them.
+  has_special <- any(vapply(predictors, function(p) {
+    NROW(p$special) > 0L
+  }, logical(1L)))
   structure(
     list(
       sdata = sdata,
       draws = draws,
       formula = brmsfit$formula,
+      predictors = predictors,
       newdata = newdata,
       nobs = nrow(newdata),
       ranef = brmsfit$ranef,
-      re_formula = re_formula
+      re_formula = re_formula,
+      me = if (has_special) me_term_frame(brmsfit$formula, brmsfit$data),
+      data = brmsfit$data,
+      # Each observation of a trend cell takes the cell's draws. The
+      # trend's placeholder response identifies no row.
+      fitted_row = if (has_special) {
+        fitted_row_index(
+          newdata, brmsfit$data,
+          cols = if (trend) {
+            setdiff(names(brmsfit$data), response_columns(brmsfit$formula))
+          } else {
+            names(brmsfit$data)
+          },
+          shared = trend
+        )
+      }
     ),
     class = "mvgam_prep"
   )
+}
+
+
+#' The fitted row each prediction row repeats
+#'
+#' A latent quantity the fit sampled per row, such as the noise-free
+#' value of an `me()` covariate or a missing value `mi()` imputes,
+#' belongs to that row. A prediction row holding the same values in
+#' `cols` as a fitted row, missing values included, takes that row's
+#' draws. Every other row is new. Its latent values are drawn afresh.
+#'
+#' @param newdata The prediction frame
+#' @param data The fitted model's data
+#' @param cols The columns that identify a row
+#' @param shared `FALSE` to pair identical fitted rows with identical
+#'   prediction rows in order. `TRUE` to give every identical prediction
+#'   row the first identical fitted row, as each observation of a trend
+#'   cell takes the cell's draws.
+#' @return Integer vector along the rows of `newdata`: the fitted row
+#'   each repeats, or `NA` for a new row
+#' @noRd
+fitted_row_index <- function(newdata, data, cols = names(data),
+                             shared = FALSE) {
+  checkmate::assert_data_frame(newdata)
+  checkmate::assert_data_frame(data)
+  checkmate::assert_subset(cols, names(data))
+  checkmate::assert_flag(shared)
+  if (!all(cols %in% names(newdata))) {
+    return(rep(NA_integer_, nrow(newdata)))
+  }
+  # One key column per identifying column. Paired rows add the
+  # occurrence of the row among the rows identical to it.
+  keyed <- function(frame, id) {
+    out <- lapply(stats::setNames(cols, paste0(".k", seq_along(cols))),
+                  function(v) {
+                    x <- frame[[v]]
+                    if (is.factor(x)) as.character(x) else as.vector(x)
+                  })
+    out <- as.data.frame(out)
+    if (!shared) {
+      out$.occurrence <- data.table::rowidv(out, names(out))
+    }
+    out[[id]] <- seq_len(nrow(frame))
+    out
+  }
+  fitted <- keyed(data, ".fitted")
+  if (shared) {
+    fitted <- fitted[!duplicated(fitted[setdiff(names(fitted), ".fitted")]),
+                     , drop = FALSE]
+  }
+  joined <- merge(keyed(newdata, ".new"), fitted, all.x = TRUE,
+                  sort = FALSE)
+  joined$.fitted[order(joined$.new)]
+}
+
+
+#' The special terms of one predictor, each with its formula term
+#'
+#' The model has one coefficient `bsp<sfx>[j]` per column of the special
+#' terms' design. Each row of the frame is one column, with its `coef`
+#' name, its `mo()`, `me()` and `mi()` calls and the covariate `Ic`
+#' multiplying it. `mo(x):f` is one formula term with a column per
+#' level of `f` after the first. The design here replaces each special
+#' call by a column of ones. Its `assign` attribute then places each
+#' column in its formula term.
+#'
+#' @param pred The predictor's `brmsterms` entry
+#' @param data The fitted model's data
+#' @return One row per coefficient, each with a `label` column naming
+#'   its formula term. Empty without special terms.
+#' @noRd
+special_term_frame <- function(pred, data) {
+  checkmate::assert_data_frame(data)
+  form <- pred[["sp"]]
+  if (!inherits(form, "formula")) return(data.frame())
+  frame <- utils::getFromNamespace("frame_sp", "brms")(pred, data)
+  labels <- formula_term_labels(form)
+  # Each distinct special part becomes a column of ones, `.sp<k>`
+  specials <- character(0L)
+  terms <- character(length(labels))
+  for (i in seq_along(labels)) {
+    parts <- interaction_parts(str2lang(labels[i]))
+    for (j in seq_along(parts)) {
+      if (length(find_calls(parts[[j]], c("mo", "me", "mi"))) == 0L) next
+      key <- deparse1(parts[[j]])
+      specials <- union(specials, key)
+      parts[[j]] <- as.name(paste0(".sp", match(key, specials)))
+    }
+    terms[i] <- deparse1(Reduce(function(a, b) call(":", a, b), parts))
+  }
+  data[paste0(".sp", seq_along(specials))] <- 1
+  # The intercept gives a factor in an interaction treatment contrasts,
+  # one column per level after the first. The columns themselves carry
+  # no intercept.
+  assign <- design_columns(stats::reformulate(terms), data)
+  assign <- assign[names(assign) != "Intercept"]
+  if (length(assign) != nrow(frame)) {
+    stop_mvgam_fault(
+      "Each special-term coefficient must belong to one formula term.",
+      paste0(nrow(frame), " coefficients and ", length(assign),
+             " design columns.")
+    )
+  }
+  frame$label <- labels[assign]
+  frame
+}
+
+
+#' The measurement-error terms of a model, numbered model-wide
+#'
+#' @param formula The model's `brmsformula` or `mvbrmsformula`
+#' @param data The fitted model's data
+#' @return One row per `me()` term, with its call `term`, covariate
+#'   `xname`, grouping `grname` and coefficient name `coef`. Row `k` is
+#'   the term whose data are `Xn_<k>` and `noise_<k>`.
+#' @noRd
+me_term_frame <- function(formula, data) {
+  checkmate::assert_data_frame(data)
+  utils::getFromNamespace("frame_me", "brms")(brms_terms(formula), data)
+}
+
+
+#' The parts of an interaction, `a:b:c` as `a`, `b` and `c`
+#'
+#' @param expr A parsed term
+#' @return List of expressions
+#' @noRd
+interaction_parts <- function(expr) {
+  if (is.call(expr) && identical(expr[[1L]], as.name(":"))) {
+    return(c(interaction_parts(expr[[2L]]), interaction_parts(expr[[3L]])))
+  }
+  list(expr)
+}
+
+
+#' Restore the term numbers an ordinal design lacks
+#'
+#' The thresholds replace the intercept column of an ordinal
+#' predictor's design and of its category-specific design `Xcs`.
+#' Removing the column dropped `attr(X, "assign")`,
+#' the term of each column. The numbers come back from
+#' `design_columns()` on the fitted data. The fitted data fix the factor
+#' levels, which fixes the columns.
+#'
+#' @param sdata Stan data from `brms::standata(internal = TRUE)`
+#' @param predictors What `model_predictors()` gives for the model
+#' @param data The fitted model's data
+#' @return `sdata`, each design carrying its `assign` attribute
+#' @noRd
+restore_fixed_assign <- function(sdata, predictors, data) {
+  checkmate::assert_data_frame(data)
+  # Each design, by the `brmsterms` entry holding its formula
+  designs <- c(fe = "X", cs = "Xcs")
+  for (predictor in predictors) {
+    for (part in names(designs)) {
+      name <- paste0(designs[[part]], predictor$suffix)
+      X <- sdata[[name]]
+      if (is.null(X) || ncol(X) == 0L || !is.null(attr(X, "assign"))) {
+        next
+      }
+      assign <- design_columns(predictor$pred[[part]], data)
+      assign <- unname(assign[names(assign) != "Intercept"])
+      if (length(assign) != ncol(X)) {
+        stop_mvgam_fault(
+          "An ordinal design must match the model matrix of its terms.",
+          paste0("'", name, "' has ", ncol(X), " columns and the model ",
+                 "matrix ", length(assign), ".")
+        )
+      }
+      attr(sdata[[name]], "assign") <- assign
+    }
+  }
+  sdata
+}
+
+
+#' The columns of a term formula's design, named as the draws name them
+#'
+#' `brms_rename()` names each column: the intercept `Intercept` and a
+#' level `B` of a factor `f` `fB`.
+#'
+#' @param form A `brmsterms` formula, such as a predictor's `fe` or
+#'   `cs` entry or a group-level block's `form`, or `NULL`
+#' @param data A data frame holding the formula's variables
+#' @return Integer vector of term numbers, as `attr(X, "assign")` holds
+#'   them, named by column. Empty for a `NULL` formula.
+#' @noRd
+design_columns <- function(form, data) {
+  checkmate::assert_data_frame(data)
+  if (!inherits(form, "formula")) return(integer(0L))
+  X <- stats::model.matrix(stats::terms(form), data)
+  stats::setNames(attr(X, "assign"), brms_rename(colnames(X)))
 }

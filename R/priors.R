@@ -896,9 +896,7 @@ brmsprior_row_keys <- function(tab, cols) {
   cols <- intersect(cols, names(tab))
   # `c()` on a `brmsprior` adds priors. The columns are taken from a
   # plain list.
-  values <- lapply(unclass(tab)[cols], function(x) {
-    ifelse(is.na(x), "", as.character(x))
-  })
+  values <- lapply(unclass(tab)[cols], blank_if_na)
   do.call(paste, c(values, sep = "\r"))
 }
 
@@ -907,9 +905,13 @@ brmsprior_row_keys <- function(tab, cols) {
 #'
 #' Each row of `user_priors` is matched against `default_priors` on
 #' `brmsprior_key_cols`. An empty user-side key field (e.g.
-#' `coef = ""`) matches every row of that class. Matched rows take the
-#' user's `prior` string and `source`. A user row matching no default
-#' is appended.
+#' `resp = ""`) matches every value of that field. `coef` is the
+#' exception: a class-wide row matches only the class-wide default and
+#' the coefficients inherit it. `brms::validate_prior()` stores a
+#' class-wide prior the same way. A refit hands the table back to brms,
+#' which refuses a prior on one level of a by-factor `gp()` term.
+#' Matched rows take the user's `prior` string and `source`. A user row
+#' matching no default is appended.
 #'
 #' @param default_priors A `brmsprior` data frame; the table to merge
 #'   onto. Must include a `source` column.
@@ -926,7 +928,7 @@ merge_user_priors <- function(default_priors, user_priors,
   checkmate::assert_class(default_priors, "brmsprior")
   checkmate::assert_class(user_priors, "brmsprior", null.ok = TRUE)
   checkmate::assert_string(source, min.chars = 1L)
-  if (is.null(user_priors) || nrow(user_priors) == 0L) {
+  if (NROW(user_priors) == 0L) {
     return(default_priors)
   }
   key_cols <- intersect(
@@ -941,6 +943,10 @@ merge_user_priors <- function(default_priors, user_priors,
     for (col in key_cols) {
       full_val <- default_priors[[col]]
       user_val <- row[[col]]
+      if (col == "coef" && is_wildcard(user_val)) {
+        keep <- keep & is_wildcard(full_val)
+        next
+      }
       keep <- keep & (is_wildcard(user_val) |
                         (full_val == user_val) |
                         (is.na(full_val) & is.na(user_val)))
@@ -992,7 +998,7 @@ merge_user_priors <- function(default_priors, user_priors,
 overlay_family_default_priors <- function(obs_priors, formula, family) {
   checkmate::assert_class(obs_priors, "brmsprior")
   defaults <- response_default_priors(formula, family)
-  if (is.null(defaults) || nrow(defaults) == 0L) {
+  if (NROW(defaults) == 0L) {
     return(obs_priors)
   }
   merge_user_priors(obs_priors, defaults, source = "default")
@@ -1042,7 +1048,7 @@ assemble_stored_prior_table <- function(obs_priors, trend_priors,
     combined, combined_stancode,
     brms_owned = paste0(brms_trend, "_trend")
   )
-  if (!is.null(user_prior) && nrow(user_prior) > 0L) {
+  if (NROW(user_prior) > 0L) {
     lifted <- merge_user_priors(lifted, user_prior)
   }
   # Hidden on the table the fit stores and `prior_summary()` returns.
@@ -1118,7 +1124,7 @@ is_constant_prior <- function(x) {
 #' @noRd
 add_trend_suffix_to_priors <- function(trend_priors) {
   checkmate::assert_class(trend_priors, "brmsprior", null.ok = TRUE)
-  if (is.null(trend_priors) || nrow(trend_priors) == 0L) return(NULL)
+  if (NROW(trend_priors) == 0L) return(NULL)
   out <- suffix_trend_prior_classes(trend_priors)
   structure(out, class = c("brmsprior", "data.frame"))
 }
@@ -1152,7 +1158,7 @@ prior_field <- function(prior, col) {
 #' @noRd
 suffix_trend_prior_classes <- function(priors) {
   checkmate::assert_data_frame(priors, null.ok = TRUE)
-  if (is.null(priors) || nrow(priors) == 0L) return(priors)
+  if (NROW(priors) == 0L) return(priors)
   bookkeeping_sigma <- priors$class %in% brms_trend_dropped_params &
     !nzchar(prior_field(priors, "coef"))
   priors <- priors[!bookkeeping_sigma, , drop = FALSE]
@@ -1321,7 +1327,9 @@ check_trend_priors <- function(priors, defaults, constructor_classes) {
     siblings <- own$prior[key(own, cell) == key(priors[i, ], cell)]
     length(siblings) > 0L && all(nzchar(siblings))
   }, logical(1L))
-  for (i in which(unused)) {
+  # A blank class-wide row sets nothing. `update()` inherits one from
+  # the fitted table for every `gp()` length-scale.
+  for (i in which(unused & nzchar(trimws(priors$prior)))) {
     coefs <- own$coef[key(own, cell) == key(priors[i, ], cell)]
     insight::format_warning(c(
       paste0("Every coefficient of class '", priors$class[i],
@@ -1336,6 +1344,53 @@ check_trend_priors <- function(priors, defaults, constructor_classes) {
             constructor = constructor[!unused])
 }
 
+
+
+#' Refuse a prior on one level of a by-factor `gp()` term
+#'
+#' A `by` factor gives a `gp()` term one process per level. brms
+#' samples their marginal SDs as one vector under one prior.
+#' `get_prior()` lists a `sdgp` row per level, but brms stops with
+#' `all(index == 1L) is not TRUE` when one of them carries a prior.
+#'
+#' @param prior A `brmsprior` handed to brms, or NULL
+#' @param formula The formula handed to brms with it
+#' @param data The data handed to brms with it
+#' @param class_suffix `"_trend"` when the rows came from the trend
+#'   formula. The message names the class as the user wrote it.
+#' @return `NULL`, invisibly
+#' @noRd
+refuse_gp_level_sd_priors <- function(prior, formula, data,
+                                      class_suffix = "") {
+  checkmate::assert_class(prior, "brmsprior", null.ok = TRUE)
+  checkmate::assert_data_frame(data)
+  checkmate::assert_string(class_suffix)
+  set <- !is.null(prior) && any(prior$class == "sdgp" &
+                                  nzchar(prior$coef) & nzchar(prior$prior))
+  if (!set) {
+    return(invisible(NULL))
+  }
+  levels <- unlist(lapply(model_predictors(formula), function(lp) {
+    lapply(brms_gp_terms(lp$pred[["gp"]]), function(g) {
+      labels <- brms_gp_labels(g, data)
+      if (length(labels) > 1L) labels
+    })
+  }))
+  bad <- prior$class == "sdgp" & nzchar(prior$prior) &
+    prior$coef %in% levels
+  if (!any(bad)) {
+    return(invisible(NULL))
+  }
+  cls <- paste0("sdgp", class_suffix)
+  stop(insight::format_error(c(
+    "A prior on one level of a by-factor 'gp()' term is not supported.",
+    x = paste0("Given for class '", cls, "', coef '", prior$coef[bad][1L],
+               "'."),
+    i = "brms samples the SDs of all levels under one prior.",
+    i = paste0("Set it for the class, as in 'prior(exponential(1), ",
+               "class = ", cls, ")'.")
+  )), call. = FALSE)
+}
 
 
 #' The user's prior on a class mvgam samples itself
@@ -1861,10 +1916,6 @@ get_prior.mvgam_formula <- function(object, data, family = gaussian(),
     return(obs_priors)
   }
 
-  # Each response's column, named by its key, as the fitting path
-  # builds them
-  response_vars <- response_columns(formula)
-
   mv_spec <- parse_multivariate_trends(formula, trend_formula)
 
   mv_spec$trend_specs <- prepare_trend_specs(
@@ -1875,7 +1926,7 @@ get_prior.mvgam_formula <- function(object, data, family = gaussian(),
   # formula has its `by = lv_axis()` terms rewritten to the columns
   # the trend data holds.
   components <- extract_and_validate_trend_components(
-    data, mv_spec, response_vars, family = family
+    data, mv_spec, formula, family = family
   )
   trend_head <- trend_spec_head(components$enhanced_mv_spec$trend_specs)
   trend_priors <- generate_trend_priors(

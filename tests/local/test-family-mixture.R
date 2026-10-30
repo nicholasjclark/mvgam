@@ -979,4 +979,10 @@ test_that("an argument these methods cannot read is refused", {
 })
 
 
+test_that("each part's response-scale share is the fit's own: hurdle and zero-inflated", {
+  expect_epred_parts(fit)
+  expect_epred_parts(fit2)
+  expect_epred_parts(fit3)
+})
+
 cat("\nDone.\n")

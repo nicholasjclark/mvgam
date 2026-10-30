@@ -1,7 +1,7 @@
-# Shared ggplot building blocks for every plot method in mvgam.
-# Defines the palette, theme, ribbon stacking,
-# observation overlays, faceting, and label-repel wrappers.
-# Nothing in this file is exported.
+# Shared ggplot building blocks for every plot method in mvgam: the
+# colour schemes, the exported `mvgam_theme()`, posterior ribbons and
+# medians, observation overlays, faceting, label repelling, and the
+# heatmaps of correlation and coefficient matrices.
 
 #' A bayesplot colour scheme, by name or the active one
 #'
@@ -83,14 +83,7 @@ restore_color_scheme <- function(cs) {
 #' @return The value of `expr`
 #' @noRd
 with_color_scheme <- function(expr, scheme = "red") {
-  checkmate::assert_string(scheme)
-  prior <- bayesplot::color_scheme_get()
-  prior_theme <- bayesplot::bayesplot_theme_set(mvgam_theme())
-  bayesplot::color_scheme_set(scheme)
-  on.exit({
-    restore_color_scheme(prior)
-    bayesplot::bayesplot_theme_set(prior_theme)
-  }, add = TRUE)
+  set_color_scheme_local(scheme)
   force(expr)
 }
 
@@ -386,16 +379,12 @@ mvgam_band_layer <- function(
   fill = NULL
 ) {
   checkmate::assert_numeric(
-    probs, lower = 0, upper = 1, min.len = 1L, any.missing = FALSE
+    probs, lower = 0, upper = 1, min.len = 1L, any.missing = FALSE,
+    unique = TRUE
   )
   checkmate::assert_matrix(draws_mat)
   checkmate::assert_character(palette, min.len = 1L)
   checkmate::assert_string(fill, null.ok = TRUE)
-  if (any(duplicated(probs))) {
-    stop(insight::format_error(
-      "'probs' must be unique."
-    ), call. = FALSE)
-  }
   # Widest first. The narrowest band is drawn last.
   probs <- sort(probs, decreasing = TRUE)
   # A single fill suits a secondary band, such as the grey hindcast
@@ -523,7 +512,7 @@ mvgam_cut_layer <- function(
   checkmate::assert_atomic(t_cut)
   checkmate::assert_string(linetype)
   checkmate::assert_string(colour)
-  if (is.null(t_cut) || length(t_cut) == 0L || all(is.na(t_cut))) {
+  if (length(t_cut) == 0L || all(is.na(t_cut))) {
     return(NULL)
   }
   ggplot2::geom_vline(
@@ -1064,117 +1053,3 @@ reorder_clusters <- function(x, dis) {
 }
 
 
-#' Resolve per-draw factor loadings for a fitted mvgam.
-#'
-#' Returns a `[ndraws, n_series, n_lv]` array of Z loadings whether
-#' Z was sampled (the default factor model) or fixed by a
-#' `trend_map`. Every method that needs Z calls this resolver, which
-#' holds the choice between the fixed and sampled paths.
-#'
-#' Two calling styles:
-#' - Object style: `resolve_factor_loadings(object = fit)`. The
-#'   resolver takes `fixed_Z`, `n_lv` and `n_series` from the fit
-#'   and extracts draws as needed.
-#' - Explicit style: `resolve_factor_loadings(fixed_Z = ...,
-#'   draws_mat = ..., n_series = ..., n_lv = ...)`. `n_series` and
-#'   `n_lv` are required in this style. `draw_innovation_grid()`
-#'   uses it with draws it has already extracted.
-#'
-#' A fully populated `fixed_Z` is repeated for every draw. Otherwise
-#' `extract_Z_loadings()` extracts the draws. A fit identified by the
-#' QR rotation stores `Z_tilde[i, j]`. Every other factor fit stores
-#' `Z[i, j]`.
-#'
-#' @param object Fitted mvgam object (object-style entry).
-#'   Required when callers omit `n_series`/`n_lv`.
-#' @param draws_mat Optional pre-extracted posterior draws.
-#'   Required when `object` is omitted and `fixed_Z` is NULL.
-#' @param fixed_Z Optional fixed-loadings matrix. With `object` it
-#'   defaults to `object$trend_metadata$fixed_Z`.
-#' @param n_lv Integer factor dimension. Required in
-#'   explicit-style; derived from `object` otherwise.
-#' @param n_series Integer series count. Required in
-#'   explicit-style; derived from `object` otherwise.
-#' @param basis `"identified"` returns the loadings a report or plot
-#'   shows. `"model"` returns the `Z` the model sampled. A caller
-#'   combining loadings with `sigma_trend`, `Sigma_trend` or
-#'   `Omega_trend` needs `"model"`: the model estimated those
-#'   parameters with the sampled `Z`. The two differ only in a fit
-#'   identified by the QR rotation.
-#'
-#' @return Numeric array of dimension `[ndraws, n_series, n_lv]`.
-#' @noRd
-resolve_factor_loadings <- function(object = NULL,
-                                    draws_mat = NULL,
-                                    fixed_Z = NULL,
-                                    n_lv = NULL,
-                                    n_series = NULL,
-                                    basis = c("identified", "model")) {
-  basis <- match.arg(basis)
-  checkmate::assert_matrix(draws_mat, null.ok = TRUE)
-  checkmate::assert_matrix(fixed_Z, null.ok = TRUE)
-  if (!is.null(object)) {
-    checkmate::assert_class(object, "mvgam")
-    if (is.null(fixed_Z)) {
-      fixed_Z <- object$trend_metadata$fixed_Z
-    }
-    if (is.null(n_lv)) {
-      n_lv <- object$trend_metadata$n_lv %||%
-        (if (!is.null(fixed_Z)) ncol(fixed_Z) else NULL)
-    }
-    n_series <- n_series %||% loading_series_count(object)
-  }
-  checkmate::assert_int(n_lv, lower = 1L)
-  checkmate::assert_int(n_series, lower = 1L)
-
-  # A partial Z marks its sampled entries with NA. The posterior
-  # stores every entry as `Z[i, j]`. The draws parser below handles
-  # that case.
-  fully_fixed <- !is.null(fixed_Z) && !anyNA(fixed_Z)
-  if (fully_fixed) {
-    # A fixed-Z fit stores Z in the Stan data. The posterior has no
-    # `Z[i, j]` columns. The matrix is repeated for every draw to
-    # match the sampled-Z return shape.
-    ndraws <- if (!is.null(draws_mat)) {
-      nrow(draws_mat)
-    } else if (!is.null(object)) {
-      posterior::ndraws(object)
-    } else {
-      stop_mvgam_fault(
-        "The fixed loadings need a draw count.",
-        "The caller passed 'object = NULL' and 'draws_mat = NULL'."
-      )
-    }
-    return(array(
-      rep(as.numeric(unname(fixed_Z)), each = ndraws),
-      dim = c(ndraws, n_series, n_lv)
-    ))
-  }
-
-  if (is.null(draws_mat)) {
-    if (is.null(object)) {
-      stop_mvgam_fault(
-        "The sampled loadings need draws.",
-        "The caller passed 'object = NULL' and 'draws_mat = NULL'."
-      )
-    }
-    draws_mat <- fit_draws(object$fit, c("Z", "Z_tilde"))
-  }
-  extract_Z_loadings(draws_mat, n_obs_series = n_series,
-                     n_lv = n_lv, basis = basis)
-}
-
-
-#' Posterior medians of a factor model's loadings
-#'
-#' @param object Fitted `mvgam` factor model
-#' @param n_lv Integer number of latent factors
-#' @return Numeric matrix `[n_series, n_lv]` with the fitted series as
-#'   row names
-#' @noRd
-factor_loading_medians <- function(object, n_lv) {
-  med <- apply(resolve_factor_loadings(object, n_lv = n_lv), c(2L, 3L),
-               stats::median)
-  rownames(med) <- fitted_series_levels(object)
-  med
-}

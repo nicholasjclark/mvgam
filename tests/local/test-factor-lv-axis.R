@@ -616,6 +616,11 @@ test_that("the trend linpred comes back at the series grain", {
   )
   expect_identical(dim(lp), c(20L, nrow(dat)))
   expect_false(anyNA(lp))
+  # Each term is projected through `Z` as the whole predictor is
+  parts <- extract_component_parts(
+    mvgam_fit = fit, newdata = dat, component = "trend", draw_ids = 1:20
+  )
+  expect_equal(Reduce(`+`, parts), lp)
 
   # The trend component is the deterministic submodel. The conditional
   # state is a different quantity, reached by the route that owns it.
@@ -986,9 +991,7 @@ test_that("the factor-axis smooth is drawn once per latent factor", {
 })
 
 
-test_that("summary and the criticism methods run on this fit", {
-  txt <- capture.output(summary(fit))
-  expect_true(any(grepl(paste0("Series:\\s*", n_species), txt)))
+test_that("the criticism methods run on this fit", {
   # `log_lik` answers per frame row, not per likelihood term, so it
   # spans all 300 rows while only 276 reached the model. A cell with
   # no response contributes no density, and it comes back non-finite
@@ -1228,6 +1231,11 @@ test_that("per-factor slopes are reported in the identified basis", {
   slopes <- paste0("elev:.trend", seq_len(N_lv), "_trend")
   expect_identical(rownames(fixef(fit_slope, trend_effects = TRUE)), slopes)
   expect_false(any(grepl("^b_trend\\[", variables(fit_slope))))
+})
+
+test_that("the predictor's parts sum to it: by-factor trend terms and factors", {
+  expect_parts_sum(fit, c("state (Factor 1)", "state (Factor 2)"),
+                   newdata = dat_obs)
 })
 
 cat("\nDone.\n")

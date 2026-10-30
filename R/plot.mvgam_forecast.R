@@ -110,11 +110,8 @@ plot.mvgam_forecast <- function(
 
   if (!have_fc && !have_hc) {
     stop(insight::format_error(c(
-      "Nothing to plot: object has neither hindcasts nor forecasts.",
-      i = paste0(
-        "Was the source object constructed by hindcast() / ",
-        "forecast()?"
-      )
+      "Plotting needs hindcasts or forecasts in the object.",
+      i = "Create it with 'hindcast()' or 'forecast()'."
     )), call. = FALSE)
   }
 
@@ -185,7 +182,7 @@ resolve_series <- function(series, series_levels) {
           "The fit has ", length(series_levels), " series: ",
           paste0("'", series_levels, "'", collapse = ", "), "."
         )
-      )))
+      )), call. = FALSE)
     }
     return(as.integer(series))
   }
@@ -201,13 +198,13 @@ resolve_series <- function(series, series_levels) {
           "Available: ",
           paste0("'", series_levels, "'", collapse = ", "), "."
         )
-      )))
+      )), call. = FALSE)
     }
     return(match(series, series_levels))
   }
   stop(insight::format_error(
     "'series' must be NULL, numeric, character or 'all'."
-  ))
+  ), call. = FALSE)
 }
 
 

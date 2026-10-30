@@ -118,15 +118,19 @@ default_plot_variables <- function(x) {
 #' belong to no bucket.
 #'
 #' @param x A fitted `mvgam` object
+#' @param latents Whether to add each side's `latent` values, which
+#'   predictions use and the tables leave out
 #' @return A named list of character vectors of Stan names, each
 #'   possibly empty: `observation_pars`, `observation_betas`,
 #'   `observation_smoothpars`, `observation_re_params`, `trend_pars`,
-#'   `trend_betas`, `trend_smoothpars` and `trend_re_params`. A
-#'   population block holds brms's centred intercept and the uncentred
+#'   `trend_betas`, `trend_smoothpars` and `trend_re_params`. Under
+#'   `latents = TRUE` it adds `observation_latents` and `trend_latents`.
+#'   A population block holds brms's centred intercept and the uncentred
 #'   `b_Intercept` both.
 #' @noRd
-categorize_mvgam_parameters <- function(x) {
+categorize_mvgam_parameters <- function(x, latents = FALSE) {
   checkmate::assert_class(x, "mvgam")
+  checkmate::assert_flag(latents)
 
   # The names Stan wrote, which the prediction pipeline subsets the
   # draws by. The names a user reads are `mvgam_user_pars()`'s.
@@ -140,7 +144,7 @@ categorize_mvgam_parameters <- function(x) {
   smooths <- c("smooth_sd", "smooth_coef", "gp", "gp_coef")
   ranef <- c("ranef_sd", "ranef_coef")
 
-  list(
+  out <- list(
     observation_pars = pick("family", "observation"),
     observation_betas = pick(betas, "observation"),
     observation_smoothpars = pick(smooths, "observation"),
@@ -155,16 +159,22 @@ categorize_mvgam_parameters <- function(x) {
     trend_smoothpars = pick(smooths, "trend"),
     trend_re_params = pick(ranef, "trend")
   )
+  if (latents) {
+    out$observation_latents <- pick("latent", "observation")
+    out$trend_latents <- pick("latent", "trend")
+  }
+  out
 }
 
 
 #' The parameter names of one side of a fit
 #'
 #' The observation side holds the family's parameters, the
-#' population-level coefficients, the smooths and the group-level terms
-#' of the observation model. The trend side holds the same of the trend
-#' model with its dynamics and loadings. The trend's state arrays are
-#' derived quantities and belong to neither.
+#' population-level coefficients, the smooths, the group-level terms
+#' and the special terms' latent values of the observation model. The
+#' trend side holds the same of the trend model with its dynamics and
+#' loadings. The trend's state arrays are derived quantities and belong
+#' to neither.
 #'
 #' @param mvgam_fit A fitted `mvgam` object
 #' @param side `"obs"` or `"trend"`
@@ -174,8 +184,9 @@ side_parameters <- function(mvgam_fit, side) {
   checkmate::assert_class(mvgam_fit, "mvgam")
   checkmate::assert_choice(side, c("obs", "trend"))
   prefix <- if (identical(side, "obs")) "observation" else "trend"
-  buckets <- categorize_mvgam_parameters(mvgam_fit)[
-    paste0(prefix, c("_pars", "_betas", "_smoothpars", "_re_params"))
+  buckets <- categorize_mvgam_parameters(mvgam_fit, latents = TRUE)[
+    paste0(prefix, c("_pars", "_betas", "_smoothpars", "_re_params",
+                     "_latents"))
   ]
   as.character(unlist(buckets, use.names = FALSE))
 }

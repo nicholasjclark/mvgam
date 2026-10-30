@@ -17,7 +17,7 @@
 #'   expressions. Recognised keywords:
 #'   \itemize{
 #'     \item `"betas"`: population-level coefficients, the set
-#'       [brms::fixef()] reports (`b_*`, `bs_*` and `bsp_*`).
+#'       [brms::fixef()] reports (`b_*`, `bs_*`, `bsp_*` and `bcs_*`).
 #'     \item `"obs_params"`: observation-family distributional
 #'       parameters (`sigma`, `phi`, `shape`, ...).
 #'     \item `"smooth_params"`: smooth-term standard deviations
@@ -140,17 +140,17 @@ mvgam_beta_aliases <- function(x) {
   checkmate::assert_class(x, "mvgam")
   # brms's stancode centres the design matrix whenever an Intercept
   # column is present: `b[k]` then enumerates the K - 1 non-Intercept
-  # columns. Without an Intercept the mapping is direct. Every
-  # linear predictor gets its own design-matrix block in standata:
+  # columns. Without an Intercept the mapping is direct. Every linear
+  # predictor gets its own design-matrix block in standata, named by
+  # the suffix `model_predictors()` gives it:
   #   `X`             obs main formula  -> b[k]            -> b_<term>
   #   `X_<resp>`      MV response       -> b_<resp>[k]     -> b_<resp>_<term>
   #   `X_<dpar>`      dpar formula      -> b_<dpar>[k]     -> b_<dpar>_<term>
   #   `X_<nlpar>`     nl sub-formula    -> b_<nlpar>[k]    -> b_<nlpar>_<term>
   #   `X_trend`       mvgam-only        -> b_trend[k]      -> b_<term>_trend
   # The trend block takes a name suffix and every other block a
-  # prefix. One sweep over `names(x$standata)` builds the whole map.
-  # brms does not centre a non-linear sub-formula's design: the
-  # columns of `X_<nlpar>` match `b_<nlpar>` one to one, with the
+  # prefix. brms does not centre a non-linear sub-formula's design:
+  # the columns of `X_<nlpar>` match `b_<nlpar>` one to one, with the
   # Intercept at position 1. `strip_intercept = FALSE` states that.
   build <- function(X, pos_prefix, alias_prefix, alias_suffix,
                     strip_intercept = TRUE) {
@@ -158,9 +158,6 @@ mvgam_beta_aliases <- function(x) {
       return(character(0L))
     }
     cn <- colnames(X)
-    if (length(cn) == 0L) {
-      return(character(0L))
-    }
     if (strip_intercept && identical(cn[1L], "Intercept")) {
       cn <- cn[-1L]
     }
@@ -171,59 +168,49 @@ mvgam_beta_aliases <- function(x) {
     old <- paste0(pos_prefix, "[", seq_along(cn), "]")
     stats::setNames(old, new)
   }
-  # brms stores a non-linear sub-formula in `pforms` under its nlpar
-  # name. It treats the formula as non-linear only when the top-level
-  # formula carries `attr(., "nl") = TRUE`. The per-block branch below
-  # tests the names found here.
-  obs_form <- x$formula
-  is_nl <- isTRUE(attr(
-    if (inherits(obs_form, "brmsformula")) obs_form$formula else obs_form,
-    "nl"
-  ))
-  nlpar_names <- if (is_nl && inherits(obs_form, "brmsformula")) {
-    names(obs_form$pforms %||% list())
-  } else {
-    character(0L)
+  sdata <- x$standata
+  obs <- lapply(model_predictors(side_model(x, "obs")$formula), function(lp) {
+    p <- lp$suffix
+    c(
+      build(sdata[[paste0("X", p)]], paste0("b", p),
+            paste0("b", p, "_"), "", strip_intercept = is.null(lp$nlpar)),
+      # The unpenalised part of each smooth: `bs<p>[k]` maps to
+      # `bs<p>_<colname>`. brms keeps no intercept column in `Xs`.
+      build(sdata[[paste0("Xs", p)]], paste0("bs", p), paste0("bs", p, "_"),
+            "", strip_intercept = FALSE),
+      cs_aliases(sdata[[paste0("Xcs", p)]], sdata[[paste0("nthres", p)]], p)
+    )
+  })
+  # A slope that varies by factor is reported in the identified factor
+  # basis
+  rotated <- isTRUE(x$trend_metadata$has_by_lv) &&
+    identical(fit_factor_identification(x), "rotation")
+  c(unlist(obs),
+    build(sdata$X_trend, if (rotated) "b_trend_tilde" else "b_trend", "b_",
+          "_trend"),
+    build(sdata$Xs_trend, "bs_trend", "bs_", "_trend",
+          strip_intercept = FALSE))
+}
+
+
+#' The brms names of a predictor's category-specific coefficients
+#'
+#' `bcs<p>[j, k]` is column `j` of `Xcs<p>` at threshold `k`, which
+#' brms names `bcs<p>_<column>[k]`.
+#'
+#' @param Xcs The predictor's category-specific design, or `NULL`
+#' @param n_thres The response's number of thresholds, or `NULL`
+#' @param p The predictor's suffix
+#' @return Named character vector mapping brms names to Stan names
+#' @noRd
+cs_aliases <- function(Xcs, n_thres, p) {
+  if (is.null(Xcs) || ncol(Xcs) == 0L || is.null(n_thres)) {
+    return(character(0L))
   }
-  X_blocks <- grep("^X(_.+)?$", names(x$standata), value = TRUE)
-  parts <- lapply(X_blocks, function(blk) {
-    X <- x$standata[[blk]]
-    if (identical(blk, "X")) {
-      build(X, "b", "b_", "")
-    } else if (identical(blk, "X_trend")) {
-      # A slope that varies by factor is reported in the identified
-      # factor basis
-      rotated <- isTRUE(x$trend_metadata$has_by_lv) &&
-        identical(fit_factor_identification(x), "rotation")
-      build(X, if (rotated) "b_trend_tilde" else "b_trend", "b_", "_trend")
-    } else {
-      suffix <- sub("^X_", "", blk)
-      build(
-        X,
-        pos_prefix = paste0("b_", suffix),
-        alias_prefix = paste0("b_", suffix, "_"),
-        alias_suffix = "",
-        strip_intercept = !(suffix %in% nlpar_names)
-      )
-    }
-  })
-  # The unpenalised part of each smooth: `bs<p>[k]` maps to
-  # `bs<p>_<colname>`, the column named in the matching `Xs<p>`
-  # block, for every predictor `<p>` as the `X` sweep above names
-  # them. brms keeps no intercept column in `Xs`. Each index maps to
-  # the column at that position.
-  Xs_blocks <- grep("^Xs(_.+)?$", names(x$standata), value = TRUE)
-  bs_parts <- lapply(Xs_blocks, function(blk) {
-    suffix <- sub("^Xs", "", blk)
-    if (identical(suffix, "_trend")) {
-      build(x$standata[[blk]], "bs_trend", "bs_", "_trend",
-            strip_intercept = FALSE)
-    } else {
-      build(x$standata[[blk]], paste0("bs", suffix),
-            paste0("bs", suffix, "_"), "", strip_intercept = FALSE)
-    }
-  })
-  c(unlist(parts), unlist(bs_parts))
+  coefs <- cs_coef_frame(colnames(Xcs), n_thres)
+  j <- match(coefs$var, colnames(Xcs))
+  stats::setNames(paste0("bcs", p, "[", j, ",", coefs$threshold, "]"),
+                  paste0("bcs", p, "_", coefs$name))
 }
 
 
@@ -270,15 +257,16 @@ mvgam_smooth_aliases <- function(x, raw) {
 
 #' The brms names of Gaussian-process and special terms
 #'
-#' brms numbers these by position within each predictor `<p>`. The
-#' internal brms functions `rename_gp()` and `rename_sp()` name them by
-#' term.
+#' The Stan names number these by position within each predictor `<p>`.
+#' The brms names name them by term.
 #' * `sdgp<p>_<i>[k]` becomes `sdgp<p>_<label k>`
 #' * `lscale<p>_<i>[k, d]` becomes `lscale<p>_<label k><covariate d>`,
 #'   or `lscale<p>_<label k>` when isotropic
 #' * `zgp<p>_<i>[_j][m]` becomes `zgp<p>_<label j>[m]`
-#' * `bsp<p>[k]` becomes `bsp<p>_<term k>`
-#' * `simo<p>_<i>[m]` becomes `simo<p>_<term><n>[m]`, one per `mo()`
+#' * `bsp<p>[k]` becomes `bsp<p>_<coef k>`, one per column of the
+#'   special terms' design
+#' * `simo<p>_<i>[m]` becomes `simo<p>_<coef><n>[m]` for the `n`-th
+#'   `mo()` call of a coefficient
 #'
 #' A GP label joins `gp`, its covariates, its `by` variable and each
 #' level of a `by` factor. A trend-side name takes `_trend` before its
@@ -296,8 +284,15 @@ mvgam_special_aliases <- function(x, raw) {
   }
   rename_block <- function(old_prefix, new_names, sfx) {
     old <- raw[startsWith(raw, paste0(old_prefix, sfx, "["))]
-    if (length(old) != length(new_names)) {
+    if (length(old) == 0L) {
       return(character(0L))
+    }
+    if (length(old) != length(new_names)) {
+      stop_mvgam_fault(
+        "Each draw of a parameter block must have one brms name.",
+        paste0("'", old_prefix, sfx, "' has ", length(old), " draws and ",
+               length(new_names), " names.")
+      )
     }
     stats::setNames(old, paste0(new_names, sfx))
   }
@@ -312,9 +307,9 @@ mvgam_special_aliases <- function(x, raw) {
     sfx <- if (identical(side, "trend")) "_trend" else ""
     for (lp in model_predictors(model$formula)) {
       p <- lp$suffix
-      gp_terms <- formula_term_labels(lp$pred[["gp"]])
+      gp_terms <- brms_gp_terms(lp$pred[["gp"]])
       for (i in seq_along(gp_terms)) {
-        g <- eval(str2lang(gp_terms[i]), list(gp = brms::gp))
+        g <- gp_terms[[i]]
         labels <- brms_gp_labels(g, model$data)
         cells <- if (isTRUE(g$iso)) labels else {
           as.vector(outer(labels, g$term, paste0))
@@ -337,16 +332,15 @@ mvgam_special_aliases <- function(x, raw) {
         }
         out <- c(out, unlist(zgp))
       }
-      sp_terms <- formula_term_labels(lp$pred[["sp"]])
-      if (length(sp_terms)) {
-        coefs <- brms_rename(sp_terms)
+      special <- special_term_frame(lp$pred, model$data)
+      if (NROW(special) > 0L) {
         out <- c(out, rename_block(paste0("bsp", p),
-                                   paste0("bsp", p, "_", coefs), sfx))
-        n_mo <- lengths(regmatches(sp_terms,
-                                   gregexpr("\\bmo\\(", sp_terms)))
-        simo <- unlist(Map(function(coef, n) {
-          if (n > 0L) paste0(coef, seq_len(n))
-        }, coefs, n_mo), use.names = FALSE)
+                                   paste0("bsp", p, "_", special$coef), sfx))
+        # `Imo` numbers each coefficient's `mo()` calls in turn. A
+        # coefficient without one has no simplex.
+        simo <- unlist(Map(function(coef, mo) {
+          if (length(mo)) paste0(coef, seq_along(mo))
+        }, special$coef, special$Imo), use.names = FALSE)
         for (i in seq_along(simo)) {
           out <- c(out, rename_vector(paste0("simo", p, "_", i),
                                       paste0("simo", p, "_", simo[i]), sfx))
@@ -360,7 +354,7 @@ mvgam_special_aliases <- function(x, raw) {
 
 #' The label of each Gaussian process a `gp()` term fits
 #'
-#' Follows the internal brms function `frame_gp()`. The label joins
+#' The label joins
 #' `gp`, the covariates and the `by` variable. A `by` factor fits one
 #' process per column of its cell-means design, labelled by level.
 #'
@@ -400,6 +394,36 @@ formula_term_labels <- function(form) {
     return(character(0L))
   }
   attr(stats::terms(form), "term.labels")
+}
+
+
+#' The term calls of a component formula
+#'
+#' @inheritParams formula_term_labels
+#' @return List of language objects, one per term label and named by
+#'   it, empty for a non-formula
+#' @noRd
+formula_term_calls <- function(form) {
+  labels <- formula_term_labels(form)
+  if (length(labels) == 0L) {
+    return(list())
+  }
+  stats::setNames(lapply(labels, str2lang), labels)
+}
+
+
+#' What `brms::gp()` gives for each `gp()` term of a component formula
+#'
+#' Each term is evaluated in the formula's environment, where a setting
+#' such as `k = kk` finds its object.
+#'
+#' @param gp_form The `gp` entry of a predictor's `brmsterms`, or
+#'   `NULL`
+#' @return Named list, one entry per term, named by its label
+#' @noRd
+brms_gp_terms <- function(gp_form) {
+  lapply(formula_term_calls(gp_form), eval, envir = list(gp = brms::gp),
+         enclos = environment(gp_form) %||% baseenv())
 }
 
 
@@ -660,7 +684,7 @@ mvgam_ranef_metadata <- function(x,
   } else {
     x$obs_model$ranef
   }
-  if (is.null(reframe) || nrow(reframe) == 0L) {
+  if (NROW(reframe) == 0L) {
     return(NULL)
   }
   group_levels <- lapply(attr(reframe, "levels"), function(lv) {

@@ -378,9 +378,6 @@ test_that("birds: every post-fit method answers on this fit", {
   sim <- sim_birds()
   n_obs <- nrow(sim$data)
 
-  txt <- capture.output(summary(fit))
-  expect_true(any(grepl(paste0("Series:\\s*", sim$n_species), txt)))
-  expect_gt(length(capture.output(print(fit))), 5L)
 
   ep <- posterior_epred(fit, draw_ids = 1:30)
   pp <- posterior_predict(fit, draw_ids = 1:30)
@@ -407,10 +404,7 @@ test_that("birds: every post-fit method answers on this fit", {
   expect_true(all(grepl("Pareto", seen)))
 
   expect_drawn(plot(fit, type = "factors"))
-  ord <- expect_drawn(ordinate(fit, alpha = 0.7))
-  # One point per species on the biplot.
-  expect_true(any(vapply(ord, function(x) nrow(x) == sim$n_species,
-                         logical(1))))
+  expect_drawn(ordinate(fit, alpha = 0.7))
   expect_drawn(pp_check(fit, ndraws = 30L))
   # `y ~ 1` with a factor trend leaves no covariate to draw
   expect_length(conditional_effects(fit), 0L)

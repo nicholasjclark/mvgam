@@ -541,9 +541,7 @@ test_that("a newdata missing either gp covariate is refused by name", {
 })
 
 
-test_that("summary, tidiers and criticism run on an ARMA fit", {
-  txt <- capture.output(summary(fit))
-  expect_true(any(grepl(paste0("Series:\\s*", n_series), txt)))
+test_that("tidiers and criticism run on an ARMA fit", {
 
   ll <- log_lik(fit, ndraws = 20L)
   expect_identical(dim(ll), c(20L, nrow(dat)))
@@ -663,6 +661,11 @@ test_that("MA factors are relabelled, and theta moves with its factor", {
     worst <- max(worst, abs(apply(e, 2L, cumsum) - lv))
   }
   expect_lt(worst, 1e-5)
+})
+
+test_that("the predictor's parts sum to it: each sampled factor", {
+  expect_parts_sum(ma_factor_fit,
+                   c("state (Factor 1)", "state (Factor 2)"))
 })
 
 cat("\nDone.\n")

@@ -28,8 +28,8 @@ which can be further customized using the \pkg{ggplot2} package
 }
 \description{
 This function takes an \code{mvgam_fevd} object and produces
-a plot of the posterior median contributions to forecast variance for each series
-in the fitted Vector Autoregression
+a plot of the posterior median contributions to forecast variance for
+each series in the fitted Vector Autoregression
 }
 \seealso{
 \code{\link[=fevd]{fevd()}}, \code{\link[=irf]{irf()}}, \code{\link[=stability]{stability()}},

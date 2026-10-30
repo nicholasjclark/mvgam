@@ -57,9 +57,10 @@ per series, for \code{"variogram"}.}
 An object of class \code{mvgam_score}: a named list with one data
 frame per series plus a trailing \code{all_series} summary. Its \code{print()}
 method shows the mean score and interval coverage of each series.
-A multivariate model gives one such object per response. Each series' data frame has columns \code{score},
-\code{in_interval}, \code{interval_width}, \code{eval_horizon} and \code{score_type},
-the requested \code{score}. A joint score leaves the per-series \code{score}
+A multivariate model gives one such object per response. Each
+series' data frame has columns \code{score}, \code{in_interval},
+\code{interval_width}, \code{eval_horizon} and \code{score_type}, which names the
+requested \code{score}. A joint score leaves the per-series \code{score}
 column \code{NA}.
 
 For a univariate score, \code{all_series} sums the scores over the

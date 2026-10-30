@@ -111,6 +111,23 @@ test_that("vcov.mvgam refuses a 'pars' entry the model does not have", {
 })
 
 
+test_that("loo() on a trend fit points to lfo_cv()", {
+  withr::local_envvar(TESTTHAT = "")
+  set.seed(1L)
+  # A narrow spread keeps every Pareto k low
+  ll <- function(object, ...) {
+    matrix(rnorm(160L * 10L, -1, 0.01), 160L, 10L)
+  }
+  # The registry is mocked first. It then restores the real method.
+  local_mocked_s3_method("log_lik", "mvgam", ll)
+  local_mocked_bindings(log_lik.mvgam = ll)
+  stub <- make_loo_extras_stub()
+  expect_no_message(loo(stub))
+  stub$trend_metadata <- list(trend_type = "AR")
+  expect_message(loo(stub), "lfo_cv")
+})
+
+
 # ---- LOO / WAIC aliases --------------------------------------------
 
 test_that("LOO and WAIC forward only the arguments the caller wrote", {
@@ -122,12 +139,12 @@ test_that("LOO and WAIC forward only the arguments the caller wrote", {
     "called"
   }
   # The aliases replay their call on `loo::loo()` and `loo::waic()`
-  # from the caller's frame. Dispatch from a test frame can find the
-  # method in the package namespace or in the S3 registry, depending on
-  # what earlier tests called. Both are mocked.
-  local_mocked_bindings(loo.mvgam = record, waic.mvgam = record)
+  # from the caller's frame. Dispatch from a test frame finds the method
+  # in the package namespace before the S3 registry. Both are mocked.
+  # The registry is mocked first. It then restores the real methods.
   local_mocked_s3_method("loo", "mvgam", record)
   local_mocked_s3_method("waic", "mvgam", record)
+  local_mocked_bindings(loo.mvgam = record, waic.mvgam = record)
   stub <- structure(list(), class = "mvgam")
   expect_identical(LOO(stub, resp = "y"), "called")
   expect_identical(seen, "resp")

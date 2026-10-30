@@ -429,10 +429,7 @@ extract_cov_draws_flat <- function(cov_struct) {
     # `Sigma_trend` is already a [ndraws, p, p] array.
     Sigma_arr <- params$Sigma_trend
     checkmate::assert_array(Sigma_arr, d = 3L, any.missing = FALSE)
-    if (!identical(dim(Sigma_arr), as.integer(c(ndraws, p, p)))) {
-      stop_shape_fault("'Sigma_trend'", dim(Sigma_arr), c(ndraws, p, p))
-    }
-    return(Sigma_arr)
+    return(assert_dims(Sigma_arr, "'Sigma_trend'", c(ndraws, p, p)))
   }
 
   if (identical(effective_covariance_pattern(

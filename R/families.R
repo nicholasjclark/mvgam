@@ -176,9 +176,7 @@ mvgam_family_constructors <- function() {
 #'
 #' Every response's family is checked once, here. Closure-unit and
 #' multi-response families lay the data out by unit and write their
-#' likelihood for that layout. Each models its response alone. An ordinal
-#' response's predictions use one set of thresholds for every observation.
-#' Thresholds that vary by group are refused.
+#' likelihood for that layout. Each models its response alone.
 #'
 #' @param formula The observation formula
 #' @param family The family supplied with the formula, in any spelling
@@ -194,18 +192,6 @@ resolve_observation_family <- function(formula, family) {
   }
   families <- formula_families(formula, family)
   lapply(families, validate_supported_family)
-  forms <- response_formulas(formula)
-  for (key in names(forms)) {
-    if (has_grouped_thresholds(forms[[key]], families[[key]])) {
-      stop(insight::format_error(c(
-        "mvgam does not support ordinal thresholds that vary by group.",
-        x = paste0("Response '", key, "' is written with ",
-                   "'thres(gr = )'."),
-        i = "Predictions use one set of thresholds for every observation.",
-        i = "Drop 'gr' from 'thres()'."
-      )), call. = FALSE)
-    }
-  }
   alone <- Filter(function(f) {
     uses_closure_unit_layout(f) || is_multi_response_family(f)
   }, families)
@@ -217,30 +203,6 @@ resolve_observation_family <- function(formula, family) {
     )), call. = FALSE)
   }
   list(formula = formula, family = family)
-}
-
-#' Whether an ordinal response gives each group its own thresholds
-#'
-#' brms defines `thres(gr = g)` on the response side as one set of
-#' thresholds per level of `g`, sampled as `Intercept_1`,
-#' `Intercept_2` and so on.
-#'
-#' @param form One response's `brmsformula`
-#' @param family That response's family
-#' @return A single logical
-#' @noRd
-has_grouped_thresholds <- function(form, family) {
-  if (!is_ordinal_family(family)) {
-    return(FALSE)
-  }
-  thres <- brms::brmsterms(
-    brms::bf(form$formula, family = family)
-  )$adforms$thres
-  if (is.null(thres)) {
-    return(FALSE)
-  }
-  spec <- eval(thres[[2L]], list(resp_thres = brms::resp_thres))
-  !identical(spec$vars$gr, "NA")
 }
 
 #' Build the Stan stanvars bundle for the Tweedie family
@@ -986,10 +948,10 @@ detection_prior_laws <- function(family) {
 #' @return A `brmsprior` combining both, with no duplicated classes
 #' @noRd
 merge_default_priors <- function(defaults, user_prior) {
-  if (is.null(defaults) || nrow(defaults) == 0L) {
+  if (NROW(defaults) == 0L) {
     return(user_prior)
   }
-  if (!is.null(user_prior) && nrow(user_prior) > 0L) {
+  if (NROW(user_prior) > 0L) {
     prior_key <- function(p) paste(p$class, p$coef, p$dpar, p$resp)
     defaults <- defaults[!(prior_key(defaults) %in% prior_key(user_prior)),
                          , drop = FALSE]
@@ -1018,7 +980,7 @@ response_default_priors <- function(formula, family) {
       family_default_priors(families[[key]]), forms[[key]],
       families[[key]]
     )
-    if (is.null(defaults) || nrow(defaults) == 0L) return(NULL)
+    if (NROW(defaults) == 0L) return(NULL)
     if (inherits(formula, "mvbrmsformula")) defaults$resp <- key
     defaults
   })
@@ -1076,7 +1038,7 @@ adjust_modelled_dpar_priors <- function(prior, formula, family) {
   modelled <- modelled_dpars(formula, family)
   if (!length(modelled)) return(prior)
 
-  if (!is.null(prior) && nrow(prior) > 0L) {
+  if (NROW(prior) > 0L) {
     hit <- prior$class %in% modelled
     identity_link <- vapply(prior$class[hit], function(dp) {
       identical(family[[paste0("link_", dp)]], "identity")
@@ -1558,6 +1520,21 @@ stop_shape_fault <- function(what, got, expected) {
     paste0("Got [", paste(got, collapse = " x "), "], expected [",
            paste(expected, collapse = " x "), "].")
   )
+}
+
+
+#' Fault on an array whose dimensions differ from those expected
+#'
+#' @param arr The array
+#' @param what What the array holds, for the message
+#' @param expected Integer vector of dimensions
+#' @return `arr`, invisibly
+#' @noRd
+assert_dims <- function(arr, what, expected) {
+  if (!identical(dim(arr), as.integer(expected))) {
+    stop_shape_fault(what, dim(arr), expected)
+  }
+  invisible(arr)
 }
 
 
@@ -4472,17 +4449,35 @@ cmb_pmf <- function(mu, nu, T) {
 #' @noRd
 cmb_lpmf_vec <- function(y, mu, nu, T) {
   theta <- qlogis(mu)
-  out <- numeric(length(y))
+  cmb_by_trials(theta, nu, T, numeric(length(y)), function(lw, idx, lc) {
+    theta[idx] * y[idx] + nu[idx] * lc[y[idx] + 1L] - row_log_sum_exp(lw)
+  })
+}
+
+
+#' Evaluate a COM-Binomial quantity over its support, by trial count
+#'
+#' Rows with one trial count `T` form one matrix of log weights
+#' `nu * lchoose(T, x) + theta * x` over the support `x = 0:T`, one row
+#' per observation. A group is taken in chunks, which keeps one large-T
+#' group from allocating an oversized matrix.
+#'
+#' @param theta,nu,T Numeric vectors of the logit of `mu`, the
+#'   dispersion and the trials, one element per observation
+#' @param out The vector the values fill
+#' @param value Function of the log weights `lw`, the observations
+#'   `idx` they hold and `lchoose(T, 0:T)` returning one value per row
+#' @return `out`, filled
+#' @noRd
+cmb_by_trials <- function(theta, nu, T, out, value) {
   for (TT in unique(T)) {
     ia <- which(T == TT)
     lc <- .cmb_lchoose(TT)
-    x <- 0:TT
     chunk <- max(1L, as.integer(5e6 %/% (TT + 1L)))
     for (s in seq(1L, length(ia), by = chunk)) {
       idx <- ia[s:min(s + chunk - 1L, length(ia))]
-      lw <- outer(nu[idx], lc) + outer(theta[idx], x)
-      out[idx] <- theta[idx] * y[idx] + nu[idx] * lc[y[idx] + 1L] -
-        row_log_sum_exp(lw)
+      lw <- outer(nu[idx], lc) + outer(theta[idx], 0:TT)
+      out[idx] <- value(lw, idx, lc)
     }
   }
   out
@@ -4498,20 +4493,9 @@ cmb_lpmf_vec <- function(y, mu, nu, T) {
 #' match the binomial proportion-scale convention.
 #' @noRd
 cmb_mean_vec <- function(mu, nu, T) {
-  theta <- qlogis(mu)
-  out <- numeric(length(mu))
-  for (TT in unique(T)) {
-    ia <- which(T == TT)
-    lc <- .cmb_lchoose(TT)
-    x <- 0:TT
-    chunk <- max(1L, as.integer(5e6 %/% (TT + 1L)))
-    for (s in seq(1L, length(ia), by = chunk)) {
-      idx <- ia[s:min(s + chunk - 1L, length(ia))]
-      lw <- outer(nu[idx], lc) + outer(theta[idx], x)
-      out[idx] <- as.numeric(row_softmax(lw) %*% x)
-    }
-  }
-  out
+  cmb_by_trials(qlogis(mu), nu, T, numeric(length(mu)), function(lw, ...) {
+    as.numeric(row_softmax(lw) %*% (seq_len(ncol(lw)) - 1L))
+  })
 }
 
 
@@ -4523,20 +4507,9 @@ cmb_mean_vec <- function(mu, nu, T) {
 #' stable for point-mass mass functions (large positive `nu`).
 #' @noRd
 rcmb_vec <- function(mu, nu, T) {
-  theta <- qlogis(mu)
-  out <- integer(length(mu))
-  for (TT in unique(T)) {
-    ia <- which(T == TT)
-    lc <- .cmb_lchoose(TT)
-    x <- 0:TT
-    chunk <- max(1L, as.integer(5e6 %/% (TT + 1L)))
-    for (s in seq(1L, length(ia), by = chunk)) {
-      idx <- ia[s:min(s + chunk - 1L, length(ia))]
-      lw <- outer(nu[idx], lc) + outer(theta[idx], x)
-      out[idx] <- sample_row_index(lw) - 1L
-    }
-  }
-  out
+  cmb_by_trials(qlogis(mu), nu, T, integer(length(mu)), function(lw, ...) {
+    sample_row_index(lw) - 1L
+  })
 }
 
 
@@ -5282,7 +5255,7 @@ multinomial_training_total <- function(object) {
 }
 
 
-#' An empty per-unit log-density matrix for a composition family
+#' The per-unit log-density matrix of a composition family
 #'
 #' `diri()`, `multi()` and `categ()` score one joint density per
 #' closure unit and carry it on the unit's first row. The unit's
@@ -5292,14 +5265,41 @@ multinomial_training_total <- function(object) {
 #' `loo()` would count a site once per category. The result would then
 #' show far more observations than the fit has densities.
 #'
-#' Starting from `NA_real_` states the fact: these rows have no density.
-#' The helper that drops unscorable columns then does its job.
+#' The matrix starts from `NA_real_`, which states the fact: these rows
+#' have no density. The helper that drops unscorable columns then does
+#' its job. A unit missing a component keeps `NA` on every row.
 #'
-#' @param ndraws,N_obs Dimensions of the matrix to allocate.
-#' @return `[ndraws x N_obs]` matrix of `NA_real_`.
+#' @param linpred `[ndraws x N_obs]` linear predictor, for the dimensions
+#' @param arrays The list `build_closure_unit_arrays()` returns
+#' @param unit_lp Function of a unit's rows `idx` and its index `g`
+#'   returning the unit's log density, one value per draw
+#' @return `[ndraws x N_obs]` log-density matrix
 #' @noRd
-empty_unit_loglik <- function(ndraws, N_obs) {
-  matrix(NA_real_, nrow = ndraws, ncol = N_obs)
+unit_log_lik <- function(linpred, arrays, unit_lp) {
+  out <- matrix(NA_real_, nrow = nrow(linpred), ncol = ncol(linpred))
+  unit_rows <- closure_unit_row_split(arrays)
+  for (g in complete_closure_units(arrays, unit_rows)) {
+    idx <- unit_rows[[g]]
+    out[, idx[1L]] <- unit_lp(idx, g)
+  }
+  out
+}
+
+
+#' Per-row draws of a composition family, one unit at a time
+#'
+#' @param comp What `extract_simplex_response_components()` returns
+#' @param unit_draw Function of a unit's rows `idx` returning its
+#'   `[ndraws x length(idx)]` draws
+#' @param init The value the matrix starts from, `0` or `0L`
+#' @return `[ndraws x N_obs]` matrix of draws
+#' @noRd
+unit_predictions <- function(comp, unit_draw, init = 0) {
+  out <- matrix(init, nrow = comp$ndraws, ncol = comp$N_obs)
+  for (idx in closure_unit_row_split(comp$arrays)) {
+    out[, idx] <- unit_draw(idx)
+  }
+  out
 }
 
 
@@ -6132,10 +6132,7 @@ posterior_predict_diri <- function(object, newdata = NULL,
     object, newdata, draw_ids, ndraws = ndraws, needs_phi = TRUE,
     linpred = linpred
   )
-  out <- matrix(0, nrow = comp$ndraws, ncol = comp$N_obs)
-  unit_rows <- closure_unit_row_split(comp$arrays)
-  for (g in seq_len(comp$N_unit)) {
-    idx <- unit_rows[[g]]
+  unit_predictions(comp, function(idx) {
     Kg <- length(idx)
     prob_g <- comp$prob_row[, idx, drop = FALSE]
     # alpha[s, k] = prob_g[s, k] * phi[s, idx[1]]. `comp$phi` is a
@@ -6149,9 +6146,8 @@ posterior_predict_diri <- function(object, newdata = NULL,
                      rate = 1),
       nrow = comp$ndraws, ncol = Kg
     )
-    out[, idx] <- gam / rowSums(gam)
-  }
-  out
+    gam / rowSums(gam)
+  })
 }
 
 #' Per-observation log-likelihood for `diri()`
@@ -6172,27 +6168,16 @@ posterior_predict_diri <- function(object, newdata = NULL,
 #' @return `[ndraws x N_obs]` log-density matrix.
 #' @noRd
 log_lik_diri <- function(linpred, link, y, family_pars, trials) {
-  prob_row <- family_pars$prob_row
-  phi      <- family_pars$phi
-  arrays   <- family_pars$arrays
-  ndraws <- nrow(linpred)
-  N_obs <- ncol(linpred)
-  out <- empty_unit_loglik(ndraws, N_obs)
-  unit_rows <- closure_unit_row_split(arrays)
-  for (g in complete_closure_units(arrays, unit_rows)) {
-    idx <- unit_rows[[g]]
-    Kg <- length(idx)
-    y_unit <- y[idx]
-    prob_g <- prob_row[, idx, drop = FALSE]
-    alpha <- prob_g * phi[, idx, drop = FALSE]
+  unit_log_lik(linpred, family_pars$arrays, function(idx, g) {
+    alpha <- family_pars$prob_row[, idx, drop = FALSE] *
+      family_pars$phi[, idx, drop = FALSE]
     # dirichlet_lpdf(y | alpha) = lgamma(sum(alpha)) -
     #   sum(lgamma(alpha)) + sum((alpha - 1) * log(y))
-    log_y <- matrix(log(y_unit), nrow = ndraws, ncol = Kg, byrow = TRUE)
-    lp <- lgamma(rowSums(alpha)) - rowSums(lgamma(alpha)) +
-            rowSums((alpha - 1) * log_y)
-    out[, idx[1L]] <- lp
-  }
-  out
+    log_y <- matrix(log(y[idx]), nrow = nrow(alpha), ncol = length(idx),
+                    byrow = TRUE)
+    lgamma(rowSums(alpha)) - rowSums(lgamma(alpha)) +
+      rowSums((alpha - 1) * log_y)
+  })
 }
 
 #' Per-row expected count for a `multi()` fit
@@ -6240,19 +6225,14 @@ posterior_predict_multi <- function(object, newdata = NULL,
   # The trial total is recorded on every row of a unit. Taking it from
   # the unit's first row gives `N_site` without a second sum.
   totals <- multinomial_unit_totals(object, newdata, comp$arrays)
-  out <- matrix(0L, nrow = comp$ndraws, ncol = comp$N_obs)
-  unit_rows <- closure_unit_row_split(comp$arrays)
-  for (g in seq_len(comp$N_unit)) {
-    idx <- unit_rows[[g]]
-    n_g <- totals[idx[1L]]
+  unit_predictions(comp, function(idx) {
     prob_g <- comp$prob_row[, idx, drop = FALSE]
-    for (s in seq_len(comp$ndraws)) {
-      out[s, idx] <- as.integer(
-        stats::rmultinom(1L, size = n_g, prob = prob_g[s, ])
-      )
-    }
-  }
-  out
+    draws <- vapply(seq_len(comp$ndraws), function(s) {
+      as.integer(stats::rmultinom(1L, size = totals[idx[1L]],
+                                  prob = prob_g[s, ]))
+    }, integer(length(idx)))
+    t(matrix(draws, nrow = length(idx)))
+  }, init = 0L)
 }
 
 #' Per-observation log-likelihood for `multi()`
@@ -6264,27 +6244,16 @@ posterior_predict_multi <- function(object, newdata = NULL,
 #' @return `[ndraws x N_obs]` log-density matrix.
 #' @noRd
 log_lik_multi <- function(linpred, link, y, family_pars, trials) {
-  prob_row <- family_pars$prob_row
-  arrays   <- family_pars$arrays
-  ndraws <- nrow(linpred)
-  N_obs <- ncol(linpred)
-  out <- empty_unit_loglik(ndraws, N_obs)
-  unit_rows <- closure_unit_row_split(arrays)
-  for (g in complete_closure_units(arrays, unit_rows)) {
-    idx <- unit_rows[[g]]
-    Kg <- length(idx)
+  unit_log_lik(linpred, family_pars$arrays, function(idx, g) {
     y_unit <- as.integer(y[idx])
-    n_g <- sum(y_unit)
-    prob_g <- prob_row[, idx, drop = FALSE]
+    log_p <- log(family_pars$prob_row[, idx, drop = FALSE])
     # multinomial log-mass: lgamma(n + 1) - sum(lgamma(y + 1)) +
     #   sum(y * log(p))
-    log_p <- log(prob_g)
-    y_mat <- matrix(y_unit, nrow = ndraws, ncol = Kg, byrow = TRUE)
-    lp <- lgamma(n_g + 1) - sum(lgamma(y_unit + 1)) +
-            rowSums(y_mat * log_p)
-    out[, idx[1L]] <- lp
-  }
-  out
+    y_mat <- matrix(y_unit, nrow = nrow(log_p), ncol = length(idx),
+                    byrow = TRUE)
+    lgamma(sum(y_unit) + 1) - sum(lgamma(y_unit + 1)) +
+      rowSums(y_mat * log_p)
+  })
 }
 
 # Per-row probability for a `categ()` fit. Each row's expected value
@@ -6312,18 +6281,15 @@ posterior_predict_categ <- function(object, newdata = NULL,
     object, newdata, draw_ids, ndraws = ndraws, needs_phi = FALSE,
     linpred = linpred
   )
-  out <- matrix(0L, nrow = comp$ndraws, ncol = comp$N_obs)
-  unit_rows <- closure_unit_row_split(comp$arrays)
-  for (g in seq_len(comp$N_unit)) {
-    idx <- unit_rows[[g]]
+  unit_predictions(comp, function(idx) {
     Kg <- length(idx)
     prob_g <- comp$prob_row[, idx, drop = FALSE]
+    one_hot <- matrix(0L, nrow = comp$ndraws, ncol = Kg)
     for (s in seq_len(comp$ndraws)) {
-      cat_code <- sample.int(Kg, size = 1L, prob = prob_g[s, ])
-      out[s, idx[cat_code]] <- 1L
+      one_hot[s, sample.int(Kg, size = 1L, prob = prob_g[s, ])] <- 1L
     }
-  }
-  out
+    one_hot
+  }, init = 0L)
 }
 
 #' Per-observation log-likelihood for `categ()`
@@ -6335,14 +6301,7 @@ posterior_predict_categ <- function(object, newdata = NULL,
 #' @return `[ndraws x N_obs]` log-density matrix.
 #' @noRd
 log_lik_categ <- function(linpred, link, y, family_pars, trials) {
-  prob_row <- family_pars$prob_row
-  arrays   <- family_pars$arrays
-  ndraws <- nrow(linpred)
-  N_obs <- ncol(linpred)
-  out <- empty_unit_loglik(ndraws, N_obs)
-  unit_rows <- closure_unit_row_split(arrays)
-  for (g in complete_closure_units(arrays, unit_rows)) {
-    idx <- unit_rows[[g]]
+  unit_log_lik(linpred, family_pars$arrays, function(idx, g) {
     Kg <- length(idx)
     y_unit <- as.integer(y[idx])
     # Observed category code: the index where y_unit == 1.
@@ -6356,10 +6315,8 @@ log_lik_categ <- function(linpred, link, y, family_pars, trials) {
         )
       )))
     }
-    lp <- log(prob_row[, idx[cat_code]])
-    out[, idx[1L]] <- lp
-  }
-  out
+    log(family_pars$prob_row[, idx[cat_code]])
+  })
 }
 
 #' Posterior occupancy of each closure unit of an `occ()` fit

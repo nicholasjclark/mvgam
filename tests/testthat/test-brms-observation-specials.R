@@ -114,6 +114,17 @@ test_that("cs() plumbs through category-specific effects for cumulative", {
   expect_match(prog$code, "matrix\\[N, nthres\\] mucs = Xcs \\* bcs")
 })
 
+test_that("one mvgam() call shows a brms warning once", {
+  # Validation and the Stan build each pass the formula through brms,
+  # and each pass raises the experimental-effects warning again.
+  d <- make_specials_data()
+  w <- testthat::capture_warnings(mvgam(
+    yord ~ cs(x), trend_formula = ~ AR(), data = d, family = cumulative(),
+    run_model = FALSE, silent = 2
+  ))
+  expect_identical(sum(grepl("Category specific", w)), 1L)
+})
+
 test_that("car() resolves its data2 adjacency and emits spatial CAR code", {
   # A special that looks up an object outside `data` once failed with
   # "Object 'M' was not found in 'data2'."

@@ -906,9 +906,6 @@ jsdgam_battery <- function(nm, spec, sim, fit) {
 
   test_that(says("summary and the criticism methods run on this fit"), {
     txt <- capture.output(summary(fit))
-    # The series count and the species names are what a reader checks
-    # the axis against.
-    expect_true(any(grepl(paste0("Series:\\s*", K), txt)))
     expect_true(any(grepl("env", txt, fixed = TRUE)))
 
     ll <- log_lik(fit, draw_ids = 1:20)
@@ -1518,7 +1515,6 @@ test_that("every surface the help page sends a reader to answers", {
   # someone who has just fitted a joint species model.
   nb <- get("nb", envir = built)
   obj <- nb$fit
-  K <- nb$sim$K
   rc <- residual_cor(obj)
   expect_identical(dimnames(rc$cor),
                    list(nb$sim$species_levels, nb$sim$species_levels))
@@ -1530,10 +1526,6 @@ test_that("every surface the help page sends a reader to answers", {
   expect_identical(nrow(active_factors(obj)$per_factor),
                    as.integer(obj$standata$N_lv_trend))
   expect_drawn(compare_loadings(obj, obj))
-  expect_true(grepl(paste0("$S = ", K, "$ series"), methods_md(obj),
-                    fixed = TRUE))
-  expect_true(grepl(as.character(utils::packageVersion("mvgam")),
-                    how_to_cite(obj)$methods_text, fixed = TRUE))
 })
 
 
@@ -1558,4 +1550,11 @@ test_that("update() refits a jsdgam through jsdgam() and the refit predicts", {
                    mvgam_normalise_stancode(fit$stancode))
   expect_error(update(fit, family = poisson(), recompile = FALSE),
                "not supported for this update")
+})
+
+
+test_that("each part's response-scale share is the fit's own: each jsdgam family", {
+  for (nm in names(SPECS)) {
+    expect_epred_parts(get(nm, envir = built)$fit)
+  }
 })

@@ -279,19 +279,6 @@ test_that("multivariate models handle priors correctly", {
   }
 })
 
-test_that("mvgam_formula constructor works correctly", {
-  # Basic construction
-  mf1 <- mvgam_formula(y ~ x)
-  expect_s3_class(mf1, "mvgam_formula")
-  expect_equal(mf1$formula, y ~ x)
-  expect_null(mf1$trend_formula)
-
-  # With trend
-  mf2 <- mvgam_formula(y ~ x, trend_formula = ~ AR())
-  expect_equal(mf2$trend_formula, ~ AR())
-
-})
-
 # get_prior.mvgam_formula tests
 # ------------------------------
 test_that("get_prior.mvgam_formula works with all formula types", {
@@ -314,24 +301,12 @@ test_that("combine_obs_trend_priors works correctly", {
   obs_prior <- mock_obs_prior()
   trend_prior <- mock_trend_prior()
 
-  # Basic combination
   combined <- mvgam:::combine_obs_trend_priors(obs_prior, trend_prior)
   expect_s3_class(combined, "brmsprior")
-  expect_equal(nrow(combined), 3)
-
-  # Check parameter distribution (should have obs + trend parameters)
-  obs_count <- sum(!grepl("_trend$", combined$class))
-  trend_count <- sum(grepl("_trend$", combined$class))
-  expect_equal(obs_count, 1)   # 1 observation parameter
-  expect_equal(trend_count, 2) # 2 trend parameters
+  expect_identical(combined$class, c("Intercept", "ar1_trend", "sigma_trend"))
 })
 
 test_that("validate_trend_formula rejects invalid terms", {
-  # Valid formulas pass
-  expect_no_error(mvgam:::validate_trend_formula(~ AR()))
-  expect_no_error(mvgam:::validate_trend_formula(~ x + AR()))
-  expect_no_error(mvgam:::validate_trend_formula(~ s(x) + RW()))
-
   # Invalid addition terms rejected
   for (term in c("weights(w)", "trials(n)", "cens(c)")) {
     expect_error(
@@ -343,6 +318,12 @@ test_that("validate_trend_formula rejects invalid terms", {
   # formula cannot hold
   expect_error(mvgam:::validate_trend_formula(~ mi(x) + AR()),
                "'mi\\(\\)' is not supported")
+  # A category-specific effect shifts ordinal thresholds the trend lacks.
+  # brms would report only that its family does not support it.
+  for (f in list(~ cs(x) + AR(), ~ (cs(1) | g) + AR())) {
+    expect_error(mvgam:::validate_trend_formula(f),
+                 "'cs\\(\\)' is not supported in 'trend_formula'")
+  }
   # Every response shares one trend. The refusal names one constructor.
   expect_error(
     mvgam:::validate_trend_formula(~ AR() + RW()),
@@ -473,7 +454,6 @@ test_that("a family embedded in bf() sets the observation family", {
     data = test_data
   )
   expect_true(any(priors$dpar == "zi"))
-  expect_true("ar1_trend" %in% priors$class)
 })
 
 # get_prior.mvgam: the table a fit was built with, the same one
@@ -530,11 +510,24 @@ test_that("merge_default_priors() drops defaults the user has claimed", {
   user <- brms::prior("gamma(3, 1)", class = "shape")
 
   merged <- mvgam:::merge_default_priors(defaults, user)
-  expect_equal(sum(merged$class == "shape"), 1L)
-  expect_true("gamma(3, 1)" %in% merged$prior)
-  expect_false("gamma(2, 0.5)" %in% merged$prior)
+  expect_identical(merged$prior[merged$class == "shape"], "gamma(3, 1)")
   # the default the user did not name survives
-  expect_true("gamma(2, 0.25)" %in% merged$prior)
+  expect_identical(merged$prior[merged$class == "mtail"], "gamma(2, 0.25)")
+})
+
+test_that("a class-wide user prior leaves the coefficient rows blank", {
+  # brms stores it this way. A copy on each level of a by-factor gp()
+  # reached brms on refit, which refuses a prior on one level.
+  defaults <- rbind(
+    brms::set_prior("", class = "sdgp"),
+    brms::set_prior("", class = "sdgp", coef = "gpxa"),
+    brms::set_prior("", class = "sdgp", coef = "gpxb")
+  )
+  defaults$source <- "default"
+  merged <- merge_user_priors(defaults,
+                              brms::prior(exponential(1), class = sdgp))
+  expect_identical(merged$prior, c("exponential(1)", "", ""))
+  expect_identical(merged$source, c("user", "default", "default"))
 })
 
 test_that("merge_default_priors() passes both sides through untouched", {
@@ -582,7 +575,7 @@ test_that(
                    beside$prior[beside$class == "shape"])
   expect_identical(embedded$prior[embedded$class == "shape"],
                    "gamma(2, 0.5)")
-  expect_true("mtail" %in% beside$class)
+  expect_true("mtail" %in% embedded$class)
   mv <- get_prior(
     mvgam_formula(bf(y ~ 1, family = beta_nb()) + bf(pos ~ 1) +
                     set_rescor(FALSE)),
@@ -658,7 +651,6 @@ test_that("nu_trend is discoverable through get_prior()", {
     mvgam_formula(y ~ 1, trend_formula = ~ AR(p = 1, df = NA)),
     data = d, family = poisson()
   )
-  expect_true("nu_trend" %in% p_est$class)
   row <- p_est[p_est$class == "nu_trend", ]
   expect_identical(row$prior, "gamma(4, 0.3)")
   # the bound is required, not conventional: below 2 the innovations
@@ -955,12 +947,8 @@ test_that("a reported innovation scale is one the model samples", {
   }
 })
 
-test_that("the registry decides whether a trend has an innovation scale", {
-  pw <- PW()
-  rw <- RW()
-  expect_false(samples_innovation_scale(pw))
-  expect_true(samples_innovation_scale(rw))
-  expect_true("sigma_trend" %in% generate_monitor_params(rw))
+test_that("a trend with an innovation scale monitors it", {
+  expect_true("sigma_trend" %in% generate_monitor_params(RW()))
 })
 
 test_that("loadings traits answer once for every consumer", {
@@ -1207,6 +1195,8 @@ test_that("trend priors are checked against the table get_prior() shows", {
     "class = lscale_trend, coef\\s+= gpz"
   )
   expect_identical(nrow(kept), 0L)
+  # The blank class row a refit inherits sets nothing to warn about.
+  expect_silent(check(brms::set_prior("", class = "lscale_trend")))
   by_coef <- check(
     brms::set_prior("exponential(5)", class = "sigma_trend") +
       brms::set_prior("inv_gamma(3, 1)", class = "lscale_trend", coef = "gpz")

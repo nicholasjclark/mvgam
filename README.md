@@ -65,6 +65,14 @@ target="_blank"><code>rstan</code></a> or
 <a href="https://mc-stan.org/cmdstanr/"
 target="_blank"><code>cmdstanr</code></a>.
 
+## Introductory seminar
+
+<div class="video-embed">
+<iframe style="aspect-ratio: 16 / 9; width: 100%;" src="https://www.youtube.com/embed/0zZopLlomsQ" data-external="1" title="Ecological forecasting with Dynamic Generalized Additive Models" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+</div>
+
+<p class="github-only"><a href="https://www.youtube.com/watch?v=0zZopLlomsQ"><img src="https://img.youtube.com/vi/0zZopLlomsQ/hqdefault.jpg" width="100%" alt="Introductory seminar on Ecological forecasting with Dynamic Generalized Additive Models"/></a></p>
+
 ## Cheatsheet
 
 [![`mvgam` usage

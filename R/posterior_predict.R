@@ -147,13 +147,15 @@ rbeta_binomial_draws <- function(n, size, mu, phi) {
 #' @param hu Optional matrix `\\[ndraws x nobs\\]` of hurdle probability.
 #'   Required for: hurdle_poisson, hurdle_negbinomial, hurdle_gamma,
 #'   hurdle_lognormal
-#' @param zi Optional matrix `\\[ndraws x nobs\\]` of zero-inflation probability.
+#' @param zi Optional matrix `\\[ndraws x nobs\\]` of zero-inflation
+#'   probability.
 #'   Required for: zero_inflated_poisson, zero_inflated_negbinomial,
 #'   zero_inflated_binomial, zero_inflated_beta_binomial, zero_inflated_beta,
 #'   zero_inflated_asym_laplace
 #' @param zoi Optional matrix `\\[ndraws x nobs\\]` of zero-one inflation.
 #'   Required for: zero_one_inflated_beta (probability of boundary value)
-#' @param coi Optional matrix `\\[ndraws x nobs\\]` of conditional one-inflation.
+#' @param coi Optional matrix `\\[ndraws x nobs\\]` of conditional
+#'   one-inflation.
 #'   Required for: zero_one_inflated_beta (P(Y=1 | Y in {0,1}))
 #' @param alpha Optional matrix `\\[ndraws x nobs\\]` of skewness parameters.
 #'   Required for: skew_normal
@@ -161,7 +163,8 @@ rbeta_binomial_draws <- function(n, size, mu, phi) {
 #'   Required for: shifted_lognormal, exgaussian
 #' @param xi Optional matrix `\\[ndraws x nobs\\]` of shape/tail parameters.
 #'   Required for: gen_extreme_value
-#' @param quantile Optional matrix `\\[ndraws x nobs\\]` of quantile values (0,1).
+#' @param quantile Optional matrix `\\[ndraws x nobs\\]` of quantile
+#'   values in (0, 1).
 #'   Required for: asym_laplace, zero_inflated_asym_laplace
 #' @param kappa Optional matrix `\\[ndraws x nobs\\]` of concentration (>0).
 #'   Required for: von_mises
@@ -169,7 +172,8 @@ rbeta_binomial_draws <- function(n, size, mu, phi) {
 #'   Required for: exgaussian
 #' @param bs Optional matrix `\\[ndraws x nobs\\]` of boundary separation (>0).
 #'   Required for: wiener
-#' @param bias Optional matrix `\\[ndraws x nobs\\]` of starting point bias (0-1).
+#' @param bias Optional matrix `\\[ndraws x nobs\\]` of starting point
+#'   bias in (0, 1).
 #'   Required for: wiener
 #'
 #' @return Vector of `length(epred)` draws, in the column order of
@@ -234,7 +238,8 @@ sample_from_family <- function(family_name, ndraws, epred,
     "skew_normal" = {
       checkmate::assert_matrix(sigma, nrows = ndraws, ncols = ncol(epred))
       checkmate::assert_matrix(alpha, nrows = ndraws, ncols = ncol(epred))
-      brms::rskew_normal(length(epred), mu = epred, sigma = sigma, alpha = alpha)
+      brms::rskew_normal(length(epred), mu = epred, sigma = sigma,
+                         alpha = alpha)
     },
 
     "exponential" = {
@@ -262,7 +267,8 @@ sample_from_family <- function(family_name, ndraws, epred,
     "gen_extreme_value" = {
       checkmate::assert_matrix(sigma, nrows = ndraws, ncols = ncol(epred))
       checkmate::assert_matrix(xi, nrows = ndraws, ncols = ncol(epred))
-      brms::rgen_extreme_value(length(epred), mu = epred, sigma = sigma, xi = xi)
+      brms::rgen_extreme_value(length(epred), mu = epred, sigma = sigma,
+                               xi = xi)
     },
 
     "inverse.gaussian" = {
@@ -414,7 +420,8 @@ sample_from_family <- function(family_name, ndraws, epred,
       checkmate::assert_matrix(zi, nrows = ndraws, ncols = ncol(epred))
       checkmate::assert_matrix(shape, nrows = ndraws, ncols = ncol(epred))
       tmp <- stats::runif(length(epred))
-      ifelse(tmp < zi, 0L, stats::rnbinom(length(epred), mu = epred, size = shape))
+      ifelse(tmp < zi, 0L,
+             stats::rnbinom(length(epred), mu = epred, size = shape))
     },
 
     "zero_inflated_binomial" = {
@@ -512,7 +519,8 @@ sample_from_family <- function(family_name, ndraws, epred,
       checkmate::assert_matrix(shape, nrows = ndraws, ncols = ncol(epred))
       tmp <- stats::runif(length(epred))
       scale <- epred / shape
-      ifelse(tmp < hu, 0, stats::rgamma(length(epred), shape = shape, scale = scale))
+      ifelse(tmp < hu, 0,
+             stats::rgamma(length(epred), shape = shape, scale = scale))
     },
 
     "hurdle_lognormal" = {
@@ -843,40 +851,27 @@ extract_dpars_from_stanfit <- function(stanfit,
     return(list())
   }
 
-  draws_mat <- subset_draws_rows(fit_draws(stanfit, dpar_names),
-                                 ndraws = ndraws, draw_ids = draw_ids)
+  draws_mat <- as_plain_matrix(subset_draws_rows(
+    fit_draws(stanfit, dpar_names), ndraws = ndraws, draw_ids = draw_ids
+  ))
   all_cols <- colnames(draws_mat)
   out <- list()
   for (dpar in dpar_names) {
-    cols <- if (dpar %in% all_cols) {
-      dpar
-    } else {
-      grep(paste0("^", dpar, "\\["), all_cols, value = TRUE)
-    }
+    cols <- param_draw_columns(all_cols, dpar)
     if (length(cols) == 0L) next
-    if (length(cols) > 1L) {
-      one_index <- "^[^[]*\\[(\\d+)\\]$"
-      if (!all(grepl(one_index, cols))) {
-        stop_mvgam_fault(
-          "A per-row parameter must carry one index per column.",
-          paste0("Got ", paste(cols[!grepl(one_index, cols)],
-                               collapse = ", "), ".")
-        )
-      }
-      cols <- cols[order(as.integer(sub(one_index, "\\1", cols)))]
+    # A scalar, or a vector of one, serves every row
+    if (length(cols) == 1L) {
+      out[[dpar]] <- matrix(draws_mat[, cols], nrow(draws_mat), nobs)
+      next
     }
-    values <- as.matrix(draws_mat[, cols, drop = FALSE])
-    if (ncol(values) == 1L) {
-      out[[dpar]] <- matrix(values[, 1L], nrow = nrow(values), ncol = nobs)
-    } else if (ncol(values) == nobs) {
-      out[[dpar]] <- unname(values)
-    } else {
+    if (length(cols) != nobs) {
       stop_mvgam_fault(
         paste0("Parameter '", dpar, "' must have one column per ",
                "prediction row."),
-        paste0("Found ", ncol(values), " columns for ", nobs, " rows.")
+        paste0("Found ", length(cols), " columns for ", nobs, " rows.")
       )
     }
+    out[[dpar]] <- draw_columns(draws_mat, cols)
   }
   out
 }
@@ -1040,7 +1035,9 @@ draw_observations <- function(object, linpred, newdata, draw_ids,
   if (is_ordinal_family(family)) {
     return(ordinal_draws(ordinal_category_probs(
       object, linpred, family, draw_ids = draw_ids, newdata = newdata,
-      resp = resp
+      resp = resp, re_formula = re_formula,
+      allow_new_levels = allow_new_levels,
+      sample_new_levels = sample_new_levels
     )))
   }
 

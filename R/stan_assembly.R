@@ -935,7 +935,8 @@ generate_base_brms_standata <- function(formula, data, family = gaussian(),
 #' Keys that contain no response name (`M_1`, `NC_1`, `prior_only`,
 #' `N`) are shared across responses and left untouched.
 #'
-#' Data with every response observed in every row return unchanged.
+#' Data whose responses all cover the same rows, as `response_rows()`
+#' gives them, return unchanged.
 #'
 #' @param combined_sd Combined standata from `brms::make_standata`
 #'   on the multi-response formula.
@@ -968,20 +969,16 @@ expand_per_response_standata <- function(combined_sd, formula, data,
   keys <- names(columns)
   families <- formula_families(formula, family)
 
-  # Fast path: every response is fully observed -> brms's
-  # listwise-deleted standata already equals the per-response one.
-  observed <- lapply(columns, function(col) !is.na(data[[col]]))
-  if (all(vapply(observed, all, logical(1L)))) return(combined_sd)
+  # Responses sharing one row set need no expansion. brms's combined
+  # standata already holds those rows. A `mi()` predictor ties every
+  # response to one row set.
+  observed <- response_rows(formula, data)
+  if (length(unique(observed)) == 1L) return(combined_sd)
 
   for (key in keys) {
     keep_i <- observed[[key]]
-    if (sum(keep_i) == 0L) {
-      stop(insight::format_error(c(
-        cli::format_inline(
-          "Response variable {.field {columns[[key]]}} has no observed values."
-        ),
-        i = "A multi-response model needs observations of every response."
-      )), call. = FALSE)
+    if (!any(keep_i)) {
+      stop_unobserved_response(columns[[key]])
     }
     data_i <- data[keep_i, , drop = FALSE]
 
@@ -2979,7 +2976,8 @@ generate_llt_trend_stanvars <- function(trend_specs, data_info,
 #' season is the sum of the first states. It runs after the level
 #' recursion and adds to `lv_trend`, which then holds the level plus
 #' the season. The program stores the season and the last pair of each
-#' harmonic, which starts a forecast.
+#' harmonic, which starts a forecast. A trend with several periods also
+#' stores the season of each, as `llt_season_periods()` names them.
 #'
 #' The pair `z = g + i g*` of a harmonic at angular frequency `lambda`
 #' follows `z_t = exp(-i lambda) z_{t-1} + w_t`, with the starting pair
@@ -3009,6 +3007,25 @@ llt_season_stanvars <- function(trend_specs, scales, n_par, per_process,
     return(list(stanvars = list(), paths = character(0L)))
   }
   t_by_hp <- "[N_time_trend, N_harm_trend * N_lv_trend]"
+  # Several periods store the season of each, summed over its own
+  # harmonics within each process's block of `g`
+  periods <- llt_season_periods(trend_specs)
+  several <- nrow(periods) > 1L
+  period_decl <- if (several) {
+    paste0("matrix[N_time_trend, N_lv_trend] ", periods$path, ";\n",
+           collapse = "")
+  } else {
+    ""
+  }
+  period_fill <- if (several) {
+    paste0("        ", periods$path, "[ : , k]\n",
+           "          = g[ : , (off + ", periods$first, "):(off + ",
+           periods$last, ")]\n",
+           "            * rep_vector(1, ", periods$harmonics, ");\n",
+           collapse = "")
+  } else {
+    ""
+  }
   first <- "1:N_harm_trend"
   second <- "(N_harm_trend + 1):(2 * N_harm_trend)"
   data <- combine_stanvars(
@@ -3055,6 +3072,7 @@ llt_season_stanvars <- function(trend_specs, scales, n_par, per_process,
       "vector<lower=0>[", n_par, "] sigma_season_trend\n",
       "  = season_scale_trend * sigma_season_raw_trend;\n",
       "matrix[N_time_trend, N_lv_trend] season_trend;\n",
+      period_decl,
       "matrix[2 * N_harm_trend, N_lv_trend] season_state_trend;\n",
       "    {\n",
       "      int n_hp = N_harm_trend * N_lv_trend;\n",
@@ -3084,14 +3102,17 @@ llt_season_stanvars <- function(trend_specs, scales, n_par, per_process,
       "      matrix", t_by_hp, " g = cos_season_trend .* re\n",
       "                                 + sin_season_trend .* im;\n",
       "      for (k in 1:N_lv_trend) {\n",
+      "        int off = (k - 1) * N_harm_trend;\n",
       "        season_trend[ : , k]\n",
-      "          = g[ : , ((k - 1) * N_harm_trend + 1):(k * N_harm_trend)]\n",
+      "          = g[ : , (off + 1):(off + N_harm_trend)]\n",
       "            * rep_vector(1, N_harm_trend);\n",
+      period_fill,
       "      }\n",
       "      season_state_trend = append_row(\n",
       "        to_matrix(g[N_time_trend], N_harm_trend, N_lv_trend),\n",
       "        to_matrix(cos_season_trend[N_time_trend] .* im[N_time_trend]\n",
-      "                  - sin_season_trend[N_time_trend] .* re[N_time_trend],\n",
+      "                  - sin_season_trend[N_time_trend]",
+      " .* re[N_time_trend],\n",
       "                  N_harm_trend, N_lv_trend));\n",
       "    }\n",
       "// The latent state is the level plus the season\n",
@@ -3115,6 +3136,10 @@ llt_season_stanvars <- function(trend_specs, scales, n_par, per_process,
   list(
     stanvars = list(data, parameters, dynamics, model),
     paths = c(season_trend = "N_time_trend",
+              if (several) {
+                stats::setNames(rep("N_time_trend", nrow(periods)),
+                                periods$path)
+              },
               init_season_trend = "2 * N_harm_trend")
   )
 }

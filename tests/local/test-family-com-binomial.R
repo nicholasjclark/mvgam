@@ -488,4 +488,8 @@ test_that("predict refuses variance and names what it does offer", {
 })
 
 
+test_that("each part's response-scale share is the fit's own: com_binomial", {
+  expect_epred_parts(fit)
+})
+
 cat("\nDone.\n")

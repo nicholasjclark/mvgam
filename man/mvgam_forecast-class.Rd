@@ -5,8 +5,9 @@
 \title{\code{mvgam_forecast} object description}
 \description{
 A \code{mvgam_forecast} object returned by function \code{\link{hindcast}}
-or \code{\link[generics]{forecast}}. Run \code{methods(class = "mvgam_forecast")} to see
-an overview of available methods.
+or \code{\link[generics]{forecast}}. Run
+\code{methods(class = "mvgam_forecast")} to see an overview of available
+methods.
 }
 \details{
 A \code{mvgam_forecast} object contains the following elements:

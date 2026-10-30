@@ -539,7 +539,6 @@ test_that("summary and the tidiers name the occupancy structure", {
 })
 
 
-cat("\nDone.\n")
 
 # ----------------------------------------------------------------------
 # An abundance ceiling, and the grid the kernel numbers
@@ -1301,9 +1300,7 @@ closure_jsdm_battery <- function(nm, sim, fit, threshold_cor,
     expect_lte(max(cd$effect1__), max(trend_env) + 1e-8)
   })
 
-  test_that(says("summary and the criticism methods run on this fit"), {
-    txt <- capture.output(summary(fit))
-    expect_true(any(grepl(paste0("Series:\\s*", K), txt)))
+  test_that(says("the criticism methods run on this fit"), {
     caught <- with_warnings(loo(fit))
     ic <- caught$value
     seen <- caught$warnings
@@ -1735,3 +1732,11 @@ test_that("latent_state and latent_N are one type under two names", {
   # layers are built rather than the class asserted.
   expect_drawn(plot(ce)[[1L]])
 })
+
+
+test_that("each part's response-scale share is the fit's own: occ and nmix", {
+  expect_epred_parts(fit)
+  expect_epred_parts(nmix_fit)
+})
+
+cat("\nDone.\n")

@@ -247,7 +247,7 @@ test_that("tidy() files each block under broom.mixed's effects class", {
     "sds_1[1]", "s_1_1[1]", "sdgp_1[1]", "zgp_1[1]",
     "sd_1[1]", "cor_1[1]", "r_1_1[1]", "r_1_1[2]",
     "b_Intercept_trend", "Intercept_trend", "ar1_trend[1]",
-    "sd_1_trend[1]", "r_1_1_trend[1]"
+    "sd_1_trend[1]", "r_1_1_trend[1]", "Xme_1[1]"
   )
   stub <- structure(
     list(fit = posterior::as_draws_matrix(matrix(
@@ -281,6 +281,10 @@ test_that("tidy() files each block under broom.mixed's effects class", {
   # reads the observation model's.
   expect_true("b_Intercept_trend" %in% side_parameters(stub, "trend"))
   expect_true("b_Intercept" %in% side_parameters(stub, "obs"))
+  # A special term's latent values reach the composer and stay out of
+  # the table
+  expect_true("Xme_1[1]" %in% side_parameters(stub, "obs"))
+  expect_false("Xme_1[1]" %in% unlist(spec$params))
 
   # The table itself: one intercept, and a request no parameter
   # answers keeps its columns.
@@ -378,6 +382,28 @@ test_that("a trend-free fit keeps its parameter names", {
 })
 
 
+test_that("special-term draws take brms's names per design column", {
+  # `mo(m):f` has a column per level of `f` after the first. Each
+  # coefficient names its `mo()` simplexes in turn. The expected names
+  # are brms's own for this formula.
+  dat <- data.frame(y = 0, x = 1, sdx = 0.1, m = rep(1:3, 4L),
+                    f = gl(2L, 1L, 12L))
+  # `me(x, sdx)` alone has no simplex.
+  stub <- structure(list(obs_model = list(
+    formula = brms::bf(y ~ mo(m) + mo(m):f + me(x, sdx):mo(m) + me(x, sdx)),
+    data = dat
+  )), class = "mvgam")
+  raw <- c(paste0("bsp[", 1:4, "]"),
+           paste0("simo_", rep(1:3, each = 2L), "[", 1:2, "]"))
+  expect_identical(
+    names(mvgam_special_aliases(stub, raw)),
+    c("bsp_mom", "bsp_mexsdx", "bsp_mom:f2", "bsp_mom:mexsdx",
+      paste0(rep(c("simo_mom1", "simo_mom:f21", "simo_mom:mexsdx1"),
+                 each = 2L), "[", 1:2, "]"))
+  )
+})
+
+
 test_that("an autoregressive coefficient is told from its hyperparameters", {
   expect_true(all(is_ar_coefficient(c("ar1_trend", "ar2_trend",
                                       "ar12_trend"))))
@@ -407,6 +433,12 @@ test_that("every family and loadings-prior parameter has a kind", {
   prior <- c("theta_features[1]", "theta_features_Femur.length",
              "theta_dist_phylo", "Psi_diag[1]")
   expect_true(all(mvgam_par_kind(prior) == "loadings_prior"))
-  working <- c("varrho_inv[1]", "Z_cols[1,1]", "L_Phi_loadings[1,1]")
+  working <- c("varrho_inv[1]", "Z_cols[1,1]", "L_Phi_loadings[1,1]",
+               "zme_1[1,1]", "Lme_1_trend[1,1]")
   expect_true(all(mvgam_par_kind(working) == "internal"))
+  # A trend-side measurement-error term is no trend dynamics
+  expect_identical(mvgam_par_kind(c("meanme_1_trend[1]", "sdme_1[1]")),
+                   c("measurement", "measurement"))
+  expect_identical(mvgam_par_kind(c("Xme_1_trend[2]", "Ymi_x[1]", "Yl_x[1]")),
+                   rep("latent", 3L))
 })

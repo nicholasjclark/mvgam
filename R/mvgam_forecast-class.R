@@ -1,8 +1,9 @@
 #' `mvgam_forecast` object description
 #'
 #' A \code{mvgam_forecast} object returned by function \code{\link{hindcast}}
-#' or \code{\link[generics]{forecast}}. Run `methods(class = "mvgam_forecast")` to see
-#' an overview of available methods.
+#' or \code{\link[generics]{forecast}}. Run
+#' `methods(class = "mvgam_forecast")` to see an overview of available
+#' methods.
 #'
 #' @details A `mvgam_forecast` object contains the following elements:
 #'
@@ -71,8 +72,8 @@ NULL
 #'   holding the posterior median and the two quantiles of the
 #'   predictions, the observed value for `type = 'response'` and the
 #'   prediction type. State components of the trend add a `component`
-#'   column, their names joined by `" + "`. A multivariate fit on a long frame adds a leading
-#'   `resp` column naming the response.
+#'   column, their names joined by `" + "`. A multivariate fit on a long
+#'   frame adds a leading `resp` column naming the response.
 #'
 #' @method summary mvgam_forecast
 #'
@@ -88,8 +89,7 @@ summary.mvgam_forecast <- function(object, probs = c(0.025, 0.975), ...) {
     out <- do.call(rbind, lapply(names(parts), function(r) {
       cbind(resp = r, summary(parts[[r]], probs = probs))
     }))
-    class(out) <- c("tbl_df", "tbl", "data.frame")
-    return(out)
+    return(tibble::as_tibble(out))
   }
   object <- parts
   fc_preds <- do.call(rbind, lapply(object$series_names, function(s_name) {
@@ -112,9 +112,7 @@ summary.mvgam_forecast <- function(object, probs = c(0.025, 0.975), ...) {
     df
   }))
   fc_preds$series <- factor(fc_preds$series, levels = object$series_names)
-  rownames(fc_preds) <- NULL
-  class(fc_preds) <- c("tbl_df", "tbl", "data.frame")
-  fc_preds
+  tibble::as_tibble(fc_preds)
 }
 
 

@@ -310,6 +310,7 @@ mk_prep <- function(sdata, draws, formula, ranef = NULL, re_formula = NULL,
     sdata = sdata,
     nobs = nobs %||% nrow(sdata$X %||% sdata[[1L]]),
     formula = formula,
+    predictors = model_predictors(formula),
     ranef = ranef,
     re_formula = re_formula
   ), class = "mvgam_prep")
@@ -318,6 +319,17 @@ mk_prep <- function(sdata, draws, formula, ranef = NULL, re_formula = NULL,
 one_draw <- function(...) {
   values <- c(...)
   matrix(values, nrow = 1L, dimnames = list(NULL, names(values)))
+}
+
+# A design as brms writes it, each column numbered by its formula term
+# in `assign`, the intercept as 0
+design <- function(X, assign) {
+  structure(X, assign = as.integer(assign))
+}
+
+# An intercept-only design of `n` rows
+intercept_design <- function(n) {
+  design(cbind(Intercept = rep(1, n)), 0L)
 }
 
 
@@ -336,7 +348,7 @@ test_that("predictor_suffix() writes brms's order of parts", {
 
 test_that("the intercept column goes only when brms drew an intercept", {
   # `y ~ 0 + ones`: the column of ones is a regressor with its own b[1].
-  X <- cbind(ones = rep(1, 5))
+  X <- design(cbind(ones = rep(1, 5)), 1L)
   lp <- extract_linpred_from_prep(mk_prep(
     list(X = X), one_draw(`b[1]` = 0.788), brms::bf(y ~ 0 + ones)
   ))
@@ -344,7 +356,7 @@ test_that("the intercept column goes only when brms drew an intercept", {
 
   # `y ~ 1 + x`: brms samples the slope against the design without its
   # "Intercept" column and writes the intercept as b_Intercept.
-  X <- cbind(Intercept = 1, x = c(0, 0.5, 1, 1.5, 2))
+  X <- design(cbind(Intercept = 1, x = c(0, 0.5, 1, 1.5, 2)), 0:1)
   lp <- extract_linpred_from_prep(mk_prep(
     list(X = X), one_draw(b_Intercept = 0.5, `b[1]` = 2),
     brms::bf(y ~ 1 + x)
@@ -360,8 +372,11 @@ test_that("each predictor reads only the terms carrying its own suffix", {
   # the mean's offset into sigma.
   Zs <- matrix(c(1, 0, 2, 1, 1, 0), nrow = 3L)
   sdata <- list(
-    X = cbind(Intercept = rep(1, 3)), offsets = c(10, 20, 30),
-    X_sigma = cbind(Intercept = rep(1, 3)),
+    X = intercept_design(3L), offsets = c(10, 20, 30),
+    X_sigma = intercept_design(3L),
+    # One smooth object, with no unpenalised columns
+    Xs_sigma = structure(matrix(0, 3L, 0L), smcols = list(integer(0L)),
+                         bylevels = list(`s(x)` = NULL)),
     nb_sigma_1 = 1L, Zs_sigma_1_1 = Zs, offsets_sigma = c(1, 1, 1)
   )
   draws <- one_draw(b_Intercept = 2, b_sigma_Intercept = -1,
@@ -379,9 +394,10 @@ mk_ranef <- function(rows, levels) {
   ranef <- data.frame(
     id = rows$id, group = rows$group, gn = rows$gn %||% 1L, gtype = "",
     coef = "Intercept", cn = rows$cn %||% 1L, resp = rows$resp %||% "",
-    dpar = rows$dpar %||% "", nlpar = "", type = "",
+    dpar = rows$dpar %||% "", nlpar = "", type = "", cor = TRUE,
     stringsAsFactors = FALSE
   )
+  ranef$form <- rep(list(~1), nrow(ranef))
   attr(ranef, "levels") <- levels
   ranef
 }
@@ -395,8 +411,8 @@ test_that("a group-level term is read by its block id and prefix", {
   # found.
   J <- c(1L, 3L, 2L, 1L)
   sdata <- list(
-    X = cbind(Intercept = rep(1, 4)), Z_1_1 = rep(1, 4), J_1 = J,
-    X_sigma = cbind(Intercept = rep(1, 4)), Z_2_sigma_1 = rep(1, 4),
+    X = intercept_design(4L), Z_1_1 = rep(1, 4), J_1 = J,
+    X_sigma = intercept_design(4L), Z_2_sigma_1 = rep(1, 4),
     J_2 = J
   )
   draws <- one_draw(
@@ -436,6 +452,76 @@ test_that("a group-level term is read by its block id and prefix", {
       matrix(0, 1L, 4L)
     )
   }
+})
+
+
+test_that("each formula term's part sums to the linear predictor", {
+  # Stan data and the group-level table from brms itself, with a draw
+  # for every parameter the formula declares. `(1 | g) + (0 + x | g)`
+  # are two blocks of one grouping factor. The column `x:fb` belongs to
+  # the interaction alone.
+  set.seed(3)
+  n <- 12L
+  dat <- data.frame(
+    y = 0, x = rnorm(n), z = rnorm(n), w = rnorm(n), v = rnorm(n),
+    f = gl(2L, 1L, n), g = gl(3L, 4L), h = gl(2L, 6L),
+    m = factor(rep(1:3, 4L), ordered = TRUE), o = runif(n)
+  )
+  form <- brms::bf(
+    y ~ x * f + s(z, k = 4) + (1 | g) + (0 + x | g) + (1 + x || h) +
+      gp(w, k = 5, cov = "matern32") + gp(v, k = 5) + mo(m) + offset(o)
+  )
+  fit <- brms::brm(form, dat, empty = TRUE)
+  vec <- function(stem, k) paste0(stem, "[", seq_len(k), "]")
+  pars <- c(
+    "b_Intercept", vec("b", 3L), "bs[1]", vec("s_1_1", 2L),
+    vec("r_1_1", 3L), vec("r_2_1", 3L), vec("r_3_1", 2L), vec("r_3_2", 2L),
+    "sdgp_1[1]", "lscale_1[1,1]", vec("zgp_1", 5L),
+    "sdgp_2[1]", "lscale_2[1,1]", vec("zgp_2", 5L),
+    "bsp[1]", vec("simo_1", 2L)
+  )
+  draws <- posterior::as_draws_matrix(
+    matrix(runif(3L * length(pars), 0.2, 1.5), 3L,
+           dimnames = list(NULL, pars))
+  )
+  plain <- as_plain_matrix(draws)
+  prep <- prepare_linpred_data(draws, fit, dat)
+  predictor <- prep$predictors[[1L]]
+
+  parts <- linear_terms_parts(prep, plain, predictor, n)
+  expect_identical(names(parts), c(
+    "Intercept", "x", "f", "x:f", "s(z, k = 4)", "(1 | g)", "(0 + x | g)",
+    "(1 + x || h)", 'gp(w, k = 5, cov = "matern32")', "gp(v, k = 5)",
+    "mo(m)", "offset"
+  ))
+  expect_equal(parts[["(0 + x | g)"]],
+               unname(plain[, vec("r_2_1", 3L)])[, as.integer(dat$g)] *
+                 rep(dat$x, each = 3L))
+  expect_equal(Reduce(`+`, parts), extract_linpred_from_prep(prep))
+
+  # Under `re_formula = NA` brms writes no group-level data
+  prep <- prepare_linpred_data(draws, fit, dat, re_formula = NA)
+  parts <- linear_terms_parts(prep, plain, predictor, n)
+  expect_false(any(startsWith(names(parts), "(")))
+  expect_equal(Reduce(`+`, parts), extract_linpred_from_prep(prep))
+
+  # Each `gp()` label takes the draws brms numbers in formula order
+  plain[, vec("zgp_2", 5L)] <- 0
+  parts <- linear_terms_parts(prep, plain, predictor, n)
+  expect_true(all(parts[["gp(v, k = 5)"]] == 0))
+  expect_true(all(parts[['gp(w, k = 5, cov = "matern32")']] != 0))
+
+  # Without a sampled `b_Intercept`, as under `bf(center = FALSE)`, the
+  # intercept is the first slope column
+  fit <- brms::brm(brms::bf(y ~ x * f, center = FALSE), dat, empty = TRUE)
+  draws <- posterior::as_draws_matrix(one_draw(
+    `b[1]` = 0.3, `b[2]` = 2, `b[3]` = -1, `b[4]` = 5
+  ))
+  parts <- linear_terms_parts(prepare_linpred_data(draws, fit, dat),
+                              as_plain_matrix(draws),
+                              model_predictors(fit$formula)[[1L]], n)
+  expect_identical(names(parts), c("Intercept", "x", "f", "x:f"))
+  expect_equal(drop(parts[["Intercept"]]), rep(0.3, n))
 })
 
 
@@ -482,12 +568,14 @@ test_that("a response of a model with several reads its own terms", {
   # brms suffixes a response's names with its key, and indexes its
   # grouping by `J_<id>_<resp>`. The fixed smooth `Xs_y2` and the
   # random effect `r_1_y1_1` were both dropped.
-  Xs <- cbind(c(1, 2, 3))
+  # One smooth object, its unpenalised column alone
+  Xs <- structure(cbind(c(1, 2, 3)), smcols = list(1L),
+                  bylevels = list(`s(x)` = NULL))
   sdata <- list(
     N_y1 = 3L, N_y2 = 3L,
-    X_y1 = cbind(Intercept = rep(1, 3)), Z_1_y1_1 = rep(1, 3),
+    X_y1 = intercept_design(3L), Z_1_y1_1 = rep(1, 3),
     J_1_y1 = c(2L, 1L, 2L),
-    X_y2 = cbind(Intercept = rep(1, 3)), Xs_y2 = Xs,
+    X_y2 = intercept_design(3L), Xs_y2 = Xs, nb_y2_1 = 0L,
     offsets_y2 = c(0.5, 0.5, 0.5)
   )
   draws <- one_draw(
@@ -510,21 +598,114 @@ test_that("a response of a model with several reads its own terms", {
 
 test_that("a monotonic term reads each level as brms codes it", {
   # Three levels coded 0..2. A frame holding only the top level is
-  # coded 2 and reads the whole effect, bsp * D * (simo1 + simo2).
-  sdata <- list(
-    X = cbind(Intercept = rep(1, 2)), Ksp = 1L, Imo = 1L, Jmo = 2L,
-    Xmo_1 = c(2L, 2L)
+  # coded 2 and takes the whole effect, D * (simo1 + simo2).
+  sdata <- list(Jmo = 2L, Xmo_1 = c(2L, 2L))
+  draws <- one_draw(`simo_1[1]` = 0.25, `simo_1[2]` = 0.75)
+  expect_equal(
+    unname(mo_value(as_plain_matrix(posterior::as_draws_matrix(draws)),
+                    sdata, "", 1L, 2L)),
+    matrix(2 * (0.25 + 0.75), 1L, 2L)
   )
-  draws <- one_draw(b_Intercept = 0, `bsp[1]` = 3,
-                    `simo_1[1]` = 0.25, `simo_1[2]` = 0.75)
-  lp <- extract_linpred_from_prep(mk_prep(sdata, draws,
-                                          brms::bf(y ~ mo(z))))
-  expect_equal(unname(lp), matrix(3 * 2 * (0.25 + 0.75), 1L, 2L))
-  # An interaction of monotonic terms numbers them apart, and is refused.
-  sdata$Imo <- 2L
+})
+
+
+test_that("special terms compose as brms writes them", {
+  # Draws for every parameter of brms's own Stan data. Each special
+  # coefficient multiplies its `mo()`, `me()` and `mi()` values and any
+  # covariate it interacts with. A varying slope of a special term adds
+  # its level's deviation to the coefficient.
+  set.seed(5)
+  n <- 12L
+  dat <- data.frame(y = 0, z = rnorm(n), x = rnorm(n), sdx = 1e-12,
+                    m = rep(1:3, 4L), f = gl(2L, 1L, n), g = gl(3L, 4L))
+  # Draws of one parameter, as unnamed as the parts are
+  take <- function(cols) unname(plain[, cols])
+  draws_for <- function(pars) {
+    posterior::as_draws_matrix(matrix(
+      runif(2L * length(pars), 0.2, 1.5), 2L, dimnames = list(NULL, pars)
+    ))
+  }
+  vec <- function(stem, k) paste0(stem, "[", seq_len(k), "]")
+  mo_of <- function(simo, x) {
+    cbind(0, t(apply(simo, 1L, cumsum)))[, x + 1L] * ncol(simo)
+  }
+
+  fit <- brms::brm(y ~ mo(m) + mo(m):z + mo(m):f + (mo(m) | g), dat,
+                   empty = TRUE)
+  draws <- draws_for(c("b_Intercept", vec("bsp", 3L), vec("simo_1", 2L),
+                       vec("simo_2", 2L), vec("simo_3", 2L),
+                       vec("r_1_1", 3L), vec("r_1_2", 3L)))
+  plain <- as_plain_matrix(draws)
+  prep <- prepare_linpred_data(draws, fit, dat)
+  parts <- linear_terms_parts(prep, plain, prep$predictors[[1L]], n)
+  expect_identical(names(parts), c("Intercept", "(1 + mo(m) | g)", "mo(m)",
+                                   "mo(m):z", "mo(m):f"))
+  sd <- prep$sdata
+  J <- as.integer(dat$g)
+  expect_equal(parts[["(1 + mo(m) | g)"]], take(vec("r_1_1", 3L))[, J])
+  expect_equal(
+    parts[["mo(m)"]],
+    (take("bsp[1]") + take(vec("r_1_2", 3L))[, J]) *
+      mo_of(take(vec("simo_1", 2L)), sd$Xmo_1)
+  )
+  expect_equal(parts[["mo(m):z"]],
+               take("bsp[2]") * mo_of(take(vec("simo_2", 2L)), sd$Xmo_2) *
+                 rep(dat$z, each = 2L))
+  # With `mo(m)` in the formula, `mo(m):f` is the contrast of the second
+  # level of `f`
+  expect_equal(parts[["mo(m):f"]],
+               take("bsp[3]") * mo_of(take(vec("simo_3", 2L)), sd$Xmo_3) *
+                 rep(as.numeric(dat$f == "2"), each = 2L))
+  expect_equal(Reduce(`+`, parts), extract_linpred_from_prep(prep))
+
+  # The fit's noise-free values at the rows it was given. Other rows
+  # draw them from the observed values, here measured without error.
+  fit <- brms::brm(y ~ me(x, sdx):mo(m), dat, empty = TRUE)
+  draws <- draws_for(c("b_Intercept", "bsp[1]", vec("simo_1", 2L),
+                       vec("Xme_1", n)))
+  plain <- as_plain_matrix(draws)
+  prep <- prepare_linpred_data(draws, fit, dat)
+  mo <- mo_of(take(vec("simo_1", 2L)), prep$sdata$Xmo_1)
+  expect_equal(linear_terms_parts(prep, plain, prep$predictors[[1L]],
+                                  n)[["me(x, sdx):mo(m)"]],
+               take("bsp[1]") * take(vec("Xme_1", n)) * mo)
+  # Reordered rows keep their own draws. A new row draws its value from
+  # the observed one, here measured without error.
+  new <- dat[c(n:2, 1L), ]
+  new$x[n] <- 5
+  prep <- prepare_linpred_data(draws, fit, new)
+  xme <- cbind(take(vec("Xme_1", n))[, n:2], 5)
+  expect_equal(linear_terms_parts(prep, plain, prep$predictors[[1L]],
+                                  n)[["me(x, sdx):mo(m)"]],
+               take("bsp[1]") * xme *
+                 mo_of(take(vec("simo_1", 2L)), prep$sdata$Xmo_1))
+
+  # A missing value of an `mi()` variable takes its imputed draw at the
+  # rows the fit was given
+  dat$x[c(2L, 7L)] <- NA
+  fit <- brms::brm(brms::bf(y ~ mi(x)) + brms::bf(x | mi() ~ z) +
+                     brms::set_rescor(FALSE), dat, empty = TRUE)
+  draws <- draws_for(c("b_y_Intercept", "bsp_y[1]", vec("Ymi_x", 2L)))
+  plain <- as_plain_matrix(draws)
+  prep <- prepare_linpred_data(draws, fit, dat)
+  x <- matrix(dat$x, 2L, n, byrow = TRUE)
+  x[, c(2L, 7L)] <- take(vec("Ymi_x", 2L))
+  expect_equal(
+    linear_terms_parts(prep, plain, find_predictor(prep, "y"), n)[["mi(x)"]],
+    take("bsp_y[1]") * x
+  )
+  # Reordered rows keep their own draws. A new row needs the value.
+  prep <- prepare_linpred_data(draws, fit, dat[c(7L, 1L, 2L), ])
+  expect_equal(
+    linear_terms_parts(prep, plain, find_predictor(prep, "y"), 3L)[["mi(x)"]],
+    take("bsp_y[1]") * x[, c(7L, 1L, 2L)]
+  )
+  new <- dat[2L, ]
+  new$z <- 9
+  prep <- prepare_linpred_data(draws, fit, new)
   expect_error(
-    extract_linpred_from_prep(mk_prep(sdata, draws, brms::bf(y ~ mo(z)))),
-    "on its own"
+    linear_terms_parts(prep, plain, find_predictor(prep, "y"), 1L),
+    "needs a value of 'x'"
   )
 })
 
@@ -533,7 +714,7 @@ test_that("a non-linear mean is its expression at its parameters", {
   # Each non-linear parameter is a predictor of its own, suffixed by its
   # name, and the covariate the expression reads is `C_1`.
   sdata <- list(
-    X_a = cbind(Intercept = rep(1, 3)), X_b = cbind(Intercept = rep(1, 3)),
+    X_a = intercept_design(3L), X_b = intercept_design(3L),
     C_1 = c(0, 1, 2)
   )
   draws <- one_draw(`b_a[1]` = 2, `b_b[1]` = 0.5)
@@ -545,10 +726,11 @@ test_that("a non-linear mean is its expression at its parameters", {
 
 test_that("each Gaussian process takes the kernel its own gp() names", {
   expect_identical(
-    gp_kernels(y ~ gp(x, cov = "matern32", k = 5) + gp(z, k = 4)),
-    c("matern32", "exp_quad")
+    gp_kernels(~ gp(x, cov = "matern32", k = 5) + gp(z, k = 4)),
+    c(`gp(x, cov = "matern32", k = 5)` = "matern32",
+      `gp(z, k = 4)` = "exp_quad")
   )
-  expect_identical(gp_kernels(sigma ~ x), character(0))
+  expect_identical(gp_kernels(NULL), character(0))
 })
 
 
@@ -755,26 +937,19 @@ test_that("a conditional read ignores process_error", {
 })
 
 
-test_that("a fit with no latent state falls back to the submodel", {
-  # A deterministic trend (PW, none) carries no `trend[t, s]` draws, so
-  # the conditional read has nothing to condition on and the trend
-  # contributes its deterministic submodel alone.
+test_that("a fit missing its trend draws is a fault", {
+  # Every trend writes `trend[t, s]`, PW and ZMVN included. Every fit
+  # keeps it. The conditional surface is built from it.
   testthat::local_mocked_bindings(
-    extract_component_linpred = function(mvgam_fit, newdata, component, ...) {
-      if (component == "obs") matrix(1, 4, 3) else matrix(0.5, 4, 3)
-    },
-    extract_trend_latent_states = function(mvgam_fit, newdata,
-                                           full_draws, ...) {
-      NULL
-    },
-    has_stochastic_trend = function(object) FALSE,
+    extract_component_linpred = function(...) matrix(1, 4, 3),
+    extract_trend_latent_states = function(...) NULL,
     .package = "mvgam"
   )
-  out <- get_combined_linpred(
-    stub_obj(n_draws = 4L), newdata = NULL, process_error = TRUE,
-    trend_state = "conditional", draw_ids = 1:4
+  expect_error(
+    get_combined_linpred(stub_obj(n_draws = 4L), newdata = NULL,
+                         trend_state = "conditional", draw_ids = 1:4),
+    "Please report this mvgam fault"
   )
-  expect_equal(out, matrix(1.5, 4, 3))
 })
 
 

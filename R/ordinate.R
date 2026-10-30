@@ -217,7 +217,7 @@ ordinate_trait_arrows <- function(traits, loadings_2d,
       )
     }
   ))
-  if (is.null(arrow_dat) || NROW(arrow_dat) == 0L) return(NULL)
+  if (NROW(arrow_dat) == 0L) return(NULL)
   loading_radii <- sqrt(rowSums(loadings_2d^2))
   trait_radii <- sqrt(arrow_dat$x^2 + arrow_dat$y^2)
   max_trait_r <- max(trait_radii)

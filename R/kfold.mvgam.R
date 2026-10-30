@@ -807,14 +807,9 @@ build_mvgam_kfold <- function(pointwise, pointwise_psis = NULL,
 #' @return The refitted model.
 #' @noRd
 refit_on_held_out <- function(object, train_data, silent = 1L) {
-  withCallingHandlers(
+  without_warnings_matching(
     update(object, newdata = train_data,
            silent = min(silent + 1L, 2L), refresh = 0),
-    warning = function(w) {
-      if (grepl("Rows containing NAs", conditionMessage(w),
-                fixed = TRUE)) {
-        invokeRestart("muffleWarning")
-      }
-    }
+    "Rows containing NAs", fixed = TRUE
   )
 }

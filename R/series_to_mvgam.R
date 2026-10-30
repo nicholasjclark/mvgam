@@ -67,9 +67,8 @@
 #'   `time` (an integer for regular data), the response and the original
 #'   index (`index` for a `ts`). Any `tsibble` key and covariate columns
 #'   follow, then one season column per period above 1. Rows are ordered
-#'   by time,
-#'   then series. With `h` or `train_prop`, a list holding `data_train`
-#'   and `data_test` instead.
+#'   by time, then series. With `h` or `train_prop`, a list holding
+#'   `data_train` and `data_test` instead.
 #'
 #' @examples
 #' # Monthly airline passengers, holding out the final year
@@ -339,8 +338,7 @@ tsibble_to_long <- function(series, response, freq) {
 }
 
 # Position within each seasonal period, counted from the calendar
-# origin of the steps. Periods of 1 or less carry no season. One period
-# gives a `season` column, several give `season_<period>` columns.
+# origin of the steps. Periods of 1 or less carry no season.
 #
 # @noRd
 season_columns <- function(steps, periods, taken) {
@@ -348,15 +346,26 @@ season_columns <- function(steps, periods, taken) {
   if (!length(periods)) {
     return(data.frame(row.names = seq_along(steps)))
   }
-  labels <- if (length(periods) == 1L) {
-    "season"
-  } else {
-    paste0("season_", as.character(periods))
-  }
+  labels <- season_period_names(periods)
   refuse_reserved_columns(intersect(labels, taken))
   out <- lapply(periods, function(p) as.integer(floor(steps %% p) + 1))
   names(out) <- labels
   as.data.frame(out)
+}
+
+# The names of seasonal periods. One period is `season`. Several are
+# `season_<period>`, such as `season_7` and `season_365.25`. The
+# columns `series_to_mvgam()` writes and the season components of
+# `LLT()` share these names. A component's calendar positions are then
+# the data column of its name.
+#
+# @noRd
+season_period_names <- function(periods) {
+  checkmate::assert_numeric(periods, any.missing = FALSE, min.len = 1L)
+  if (length(periods) == 1L) {
+    return("season")
+  }
+  paste0("season_", as.character(periods))
 }
 
 # Refuse input columns that clash with columns the output creates.

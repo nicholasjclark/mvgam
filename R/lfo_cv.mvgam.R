@@ -713,9 +713,7 @@ summary.mvgam_lfo <- function(object, ...) {
       out[[sc]] <- object$scores[[sc]]
     }
   }
-  rownames(out) <- NULL
-  class(out) <- c("tbl_df", "tbl", "data.frame")
-  out
+  tibble::as_tibble(out)
 }
 
 

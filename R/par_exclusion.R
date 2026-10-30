@@ -60,8 +60,8 @@ brms_working_pars <- function(bfit, standata, save_pars, suffix = "") {
   if (is.null(bfit) || is.null(bfit$formula)) {
     return(character(0L))
   }
-  bterms <- brms::brmsterms(bfit$formula)
-  frames <- if (inherits(bterms, "mvbrmsterms")) bterms$terms else list(bterms)
+  bterms <- brms_terms(bfit$formula)
+  frames <- response_frames(bterms)
 
   out <- character(0L)
   # A model with several responses estimates their residual
@@ -149,7 +149,7 @@ smooth_working_pars <- function(standata, suffix = "") {
 #' @return Character vector of Stan variable names.
 #' @noRd
 ranef_working_pars <- function(reframe, save_pars) {
-  if (is.null(reframe) || nrow(reframe) == 0L) {
+  if (NROW(reframe) == 0L) {
     return(character(0L))
   }
   classes <- c(if (!save_pars$all) c("z", "L"), "Cor", "r")

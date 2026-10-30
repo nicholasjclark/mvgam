@@ -420,6 +420,8 @@ extract_innovation_history <- function(draws, n_series, max_ma, n_time) {
 #' @param fit Fitted `mvgam` object
 #' @param state_var Character parameter name of the state grid
 #' @return List holding `params` and `last_state`
+#' @details Every trend's extractor shares this signature.
+#'   `extract_last_states()`, their one caller, checks the arguments.
 #' @noRd
 extract_rw_state <- function(draws, meta, n_series, n_lv, fit,
                              state_var = "trend") {
@@ -454,13 +456,7 @@ extract_ar_state <- function(draws, meta, n_series, n_lv, fit,
 #' @noRd
 extract_arma_state <- function(draws, meta, n_series, n_lv, fit,
                                pull_ar, state_var = "trend") {
-  checkmate::assert_matrix(draws, min.rows = 1L)
-  checkmate::assert_list(meta)
-  checkmate::assert_int(n_series, lower = 1L)
-  checkmate::assert_int(n_lv, lower = 1L)
-  checkmate::assert_class(fit, "mvgam")
   checkmate::assert_flag(pull_ar)
-  checkmate::assert_string(state_var)
   n_time <- as.integer(fit$standata$N_time_trend)
   scov <- extract_sigma_and_cov(draws, n_series, n_lv,
                                 meta$has_cor, fit$standata)
@@ -497,12 +493,6 @@ extract_arma_state <- function(draws, meta, n_series, n_lv, fit,
 #' @noRd
 extract_var_state <- function(draws, meta, n_series, n_lv, fit,
                               state_var = "trend") {
-  checkmate::assert_matrix(draws, min.rows = 1L)
-  checkmate::assert_list(meta)
-  checkmate::assert_int(n_series, lower = 1L)
-  checkmate::assert_int(n_lv, lower = 1L)
-  checkmate::assert_class(fit, "mvgam")
-  checkmate::assert_string(state_var)
   n_time <- as.integer(fit$standata$N_time_trend)
   # Stan declares Phi_trend as `array[N_lags_trend] matrix[N_lv,
   # N_lv]`. Its draws are indexed `Phi_trend[lag, i, j]`: the array
@@ -602,12 +592,6 @@ varma_last_innovation <- function(init, lv, A_cube, D, ar_lags) {
 #' @noRd
 extract_car_state <- function(draws, meta, n_series, n_lv, fit,
                               state_var = "trend") {
-  checkmate::assert_matrix(draws, min.rows = 1L)
-  checkmate::assert_list(meta)
-  checkmate::assert_int(n_series, lower = 1L)
-  checkmate::assert_int(n_lv, lower = 1L)
-  checkmate::assert_class(fit, "mvgam")
-  checkmate::assert_string(state_var)
   n_time <- as.integer(fit$standata$N_time_trend)
   phi <- broadcast_to_series(read_draws_vector(draws, "ar1_trend", n_lv),
                              n_series)
@@ -667,12 +651,6 @@ extract_last_observed_times <- function(fit, n_series) {
 #' @noRd
 extract_llt_state <- function(draws, meta, n_series, n_lv, fit,
                               state_var = "trend") {
-  checkmate::assert_matrix(draws, min.rows = 1L)
-  checkmate::assert_list(meta)
-  checkmate::assert_int(n_series, lower = 1L)
-  checkmate::assert_int(n_lv, lower = 1L)
-  checkmate::assert_class(fit, "mvgam")
-  checkmate::assert_string(state_var)
   n_time <- as.integer(fit$standata$N_time_trend)
   scov <- extract_sigma_and_cov(draws, n_series, n_lv, meta$has_cor,
                                 fit$standata)
@@ -740,12 +718,6 @@ extract_llt_state <- function(draws, meta, n_series, n_lv, fit,
 #' @noRd
 extract_zmvn_state <- function(draws, meta, n_series, n_lv, fit,
                                state_var = "trend") {
-  checkmate::assert_matrix(draws, min.rows = 1L)
-  checkmate::assert_list(meta)
-  checkmate::assert_int(n_series, lower = 1L)
-  checkmate::assert_int(n_lv, lower = 1L)
-  checkmate::assert_class(fit, "mvgam")
-  checkmate::assert_string(state_var)
   scov <- extract_sigma_and_cov(draws, n_series, n_lv,
                                 has_cor = TRUE,
                                 standata = fit$standata)
@@ -774,12 +746,6 @@ extract_zmvn_state <- function(draws, meta, n_series, n_lv, fit,
 #' @noRd
 extract_pw_state <- function(draws, meta, n_series, n_lv, fit,
                              state_var = "trend") {
-  checkmate::assert_matrix(draws, min.rows = 1L)
-  checkmate::assert_list(meta)
-  checkmate::assert_int(n_series, lower = 1L)
-  checkmate::assert_int(n_lv, lower = 1L)
-  checkmate::assert_class(fit, "mvgam")
-  checkmate::assert_string(state_var)
   ndraws <- nrow(draws)
   k <- broadcast_to_series(read_draws_vector(draws, "k_trend", n_lv),
                            n_series)

@@ -220,6 +220,20 @@ test_that("an LLT forecast turns each seasonal pair by its frequency", {
   expect_equal(colSums(fixed[1:12, ]), c(0, 0))
 })
 
+test_that("an LLT forecast with two periods parts the season by period", {
+  # Without shocks each period repeats on its own length
+  spec <- LLT(season = c(4, 12), harmonics = c(1L, 2L))
+  season0 <- matrix(c(0.3, -0.1, 0.2, 0.05, -0.2, 0.4), 6L)
+  state <- list(trends = matrix(1 + sum(season0[1:3]), 1L), errors = NULL,
+                slope = 0, season = season0)
+  params <- list(sigma = 0.3, sigma_slope = 0.1, sigma_season = 0)
+  paths <- attr(propagate_trend(spec, params, h = 24L, n_series = 1L,
+                                last_state = state), "components")
+  expect_equal(paths$season_4 + paths$season_12, paths$season)
+  expect_equal(paths$season_4[1:20, ], paths$season_4[5:24, ])
+  expect_equal(paths$season_12[1:12, ], paths$season_12[13:24, ])
+})
+
 # ---- VAR ----------------------------------------------------------
 
 test_that("the VAR kernel multiplies each lag's matrix into its state", {

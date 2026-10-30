@@ -190,28 +190,36 @@ trend_component_values <- function(total, parts, component, components) {
 #'
 #' A trend without factors stores the path by series. A factor fit
 #' stores it by factor. Each draw's sampled loadings then project it,
-#' as they project the trend.
+#' as they project the trend. One factor's share is the path projected
+#' through that factor's loadings alone.
 #'
 #' @param object A fitted `mvgam` object
 #' @param path Name of a Stan `matrix[N_time_trend, N_lv_trend]`
 #' @param draw_idx Indices of the draws to keep
+#' @param factor The factor whose share to take, or `NULL` for every
+#'   factor
 #' @return Draws matrix, one row per draw, with columns `path[t, s]`
 #' @noRd
-series_path_draws <- function(object, path, draw_idx) {
+series_path_draws <- function(object, path, draw_idx, factor = NULL) {
   checkmate::assert_class(object, "mvgam")
   checkmate::assert_string(path)
   checkmate::assert_integerish(draw_idx, lower = 1L, min.len = 1L)
   n_series <- as.integer(object$standata$N_series_trend)
-  if (is.null(detect_factor_n_lv(object, n_series))) {
+  n_lv <- detect_factor_n_lv(object, n_series)
+  checkmate::assert_int(factor, lower = 1L, upper = n_lv %||% 0L,
+                        null.ok = TRUE)
+  if (is.null(n_lv)) {
     return(subset_draws_rows(fit_draws(object$fit, path),
                              draw_ids = draw_idx))
   }
   draws <- subset_draws_rows(fit_draws(object$fit, c(path, "Z", "Z_tilde")),
                              draw_ids = draw_idx)
   n_time <- as.integer(object$standata$N_time_trend)
-  n_lv <- as.integer(object$standata$N_lv_trend)
   Z <- resolve_factor_loadings(object, draws_mat = draws, n_lv = n_lv,
                                n_series = n_series, basis = "model")
+  if (!is.null(factor)) {
+    Z[, , -factor] <- 0
+  }
   out <- project_lv_grid(
     as_plain_matrix(draws[, stan_matrix_names(path, n_time, n_lv),
                           drop = FALSE]),
@@ -222,6 +230,27 @@ series_path_draws <- function(object, path, draw_idx) {
 }
 
 
+#' A stored path at given rows
+#'
+#' @inheritParams series_path_draws
+#' @param newdata Rows of the training frame
+#' @param resp A response name, or NULL
+#' @return `[length(draw_idx), nrow(newdata)]` matrix, or `NULL` when
+#'   the draws lack the path
+#' @noRd
+path_rows <- function(object, newdata, path, draw_idx, resp = NULL,
+                      factor = NULL) {
+  draws <- if (identical(path, "trend")) {
+    checkmate::assert_null(factor)
+    subset_draws_rows(fit_draws(object$fit, "trend"), draw_ids = draw_idx)
+  } else {
+    series_path_draws(object, path, draw_idx, factor = factor)
+  }
+  extract_trend_latent_states(object, newdata, full_draws = draws,
+                              resp = resp, state = path)
+}
+
+
 #' The fitted trend, or one of its components, at given rows
 #'
 #' @param object A fitted `mvgam` object
@@ -229,23 +258,30 @@ series_path_draws <- function(object, path, draw_idx) {
 #' @param draw_idx Indices of the draws to keep
 #' @param resp A response name, or NULL
 #' @param component Component names, or `NULL` for the summed trend
+#' @param factor The factor whose share of the components to take, or
+#'   `NULL` for every factor. A share is defined for components with a
+#'   path alone.
 #' @return `[length(draw_idx), nrow(newdata)]` matrix, or `NULL` for a
 #'   fit without a trend
 #' @noRd
 trend_state_rows <- function(object, newdata, draw_idx, resp = NULL,
-                             component = NULL) {
+                             component = NULL, factor = NULL) {
   checkmate::assert_class(object, "mvgam")
   checkmate::assert_character(component, null.ok = TRUE)
   components <- if (is.null(component)) list() else trend_components(object)
-  at_rows <- function(draws, state) {
-    extract_trend_latent_states(object, newdata, full_draws = draws,
-                                resp = resp, state = state)
+  use_total <- needs_total(components, component)
+  if (use_total && !is.null(factor)) {
+    stop_mvgam_fault(
+      "A factor's share is defined for components with a path alone.",
+      paste0("Asked for '", component_label(component %||% "trend"),
+             "' of factor ", factor, ".")
+    )
   }
   parts <- lapply(
     stats::setNames(nm = component_parts(components, component)),
     function(nm) {
       path <- components[[nm]]$path
-      vals <- at_rows(series_path_draws(object, path, draw_idx), path)
+      vals <- path_rows(object, newdata, path, draw_idx, resp, factor)
       # A fit without a trend reaches no component. A declared path the
       # draws lack would otherwise give a hindcast of zeros.
       if (is.null(vals)) {
@@ -257,9 +293,40 @@ trend_state_rows <- function(object, newdata, draw_idx, resp = NULL,
       vals
     }
   )
-  total <- if (needs_total(components, component)) {
-    at_rows(subset_draws_rows(fit_draws(object$fit, "trend"),
-                              draw_ids = draw_idx), "trend")
-  }
+  total <- if (use_total) path_rows(object, newdata, "trend", draw_idx, resp)
   trend_component_values(total, parts, component, components)
+}
+
+
+#' The latent state's parts at given rows
+#'
+#' Every trend writes `trend = Z lv_trend + mu_trend`. The latent state
+#' is `Z lv_trend`, the fitted trend less the trend formula's predictor.
+#' A trend that declares components parts the state into its additive
+#' components with a path, as the level and season of `LLT()`. Any
+#' other trend is one part, `state`. A factor fit parts each again into
+#' the share each factor's loadings carry, labelled `<part> (Factor k)`.
+#'
+#' @inheritParams trend_state_rows
+#' @return Named list of `[length(draw_idx), nrow(newdata)]` matrices
+#' @noRd
+latent_trend_parts <- function(object, newdata, draw_idx, resp = NULL) {
+  checkmate::assert_class(object, "mvgam")
+  components <- additive_paths(trend_components(object))
+  n_lv <- detect_factor_n_lv(object,
+                             as.integer(object$standata$N_series_trend))
+  factors <- if (is.null(n_lv)) list(NULL) else as.list(seq_len(n_lv))
+  out <- list()
+  for (nm in if (length(components)) components else "state") {
+    for (f in factors) {
+      label <- if (is.null(f)) nm else paste0(nm, " (Factor ", f, ")")
+      out[[label]] <- if (identical(nm, "state")) {
+        path_rows(object, newdata, "lv_trend", draw_idx, resp, f)
+      } else {
+        trend_state_rows(object, newdata, draw_idx, resp, component = nm,
+                         factor = f)
+      }
+    }
+  }
+  out
 }

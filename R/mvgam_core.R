@@ -415,9 +415,9 @@ mvgam_imputation_forwarded <- c(
 #'   keyword runs Stan's Pathfinder approximation on the compiled model
 #'   and draws one starting value per chain from it. Sampling then
 #'   proceeds as usual from those values. It helps a model whose chains
-#'   stall at a poor starting point or fill warmup with divergences. On a model that already warms up
-#'   cleanly it adds about a second and lowers effective samples per
-#'   second.
+#'   stall at a poor starting point or fill warmup with divergences. On
+#'   a model that already warms up cleanly it adds about a second and
+#'   lowers effective samples per second.
 #'
 #'   Five arguments shape the Stan program and reach brms unchanged:
 #'   \itemize{
@@ -671,6 +671,38 @@ mvgam <- function(formula, trend_formula = NULL, data = NULL,
   }
 
   local_mvgam_silent(list(...)$silent %||% 1L)
+  # This is the last frame that holds the user's symbols. Every step
+  # below reaches the pipeline through `do.call()`, which substitutes
+  # each argument's value. A call captured deeper would inline the
+  # whole data frame and the family object.
+  user_call <- match.call()
+  # Validation and the Stan build each pass the formula through brms.
+  # One scope covers both. A warning brms raises in each pass then
+  # shows once.
+  warn_once_per_call(mvgam_from_data(
+    formula = formula, trend_formula = trend_formula, data = data,
+    newdata = newdata, trend_map = trend_map,
+    loadings_prior = loadings_prior, backend = backend,
+    combine = combine, family = family, threads = threads,
+    save_pars = save_pars, run_model = run_model,
+    user_call = user_call, ...
+  ))
+}
+
+
+#' Validate the data of an `mvgam()` call and fit the model
+#'
+#' The body of `mvgam()` once its arguments are translated.
+#'
+#' @inheritParams mvgam
+#' @param user_call The call the user made
+#' @return What `mvgam()` returns
+#' @noRd
+mvgam_from_data <- function(formula, trend_formula, data, newdata,
+                            trend_map, loadings_prior, backend, combine,
+                            family, threads, save_pars, run_model,
+                            user_call, ...) {
+  checkmate::assert_class(user_call, "call")
 
   if (inherits(data, "mids")) {
     data <- lapply(seq_len(data$m), function(i) mice::complete(data, i))
@@ -720,11 +752,6 @@ mvgam <- function(formula, trend_formula = NULL, data = NULL,
   # A `threads` that is no thread count is refused before any data
   # check
   thread_count(threads)
-  # This is the last frame that holds the user's symbols. Every step
-  # below reaches the pipeline through `do.call()`, which substitutes
-  # each argument's value. A call captured deeper would inline the
-  # whole data frame and the family object.
-  user_call <- match.call()
   data_name <- call_data_name(user_call)
 
   # A positive mean under a link that admits zero needs the linear

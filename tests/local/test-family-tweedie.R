@@ -446,4 +446,8 @@ test_that("an argument this family's methods cannot read is refused", {
 })
 
 
+test_that("each part's response-scale share is the fit's own: tweedie", {
+  expect_epred_parts(fit, exp)
+})
+
 cat("\nDone.\n")

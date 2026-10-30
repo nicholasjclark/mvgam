@@ -230,7 +230,7 @@ test_that("ordinal thresholds follow the draws of their predictor", {
   fit <- fit_ord
   draws <- posterior::as_draws_matrix(fit$fit)
   ids <- c(2L, 9L, 40L)
-  thres <- mvgam:::ordinal_thresholds(fit, draw_ids = ids)
+  thres <- mvgam:::ordinal_thresholds(fit, draw_ids = ids)[[1L]]
   expect_equal(nrow(thres), length(ids))
   # The thresholds are the ones sampled at those iterations, not the
   # first few rows of the posterior, and they are the ones that cut
@@ -946,4 +946,12 @@ test_that("a fold splits the simplest frame there is", {
 
   kf <- kfold(fit_plain, K = 2L, silent = 2L)
   expect_true(is.finite(kf$estimates["elpd_kfold", "Estimate"]))
+})
+
+
+test_that("each part's response-scale share is the fit's own: ordinal and truncated", {
+  expect_epred_parts(fit_plain, exp)
+  expect_epred_parts(fit_ord)
+  expect_epred_parts(fit_dpar, identity)
+  expect_epred_parts(fit_trunc)
 })

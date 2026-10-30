@@ -233,7 +233,7 @@ parse_side_terms <- function(f, family, resp) {
   if (inherits(f, "mvbrmsformula") && is.null(f$rescor)) {
     f$rescor <- FALSE
   }
-  bt <- brms::brmsterms(f)
+  bt <- brms_terms(f)
   if (is.null(bt$terms)) {
     return(mvgam_brmsterms_parts(bt))
   }

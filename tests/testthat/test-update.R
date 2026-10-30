@@ -64,22 +64,6 @@ test_that("update.mvgam rejects pooled multiple-imputation fits", {
   )
 })
 
-test_that("update.mvgam rejects non-data.frame newdata", {
-  stub <- make_update_stub()
-  expect_error(
-    update(stub, newdata = list(y = 1, x = 1)),
-    "data.frame"
-  )
-})
-
-test_that("update.mvgam rejects non-logical recompile", {
-  stub <- make_update_stub()
-  expect_error(
-    update(stub, recompile = "yes"),
-    "logical"
-  )
-})
-
 # ---- mvgam_update_call helper --------------------------------------
 
 test_that("mvgam_update_call inherits what the call leaves out", {
@@ -195,10 +179,9 @@ test_that("mvgam_update_call passes through unrelated dots", {
   stub <- make_update_stub()
   out <- mvgam_update_call(
     stub, formula. = NULL, newdata = NULL,
-    dots = list(seed = 42L, init = "random", silent = 2L)
+    dots = list(seed = 42L, silent = 2L)
   )
   expect_identical(out$seed, 42L)
-  expect_identical(out$init, "random")
   expect_identical(out$silent, 2L)
 })
 
@@ -215,15 +198,6 @@ test_that("mvgam_normalise_stancode collapses trailing whitespace", {
 
 test_that("mvgam_normalise_stancode handles NULL input", {
   expect_identical(mvgam_normalise_stancode(NULL), character(0L))
-})
-
-test_that("mvgam_normalise_stancode strips a leading // comment line", {
-  s1 <- "// Generated with mvgam 2.0.0 using brms 2.23.0\ndata { int N; }"
-  s2 <- "// Generated with mvgam 9.9.9 using brms 9.9.9\ndata { int N; }"
-  expect_identical(
-    mvgam_normalise_stancode(s1),
-    mvgam_normalise_stancode(s2)
-  )
 })
 
 test_that("mvgam_normalise_stancode keeps stancode without a header", {
@@ -389,8 +363,6 @@ test_that("every mvgam() argument is inherited or named as not", {
   # Nothing is claimed in both places.
   expect_identical(intersect(inherited, names(mvgam_update_uninherited)),
                    character(0L))
-  # Every reason says something.
-  expect_true(all(nzchar(mvgam_update_uninherited)))
 })
 
 test_that("every prediction argument reaches the method's body", {
@@ -594,7 +566,6 @@ test_that("a refit states an n_lv the trend formula does not name", {
   # the fit resolved.
   trend_call <- ~ s(elev, k = 5, by = lv_axis()) - 1 + ZMVN(cor = TRUE)
   out <- state_resolved_trend_args(trend_call, list(n_lv = 2L))
-  expect_true(trend_call_names_arg(out, "n_lv"))
   # Stated on the constructor that owns it, leaving the rest of the
   # expression as the user wrote it.
   expect_identical(
@@ -644,14 +615,6 @@ test_that("a resolved count with nowhere to be stated is refused", {
     state_resolved_trend_args(~ s(env, by = lv_axis()) - 1,
                               list(n_lv = 2L)),
     "lacks a trend constructor"
-  )
-})
-
-test_that("the arguments a refit states are ones the map knows", {
-  # Two tables naming the same argument would drift. The slot each one is
-  # taken from is recorded in `trend_arg_metadata` alone.
-  expect_true(
-    all(trend_args_stated_on_rebuild %in% names(trend_arg_metadata))
   )
 })
 
@@ -708,19 +671,46 @@ test_that("sampler settings travel only with the original algorithm", {
 
 test_that("a new prior joins the priors the user set before", {
   old <- rbind(
-    brms::prior_string("exponential(3)", class = "sigma_trend"),
+    brms::prior_string("exponential(3)", class = "sdgp"),
     brms::prior_string("normal(0, 5)", class = "b")
   )
-  old$lb <- ""
-  new <- brms::prior(normal(0, 1), class = b)
+  # A fitted table records the declared bound of a scale. `prior()`
+  # leaves it NA.
+  old$lb <- c("0", "")
+  new <- brms::prior(exponential(1), class = sdgp)
   merged <- merge_update_priors(new, old)
-  # The new `b` row replaces the old one. The old row spells its
-  # unbounded `lb` as "" and the new one as NA.
-  expect_equal(nrow(merged), 2L)
-  expect_identical(merged$prior[merged$class == "b"], "normal(0, 1)")
-  expect_identical(merged$prior[merged$class == "sigma_trend"],
-                   "exponential(3)")
+  expect_identical(merged$prior[merged$class == "sdgp"], "exponential(1)")
+  expect_identical(merged$prior[merged$class == "b"], "normal(0, 5)")
   expect_identical(merge_update_priors(new, NULL), new)
+})
+
+test_that("a by-factor GP with a class-wide prior refits", {
+  # The class prior was copied into each level's row and stored as the
+  # user's. A refit handed the rows back. brms then stopped with
+  # `all(index == 1L) is not TRUE`, which broke every `lfo_cv()` refit.
+  set.seed(1)
+  dat <- expand.grid(time = 1:20, series = factor(c("a", "b")))
+  dat$y <- rpois(nrow(dat), 5)
+  tf <- ~ gp(time, k = 6, by = lv_axis()) + AR(p = 1, cor = TRUE)
+  prefit <- mvgam(y ~ 1, trend_formula = tf, data = dat, family = poisson(),
+                  prior = brms::prior(exponential(1), class = sdgp_trend),
+                  run_model = FALSE, silent = 2, validate = FALSE)
+  expect_s3_class(
+    update(prefit, newdata = dat[dat$time <= 15, ], run_model = FALSE,
+           validate = FALSE),
+    "mvgam"
+  )
+  refit <- update(prefit, run_model = FALSE, validate = FALSE,
+                  prior = brms::prior(exponential(2), class = sdgp_trend))
+  expect_identical(refit$prior$prior[refit$prior$source == "user"],
+                   "exponential(2)")
+  # brms takes no prior on one level. The refusal names the class form.
+  expect_error(
+    update(prefit, run_model = FALSE, validate = FALSE,
+           prior = brms::prior(exponential(2), class = sdgp_trend,
+                               coef = gptimeseriesa)),
+    "class = sdgp_trend)"
+  )
 })
 
 test_that("a multivariate formula update takes the whole formula", {

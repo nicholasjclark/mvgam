@@ -187,9 +187,9 @@ default), \code{"0"}, a numeric value, a list or a function. With
 keyword runs Stan's Pathfinder approximation on the compiled model
 and draws one starting value per chain from it. Sampling then
 proceeds as usual from those values. It helps a model whose chains
-stall at a poor starting point or fill warmup with divergences. On a model that already warms up
-cleanly it adds about a second and lowers effective samples per
-second.
+stall at a poor starting point or fill warmup with divergences. On
+a model that already warms up cleanly it adds about a second and
+lowers effective samples per second.
 
 Five arguments shape the Stan program and reach brms unchanged:
 \itemize{

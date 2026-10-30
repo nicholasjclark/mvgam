@@ -792,9 +792,10 @@ build_hindcast_arms <- function(object, training, type, draw_idx,
 #' the state component `component` names. The observation predictor
 #' added to the trend gives the `link` hindcast. A fit without a trend
 #' takes a zero trend. A closure-unit family's `expected` and `response`
-#' marginalise over the latent state of each unit. `posterior_epred()` and `posterior_predict()` give
-#' those per visit row. `process_error = TRUE` takes the marginal draws
-#' of those functions for every family.
+#' marginalise over the latent state of each unit. `posterior_epred()`
+#' and `posterior_predict()` give those per visit row.
+#' `process_error = TRUE` takes the marginal draws of those functions
+#' for every family.
 #'
 #' @inheritParams build_hindcast_arms
 #' @param sub_data Rows of the training frame
@@ -847,8 +848,8 @@ hindcast_draws <- function(object, sub_data, type, draw_idx,
         draw_observations(object, linpred, sub_data, draw_ids = draw_idx,
                           resp = resp)
       } else {
-        expected_from_linpred(object, linpred, newdata = sub_data,
-                              draw_ids = draw_idx, resp = resp)
+        response_epred(object, linpred, newdata = sub_data,
+                       draw_ids = draw_idx, resp = resp, ordinal = "mean")
       }
     }
   }
@@ -1076,9 +1077,9 @@ build_forecast_arms <- function(object, trend_model, meta,
   # subsample would pair `mu` with a `zi` or `shape` from another
   # draw.
   if (type == "expected" || !obs_uncertainty) {
-    return(arms_of(expected_from_linpred(
+    return(arms_of(response_epred(
       object, eta_full, newdata = fc_grid$data, draw_ids = draw_idx,
-      resp = resp
+      resp = resp, ordinal = "mean"
     )))
   }
   arms_of(draw_observations(
@@ -1532,13 +1533,8 @@ extract_family_pars_for_draws <- function(object, draw_idx, resp = NULL) {
   draws_mat <- fit_draws(object$fit, paste0(dpar_names, suffix))
   out <- list()
   for (nm in dpar_names) {
-    pat <- paste0("^", nm, suffix, "(\\[|$)")
-    cols <- grep(pat, colnames(draws_mat), value = TRUE)
+    cols <- param_draw_columns(colnames(draws_mat), paste0(nm, suffix))
     if (length(cols) == 0L) next
-    # Ordered by index. `sigma[10]` sorts before `sigma[2]` by name.
-    if (all(grepl("\\[[0-9]+\\]$", cols))) {
-      cols <- cols[order(as.integer(stan_index(cols)))]
-    }
     out[[nm]] <- draws_mat[draw_idx, cols, drop = FALSE]
   }
   out

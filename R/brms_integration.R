@@ -160,45 +160,27 @@ setup_brms_lightweight <- function(formula, data, family = gaussian(),
   checkmate::assert_class(stanvars, "stanvars", null.ok = TRUE)
   checkmate::assert_list(data2, null.ok = TRUE)
 
-  # A plain formula without a response is a trend formula. brms formula
-  # objects keep their response.
+  # A plain one-sided formula is a trend formula, as `~ 1` or `~ x`. Its
+  # brms model takes the placeholder response `trend_y`, which no
+  # likelihood scores. brms centres the default intercept prior on the
+  # response's median. A zero placeholder centres it on zero, where the
+  # trend is centred. A random placeholder drew from the user's random
+  # numbers and moved that prior with the seed.
   if (inherits(formula, "formula") &&
-      !inherits(formula, c("brmsformula", "mvbrmsformula", "bform"))) {
-    # A formula without a response (e.g. ~ 1, ~ x + y). `deparse()`
-    # splits a long formula over several lines. The lines are collapsed
-    # into one string for the scalar `grepl()` checks.
-    formula_chr <- paste(deparse(formula), collapse = " ")
-    if (!grepl("~.*~", formula_chr) && grepl("^\\s*~", formula_chr)) {
-      # This is a trend formula without response variable
-      # Add fake trend_y response variable following mvgam pattern
-      data$trend_y <- rnorm(nrow(data))
-
-      # Update formula to include trend_y response
-      # Use mvgam-aware intercept detection for trend formulas
-      has_intercept_check <- should_trend_formula_have_intercept(formula)
-      # Check formula structure. Collapse multi-line deparse so
-      # the scalar `||` comparison below sees one string.
-      rhs_str <- paste(
-        deparse(rlang::f_rhs(formula)), collapse = " "
-      )
-
-      if (rhs_str == "0" || rhs_str == "-1") {
-        # Direct assignment for clean no-intercept formula.
-        # `as.formula()` with no `env` takes this function's frame,
-        # which contains the mock brmsfit and the training data. A
-        # refit resolves the constructor's names against the
-        # environment the user wrote the formula in.
-        formula <- stats::as.formula(
-          "trend_y ~ 0",
-          env = environment(formula)
-        )
-      } else if (has_intercept_check) {
-        # Has intercept: keep intercept to get Intercept_trend prior
-        formula <- update(formula, trend_y ~ .)
-      } else {
-        # No intercept: explicitly remove intercept
-        formula <- update(formula, trend_y ~ 0 + .)
-      }
+      !inherits(formula, c("brmsformula", "mvbrmsformula", "bform")) &&
+      length(formula) == 2L) {
+    data$trend_y <- 0
+    rhs <- rlang::f_rhs(formula)
+    formula <- if (identical(rhs, 0) || identical(rhs, quote(-1))) {
+      # `as.formula()` with no `env` takes this function's frame. A
+      # refit resolves the constructor's names against the environment
+      # the user wrote the formula in.
+      stats::as.formula("trend_y ~ 0", env = environment(formula))
+    } else if (should_trend_formula_have_intercept(formula)) {
+      # The intercept keeps its `Intercept_trend` prior
+      update(formula, trend_y ~ .)
+    } else {
+      update(formula, trend_y ~ 0 + .)
     }
   }
 
@@ -219,6 +201,9 @@ setup_brms_lightweight <- function(formula, data, family = gaussian(),
     data <- injected$data
     prior <- injected$prior
   }
+
+  refuse_gp_level_sd_priors(prior, formula, data,
+                            if (is_trend_setup) "_trend" else "")
 
   # A mock-backend brmsfit, which prediction needs. `data2` holds the
   # objects brms specials look up outside `data`, such as a `car()`
@@ -672,13 +657,13 @@ ensure_obs_placeholder_pin <- function(prior, object) {
   checkmate::assert_data_frame(prior, null.ok = TRUE)
   checkmate::assert_list(object)
   resps <- obs_placeholder_resps(object$formula)
-  if (!is.null(prior) && nrow(prior) > 0L) {
+  if (NROW(prior) > 0L) {
     held <- prior$resp[prior$coef == MVGAM_EMPTY_OBS_PLACEHOLDER]
     resps <- setdiff(resps, held)
   }
   if (!length(resps)) return(prior)
   pin <- obs_placeholder_pin(resps)
-  if (is.null(prior) || nrow(prior) == 0L) pin else rbind(prior, pin)
+  if (NROW(prior) == 0L) pin else rbind(prior, pin)
 }
 
 
@@ -813,7 +798,7 @@ mvgam_stancode_prior_rows <- function(sc) {
   # The shared predicate, less the latent states. Their sampling
   # statements are the trend equation.
   is_mvgam_param <- function(nm) {
-    is_mvgam_managed_class(nm) & !nm %in% MVGAM_STATE_PARAMS
+    is_mvgam_managed_class(nm) & !is_state_param(nm)
   }
   # Each parameter's support is declared in the same program as its
   # prior. Without the bounds an autoregressive coefficient held inside

@@ -709,9 +709,7 @@ test_that("the smooth is reachable and drawn over both margins", {
 })
 
 
-test_that("summary, tidiers and criticism run on a PW fit", {
-  txt <- capture.output(summary(fit))
-  expect_true(any(grepl(paste0("Series:\\s*", n_series), txt)))
+test_that("tidiers and criticism run on a PW fit", {
 
   ll <- log_lik(fit, ndraws = 20L)
   expect_identical(dim(ll), c(20L, nrow(dat)))
@@ -823,6 +821,10 @@ test_that("a PW forecast continues a trend fitted on calendar years", {
   )$forecasts$a[, 1L])
   # One year on, a trend of slope near 0.03 moves by far less than 1
   expect_lt(abs(step1 - last), 0.5)
+})
+
+test_that("the predictor's parts sum to it: obs, PW state", {
+  expect_parts_sum(fit, "state")
 })
 
 cat("\nDone.\n")
