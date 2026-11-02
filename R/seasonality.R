@@ -16,12 +16,11 @@
 #' @param ndraws,draw_ids The posterior draws to use, as
 #'   [hindcast.mvgam()] takes them. `NULL` for both uses every draw.
 #' @param scale `"link"` (the default) reports the latent season.
-#'   `"response"` reports its contribution to the expected value: the
+#'   `"expected"` reports its contribution to the expected value: the
 #'   expected value with the season less the expected value without it.
 #'   `"ratio"` reports the first of those over the second. Under a log
 #'   link that ratio is the season's multiplicative effect.
-#' @param resp The response to report, needed by `scale = "response"`
-#'   and `scale = "ratio"` on a model with several.
+#' @param resp The response to report, needed on a model with several.
 #' @param ... Unused. Anything passed here is refused.
 #'
 #' @details
@@ -42,6 +41,15 @@
 #' and the last complete cycle then comes with its posterior
 #' probability.
 #'
+#' *Strength*. The strength of a fitted cycle is the season's share of
+#' the variance of the link predictor over that cycle:
+#' `Var(season) / (Var(season) + Var(predictor less season))`, computed
+#' draw by draw. It runs from 0 to 1 on every `scale`. A cycle spans
+#' little of the level's long-run drift, which leaves the season's
+#' share visible in a series dominated by that drift. A cycle reaching
+#' the forecast has no strength: its predictor mixes the season with
+#' fresh innovations.
+#'
 #' *Scale*. The expected value comes from the fit's own family, draw by
 #' draw, with every other part of the predictor at its fitted or
 #' forecast value. Under a non-linear link the response-scale season
@@ -53,8 +61,9 @@
 #'
 #' @return An object of class `mvgam_seasonality`. `print()` gives each
 #'   series' amplitude and peak in its first and last complete cycles.
-#'   `summary()` returns four tables: `profile`, `amplitude`, `peak` and
-#'   `change`, the last comparing the first and last complete cycles.
+#'   `summary()` returns five tables: `profile`, `amplitude`, `peak`,
+#'   `strength` and `change`, the last comparing the first and last
+#'   complete cycles.
 #'   `plot()` draws the profile by position, or one panel per position
 #'   over the cycles.
 #'
@@ -104,7 +113,7 @@ seasonality <- function(object, ...) {
 #' @export
 seasonality.mvgam <- function(object, newdata = NULL, ...,
                               ndraws = NULL, draw_ids = NULL,
-                              scale = c("link", "response", "ratio"),
+                              scale = c("link", "expected", "ratio"),
                               resp = NULL) {
   checkmate::assert_class(object, "mvgam")
   checkmate::assert_data_frame(newdata, null.ok = TRUE)
@@ -113,8 +122,7 @@ seasonality.mvgam <- function(object, newdata = NULL, ...,
   require_fitted_model(object, "seasonality")
   require_series_axis(object, "seasonality")
   scale <- match.arg(scale)
-  resolve_resp(object, resp, required = scale != "link",
-               caller = "seasonality")
+  resolve_resp(object, resp, required = TRUE, caller = "seasonality")
   periods <- require_llt_season(object)
   draw_ids <- resolve_draw_indices(posterior::ndraws(object), ndraws,
                                    draw_ids)
@@ -123,11 +131,16 @@ seasonality.mvgam <- function(object, newdata = NULL, ...,
   # Each period takes one hindcast. With newdata it takes one forecast.
   per_period <- lapply(seq_len(nrow(periods)), function(p) {
     cmp <- periods$component[p]
-    hc <- hindcast(object, type = "trend", component = cmp,
-                   draw_ids = draw_ids, resp = resp)
-    if (scale != "link") {
-      hc$hindcasts <- season_hindcast_effect(object, cmp, draw_ids, resp,
-                                             scale)
+    fitted <- season_fitted_rows(object, cmp, draw_ids, resp)
+    at_cycle_rows <- function(mat) {
+      lapply(fitted$rows, function(rows) mat[, rows, drop = FALSE])
+    }
+    season <- at_cycle_rows(fitted$season)
+    hindcasts <- if (scale == "link") {
+      season
+    } else {
+      at_cycle_rows(season_effect(object, fitted$whole, fitted$season,
+                                  fitted$frame, draw_ids, resp, scale))
     }
     fc <- if (is.null(newdata)) {
       NULL
@@ -137,16 +150,21 @@ seasonality.mvgam <- function(object, newdata = NULL, ...,
     } else {
       season_forecast_effect(object, newdata, cmp, draw_ids, resp, scale)
     }
-    fitted <- shared_series_times(hc$train_times)
-    times <- c(fitted, if (!is.null(fc)) shared_series_times(fc$test_times))
+    train_times <- shared_series_times(fitted$times)
+    times <- c(train_times,
+               if (!is.null(fc)) shared_series_times(fc$test_times))
+    layout <- season_layout(times, n_fitted = length(train_times),
+                            period = periods$period[p],
+                            frames = list(object$data, newdata),
+                            column = cmp, time_var = time_var)
     list(
-      draws = lapply(stats::setNames(nm = names(hc$hindcasts)), function(s) {
-        cbind(hc$hindcasts[[s]], fc$forecasts[[s]])
+      draws = lapply(stats::setNames(nm = names(hindcasts)), function(s) {
+        cbind(hindcasts[[s]], fc$forecasts[[s]])
       }),
-      layout = season_layout(times, n_fitted = length(fitted),
-                             period = periods$period[p],
-                             frames = list(object$data, newdata),
-                             column = cmp, time_var = time_var)
+      strength = Map(cycle_strength, season,
+                     at_cycle_rows(fitted$whole - fitted$season),
+                     MoreArgs = list(layout = layout)),
+      layout = layout
     )
   })
   names(per_period) <- periods$component
@@ -156,6 +174,7 @@ seasonality.mvgam <- function(object, newdata = NULL, ...,
       series = names(per_period[[1L]]$draws),
       seasons = lapply(per_period, `[[`, "draws"),
       layouts = lapply(per_period, `[[`, "layout"),
+      strength = lapply(per_period, `[[`, "strength"),
       draw_ids = draw_ids,
       scale = scale
     ),
@@ -172,13 +191,13 @@ seasonality.mvgam <- function(object, newdata = NULL, ...,
 #' @param frame The rows
 #' @param draw_ids Indices of the draws
 #' @param resp A response name, or NULL
-#' @param scale `"response"` for the difference of the expected values
+#' @param scale `"expected"` for the difference of the expected values
 #'   with and without the season, `"ratio"` for their ratio
 #' @return `[ndraws, nrow]` matrix
 #' @noRd
 season_effect <- function(object, whole, season, frame, draw_ids, resp,
                           scale) {
-  checkmate::assert_choice(scale, c("response", "ratio"))
+  checkmate::assert_choice(scale, c("expected", "ratio"))
   expect <- epred_map(object, frame, draw_ids, resp, dim(whole),
                       ordinal = "mean")
   with_season <- expect(whole)
@@ -190,28 +209,31 @@ season_effect <- function(object, whole, season, frame, draw_ids, resp,
 }
 
 
-#' The season's effect on the expected value at the fitted times
+#' The season and the whole predictor at the fitted times
 #'
 #' @inheritParams season_effect
 #' @param cmp The season's component name
-#' @return Named list of `[ndraws, n_times]` matrices, one per series
+#' @return List of `[ndraws, nrow]` matrices `whole` and `season`, their
+#'   `frame`, the `rows` of each series holding one row per occasion
+#'   and the `times` of those rows
 #' @noRd
-season_hindcast_effect <- function(object, cmp, draw_ids, resp, scale) {
+season_fitted_rows <- function(object, cmp, draw_ids, resp) {
   series_levels <- fitted_series_levels(object)
   training <- build_training_arms(object, series_levels, resp = resp)
   frame <- training$data
-  effect <- season_effect(
-    object,
-    get_combined_linpred(object, frame, trend_state = "conditional",
-                         draw_ids = draw_ids, resp = resp),
-    trend_state_rows(object, frame, draw_ids, resp, component = cmp),
-    frame, draw_ids, resp, scale
-  )
   times <- frame[[training$time_var]]
-  lapply(training$series_rows[reported_series(object, resp, series_levels)],
-         function(rows) {
-           effect[, rows[!duplicated(times[rows])], drop = FALSE]
-         })
+  rows <- lapply(
+    training$series_rows[reported_series(object, resp, series_levels)],
+    function(at) at[!duplicated(times[at])]
+  )
+  list(
+    whole = get_combined_linpred(object, frame, trend_state = "conditional",
+                                 draw_ids = draw_ids, resp = resp),
+    season = trend_state_rows(object, frame, draw_ids, resp, component = cmp),
+    frame = frame,
+    rows = rows,
+    times = lapply(rows, function(at) times[at])
+  )
 }
 
 
@@ -220,7 +242,7 @@ season_hindcast_effect <- function(object, cmp, draw_ids, resp, scale) {
 #' One propagation gives the season and the whole predictor, which then
 #' share their innovations.
 #'
-#' @inheritParams season_hindcast_effect
+#' @inheritParams season_fitted_rows
 #' @param newdata Future rows
 #' @return List of `forecasts`, `[ndraws, h]` matrices named by series,
 #'   and `test_times`, as a forecast holds them
@@ -258,7 +280,7 @@ season_scale_labels <- function(scale) {
     scale,
     link = list(title = "Seasonal pattern of the latent trend (link scale)",
                 axis = "Latent season", null = 0),
-    response = list(title = "Seasonal effect on the expected value",
+    expected = list(title = "Seasonal effect on the expected value",
                     axis = "Season's effect on the expected value",
                     null = 0),
     ratio = list(title = "Seasonal multiple of the expected value",
@@ -419,6 +441,29 @@ cycle_amplitude_peak <- function(draws, layout) {
 }
 
 
+#' The season's share of the predictor's variance in each fitted cycle
+#'
+#' @param season `[ndraws, n_fitted]` matrix of the season
+#' @param rest The same of the predictor less the season
+#' @param layout Frame from `season_layout()`
+#' @return `[ndraws, n_cycles]` matrix, columns named by cycle
+#' @noRd
+cycle_strength <- function(season, rest, layout) {
+  checkmate::assert_matrix(season, ncols = sum(layout$horizon == "fitted"))
+  # A cycle running into the forecast holds rows without a fitted
+  # predictor
+  cycles <- setdiff(layout$cycle[layout$complete],
+                    layout$cycle[layout$horizon == "forecast"])
+  out <- vapply(cycles, function(k) {
+    cols <- which(layout$cycle == k)
+    of_season <- row_var(season[, cols, drop = FALSE])
+    of_rest <- row_var(rest[, cols, drop = FALSE])
+    of_season / (of_season + of_rest)
+  }, numeric(nrow(season)))
+  matrix(out, nrow(season), length(cycles), dimnames = list(NULL, cycles))
+}
+
+
 #' The most probable position and its posterior probability
 #'
 #' @param pos Numeric vector of positions over draws
@@ -450,14 +495,16 @@ circular_shift <- function(from, to, n_pos) {
 #'
 #' @param x An `mvgam_seasonality` object
 #' @return Nested list by period then series. Each element holds the
-#'   season's `draws`, the `[ndraws, n_cycles]` matrices `amplitude` and
-#'   `peak` and the period's `layout`.
+#'   season's `draws`, the `[ndraws, n_cycles]` matrices `amplitude`,
+#'   `peak` and `strength` and the period's `layout`.
 #' @noRd
 season_cycle_draws <- function(x) {
   lapply(stats::setNames(nm = x$periods$component), function(cmp) {
     layout <- x$layouts[[cmp]]
-    lapply(x$seasons[[cmp]], function(draws) {
-      c(list(draws = draws, layout = layout),
+    lapply(stats::setNames(nm = x$series), function(s) {
+      draws <- x$seasons[[cmp]][[s]]
+      c(list(draws = draws, layout = layout,
+             strength = x$strength[[cmp]][[s]]),
         cycle_amplitude_peak(draws, layout))
     })
   })
@@ -554,6 +601,10 @@ summary.mvgam_seasonality <- function(object, probs = c(0.025, 0.975),
             median_interval_cols(el$amplitude, probs, ""))
     }),
     peak = stack_season_rows(cycle_draws, season_peak_rows),
+    strength = stack_season_rows(cycle_draws, function(el) {
+      cbind(cycle_rows(el$strength, el$layout),
+            median_interval_cols(el$strength, probs, ""))
+    }),
     change = stack_season_rows(cycle_draws, function(el) {
       season_change_row(el, probs)
     })
@@ -581,6 +632,7 @@ print.mvgam_seasonality <- function(x, digits = 2L, ...) {
       pk <- season_peak_rows(el)
       ch <- season_change_row(el, c(0.025, 0.975))
       ends <- c(1L, length(amp))
+      strength <- apply(el$strength, 2L, stats::median)
       cat("  ", s, "\n",
           "    amplitude ", paste(num(amp[ends]), collapse = " -> "),
           ", P(larger) = ", num(ch$prob_larger), "\n",
@@ -588,6 +640,11 @@ print.mvgam_seasonality <- function(x, digits = 2L, ...) {
                             collapse = " -> "),
           ", P(earlier) = ", num(ch$prob_earlier),
           ", P(later) = ", num(ch$prob_later), "\n",
+          if (length(strength)) {
+            paste0("    strength ",
+                   paste(num(strength[c(1L, length(strength))]),
+                         collapse = " -> "), "\n")
+          },
           sep = "")
     }
   }

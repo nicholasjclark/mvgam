@@ -1023,3 +1023,41 @@ test_that("a component forecast carries its own path and the trend's mean", {
                         fixed = TRUE)))
   expect_identical(plot(slope)$labels$y, "Latent slope")
 })
+
+
+test_that("overlapping terms offset within their kind", {
+  n <- 400L
+  set.seed(1)
+  noise <- matrix(rnorm(n), n, 1L)
+  cell <- list(
+    mean = noise,
+    within = matrix(1, n, 1L),
+    noise = NULL,
+    effects = list(a = 50 * noise, b = -49 * noise),
+    kinds = c(a = "coefficients", b = "coefficients"),
+    replicates = 2L
+  )
+  # The terms sum to the parameter uncertainty, in their own ratio
+  split <- variance_split(cell)
+  expected <- var(noise[, 1L]) - 0.5
+  expect_equal(sum(split[, c("a", "b")]), expected)
+  expect_equal(unname(split[, "a"] / split[, "b"]), -50 / 49)
+})
+
+test_that("the overview ranks kinds", {
+  sources <- data.frame(
+    series = "s", time = 1, horizon = 1L,
+    source = c("a", "b", "process error"),
+    kind = c("coefficients", "coefficients", "process error"),
+    variance = c(9, 9, 1), contribution = c(5, -4.5, 1),
+    share = c(5, -4.5, 1) / 1.5
+  )
+  x <- list(sources = sources,
+            horizons = data.frame(series = "s", horizon = 1L, variance = 1.5),
+            boot = list(s = t(replicate(4L, sources$share))),
+            series = "s")
+  overview <- forecast_overview(x)
+  # Term `a` leads alone. Its kind offsets to a third.
+  expect_identical(overview$dominant, "process error")
+  expect_identical(overview$support, 1)
+})

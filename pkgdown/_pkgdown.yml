@@ -299,6 +299,8 @@ reference:
   - shared_variation
   - plot.mvgam_shared_variation
   - residual_cor
+  - variance_partition
+  - forecast_uncertainty
   - mvgam_residcor-class
   - print.mvgam_residcor
   - summary.mvgam_residcor

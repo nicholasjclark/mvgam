@@ -76,7 +76,8 @@
 #'   [posterior_predict.mvgam()] and [posterior_epred.mvgam()] predict
 #'   from the covariate part of the model. `forecast()`
 #'   extrapolates the fitted latent state. [score.mvgam_forecast()]
-#'   scores a forecast against held-out data. The
+#'   scores a forecast against held-out data.
+#'   [forecast_uncertainty()] splits its variance by source. The
 #'   `r mvgam_article("forecast_evaluation", "forecast evaluation article")`
 #'   scores, compares and combines the forecasts of three models of
 #'   rodent counts.
@@ -108,6 +109,9 @@
 #'
 #' # Next, score the forecast against the held-out counts
 #' head(score(fc, score = "crps")[[1]])
+#'
+#' # The sources of the forecast's variance at each horizon
+#' plot(forecast_uncertainty(mod, ndraws = 200))
 #' }
 #'
 #' @importFrom generics forecast
@@ -306,8 +310,32 @@ get_forecast_parts <- function(object, newdata = NULL, ndraws = NULL,
   if (!is.null(fan)) {
     return(fan)
   }
-  setup <- forecast_setup(object, newdata, "link", resp, ndraws, draw_ids,
-                          re_formula, allow_new_levels, sample_new_levels)
+  parts <- forecast_parts_of(
+    object,
+    forecast_setup(object, newdata, "link", resp, ndraws, draw_ids,
+                   re_formula, allow_new_levels, sample_new_levels),
+    coef_uncertainty, trend_uncertainty, resp
+  )
+  parts$latent <- parts$latent[[1L]]
+  lapply(parts[c("obs", "trend", "latent")], function(group) {
+    lapply(group, parts$slice)
+  })
+}
+
+
+#' The forecast's parts from a prepared forecast
+#'
+#' A caller repeating the propagation prepares once.
+#'
+#' @inheritParams forecast.mvgam
+#' @param setup What `forecast_setup()` gives
+#' @param replicates Number of times each draw is propagated
+#' @return List of `obs` and `trend`, named lists of `[ndraws x nrow]`
+#'   matrices in the rows of `frame`. `latent` holds one such list per
+#'   replicate. `slice` cuts such a matrix into one per series.
+#' @noRd
+forecast_parts_of <- function(object, setup, coef_uncertainty,
+                              trend_uncertainty, resp, replicates = 1L) {
   if (is.null(setup$fc_grid)) {
     stop(insight::format_error(c(
       "Forecast parts need rows after the training grid.",
@@ -328,7 +356,8 @@ get_forecast_parts <- function(object, newdata = NULL, ndraws = NULL,
     draw_idx = setup$draw_idx, coef_uncertainty = coef_uncertainty,
     trend_uncertainty = trend_uncertainty, obs_uncertainty = TRUE,
     series_levels = setup$series_levels, resp = resp,
-    reported = setup$reported, group_level = setup$group_level, parts = TRUE
+    reported = setup$reported, group_level = setup$group_level, parts = TRUE,
+    replicates = replicates
   )
 }
 
@@ -985,8 +1014,8 @@ predictor_for_type <- function(type, sample_family) {
 #' @param resp A response name, or NULL
 #' @param group_level List of `re_formula`, `allow_new_levels` and
 #'   `sample_new_levels`
-#' @param parts Whether to return the parts `get_forecast_parts()`
-#'   gives, in place of their sum
+#' @param parts Whether to return what `forecast_parts_of()` gives, in
+#'   place of the draws of `type`
 #' @return Named list of draws matrices, one per series
 #' @noRd
 build_trendless_forecast_arms <- function(object, fc_grid, type,
@@ -1012,7 +1041,8 @@ build_trendless_forecast_arms <- function(object, fc_grid, type,
            draw_ids = draw_idx),
       group_level
     ))
-    return(list(obs = lapply(obs, arms_of), trend = list(), latent = list()))
+    return(list(obs = obs, trend = list(), latent = list(list()),
+                frame = fc_data, slice = arms_of))
   }
   # Scoped to one response, which gives one draws matrix
   arms_of(do.call(
@@ -1048,8 +1078,11 @@ build_trendless_forecast_arms <- function(object, fc_grid, type,
 #'   summed trend. A component needs `type = "trend"`.
 #' @param group_level List of `re_formula`, `allow_new_levels` and
 #'   `sample_new_levels`
-#' @param parts Whether to return the parts `get_forecast_parts()`
-#'   gives, in place of their sum
+#' @param parts Whether to return what `forecast_parts_of()` gives, in
+#'   place of the draws of `type`
+#' @param replicates With `parts`, the number of times each draw is
+#'   propagated, each with fresh innovations. The predictor's terms are
+#'   computed once.
 #' @param effect_of Function of the whole predictor, the `component` and
 #'   the frame, all in the rows of the grid. It gives the draws to
 #'   return. `NULL` returns the draws of `type`.
@@ -1067,10 +1100,12 @@ build_forecast_arms <- function(object, trend_model, meta,
                                 component = NULL,
                                 group_level = list(),
                                 parts = FALSE,
+                                replicates = 1L,
                                 effect_of = NULL) {
   checkmate::assert_list(fc_grid)
   checkmate::assert_integerish(draw_idx, lower = 1L, min.len = 1L)
   checkmate::assert_flag(parts)
+  checkmate::assert_count(replicates, positive = TRUE)
   checkmate::assert_function(effect_of, null.ok = TRUE)
   checkmate::assert_flag(coef_uncertainty)
   checkmate::assert_flag(trend_uncertainty)
@@ -1162,8 +1197,6 @@ build_forecast_arms <- function(object, trend_model, meta,
     NULL
   }
 
-  components <- if (is.null(component)) list() else trend_components(object)
-
   # `trend_flat[i, j]` is the trend of draw `draw_idx[i]` at row `j`
   # of the forecast grid, in the order of `obs_struct_fc`.
   trend_flat <- matrix(NA_real_, nrow = ndraws_use, ncol = nobs_fc)
@@ -1176,8 +1209,13 @@ build_forecast_arms <- function(object, trend_model, meta,
   latent_specs <- if (parts || !is.null(effect_of)) {
     latent_part_specs(object)
   }
-  latent_flat <- lapply(stats::setNames(nm = latent_specs$label),
-                        function(label) trend_flat)
+  latent_flat <- rep(list(lapply(stats::setNames(nm = latent_specs$label),
+                                 function(label) trend_flat)), replicates)
+  components <- if (!is.null(component) || !is.null(latent_specs)) {
+    trend_components(object)
+  } else {
+    list()
+  }
   for (i in seq_len(ndraws_use)) {
     d <- if (trend_uncertainty) i else 1L
     # A single factor drops `Z[d, , ]` to a vector. The reshape keeps
@@ -1185,34 +1223,38 @@ build_forecast_arms <- function(object, trend_model, meta,
     Z_slice <- if (!is.null(Z_arr)) {
       matrix(Z_arr[d, , ], nrow = n_series, ncol = n_lv_trend)
     }
-    fc_trend <- propagate_one_draw(
-      object = object,
-      trend_model = trend_model,
-      meta = meta,
-      state = last_state_of_draw(states, d),
-      d = d,
-      h_max = h_max,
-      n_series = n_series,
-      trend_lp_tail = trend_lp_tail,
-      trend_lp_fc = trend_lp_fc,
-      obs_struct_tail = obs_struct_tail,
-      obs_struct_fc = obs_struct_fc,
-      context = context,
-      Z_slice = Z_slice,
-      component = component,
-      components = components,
-      latent_specs = latent_specs
-    )
-    for (label in latent_specs$label) {
-      latent_flat[[label]][i, ] <- flatten_grid_to_obs_order(
-        attr(fc_trend, "latent")[[label]], obs_struct_fc
+    for (r in seq_len(replicates)) {
+      fc_trend <- propagate_one_draw(
+        trend_model = trend_model,
+        meta = meta,
+        state = last_state_of_draw(states, d),
+        d = d,
+        h_max = h_max,
+        n_series = n_series,
+        trend_lp_tail = trend_lp_tail,
+        trend_lp_fc = trend_lp_fc,
+        obs_struct_tail = obs_struct_tail,
+        obs_struct_fc = obs_struct_fc,
+        context = context,
+        Z_slice = Z_slice,
+        component = component,
+        components = components,
+        latent_specs = latent_specs
       )
-    }
-    trend_flat[i, ] <- flatten_grid_to_obs_order(fc_trend, obs_struct_fc)
-    for (var in imputed) {
-      imputed_trend[[var]][i, ] <- flatten_grid_to_obs_order(
-        fc_trend, imputed_struct[[var]]
-      )
+      for (label in latent_specs$label) {
+        latent_flat[[r]][[label]][i, ] <- flatten_grid_to_obs_order(
+          attr(fc_trend, "latent")[[label]], obs_struct_fc
+        )
+      }
+      # The first replicate is the forecast. A value `mi()` imputes takes
+      # its trend.
+      if (r > 1L) next
+      trend_flat[i, ] <- flatten_grid_to_obs_order(fc_trend, obs_struct_fc)
+      for (var in imputed) {
+        imputed_trend[[var]][i, ] <- flatten_grid_to_obs_order(
+          fc_trend, imputed_struct[[var]]
+        )
+      }
     }
   }
 
@@ -1222,15 +1264,14 @@ build_forecast_arms <- function(object, trend_model, meta,
   impute_trend <- if (length(imputed)) function(var) imputed_trend[[var]]
   if (!is.null(effect_of)) {
     whole <- component_lp(fc_grid$data, "obs", resp, impute_trend) +
-      Reduce(`+`, latent_flat, trend_lp_fc)
+      Reduce(`+`, latent_flat[[1L]], trend_lp_fc)
     return(arms_of(effect_of(whole, trend_flat, fc_grid$data)))
   }
   if (parts) {
     obs_parts <- component_lp(fc_grid$data, "obs", resp, impute_trend,
                               extract_component_parts)
-    return(list(obs = lapply(obs_parts, arms_of),
-                trend = lapply(trend_parts, arms_of),
-                latent = lapply(latent_flat, arms_of)))
+    return(list(obs = obs_parts, trend = trend_parts, latent = latent_flat,
+                frame = fc_grid$data, slice = arms_of))
   }
   eta_full <- component_lp(fc_grid$data, "obs", resp, impute_trend) +
     trend_flat
@@ -1269,7 +1310,6 @@ build_forecast_arms <- function(object, trend_model, meta,
 #' propagator records in its `components` attribute. The loadings
 #' project each path as they project the state.
 #'
-#' @param object A fitted `mvgam` object
 #' @param trend_model The trend specification
 #' @param meta The fit's trend metadata
 #' @param state The draw's trend parameters and last state, from
@@ -1290,7 +1330,7 @@ build_forecast_arms <- function(object, trend_model, meta,
 #'   part's grid as the `latent` attribute, or `NULL`
 #' @return Numeric matrix `[h_max, n_series]`
 #' @noRd
-propagate_one_draw <- function(object, trend_model, meta, state, d,
+propagate_one_draw <- function(trend_model, meta, state, d,
                                h_max, n_series,
                                trend_lp_tail, trend_lp_fc,
                                obs_struct_tail, obs_struct_fc,
@@ -1341,7 +1381,7 @@ propagate_one_draw <- function(object, trend_model, meta, state, d,
                                 component, components)
   if (!is.null(latent_specs)) {
     attr(out, "latent") <- latent_part_grids(
-      fc_state, paths, latent_specs, trend_components(object),
+      fc_state, paths, latent_specs, components,
       if (in_factor_mode) Z_slice
     )
   }

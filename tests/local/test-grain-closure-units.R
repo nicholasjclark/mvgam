@@ -1740,3 +1740,18 @@ test_that("each part's response-scale share is the fit's own: occ and nmix", {
 })
 
 cat("\nDone.\n")
+
+
+test_that("variance_partition() pools an effect that differs by site", {
+  # `elev` holds one value per site. It moves no site over its own rows.
+  # Only the pooled rows show it, as a share against the detection terms.
+  ids <- 1:10
+  x <- variance_partition(fit, draw_ids = ids)
+  expect_identical(x$sources, c("environment", "detection"))
+  of <- function(m) apply(m, 1L, var)
+  p <- of(extract_component_linpred(fit, fit$data, component = "p",
+                                    draw_ids = ids))
+  occupancy <- of(extract_component_linpred(fit, fit$data, draw_ids = ids))
+  expect_equal(x$community[, "detection"], p / (p + occupancy))
+  expect_identical(unique(as.vector(x$shares[[1L]][, "detection"])), 1)
+})

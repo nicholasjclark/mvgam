@@ -168,23 +168,53 @@ plot_fevd_shares <- function(shares, target_names, source_names) {
   shares$Series <- factor(shares$Series, levels = source_names)
   shares$target <- factor(shares$target, levels = target_names)
 
-  # The bars partition a variance among sources. Up to three sources
-  # take the shades of the red scheme the irf and stability plots draw
-  # with. More sources take the Okabe-Ito hues.
   set_color_scheme_local()
   ggplot2::ggplot(
     shares,
     ggplot2::aes(fill = .data$Series, y = .data$share, x = .data$horizon)
   ) +
-    ggplot2::geom_bar(position = "stack", stat = "identity",
-                      colour = "white", linewidth = 0.2) +
-    mvgam_model_colour_scale(length(source_names), name = "Source",
-                             aesthetics = "fill") +
+    share_bars(length(source_names)) +
     ggplot2::facet_wrap(~ target) +
     mvgam_theme() +
     scale_x_steps("Forecast horizon") +
     ggplot2::labs(y = "Median contribution to forecast variance",
                   fill = "Source")
+}
+
+#' The fill scale of a variance's sources
+#'
+#' Up to three sources take the shades of the red scheme the irf and
+#' stability plots draw with. More sources take the Okabe-Ito hues.
+#'
+#' @param n_sources Number of sources
+#' @return A `ggplot` scale
+#' @noRd
+share_fill_scale <- function(n_sources) {
+  mvgam_model_colour_scale(n_sources, name = "Source", aesthetics = "fill")
+}
+
+#' Stacked bars of a variance's shares
+#'
+#' @inheritParams share_fill_scale
+#' @param reverse Whether the first source stacks first, nearest the
+#'   axis
+#' @return List of `ggplot` layers
+#' @noRd
+share_bars <- function(n_sources, reverse = FALSE) {
+  list(
+    ggplot2::geom_bar(position = ggplot2::position_stack(reverse = reverse),
+                      stat = "identity", colour = "white", linewidth = 0.2),
+    share_fill_scale(n_sources)
+  )
+}
+
+#' Axis labels of a share, as percentages
+#'
+#' @param x Numeric shares
+#' @return Character labels
+#' @noRd
+percent_labels <- function(x) {
+  paste0(round(100 * x), "%")
 }
 
 #' The draws of every variance share, one column per cell

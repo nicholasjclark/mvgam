@@ -820,21 +820,21 @@ test_that("seasonality() reports the season on the expected value", {
   # at the fitted times and over the forecast. The forecast's trend and
   # predictor take one set of innovations, which makes the ratio exact.
   ids <- 1:20
-  rows <- future_rows(fit_f, 12L)
+  rows <- future_frame(train_f, 12L)
   draws <- function(scale) {
     set.seed(71L)
     seasonality(fit_f, newdata = rows, draw_ids = ids, scale = scale)$seasons
   }
   link <- draws("link")$season
   ratio <- draws("ratio")$season
-  response <- draws("response")$season
+  expected <- draws("expected")$season
   for (s in names(link)) {
     expect_equal(ratio[[s]], exp(link[[s]]), ignore_attr = TRUE)
   }
   # The contribution is the expectation less the same without the season
   fitted <- get_epred_parts(fit_f, fit_f$data[fit_f$data$series == "s1", ],
                             draw_ids = ids)
-  expect_equal(response$s1[, seq_len(ncol(fitted$latent$season))],
+  expect_equal(expected$s1[, seq_len(ncol(fitted$latent$season))],
                fitted$latent$season, ignore_attr = TRUE, tolerance = 1e-5)
   # A period of its own takes its own season
   two <- seasonality(fit_g, draw_ids = ids, scale = "ratio")
@@ -843,6 +843,74 @@ test_that("seasonality() reports the season on the expected value", {
     expect_equal(two$seasons[[p]][[1L]], exp(latent$seasons[[p]][[1L]]),
                  ignore_attr = TRUE)
   }
+})
+
+test_that("a cycle's strength is the season's share of its predictor", {
+  # By hand from the parts of the first complete cycle of each period.
+  # The other period's season counts among the rest.
+  ids <- 1:20
+  x <- seasonality(fit_g, draw_ids = ids)
+  frame <- fit_g$data[fit_g$data$series == x$series[1L], ]
+  parts <- get_linpred_parts(fit_g, frame, draw_ids = ids)
+  whole <- Reduce(`+`, c(parts$obs, parts$trend, parts$latent))
+  for (cmp in names(x$seasons)) {
+    layout <- x$layouts[[cmp]]
+    season <- x$seasons[[cmp]][[1L]]
+    cols <- which(layout$cycle == layout$cycle[layout$complete][1L])
+    of <- function(m) apply(m[, cols, drop = FALSE], 1L, var)
+    expect_equal(x$strength[[cmp]][[1L]][, 1L],
+                 of(season) / (of(season) + of(whole - season)),
+                 tolerance = 1e-4)
+  }
+  # The strength reports the link predictor on every scale
+  expect_identical(
+    seasonality(fit_g, draw_ids = ids, scale = "ratio")$strength,
+    x$strength
+  )
+})
+
+test_that("variance_partition() sets the factors and the season apart", {
+  latent <- paste(rep(c("level", "season"), each = 2L),
+                  rep(c("(Factor 1)", "(Factor 2)"), 2L))
+  expect_source_shares(
+    fit_g, list(associations = latent[1:2], season = latent[3:4]),
+    fit_g$data, "s1"
+  )
+  # A state of one series is its own trend
+  expect_source_shares(fit_f, list(trend = "level", season = "season"),
+                       fit_f$data, "s1")
+})
+
+test_that("forecast_uncertainty() splits a count forecast on each scale", {
+  ids <- 1:100
+  rows <- future_frame(train_f, 12L)
+  split <- function(scale) {
+    forecast_uncertainty(fit_f, newdata = rows, scale = scale,
+                         n_replicates = 30L, n_boot = 20L, draw_ids = ids)
+  }
+  expected <- split("expected")
+  # The total is the variance of the expected counts across the draws
+  whole <- forecast(fit_f, newdata = rows, type = "expected",
+                    draw_ids = ids)$forecasts$s1
+  s1 <- expected$horizons[expected$horizons$series == "s1", ]
+  expect_equal(s1$variance, apply(whole, 2L, var), tolerance = 0.4)
+  # Poisson noise is the mean count, the expected scale's forecast
+  counts <- split("response")
+  noise <- counts$sources[counts$sources$source == "observation" &
+                            counts$sources$series == "s1", ]
+  expect_equal(noise$variance, colMeans(whole), tolerance = 0.1)
+})
+
+test_that("variance_partition() reports an effect on the expected value", {
+  ids <- 1:10
+  x <- variance_partition(fit_f, draw_ids = ids, scale = "expected")
+  frame <- fit_f$data[fit_f$data$series == "s1", ]
+  parts <- get_epred_parts(fit_f, frame, draw_ids = ids)
+  of <- function(m) apply(m, 1L, var)
+  level <- of(parts$latent$level)
+  season <- of(parts$latent$season)
+  expect_equal(x$shares$s1[, "season"], season / (level + season),
+               tolerance = 1e-3, ignore_attr = TRUE)
 })
 
 test_that("each part's response-scale share is the fit's own: poisson LLT", {

@@ -138,6 +138,9 @@ plot(forecast(mod, type = "expected"))
 
 # Next, score the forecast against the held-out counts
 head(score(fc, score = "crps")[[1]])
+
+# The sources of the forecast's variance at each horizon
+plot(forecast_uncertainty(mod, ndraws = 200))
 }
 
 }
@@ -146,7 +149,8 @@ head(score(fc, score = "crps")[[1]])
 \code{\link[=posterior_predict.mvgam]{posterior_predict.mvgam()}} and \code{\link[=posterior_epred.mvgam]{posterior_epred.mvgam()}} predict
 from the covariate part of the model. \code{forecast()}
 extrapolates the fitted latent state. \code{\link[=score.mvgam_forecast]{score.mvgam_forecast()}}
-scores a forecast against held-out data. The
+scores a forecast against held-out data.
+\code{\link[=forecast_uncertainty]{forecast_uncertainty()}} splits its variance by source. The
 \href{https://nicholasjclark.github.io/mvgam/dev/articles/forecast_evaluation.html}{forecast evaluation article}
 scores, compares and combines the forecasts of three models of
 rodent counts.
@@ -154,6 +158,7 @@ rodent counts.
 Other forecasting: 
 \code{\link{compare_scores}()},
 \code{\link{ensemble.mvgam_forecast}()},
+\code{\link{forecast_uncertainty}()},
 \code{\link{hindcast.mvgam}()},
 \code{\link{lfo_cv.mvgam}()},
 \code{\link{score.mvgam_forecast}()}

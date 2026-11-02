@@ -131,6 +131,7 @@ Other forecasting:
 \code{\link{compare_scores}()},
 \code{\link{ensemble.mvgam_forecast}()},
 \code{\link{forecast.mvgam}()},
+\code{\link{forecast_uncertainty}()},
 \code{\link{lfo_cv.mvgam}()},
 \code{\link{score.mvgam_forecast}()}
 }

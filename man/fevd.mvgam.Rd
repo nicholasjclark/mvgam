@@ -84,6 +84,7 @@ Analysis. Springer, Berlin. \doi{10.1007/978-3-540-27752-1}
 }
 \seealso{
 \code{\link[=irf]{irf()}} and \code{\link[=stability]{stability()}} summarise the same VAR dynamics.
+\code{\link[=forecast_uncertainty]{forecast_uncertainty()}} splits a forecast of any model by source.
 The \href{https://nicholasjclark.github.io/mvgam/dev/articles/var.html}{VAR article} runs \code{fevd()} on a
 plankton community.
 

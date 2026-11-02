@@ -38,3 +38,18 @@ test_that("a fractional period's short cycles count as complete", {
 test_that("a peak shift takes the shorter way around the period", {
   expect_identical(circular_shift(c(12, 1, 3), c(1, 12, 9), 12), c(1, -1, -6))
 })
+
+
+test_that("a cycle running into the forecast has no strength", {
+  # Period 4. The third cycle holds two fitted steps and two forecast ones.
+  layout <- season_layout(times = 1:12, n_fitted = 10L, period = 4,
+                          frames = list(data.frame(time = 1:12)),
+                          column = "season", time_var = "time")
+  season <- matrix(rep(c(1, -1), 10L), 2L, 10L, byrow = TRUE)
+  rest <- matrix(0, 2L, 10L)
+  rest[, 1:4] <- rep(c(1, -1, 1, -1), each = 2L) * 2
+  strength <- cycle_strength(season, rest, layout)
+  expect_identical(colnames(strength), c("1", "2"))
+  expect_equal(strength[, "1"], rep(0.2, 2L))
+  expect_equal(strength[, "2"], rep(1, 2L))
+})

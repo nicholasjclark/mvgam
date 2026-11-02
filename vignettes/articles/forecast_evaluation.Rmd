@@ -37,8 +37,9 @@ scores are better.
 
 This article compares three models of monthly rodent captures, each
 with a different trend. We score their forecasts of a twelve-month
-holdout, repeat the comparison over rolling forecast origins and
-combine the models into a weighted ensemble.
+holdout, ask where the forecast uncertainty comes from, repeat the
+comparison over rolling forecast origins and combine the models into a
+weighted ensemble.
 
 ## The data
 
@@ -143,6 +144,52 @@ latent state forward instead:
 ```{r plot-ar, fig.asp = 0.75, fig.cap = "AR hindcasts and forecasts of each species' captures."}
 plot(fc_ar)
 ```
+
+## Where the uncertainty comes from
+
+The width of a forecast does not say what causes it. To find what limits
+the AR model's forecasts, `forecast_uncertainty()` splits the variance
+of the forecast at each horizon by source. Each posterior draw is
+propagated many times, which separates what the posterior leaves
+unknown from what the future adds. The split uses the link scale, where
+the parts of the model add:
+
+```{r uncertainty, fig.asp = 0.75, fig.cap = "Variance of the AR model's forecast predictor at each horizon, split by kind of source."}
+set.seed(2026)
+unc_ar <- forecast_uncertainty(mod_ar, ndraws = 500)
+unc_ar
+plot(unc_ar)
+```
+
+```{r uncertainty-numbers, include = FALSE}
+unc <- summary(unc_ar)$sources
+do_share <- function(source, h) {
+  paste0(round(100 * unc$share[unc$series == "DO" &
+                                 unc$source == source &
+                                 unc$horizon == h]), "%")
+}
+```
+
+Process error, the variance the state's innovations add, leads for every
+species by month 12. Because this variance belongs to the process, more
+data will not shrink it. For DO it grows from
+`r do_share("process error", 1)` of the variance at month 1 to
+`r do_share("process error", 12)` at month 12. Because an AR(1) state
+loses its memory of the last training month, the latent dynamics fade
+from `r do_share("latent dynamics", 1)` to
+`r do_share("latent dynamics", 12)` over the same months.
+
+The bars jump at month 8. With `by = "source"` and `type = "share"`, the
+plot names the term responsible:
+
+```{r uncertainty-terms, fig.asp = 0.6, fig.cap = "Share of the variance of the DO forecast held by each term."}
+plot(unc_ar, type = "share", by = "source", series = "DO")
+```
+
+The temperature smooth peaks at month 8. Minimum temperature that month
+was `r round(min(test$mintemp), 2)`, below the coldest training month at
+`r round(min(train$mintemp, na.rm = TRUE), 2)`. The smooth extrapolates
+there, which widens the forecast.
 
 ## Scoring the holdout
 

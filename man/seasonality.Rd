@@ -16,7 +16,7 @@ seasonality(object, ...)
   ...,
   ndraws = NULL,
   draw_ids = NULL,
-  scale = c("link", "response", "ratio"),
+  scale = c("link", "expected", "ratio"),
   resp = NULL
 )
 
@@ -48,13 +48,12 @@ series.}
 \code{\link[=hindcast.mvgam]{hindcast.mvgam()}} takes them. \code{NULL} for both uses every draw.}
 
 \item{scale}{\code{"link"} (the default) reports the latent season.
-\code{"response"} reports its contribution to the expected value: the
+\code{"expected"} reports its contribution to the expected value: the
 expected value with the season less the expected value without it.
 \code{"ratio"} reports the first of those over the second. Under a log
 link that ratio is the season's multiplicative effect.}
 
-\item{resp}{The response to report, needed by \code{scale = "response"}
-and \code{scale = "ratio"} on a model with several.}
+\item{resp}{The response to report, needed on a model with several.}
 
 \item{probs}{Interval probabilities of the tables. Defaults to
 \code{c(0.025, 0.975)}.}
@@ -84,8 +83,9 @@ intervals of \code{\link[=plot.mvgam_forecast]{plot.mvgam_forecast()}}.}
 \value{
 An object of class \code{mvgam_seasonality}. \code{print()} gives each
 series' amplitude and peak in its first and last complete cycles.
-\code{summary()} returns four tables: \code{profile}, \code{amplitude}, \code{peak} and
-\code{change}, the last comparing the first and last complete cycles.
+\code{summary()} returns five tables: \code{profile}, \code{amplitude}, \code{peak},
+\code{strength} and \code{change}, the last comparing the first and last
+complete cycles.
 \code{plot()} draws the profile by position, or one panel per position
 over the cycles.
 }
@@ -114,6 +114,15 @@ the season within it. Its peak is the position of the largest
 value. Both are computed draw by draw. A change between the first
 and the last complete cycle then comes with its posterior
 probability.
+
+\emph{Strength}. The strength of a fitted cycle is the season's share of
+the variance of the link predictor over that cycle:
+\verb{Var(season) / (Var(season) + Var(predictor less season))}, computed
+draw by draw. It runs from 0 to 1 on every \code{scale}. A cycle spans
+little of the level's long-run drift, which leaves the season's
+share visible in a series dominated by that drift. A cycle reaching
+the forecast has no strength: its predictor mixes the season with
+fresh innovations.
 
 \emph{Scale}. The expected value comes from the fit's own family, draw by
 draw, with every other part of the predictor at its fitted or

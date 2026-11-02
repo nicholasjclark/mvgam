@@ -257,6 +257,39 @@ test_that("the predictor's parts sum to it: trend formula terms and state", {
   }
 })
 
+test_that("forecast_uncertainty() recovers an AR process's variance", {
+  # By hand: an AR(1) adds sigma^2 at the first step and
+  # sigma^2 (1 + phi^2) by the second, draw by draw
+  fit <- fits$trend_intercept
+  ids <- 1:100
+  rows <- future_rows(fit, 2L)
+  x <- forecast_uncertainty(fit, newdata = rows, scale = "link",
+                            n_replicates = 100L, n_boot = 2L, draw_ids = ids)
+  process <- x$sources[x$sources$source == "process error", ]
+  draws <- as_draws_matrix(fit)[ids, ]
+  of <- function(stem) {
+    as.vector(draws[, startsWith(colnames(draws), stem)])
+  }
+  sigma <- of("sigma_trend")
+  phi <- of("ar1_trend")
+  expect_equal(process$variance,
+               c(mean(sigma^2), mean(sigma^2 * (1 + phi^2))),
+               tolerance = 0.1)
+  # The total is the variance of the forecast across the draws
+  whole <- forecast(fit, newdata = rows, type = "link",
+                    draw_ids = ids)$forecasts[[1L]]
+  expect_equal(x$horizons$variance, apply(whole, 2L, var), tolerance = 0.35)
+})
+
+test_that("a trendless forecast has no process error", {
+  x <- forecast_uncertainty(fits$smooths, newdata = future_rows(fits$smooths),
+                            scale = "link", n_replicates = 2L, n_boot = 2L,
+                            draw_ids = 1:20)
+  expect_identical(
+    unique(x$sources$variance[x$sources$source == "process error"]), 0
+  )
+})
+
 test_that("a trendless forecast's parts are its observation terms", {
   expect_forecast_parts_sum(fits$smooths, NULL)
 })

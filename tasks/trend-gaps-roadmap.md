@@ -30,8 +30,6 @@ Posterior support comes from `sign_probabilities()` and summaries from
 `seasonality()` gives the profile and per-position plots and the
 amplitude and peak of each cycle, with their change. Remaining:
 
-- **1c. Seasonal strength.** The season's share of variance,
-  per series and period, added to `seasonality()`.
 - **1e. Correlated seasonal shocks under `cor`.** They take the level's
   correlation matrix with their own scales, as the slope shocks do.
   `residual_cor()` reports which series shift seasons together.
@@ -42,17 +40,6 @@ amplitude and peak of each cycle, with their change. Remaining:
   `validate_data_llt()` fits the `ti()` route.
 - **1h. Discoverability.** `LLT()` and the overview article point to
   `seasonality()`, with a worked example on real data from 1g.
-- **1i. Forecast uncertainty by source.** Per series and
-  horizon, the share of forecast variance from each source, for every
-  fit. The law of total variance splits parameter uncertainty,
-  `Var(E[y_h | theta])`, from process error, `E(Var[y_h | theta])`,
-  with the second from propagation with and without fresh
-  innovations. The parameter term splits by part (each covariate
-  term, the latent dynamics), with the covariances between parts
-  reported, not discarded. Motivation: the 1.x `gamvar_unc()` scripts
-  (Portal analysis), which nested four scenarios in a fixed order,
-  zeroed coefficients, fixed the VAR parameters at one draw and
-  clipped negative increments. A stacked-area plot by horizon.
 
 ## 4. Joint species distribution models
 
@@ -68,10 +55,6 @@ into environment, space and associations, with ternary plots of sites
 and species. Only mvgam has dynamic factors, detection-corrected
 occupancy and abundance, VAR interactions and community forecasts.
 
-- **4a. Variance partitioning.** Per series: environment,
-  latent associations, trend dynamics, season and, where present,
-  detection. It works for every mvgam fit. A stacked bar per species
-  and a community summary.
 - **4b. Community gradients and forecasts (F4).** Richness, CWM
   traits and co-occurrence along a covariate gradient and over the
   forecast horizon, with posterior support for change.
@@ -132,12 +115,11 @@ dependency and stay out.
 
 ## Order
 
-1. 1c and variance partitioning 4a, then 1i
-2. F4, then community gradients and forecasts 4b
-3. 4c, 4d, 4e, 1e, 4f
-4. Dummy seasonal form 1f
-5. Real-data seasonal check 1g, then 1h
-6. Centred prototype and decision (5)
-7. Calendar helpers (6), heavy-tail example (2a)
+1. F4, then community gradients and forecasts 4b
+2. 4c, 4d, 4e, 1e, 4f
+3. Dummy seasonal form 1f
+4. Real-data seasonal check 1g, then 1h
+5. Centred prototype and decision (5)
+6. Calendar helpers (6), heavy-tail example (2a)
 
 Parked: horseshoe steps (2b). Not planned: combining trends (3).

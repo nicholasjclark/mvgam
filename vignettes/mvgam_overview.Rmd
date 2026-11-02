@@ -315,6 +315,13 @@ The forecasts track the held-out counts of all four species. Their
 90% intervals contain `r sum(in_interval, na.rm = TRUE)` of the
 `r sum(!is.na(in_interval))` held-out counts.
 
+`forecast_uncertainty()` splits the variance of each forecast by
+source at each horizon:
+
+```{r cor-uncertainty, fig.asp = 0.75, out.width = "90%"}
+plot(forecast_uncertainty(fit_cor, ndraws = 200))
+```
+
 `residual_cor()` returns the correlations among the species'
 innovations, which measure how strongly the species rise and fall
 together once temperature and vegetation are accounted for:

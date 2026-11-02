@@ -143,6 +143,29 @@ row_max <- function(m) {
 }
 
 
+#' Variance of each row of a numeric matrix
+#'
+#' @param m Numeric matrix.
+#' @return Numeric vector, one entry per row.
+#' @noRd
+row_var <- function(m) {
+  rowSums((m - rowMeans(m))^2) / (ncol(m) - 1L)
+}
+
+
+#' Covariance of two matrices' columns over their rows
+#'
+#' @param a,b Numeric matrices of one shape. `NULL` for `b` gives each
+#'   column's variance.
+#' @return Numeric vector, one entry per column.
+#' @noRd
+column_cov <- function(a, b = NULL) {
+  centred <- function(m) m - rep(colMeans(m), each = nrow(m))
+  a <- centred(a)
+  colSums(a * if (is.null(b)) a else centred(b)) / (nrow(a) - 1L)
+}
+
+
 #' `log(sum(exp(m[i, ])))` for each row of a matrix
 #'
 #' @param m Numeric matrix of log values.

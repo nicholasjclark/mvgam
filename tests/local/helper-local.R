@@ -364,6 +364,28 @@ expect_forecast_parts_sum <- function(fit, latent,
 }
 
 
+# Each source's share of a series' variance, by hand from the parts
+#
+# @param fit A fitted mvgam object
+# @param groups Named list: the part names each source sums, by source
+# @param frame The fitted rows
+# @param series The series to check
+expect_source_shares <- function(fit, groups, frame, series) {
+  ids <- 1:10
+  x <- variance_partition(fit, draw_ids = ids)
+  parts <- get_linpred_parts(fit, frame, draw_ids = ids)
+  parts <- c(parts$obs, parts$trend, parts$latent)
+  rows <- which(frame$series == series)
+  variance <- vapply(groups, function(labels) {
+    apply(Reduce(`+`, parts[labels])[, rows, drop = FALSE], 1L, var)
+  }, numeric(length(ids)))
+  expect_identical(x$sources, names(groups))
+  # cmdstanr's rounding of the stored draws, as in `expect_parts_sum()`
+  expect_equal(x$shares[[series]], variance / rowSums(variance),
+               tolerance = 1e-3, ignore_attr = TRUE)
+}
+
+
 # The response-scale parts take the fit's own expectation. The
 # expectation from the whole predictor is posterior_epred()'s from the
 # fitted state, an ordinal response's as its expected level. Given

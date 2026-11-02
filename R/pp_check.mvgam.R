@@ -1031,7 +1031,7 @@ build_resid_variogram_panel <- function(resid_draws, times,
     as.numeric(rowsum(0.5 * (r[j] - r[i])^2, bin)) / n_pairs
   }, numeric(length(lags))), ncol = length(lags), byrow = TRUE)
 
-  sill <- stats::median(apply(resid_draws, 1L, stats::var))
+  sill <- stats::median(row_var(resid_draws))
   reference <- list(ggplot2::geom_hline(
     yintercept = sill, linetype = "dashed", colour = "black"
   ))

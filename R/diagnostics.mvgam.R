@@ -334,8 +334,8 @@ bayes_R2.mvgam <- function(object, resp = NULL, summary = TRUE,
   observed <- !is.na(y)
   epred <- epred[, observed, drop = FALSE]
   resid <- sweep(epred, 2L, y[observed], FUN = "-")
-  var_ep <- apply(epred, 1L, stats::var)
-  r2_result(var_ep / (var_ep + apply(resid, 1L, stats::var)),
+  var_ep <- row_var(epred)
+  r2_result(var_ep / (var_ep + row_var(resid)),
             summary, robust, probs)
 }
 

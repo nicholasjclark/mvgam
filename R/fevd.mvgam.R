@@ -25,6 +25,7 @@
 #' @author Nicholas J Clark
 #'
 #' @seealso [irf()] and [stability()] summarise the same VAR dynamics.
+#'   [forecast_uncertainty()] splits a forecast of any model by source.
 #'   The `r mvgam_article("var", "VAR article")` runs `fevd()` on a
 #'   plankton community.
 #'

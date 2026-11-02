@@ -466,9 +466,8 @@ propagate_llt <- function(trend_model, params, h, n_series, last_state,
   seasons <- out
   # Several periods each sum their own harmonics. One period's season
   # is the sum itself.
-  periods <- llt_season_periods(trend_model)
-  if (nrow(periods) < 2L) {
-    periods <- periods[0L, ]
+  periods <- if (length(trend_model$season) > 1L) {
+    llt_season_periods(trend_model)
   }
   by_period <- lapply(stats::setNames(nm = periods$component),
                       function(nm) out)
@@ -483,7 +482,7 @@ propagate_llt <- function(trend_model, params, h, n_series, last_state,
       g_star <- cos(freq) * g_star - sin(freq) * g_last + pair(shock_sd)
       seasons[step, ] <- colSums(g)
       out[step, ] <- level + seasons[step, ]
-      for (p in seq_len(nrow(periods))) {
+      for (p in seq_len(NROW(periods))) {
         rows <- periods$first[p]:periods$last[p]
         by_period[[p]][step, ] <- colSums(g[rows, , drop = FALSE])
       }
@@ -782,7 +781,12 @@ rmvn <- function(n, mu, Sigma, df = Inf) {
   checkmate::assert_count(n)
   checkmate::assert_numeric(mu, any.missing = FALSE)
   checkmate::assert_matrix(Sigma, nrows = length(mu), ncols = length(mu))
-  L <- mgcv::mroot(Sigma)
+  # A diagonal scale, the common case, factors without a decomposition
+  L <- if (all(Sigma[upper.tri(Sigma)] == 0)) {
+    diag(sqrt(diag(Sigma)), nrow(Sigma))
+  } else {
+    mgcv::mroot(Sigma)
+  }
   m <- ncol(L)
   z <- if (is_gaussian_df(df)) {
     matrix(stats::rnorm(m * n), m, n)

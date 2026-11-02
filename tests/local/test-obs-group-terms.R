@@ -152,6 +152,25 @@ test_that("the parts name each term and sum to the predictor", {
 })
 
 
+test_that("forecast_uncertainty() sets group terms apart and adds new levels", {
+  # A level the fit never saw carries the spread among levels
+  known <- future_rows(fits$G)
+  new <- known
+  new$g1 <- as.character(new$g1)
+  new$g1[] <- "unseen"
+  split <- function(rows, ...) {
+    forecast_uncertainty(fits$G, newdata = rows, scale = "link",
+                         n_replicates = 20L, n_boot = 2L, draw_ids = 1:200,
+                         ...)
+  }
+  at_known <- split(known)
+  at_new <- split(new, allow_new_levels = TRUE)
+  groups <- at_known$sources$source[at_known$sources$kind == "random effects"]
+  expect_setequal(groups, c("(1 + x | g1)", "(1 | g2)", "(1 | g1) (trend)"))
+  of <- function(x) sum(x$sources$contribution[x$sources$kind == "random effects"])
+  expect_gt(of(at_new), of(at_known))
+})
+
 test_that("re_formula refuses a term no formula holds", {
   for (rf in list(~ (1 | g3), ~ (1 + x | g2))) {
     expect_error(posterior_linpred(fits$G, newdata = dat[1:2, ],

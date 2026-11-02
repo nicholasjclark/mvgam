@@ -107,6 +107,7 @@ weights an ensemble by leave-future-out stacking weights.
 Other forecasting: 
 \code{\link{compare_scores}()},
 \code{\link{forecast.mvgam}()},
+\code{\link{forecast_uncertainty}()},
 \code{\link{hindcast.mvgam}()},
 \code{\link{lfo_cv.mvgam}()},
 \code{\link{score.mvgam_forecast}()}
