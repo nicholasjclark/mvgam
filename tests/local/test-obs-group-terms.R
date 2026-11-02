@@ -171,6 +171,34 @@ test_that("forecast_uncertainty() sets group terms apart and adds new levels", {
   expect_gt(of(at_new), of(at_known))
 })
 
+test_that("scenarios differ by what their covariates change", {
+  ids <- 1:50
+  rows <- future_rows(fits$G)
+  shifted <- rows
+  shifted$x <- shifted$x + 1
+  compare <- function(a, b, ...) {
+    forecast_uncertainty(fits$G, newdata = list(a = a, b = b),
+                         n_replicates = 3L, n_boot = 2L, draw_ids = ids, ...)
+  }
+  # A new level redraws unless the scenarios share their seed
+  new <- rows
+  new$g1 <- as.character(new$g1)
+  new$g1[] <- "unseen"
+  same <- compare(new, new, allow_new_levels = TRUE)
+  expect_identical(max(abs(scenario_contrasts(same)$draws)), 0)
+  # By hand: the state cancels, leaving the predictor's own difference
+  x <- compare(rows, shifted)
+  of <- function(frame) {
+    extract_component_linpred(fits$G, frame, component = "obs",
+                              draw_ids = ids)
+  }
+  by_hand <- of(shifted) - of(rows)
+  north <- rows$series == "north"
+  expect_equal(unname(x$scenarios$b$draws$north - x$scenarios$a$draws$north),
+               unname(by_hand[, north]))
+})
+
+
 test_that("re_formula refuses a term no formula holds", {
   for (rf in list(~ (1 | g3), ~ (1 + x | g2))) {
     expect_error(posterior_linpred(fits$G, newdata = dat[1:2, ],

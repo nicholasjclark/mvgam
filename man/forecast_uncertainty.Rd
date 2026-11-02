@@ -6,6 +6,9 @@
 \alias{summary.mvgam_forecast_uncertainty}
 \alias{print.mvgam_forecast_uncertainty}
 \alias{plot.mvgam_forecast_uncertainty}
+\alias{summary.mvgam_forecast_scenarios}
+\alias{print.mvgam_forecast_scenarios}
+\alias{plot.mvgam_forecast_scenarios}
 \title{Forecast uncertainty by source}
 \usage{
 forecast_uncertainty(object, ...)
@@ -36,6 +39,12 @@ forecast_uncertainty(object, ...)
   series = NULL,
   ...
 )
+
+\method{summary}{mvgam_forecast_scenarios}(object, probs = c(0.025, 0.975), ...)
+
+\method{print}{mvgam_forecast_scenarios}(x, digits = 2L, ...)
+
+\method{plot}{mvgam_forecast_scenarios}(x, series = NULL, ...)
 }
 \arguments{
 \item{object}{A fitted \code{mvgam} object.}
@@ -43,7 +52,9 @@ forecast_uncertainty(object, ...)
 \item{...}{Unused. Anything passed here is refused.}
 
 \item{newdata}{Data frame of future times, as \code{\link[=forecast.mvgam]{forecast.mvgam()}} takes
-it. \code{NULL} uses the data held out at fit time.}
+it. \code{NULL} uses the data held out at fit time. A named list of such
+frames compares scenarios, each frame holding one possible future of
+the covariates. See \emph{Scenarios}.}
 
 \item{scale}{\code{"link"} (the default) splits the predictor, where its
 parts add and the split is exact. \code{"expected"} splits the expected
@@ -96,6 +107,13 @@ first horizon's;
 \code{horizons}, the forecast's variance at each horizon; and \code{sources}, each source's \code{variance}, \code{contribution} and
 \code{share} at each horizon with their interval. \code{plot()} stacks the
 sources over the horizon. A negative contribution is drawn as zero.
+
+A list of frames in \code{newdata} gives an object of class
+\code{mvgam_forecast_scenarios}. \code{print()} gives each difference at the
+last horizon. \code{summary()} returns a list of \code{contrasts}, one row per
+horizon, with \code{overview}, one row per scenario and series. \code{plot()}
+draws each difference over the horizon. Its \code{scenarios} element holds
+each scenario's own \code{mvgam_forecast_uncertainty} object.
 }
 \description{
 Shows where a forecast's uncertainty comes from and how each source
@@ -124,6 +142,10 @@ This uncertainty falls with more data.}
 uncertain last state and trend parameters}
 \item{\verb{process error}}{what the trend's innovations add. It persists
 however much data arrives.}
+\item{\code{driver}}{what an uncertain future covariate adds. A \code{mi()}
+covariate missing from \code{newdata} follows its own trend into the
+forecast. Its innovations are \verb{imputed covariates}, split from
+\verb{process error} by their covariance with the forecast.}
 \item{\code{observation}}{noise around the expected value, under
 \code{scale = "response"} alone}
 }
@@ -150,6 +172,14 @@ split an approximation. The split between parameter uncertainty,
 process error and observation stays exact. On a skewed scale a few
 draws can drive a variance, which makes the link scale steadier.
 
+\emph{Scenarios}. A list of frames sharing their series and times gives
+each scenario its own split. It also gives the difference between
+each scenario and the first, draw by draw, with a posterior interval.
+Every scenario takes the same draws and the same innovations. On the
+link scale the state then cancels, leaving what the covariates change.
+Because a list of scenarios is no probability distribution, no variance
+is taken across it. To separate two covariates, vary one at a time.
+
 The intervals resample the draws. They measure the Monte Carlo error
 of a share, which falls with \code{ndraws} and \code{n_replicates}.
 }
@@ -175,6 +205,17 @@ plot(fu)
 
 # Fractions of the total, by term
 plot(fu, type = "share", by = "source")
+
+# Two possible futures of the covariate
+warmer <- simdat$data_test
+warmer$x <- warmer$x + 1
+scenarios <- forecast_uncertainty(
+  mod,
+  newdata = list(current = simdat$data_test, warmer = warmer),
+  ndraws = 200
+)
+scenarios
+plot(scenarios)
 
 # Include observation noise
 forecast_uncertainty(mod, newdata = simdat$data_test, ndraws = 200,

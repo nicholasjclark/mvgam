@@ -174,47 +174,57 @@ plot_fevd_shares <- function(shares, target_names, source_names) {
     ggplot2::aes(fill = .data$Series, y = .data$share, x = .data$horizon)
   ) +
     share_bars(length(source_names)) +
+    share_axis("y") +
     ggplot2::facet_wrap(~ target) +
-    mvgam_theme() +
     scale_x_steps("Forecast horizon") +
-    ggplot2::labs(y = "Median contribution to forecast variance",
-                  fill = "Source")
+    ggplot2::labs(y = "Median share of forecast variance") +
+    mvgam_theme()
 }
 
 #' The fill scale of a variance's sources
 #'
 #' Up to three sources take the shades of the red scheme the irf and
-#' stability plots draw with. More sources take the Okabe-Ito hues.
+#' stability plots draw with. More sources take the Okabe-Ito hues. A
+#' long label, such as a tensor product's call, wraps to keep the panels
+#' their width.
 #'
 #' @param n_sources Number of sources
 #' @return A `ggplot` scale
 #' @noRd
 share_fill_scale <- function(n_sources) {
-  mvgam_model_colour_scale(n_sources, name = "Source", aesthetics = "fill")
+  mvgam_model_colour_scale(
+    n_sources, name = "Source", aesthetics = "fill",
+    labels = function(x) {
+      vapply(strwrap(x, width = 24L, simplify = FALSE), paste, character(1L),
+             collapse = "\n")
+    }
+  )
 }
 
-#' Stacked bars of a variance's shares
+#' Stacked bars of a variance's sources
+#'
+#' The first source stacks nearest the axis.
 #'
 #' @inheritParams share_fill_scale
-#' @param reverse Whether the first source stacks first, nearest the
-#'   axis
 #' @return List of `ggplot` layers
 #' @noRd
-share_bars <- function(n_sources, reverse = FALSE) {
+share_bars <- function(n_sources) {
   list(
-    ggplot2::geom_bar(position = ggplot2::position_stack(reverse = reverse),
+    ggplot2::geom_bar(position = ggplot2::position_stack(reverse = TRUE),
                       stat = "identity", colour = "white", linewidth = 0.2),
     share_fill_scale(n_sources)
   )
 }
 
-#' Axis labels of a share, as percentages
+#' The percentage axis of stacked shares
 #'
-#' @param x Numeric shares
-#' @return Character labels
+#' @param axis `"x"` or `"y"`
+#' @return A `ggplot` scale
 #' @noRd
-percent_labels <- function(x) {
-  paste0(round(100 * x), "%")
+share_axis <- function(axis) {
+  scale <- switch(axis, x = ggplot2::scale_x_continuous,
+                  y = ggplot2::scale_y_continuous)
+  scale(labels = function(x) paste0(round(100 * x), "%"), expand = c(0, 0))
 }
 
 #' The draws of every variance share, one column per cell

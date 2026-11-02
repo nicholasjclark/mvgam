@@ -256,11 +256,10 @@ plot.mvgam_variance_partition <- function(x, ...) {
     means,
     ggplot2::aes(fill = .data$source, x = .data$share, y = .data$series)
   ) +
-    share_bars(length(x$sources), reverse = TRUE) +
+    share_bars(length(x$sources)) +
+    share_axis("x") +
     ggplot2::facet_grid(rows = ggplot2::vars(.data$panel), scales = "free_y",
                         space = "free_y") +
-    ggplot2::scale_x_continuous(labels = percent_labels,
-                                expand = c(0, 0)) +
     mvgam_theme() +
     ggplot2::theme(strip.text = ggplot2::element_blank(),
                    strip.background = ggplot2::element_blank()) +

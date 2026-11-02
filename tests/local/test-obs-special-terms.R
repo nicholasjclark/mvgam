@@ -440,6 +440,28 @@ test_that("D: the forecast's parts hold the imputed value's own trend", {
 })
 
 
+test_that("D: an imputed value's innovations are its own driver", {
+  # By hand: a step of `xa`'s trend adds b^2 sigma^2 to `ya`
+  ids <- 1:200
+  known <- future_rows(fits$D, 1L)
+  imputed <- known
+  imputed$xa <- NA_real_
+  split <- function(rows) {
+    forecast_uncertainty(fits$D, newdata = rows, resp = "ya",
+                         n_replicates = 50L, n_boot = 2L, draw_ids = ids)$sources
+  }
+  of <- function(x, source) x$variance[x$source == source]
+  at_imputed <- split(imputed)
+  draws <- as_draws_matrix(fits$D)[ids, ]
+  by_hand <- mean(as.vector(draws[, "bsp_ya_mixa"])^2 *
+                    as.vector(draws[, "sigma_trend[xa]"])^2)
+  expect_equal(of(at_imputed, "imputed covariates"), by_hand, tolerance = 0.25)
+  # What remains is the process of `ya` itself
+  expect_equal(of(at_imputed, "process error"),
+               of(split(known), "process error"), tolerance = 0.25)
+})
+
+
 test_that("D: each response of a wide frame is one series in the equations", {
   text <- methods_md(fits$D)
   expect_match(text, "\\mathrm{ya}_{t} &\\sim", fixed = TRUE)

@@ -1205,7 +1205,9 @@ build_forecast_arms <- function(object, trend_model, meta,
   imputed_struct <- lapply(stats::setNames(nm = imputed), function(var) {
     get_observation_structure(object, newdata = fc_grid$data, resp = var)
   })
-  imputed_trend <- lapply(imputed_struct, function(struct) trend_flat)
+  imputed_trend <- rep(list(lapply(imputed_struct, function(struct) {
+    trend_flat
+  })), replicates)
   latent_specs <- if (parts || !is.null(effect_of)) {
     latent_part_specs(object)
   }
@@ -1246,14 +1248,15 @@ build_forecast_arms <- function(object, trend_model, meta,
           attr(fc_trend, "latent")[[label]], obs_struct_fc
         )
       }
-      # The first replicate is the forecast. A value `mi()` imputes takes
-      # its trend.
-      if (r > 1L) next
-      trend_flat[i, ] <- flatten_grid_to_obs_order(fc_trend, obs_struct_fc)
+      # A value `mi()` imputes takes the trend of its own replicate
       for (var in imputed) {
-        imputed_trend[[var]][i, ] <- flatten_grid_to_obs_order(
+        imputed_trend[[r]][[var]][i, ] <- flatten_grid_to_obs_order(
           fc_trend, imputed_struct[[var]]
         )
+      }
+      # The first replicate is the forecast
+      if (r == 1L) {
+        trend_flat[i, ] <- flatten_grid_to_obs_order(fc_trend, obs_struct_fc)
       }
     }
   }
@@ -1261,19 +1264,35 @@ build_forecast_arms <- function(object, trend_model, meta,
   if (type == "trend") {
     return(arms_of(trend_flat))
   }
-  impute_trend <- if (length(imputed)) function(var) imputed_trend[[var]]
+  impute_trend <- function(r) {
+    if (length(imputed)) function(var) imputed_trend[[r]][[var]]
+  }
   if (!is.null(effect_of)) {
-    whole <- component_lp(fc_grid$data, "obs", resp, impute_trend) +
+    whole <- component_lp(fc_grid$data, "obs", resp, impute_trend(1L)) +
       Reduce(`+`, latent_flat[[1L]], trend_lp_fc)
     return(arms_of(effect_of(whole, trend_flat, fc_grid$data)))
   }
   if (parts) {
-    obs_parts <- component_lp(fc_grid$data, "obs", resp, impute_trend,
+    obs_parts <- component_lp(fc_grid$data, "obs", resp, impute_trend(1L),
                               extract_component_parts)
+    if (length(imputed) && replicates > 1L) {
+      # A replicate's imputed values move its predictor. One seed holds
+      # every other random quantity, such as a new level, across them.
+      seed <- sample.int(.Machine$integer.max, 1L)
+      obs_of <- function(r) {
+        local_seed(seed)
+        Reduce(`+`, component_lp(fc_grid$data, "obs", resp, impute_trend(r),
+                                 extract_component_parts))
+      }
+      first <- obs_of(1L)
+      latent_flat <- Map(function(latent, r) {
+        c(latent, list(imputed = obs_of(r) - first))
+      }, latent_flat, seq_len(replicates))
+    }
     return(list(obs = obs_parts, trend = trend_parts, latent = latent_flat,
                 frame = fc_grid$data, slice = arms_of))
   }
-  eta_full <- component_lp(fc_grid$data, "obs", resp, impute_trend) +
+  eta_full <- component_lp(fc_grid$data, "obs", resp, impute_trend(1L)) +
     trend_flat
   if (type == "link") {
     return(arms_of(eta_full))

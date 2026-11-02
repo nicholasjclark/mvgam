@@ -221,6 +221,9 @@ side_terms_key <- function(f, family, resp) {
 #' @return The list `mvgam_side_terms()` returns
 #' @noRd
 parse_side_terms <- function(f, family, resp) {
+  # brms samples an internal id for a block mixing kinds of term. The
+  # parse runs once per session and leaves the caller's stream alone.
+  local_seed(1L)
   if (!is.null(family)) {
     if (inherits(f, "mvbrmsformula")) {
       # Each response of a multivariate formula holds its own family.
