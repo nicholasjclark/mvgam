@@ -352,6 +352,29 @@ term out of three. So do `posterior_smooths()` and
 `conditional_smooths()`. A method that returned the first term
 whatever it was asked for passes on any single-smooth model.
 
+**test-obs-special-terms.R** fits six models with an AR(1) trend, five
+over two series and one in a frame where the responses are the series.
+The first crosses `mo()` with a covariate and a factor
+under a varying `(mo() | site)` slope. The second holds `me()` terms
+grouped and ungrouped, one of them in the trend formula. In the third,
+a response imputes the `mi()` covariate of another, as it does in the
+wide fit, under the response's own trend. The fifth uses each latent
+value in two terms and the sixth measures a `mi()` response with known
+noise. Latent values belong to fitted units. A prediction row that
+changes another
+covariate keeps them, which only real draws can show. The file also
+places the rows of eight other cached fits on their units, one for
+each kind of axis.
+
+**test-obs-group-terms.R** fits three models over two series with an
+AR(1) trend. One carries a weighted multi-membership term in the
+observation formula and an unweighted one in the trend formula. The
+other carries an `mmc()` slope on one response of two. A row's term
+sums over its memberships, each with its own weight, design and index.
+A predictor that dropped a membership or a weight stays finite and
+correctly shaped. The trend side is written over trend cells, a grain
+brms never sees.
+
 ### The method surface
 
 **test-backend-fits.R** fits small Poisson AR models through rstan,
@@ -371,12 +394,7 @@ registry, a method added without the guard fails here.
 term type under every brms suffix: a distributional parameter, a
 response of an `mvbf()` model and a non-linear parameter. Each linear
 predictor mvgam composes from the Stan data is held against the one
-brms computes from the same draws. Two more fits hold the special
-terms. The first carries `mo()` times a covariate and times a factor,
-`me()` times `mo()` and a varying `(mo() | g)` slope. It saves its
-latents, which gives brms and mvgam the same noise-free values at the
-fitted rows. The second imputes a missing covariate through `mi()`.
-Three ordinal fits follow. Two carry
+brms computes from the same draws. Three ordinal fits follow. Two carry
 category-specific `cs()` terms, which shift each threshold by its own
 amount. A cumulative family subtracts the shift where an
 adjacent-category family adds it, which tests both directions. The

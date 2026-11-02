@@ -28,8 +28,10 @@ jsdgam(
 \arguments{
 \item{formula}{Main observation model formula (supports brms syntax).
 Smooth specials \code{s()}, \code{t2()}, \code{gp()}, varying intercepts and
-slopes, monotonic \code{mo()}, measurement-error \code{me()}, distributional
-\code{dpar} sub-formulas and \code{offset()} are all available. \code{gp()}
+slopes, multi-membership \code{mm()}, monotonic \code{mo()}, measurement-error
+\code{me()}, imputed \code{mi()}, distributional \code{dpar} sub-formulas and
+\code{offset()} are all available. A response leaves rows out by holding
+\code{NA} there. \code{subset()} and \code{index()} are not supported. \code{gp()}
 accepts both the approximate Hilbert-space form
 (\code{gp(x, k = 20)}) and the exact full-covariance form
 (\code{gp(x)}, no \code{k}). Prediction at \code{newdata} requires the

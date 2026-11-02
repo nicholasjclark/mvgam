@@ -5,7 +5,8 @@
 #' within its period. It reports the size of the seasonal swing and
 #' where in the period it peaks, cycle by cycle. With `newdata` the
 #' season continues into the forecast horizon. The season is part of
-#' the latent trend, on the link scale.
+#' the latent trend, on the link scale. `scale` reports it on the scale
+#' of the expected value.
 #'
 #' @param object A fitted `mvgam` object whose trend is
 #'   `LLT(season = ...)`.
@@ -14,6 +15,13 @@
 #'   series.
 #' @param ndraws,draw_ids The posterior draws to use, as
 #'   [hindcast.mvgam()] takes them. `NULL` for both uses every draw.
+#' @param scale `"link"` (the default) reports the latent season.
+#'   `"response"` reports its contribution to the expected value: the
+#'   expected value with the season less the expected value without it.
+#'   `"ratio"` reports the first of those over the second. Under a log
+#'   link that ratio is the season's multiplicative effect.
+#' @param resp The response to report, needed by `scale = "response"`
+#'   and `scale = "ratio"` on a model with several.
 #' @param ... Unused. Anything passed here is refused.
 #'
 #' @details
@@ -33,6 +41,12 @@
 #' value. Both are computed draw by draw. A change between the first
 #' and the last complete cycle then comes with its posterior
 #' probability.
+#'
+#' *Scale*. The expected value comes from the fit's own family, draw by
+#' draw, with every other part of the predictor at its fitted or
+#' forecast value. Under a non-linear link the response-scale season
+#' then moves with the level. Its amplitude can grow while the latent
+#' season stays fixed.
 #'
 #' A trend with several periods, such as `LLT(season = c(7, 365.25))`,
 #' reports each period's season separately.
@@ -73,6 +87,9 @@
 #'
 #' # How the swing and its peak changed between the first and last year
 #' summary(s)$change
+#'
+#' # The season as a multiple of the expected passenger count
+#' plot(seasonality(mod, scale = "ratio"))
 #' }
 #'
 #' @author Nicholas J Clark
@@ -86,13 +103,18 @@ seasonality <- function(object, ...) {
 #' @method seasonality mvgam
 #' @export
 seasonality.mvgam <- function(object, newdata = NULL, ...,
-                              ndraws = NULL, draw_ids = NULL) {
+                              ndraws = NULL, draw_ids = NULL,
+                              scale = c("link", "response", "ratio"),
+                              resp = NULL) {
   checkmate::assert_class(object, "mvgam")
   checkmate::assert_data_frame(newdata, null.ok = TRUE)
   rlang::check_dots_empty()
   validate_draw_selectors(ndraws, draw_ids)
   require_fitted_model(object, "seasonality")
   require_series_axis(object, "seasonality")
+  scale <- match.arg(scale)
+  resolve_resp(object, resp, required = scale != "link",
+               caller = "seasonality")
   periods <- require_llt_season(object)
   draw_ids <- resolve_draw_indices(posterior::ndraws(object), ndraws,
                                    draw_ids)
@@ -102,10 +124,18 @@ seasonality.mvgam <- function(object, newdata = NULL, ...,
   per_period <- lapply(seq_len(nrow(periods)), function(p) {
     cmp <- periods$component[p]
     hc <- hindcast(object, type = "trend", component = cmp,
-                   draw_ids = draw_ids)
-    fc <- if (!is.null(newdata)) {
+                   draw_ids = draw_ids, resp = resp)
+    if (scale != "link") {
+      hc$hindcasts <- season_hindcast_effect(object, cmp, draw_ids, resp,
+                                             scale)
+    }
+    fc <- if (is.null(newdata)) {
+      NULL
+    } else if (scale == "link") {
       forecast(object, newdata = newdata, type = "trend", component = cmp,
-               draw_ids = draw_ids)
+               draw_ids = draw_ids, resp = resp)
+    } else {
+      season_forecast_effect(object, newdata, cmp, draw_ids, resp, scale)
     }
     fitted <- shared_series_times(hc$train_times)
     times <- c(fitted, if (!is.null(fc)) shared_series_times(fc$test_times))
@@ -126,9 +156,114 @@ seasonality.mvgam <- function(object, newdata = NULL, ...,
       series = names(per_period[[1L]]$draws),
       seasons = lapply(per_period, `[[`, "draws"),
       layouts = lapply(per_period, `[[`, "layout"),
-      draw_ids = draw_ids
+      draw_ids = draw_ids,
+      scale = scale
     ),
     class = "mvgam_seasonality"
+  )
+}
+
+
+#' The season's effect on the expected value
+#'
+#' @param object A fitted `mvgam` object
+#' @param whole `[ndraws, nrow]` link predictor at the rows of `frame`
+#' @param season The season at those rows
+#' @param frame The rows
+#' @param draw_ids Indices of the draws
+#' @param resp A response name, or NULL
+#' @param scale `"response"` for the difference of the expected values
+#'   with and without the season, `"ratio"` for their ratio
+#' @return `[ndraws, nrow]` matrix
+#' @noRd
+season_effect <- function(object, whole, season, frame, draw_ids, resp,
+                          scale) {
+  checkmate::assert_choice(scale, c("response", "ratio"))
+  expect <- epred_map(object, frame, draw_ids, resp, dim(whole),
+                      ordinal = "mean")
+  with_season <- expect(whole)
+  without <- expect(whole - season)
+  if (identical(scale, "ratio")) {
+    return(with_season / without)
+  }
+  with_season - without
+}
+
+
+#' The season's effect on the expected value at the fitted times
+#'
+#' @inheritParams season_effect
+#' @param cmp The season's component name
+#' @return Named list of `[ndraws, n_times]` matrices, one per series
+#' @noRd
+season_hindcast_effect <- function(object, cmp, draw_ids, resp, scale) {
+  series_levels <- fitted_series_levels(object)
+  training <- build_training_arms(object, series_levels, resp = resp)
+  frame <- training$data
+  effect <- season_effect(
+    object,
+    get_combined_linpred(object, frame, trend_state = "conditional",
+                         draw_ids = draw_ids, resp = resp),
+    trend_state_rows(object, frame, draw_ids, resp, component = cmp),
+    frame, draw_ids, resp, scale
+  )
+  times <- frame[[training$time_var]]
+  lapply(training$series_rows[reported_series(object, resp, series_levels)],
+         function(rows) {
+           effect[, rows[!duplicated(times[rows])], drop = FALSE]
+         })
+}
+
+
+#' The season's effect on the expected value at the forecast times
+#'
+#' One propagation gives the season and the whole predictor, which then
+#' share their innovations.
+#'
+#' @inheritParams season_hindcast_effect
+#' @param newdata Future rows
+#' @return List of `forecasts`, `[ndraws, h]` matrices named by series,
+#'   and `test_times`, as a forecast holds them
+#' @noRd
+season_forecast_effect <- function(object, newdata, cmp, draw_ids, resp,
+                                   scale) {
+  setup <- forecast_setup(object, newdata, "link", resp, NULL, draw_ids, NULL,
+                          FALSE, "uncertainty")
+  forecasts <- build_forecast_arms(
+    object = object, trend_model = setup$trend_model,
+    meta = object$trend_metadata, training = setup$training,
+    fc_grid = setup$fc_grid, type = "link",
+    draws_mat = forecast_draws(object, setup$draw_idx),
+    draw_idx = setup$draw_idx, coef_uncertainty = TRUE,
+    trend_uncertainty = TRUE, obs_uncertainty = TRUE,
+    series_levels = setup$series_levels, resp = resp,
+    reported = setup$reported, component = cmp,
+    group_level = setup$group_level,
+    effect_of = function(whole, season, frame) {
+      season_effect(object, whole, season, frame, setup$draw_idx, resp, scale)
+    }
+  )
+  list(forecasts = forecasts, test_times = setup$fc_grid$times[setup$reported])
+}
+
+
+#' The words and reference value of each scale
+#'
+#' @param scale The scale of a `mvgam_seasonality` object
+#' @return List of the printed `title`, the axis `axis` and the `null`
+#'   value of no seasonal effect
+#' @noRd
+season_scale_labels <- function(scale) {
+  switch(
+    scale,
+    link = list(title = "Seasonal pattern of the latent trend (link scale)",
+                axis = "Latent season", null = 0),
+    response = list(title = "Seasonal effect on the expected value",
+                    axis = "Season's effect on the expected value",
+                    null = 0),
+    ratio = list(title = "Seasonal multiple of the expected value",
+                 axis = "Expected value with the season / without it",
+                 null = 1)
   )
 }
 
@@ -434,8 +569,8 @@ print.mvgam_seasonality <- function(x, digits = 2L, ...) {
   checkmate::assert_count(digits)
   cycle_draws <- season_cycle_draws(x)
   num <- function(v) format(round(v, digits), nsmall = digits)
-  cat("Seasonal pattern of the latent trend (link scale), ",
-      length(x$draw_ids), " draws\n", sep = "")
+  cat(season_scale_labels(x$scale)$title, ", ", length(x$draw_ids),
+      " draws\n", sep = "")
   cat("First and last complete cycles. summary() gives every cycle.\n")
   for (cmp in names(cycle_draws)) {
     period <- x$periods$period[x$periods$component == cmp]
@@ -499,7 +634,8 @@ plot.mvgam_seasonality <- function(x, type = c("profile", "positions"),
       "'type = \"positions\"' draws one series at a time."
     ), call. = FALSE)
   }
-  season_positions_plot(x$seasons[[cmp]][[s]], layout, s)
+  season_positions_plot(x$seasons[[cmp]][[s]], layout, s,
+                        season_scale_labels(x$scale)$axis)
 }
 
 
@@ -545,8 +681,9 @@ season_profile_plot <- function(x, cmp, layout, cycles, probs) {
                        linewidth = 1) +
     mvgam_model_colour_scale(nlevels(df$cycle), name = NULL,
                              aesthetics = c("colour", "fill")) +
-    reference_line(yintercept = 0) +
-    ggplot2::labs(x = "Position in period", y = "Latent season") +
+    reference_line(yintercept = season_scale_labels(x$scale)$null) +
+    ggplot2::labs(x = "Position in period",
+                  y = season_scale_labels(x$scale)$axis) +
     mvgam_theme()
   if (length(x$series) > 1L) {
     p <- p + mvgam_facet_series()
@@ -564,9 +701,10 @@ season_profile_plot <- function(x, cmp, layout, cycles, probs) {
 #' @param draws `[ndraws, n_times]` matrix of one series' season
 #' @param layout Frame from `season_layout()`
 #' @param series The series' name, for the axis
+#' @param axis What the axis measures
 #' @return A `ggplot` object
 #' @noRd
-season_positions_plot <- function(draws, layout, series) {
+season_positions_plot <- function(draws, layout, series, axis) {
   labels <- levels(layout$label)
   by_position <- function(horizon) {
     lapply(stats::setNames(nm = labels), function(l) {
@@ -594,6 +732,6 @@ season_positions_plot <- function(draws, layout, series) {
     mvgam_cut_layer(t_cut) +
     mvgam_facet_series(scales = "fixed") +
     scale_x_steps(name = "Cycle") +
-    ggplot2::labs(y = paste0("Latent season for ", series)) +
+    ggplot2::labs(y = paste0(axis, " for ", series)) +
     mvgam_theme()
 }

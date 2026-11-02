@@ -68,14 +68,9 @@ get_safe_dummy_value <- function(family_obj) {
 
 #' Check the arguments that choose a prediction's group-level terms
 #'
-#' `re_formula` takes `NULL`, for every group-level term, or `NA`, for
-#' none. brms also takes a formula naming some of the terms. It then
-#' numbers the kept terms afresh, while the fitted draws keep the
-#' numbers the whole model gave them. Matching the two numberings would
-#' pair a term's design with another term's coefficients. A formula is
-#' refused for that reason. A grouping level the fit never saw is
-#' refused when the predictor is composed, whatever `allow_new_levels`
-#' says. `sample_new_levels` is checked as brms checks it.
+#' `re_formula` takes `NULL`, for every group-level term, `NA`, for
+#' none, or a formula naming the terms to keep. `sample_new_levels` is
+#' checked as brms checks it.
 #'
 #' @param re_formula,allow_new_levels,sample_new_levels As the
 #'   prediction methods take them
@@ -83,13 +78,8 @@ get_safe_dummy_value <- function(family_obj) {
 #' @noRd
 validate_group_level_args <- function(re_formula, allow_new_levels,
                                       sample_new_levels) {
-  if (!is.null(re_formula) && !checkmate::test_scalar_na(re_formula)) {
-    stop(insight::format_error(c(
-      "'re_formula' takes NULL or NA.",
-      x = "A formula choosing some of the group-level terms is not supported.",
-      i = paste0("Use NULL to include every group-level term or NA to ",
-                 "include none.")
-    )), call. = FALSE)
+  if (!checkmate::test_scalar_na(re_formula)) {
+    checkmate::assert_formula(re_formula, null.ok = TRUE)
   }
   checkmate::assert_flag(allow_new_levels)
   checkmate::assert_choice(sample_new_levels,
@@ -154,25 +144,33 @@ validate_draw_selectors <- function(ndraws, draw_ids) {
 #'   every variable the model uses. brms fills each one left out from
 #'   the first row of the fitted data. That suits a prediction that
 #'   uses some of the terms and ignores the rest.
-#' @param trend Whether `brmsfit` is the trend's model. Its rows are
-#'   the trend's cells. Its response is a placeholder without data.
+#' @param row_units Function of no arguments giving what identifies a
+#'   row, `list(new, fitted)`: one frame along `newdata` and one along
+#'   the fitted data, with the same columns. It runs for a model with
+#'   latent values alone. `NULL` takes every column of the fitted data.
+#' @param impute Function drawing a missing `mi()` value at a new row.
+#'   It takes the variable's key, its `[ndraws x nrows]` predictor at
+#'   those rows and the row numbers.
 #' @return A `mvgam_prep`: the Stan data, the draws, the formula and
 #'   its `model_predictors()`, the frame and its row count, the fit's
 #'   table of group-level terms, the `re_formula` the data was built
-#'   under, the fitted data and the fitted row each prediction row
-#'   repeats
+#'   under, the fitted data, the frames of `row_units`, the coefficients
+#'   of `new_level_coefs()` and an environment `latent_once()` fills
 #' @noRd
 prepare_linpred_data <- function(draws, brmsfit, newdata,
                                  re_formula = NULL,
                                  allow_new_levels = FALSE,
                                  sample_new_levels = "uncertainty",
-                                 req_vars = NULL, trend = FALSE) {
+                                 req_vars = NULL, row_units = NULL,
+                                 impute = NULL) {
   checkmate::assert_class(draws, "draws_matrix")
   checkmate::assert_class(brmsfit, "brmsfit")
   checkmate::assert_data_frame(newdata, min.rows = 1L)
   checkmate::assert_character(req_vars, any.missing = FALSE, null.ok = TRUE)
-  checkmate::assert_flag(trend)
+  checkmate::assert_function(row_units, null.ok = TRUE)
+  checkmate::assert_function(impute, null.ok = TRUE)
   validate_group_level_args(re_formula, allow_new_levels, sample_new_levels)
+  re_formula <- side_re_formula(brmsfit, re_formula)
 
   # brms evaluates the response to build the data. It refuses a
   # missing one with "missing value where TRUE/FALSE needed". Each
@@ -210,8 +208,22 @@ prepare_linpred_data <- function(draws, brmsfit, newdata,
   # carries `trials = 0` against a filled response of 1. brms would
   # refuse the whole frame with "Number of trials is smaller than the
   # number of events".
+  # A prediction row is its own hypothetical. Several rows of one level
+  # of `me(gr = )` may hold different measured values, as a grid sweeping
+  # the variable does. The data holds each row's value. `me_value()`
+  # places the rows on their levels.
+  per_row <- brmsfit
+  per_row$formula <- ungroup_me_terms(brmsfit$formula)
+  # The names of the rewritten terms' coefficients change with them.
+  # brms looks up each `mo()` term's prior by name.
+  if (!identical(per_row$formula, brmsfit$formula)) {
+    per_row$prior <- brms::default_prior(
+      per_row$formula, data = brmsfit$data, family = brmsfit$family,
+      data2 = brmsfit$data2
+    )
+  }
   sdata <- without_brms_fit_advisories(brms::standata(
-    brmsfit,
+    per_row,
     newdata = filled,
     re_formula = re_formula,
     allow_new_levels = allow_new_levels,
@@ -229,10 +241,11 @@ prepare_linpred_data <- function(draws, brmsfit, newdata,
   # `ranef` gives each group-level term's block `id` and place `cn`,
   # which name its design and coefficients. `me` numbers the model's
   # `me()` terms as `Xn_<k>` and `Xme_<k>` take them.
-  has_special <- any(vapply(predictors, function(p) {
-    NROW(p$special) > 0L
+  has_latent <- any(vapply(predictors, function(p) {
+    length(unlist(p$special$calls_me)) +
+      length(unlist(p$special$calls_mi)) > 0L
   }, logical(1L)))
-  structure(
+  prep <- structure(
     list(
       sdata = sdata,
       draws = draws,
@@ -240,79 +253,241 @@ prepare_linpred_data <- function(draws, brmsfit, newdata,
       predictors = predictors,
       newdata = newdata,
       nobs = nrow(newdata),
-      ranef = brmsfit$ranef,
+      ranef = kept_group_terms(brmsfit, re_formula),
       re_formula = re_formula,
-      me = if (has_special) me_term_frame(brmsfit$formula, brmsfit$data),
+      me = if (has_latent) me_term_frame(brmsfit$formula, brmsfit$data),
       data = brmsfit$data,
-      # Each observation of a trend cell takes the cell's draws. The
-      # trend's placeholder response identifies no row.
-      fitted_row = if (has_special) {
-        fitted_row_index(
-          newdata, brmsfit$data,
-          cols = if (trend) {
-            setdiff(names(brmsfit$data), response_columns(brmsfit$formula))
-          } else {
-            names(brmsfit$data)
-          },
-          shared = trend
-        )
+      impute = impute,
+      latents = new.env(parent = emptyenv()),
+      units = if (has_latent) {
+        if (is.null(row_units)) {
+          list(new = newdata, fitted = brmsfit$data)
+        } else {
+          row_units()
+        }
       }
     ),
     class = "mvgam_prep"
   )
+  if (allow_new_levels) {
+    prep$new_levels <- new_level_coefs(prep, sample_new_levels)
+  }
+  prep
+}
+
+
+#' The group-level terms a `re_formula` names
+#'
+#' @param re_formula A formula
+#' @return The terms as brms parses them, one row per term
+#' @noRd
+re_formula_terms <- function(re_formula) {
+  checkmate::assert_formula(re_formula)
+  brms_terms(rlang::new_formula(
+    quote(.mvgam_lhs), rlang::f_rhs(re_formula)
+  ))$dpars$mu$re
+}
+
+
+#' Refuse a `re_formula` naming a term no formula of the model holds
+#'
+#' brms drops such a term without a word. A misspelt group would then
+#' drop every group-level term from the prediction.
+#'
+#' @param object A fitted `mvgam` object
+#' @param re_formula `NULL`, `NA` or a formula naming the terms
+#' @return `NULL`, invisibly
+#' @noRd
+check_re_formula_terms <- function(object, re_formula) {
+  checkmate::assert_class(object, "mvgam")
+  if (!inherits(re_formula, "formula")) return(invisible(NULL))
+  own <- dplyr::bind_rows(lapply(c("obs", "trend"), function(side) {
+    side_model(object, side)$ranef[c("group", "form")]
+  }))
+  has_intercept <- function(form) attr(stats::terms(form), "intercept") == 1L
+  asked <- re_formula_terms(re_formula)
+  for (i in seq_len(NROW(asked))) {
+    group <- asked$group[[i]]
+    form <- asked$form[[i]]
+    held <- own$form[own$group == group]
+    known <- all(all.vars(form) %in% unlist(lapply(held, all.vars))) &&
+      (!has_intercept(form) || any(vapply(held, has_intercept, logical(1L))))
+    if (length(held) == 0L || !known) {
+      stop(insight::format_error(c(
+        "'re_formula' names a term outside the model.",
+        x = paste0("Got '(", deparse1(form[[2L]]), " | ", group, ")'."),
+        i = paste0("The model's groups are: ",
+                   toString(unique(as.character(own$group))), ".")
+      )), call. = FALSE)
+    }
+  }
+  invisible(NULL)
+}
+
+
+#' `re_formula` in one side's own terms
+#'
+#' One formula applies to the observation and the trend models. A term
+#' finds its group in a model that holds it, where it takes that
+#' model's grouping as written, weights included. A term of another
+#' model is dropped.
+#'
+#' @param brmsfit The brms model of one side
+#' @param re_formula `NULL`, `NA` or a formula naming the terms
+#' @return `re_formula`, a formula rewritten for the model
+#' @noRd
+side_re_formula <- function(brmsfit, re_formula) {
+  checkmate::assert_class(brmsfit, "brmsfit")
+  if (is.null(re_formula) || checkmate::test_scalar_na(re_formula)) {
+    return(re_formula)
+  }
+  asked <- re_formula_terms(re_formula)
+  own <- brmsfit$ranef
+  terms <- character(0L)
+  for (i in seq_len(NROW(asked))) {
+    hit <- match(asked$group[[i]], own$group)
+    if (is.na(hit)) next
+    terms <- c(terms, paste0(
+      "(", deparse1(asked$form[[i]][[2L]]),
+      if (asked$cor[[i]]) " | " else " || ",
+      own$gcall[[hit]]$label, ")"
+    ))
+  }
+  stats::reformulate(if (length(terms)) terms else "1")
+}
+
+
+#' The group-level terms a prediction keeps
+#'
+#' brms numbers the terms `re_formula` keeps afresh in the Stan data.
+#' The draws keep the numbers of the whole model. `id` and `cn` name the
+#' draws. `data_id` and `data_cn` name the data.
+#'
+#' @param brmsfit The brms model
+#' @param re_formula `NULL`, `NA` or a formula naming the terms
+#' @return The fit's `ranef` table, reduced to the kept terms
+#' @noRd
+kept_group_terms <- function(brmsfit, re_formula) {
+  checkmate::assert_class(brmsfit, "brmsfit")
+  ranef <- brmsfit$ranef
+  if (NROW(ranef) == 0L) return(ranef)
+  ranef$data_id <- ranef$id
+  ranef$data_cn <- ranef$cn
+  if (is.null(re_formula) || checkmate::test_scalar_na(re_formula)) {
+    return(ranef)
+  }
+  update <- utils::getFromNamespace("update_re_terms", "brms")
+  frame <- utils::getFromNamespace("frame_re", "brms")
+  kept <- frame(brms_terms(update(brmsfit$formula, re_formula)),
+                brmsfit$data)
+  cols <- c("group", "coef", "resp", "dpar", "nlpar", "type")
+  at <- match(row_keys(kept, cols), row_keys(ranef, cols))
+  out <- ranef[at, , drop = FALSE]
+  out$data_id <- kept$id
+  out$data_cn <- kept$cn
+  out$form <- kept$form
+  attr(out, "levels") <- attr(ranef, "levels")
+  out
+}
+
+
+#' `me()` terms with their grouping removed
+#'
+#' @param x A `brmsformula`, `mvbrmsformula` or one formula of either
+#' @return `x`, each `me(x, sdx, gr = g)` written `me(x, sdx)`
+#' @noRd
+ungroup_me_terms <- function(x) {
+  if (inherits(x, "mvbrmsformula")) {
+    x$forms <- lapply(x$forms, ungroup_me_terms)
+    return(x)
+  }
+  if (inherits(x, "bform")) {
+    x$formula <- ungroup_me_terms(x$formula)
+    if (length(x$pforms) > 0L) {
+      x$pforms[] <- lapply(x$pforms, ungroup_me_terms)
+    }
+    return(x)
+  }
+  if (!is.call(x)) return(x)
+  if (identical(call_head_name(x), "me")) {
+    matched <- match.call(brms::me, x)
+    if (is.null(matched$gr)) return(x)
+    matched$gr <- NULL
+    return(matched)
+  }
+  # An index such as `z[, 1]` holds an empty argument
+  for (i in seq_along(x)[-1L]) {
+    if (!identical(x[[i]], quote(expr = ))) {
+      x[[i]] <- ungroup_me_terms(x[[i]])
+    }
+  }
+  x
+}
+
+
+#' One key per row of a frame, equal for rows equal in `cols`
+#'
+#' Missing values equal each other. An integer and a double holding one
+#' number give one key.
+#'
+#' @param frame A data frame
+#' @param cols The columns to compare
+#' @return Character vector along the rows of `frame`
+#' @noRd
+row_keys <- function(frame, cols) {
+  checkmate::assert_data_frame(frame)
+  checkmate::assert_subset(cols, names(frame))
+  values <- lapply(cols, function(v) {
+    x <- frame[[v]]
+    as.character(if (is.numeric(x)) as.numeric(x) else x)
+  })
+  do.call(paste, c(values, sep = "\r"))
 }
 
 
 #' The fitted row each prediction row repeats
 #'
-#' A latent quantity the fit sampled per row, such as the noise-free
-#' value of an `me()` covariate or a missing value `mi()` imputes,
-#' belongs to that row. A prediction row holding the same values in
-#' `cols` as a fitted row, missing values included, takes that row's
-#' draws. Every other row is new. Its latent values are drawn afresh.
+#' Rows identical in `cols` pair with fitted rows in order. They start
+#' over once those run out. Copies of one fitted row stacked in a frame
+#' then each take that row.
 #'
 #' @param newdata The prediction frame
 #' @param data The fitted model's data
 #' @param cols The columns that identify a row
-#' @param shared `FALSE` to pair identical fitted rows with identical
-#'   prediction rows in order. `TRUE` to give every identical prediction
-#'   row the first identical fitted row, as each observation of a trend
-#'   cell takes the cell's draws.
 #' @return Integer vector along the rows of `newdata`: the fitted row
 #'   each repeats, or `NA` for a new row
 #' @noRd
-fitted_row_index <- function(newdata, data, cols = names(data),
-                             shared = FALSE) {
+fitted_row_index <- function(newdata, data, cols = names(data)) {
   checkmate::assert_data_frame(newdata)
   checkmate::assert_data_frame(data)
-  checkmate::assert_subset(cols, names(data))
-  checkmate::assert_flag(shared)
   if (!all(cols %in% names(newdata))) {
     return(rep(NA_integer_, nrow(newdata)))
   }
-  # One key column per identifying column. Paired rows add the
-  # occurrence of the row among the rows identical to it.
-  keyed <- function(frame, id) {
-    out <- lapply(stats::setNames(cols, paste0(".k", seq_along(cols))),
-                  function(v) {
-                    x <- frame[[v]]
-                    if (is.factor(x)) as.character(x) else as.vector(x)
-                  })
-    out <- as.data.frame(out)
-    if (!shared) {
-      out$.occurrence <- data.table::rowidv(out, names(out))
-    }
-    out[[id]] <- seq_len(nrow(frame))
-    out
-  }
-  fitted <- keyed(data, ".fitted")
-  if (shared) {
-    fitted <- fitted[!duplicated(fitted[setdiff(names(fitted), ".fitted")]),
-                     , drop = FALSE]
-  }
-  joined <- merge(keyed(newdata, ".new"), fitted, all.x = TRUE,
-                  sort = FALSE)
-  joined$.fitted[order(joined$.new)]
+  fitted <- row_keys(data, cols)
+  groups <- unique(fitted)
+  group <- match(fitted, groups)
+  size <- tabulate(group, length(groups))
+  start <- cumsum(c(0L, size))
+  keys <- row_keys(newdata, cols)
+  at <- match(keys, groups)
+  turn <- data.table::rowidv(keys)
+  order(group)[start[at] + (turn - 1L) %% size[at] + 1L]
+}
+
+
+#' The fitted unit of each prediction row
+#'
+#' A latent quantity the fit sampled, such as the noise-free value of an
+#' `me()` covariate or a value `mi()` imputes, belongs to a fitted unit.
+#' A prediction row in that unit keeps it, whatever covariates it
+#' changes.
+#'
+#' @param prep A `mvgam_prep`
+#' @return Integer vector along the rows of the prediction: the unit's
+#'   fitted row, `NA` for a new unit
+#' @noRd
+unit_rows <- function(prep) {
+  fitted_row_index(prep$units$new, prep$units$fitted)
 }
 
 

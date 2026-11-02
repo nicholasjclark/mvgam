@@ -23,8 +23,10 @@ mvgam(
 \arguments{
 \item{formula}{Main observation model formula (supports brms syntax).
 Smooth specials \code{s()}, \code{t2()}, \code{gp()}, varying intercepts and
-slopes, monotonic \code{mo()}, measurement-error \code{me()}, distributional
-\code{dpar} sub-formulas and \code{offset()} are all available. \code{gp()}
+slopes, multi-membership \code{mm()}, monotonic \code{mo()}, measurement-error
+\code{me()}, imputed \code{mi()}, distributional \code{dpar} sub-formulas and
+\code{offset()} are all available. A response leaves rows out by holding
+\code{NA} there. \code{subset()} and \code{index()} are not supported. \code{gp()}
 accepts both the approximate Hilbert-space form
 (\code{gp(x, k = 20)}) and the exact full-covariance form
 (\code{gp(x)}, no \code{k}). Prediction at \code{newdata} requires the
@@ -141,8 +143,8 @@ coefficients a shrinkage prior scales, the ordered intercepts a
 mixture is identified by. Those are left out by default, as brms
 leaves them out. \code{save_pars(all = TRUE)} keeps every one. \code{group}
 and \code{latent} keep the per-level deviations and the latent values
-of a \code{me()} covariate. \code{manual} names individual parameters to
-keep.}
+of a \code{me()} covariate or a \code{mi()} response with known noise.
+\code{manual} names individual parameters to keep.}
 
 \item{run_model}{Logical. \code{FALSE} builds the model without parsing,
 compiling or sampling it. The result holds \verb{$stancode},

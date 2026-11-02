@@ -846,15 +846,15 @@ extract_sampling_info <- function(object) {
 model_structure_text <- function(object) {
   checkmate::assert_class(object, "mvgam")
   families <- formula_families(object, object$family)
-  described <- vapply(families, function(fam) {
-    paste0(resolve_family_name(fam), " with a ", fam$link, " link")
+  names_of <- vapply(families, resolve_family_name, character(1L))
+  links <- vapply(families, function(fam) {
+    paste0(" with the ", fam$link, " link")
   }, character(1L))
-  out <- if (length(described) == 1L) {
-    paste0(" Observations followed the ",
-           sub(" with", " family with", described, fixed = TRUE), ".")
+  out <- if (length(families) == 1L) {
+    paste0(" Observations followed the ", names_of, " family", links, ".")
   } else {
     paste0(" The responses followed the families ",
-           paste0(names(described), ": ", described, collapse = "; "),
+           paste0(names(families), ": ", names_of, links, collapse = "; "),
            ".")
   }
   trend <- printed_trend_label(object)

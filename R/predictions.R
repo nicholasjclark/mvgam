@@ -194,6 +194,9 @@ is_per_response <- function(x) {
 #' @param draw_ids Draw indices to use, or `NULL` for all
 #' @param re_formula,allow_new_levels,sample_new_levels As
 #'   `validate_group_level_args()` takes them
+#' @param impute_trend Function of a response's key giving its
+#'   `[ndraws x nobs]` trend, which a missing `mi()` value at a new row
+#'   takes in its own predictor. `NULL` takes none.
 #' @return A `[ndraws x nobs]` matrix, or a list of them named by
 #'   response
 #' @noRd
@@ -201,10 +204,11 @@ extract_component_linpred <- function(mvgam_fit, newdata, component = "obs",
                                       resp = NULL, draw_ids = NULL,
                                       re_formula = NULL,
                                       allow_new_levels = FALSE,
-                                      sample_new_levels = "uncertainty") {
+                                      sample_new_levels = "uncertainty",
+                                      impute_trend = NULL) {
   prepared <- prepare_component(
     mvgam_fit, newdata, component, resp, draw_ids, re_formula,
-    allow_new_levels, sample_new_levels
+    allow_new_levels, sample_new_levels, impute_trend
   )
   finish_component(prepared, extract_linpred_from_prep(
     prepared$prep, resp = prepared$resp, dpar = prepared$dpar
@@ -226,10 +230,11 @@ extract_component_parts <- function(mvgam_fit, newdata, component = "obs",
                                     resp = NULL, draw_ids = NULL,
                                     re_formula = NULL,
                                     allow_new_levels = FALSE,
-                                    sample_new_levels = "uncertainty") {
+                                    sample_new_levels = "uncertainty",
+                                    impute_trend = NULL) {
   prepared <- prepare_component(
     mvgam_fit, newdata, component, resp, draw_ids, re_formula,
-    allow_new_levels, sample_new_levels
+    allow_new_levels, sample_new_levels, impute_trend
   )
   finish_component(prepared, extract_parts_from_prep(
     prepared$prep, resp = prepared$resp, dpar = prepared$dpar
@@ -354,10 +359,11 @@ threshold_row_sets <- function(prepared, n_sets, n_obs) {
 #' @noRd
 prepare_component <- function(mvgam_fit, newdata, component, resp, draw_ids,
                               re_formula, allow_new_levels,
-                              sample_new_levels) {
+                              sample_new_levels, impute_trend = NULL) {
   checkmate::assert_class(mvgam_fit, "mvgam")
   checkmate::assert_data_frame(newdata, min.rows = 1)
   checkmate::assert_string(component)
+  check_re_formula_terms(mvgam_fit, re_formula)
   checkmate::assert_string(resp, null.ok = TRUE)
   checkmate::assert_integerish(draw_ids, lower = 1, null.ok = TRUE,
                                any.missing = FALSE)
@@ -431,13 +437,142 @@ prepare_component <- function(mvgam_fit, newdata, component, resp, draw_ids,
     re_formula = re_formula,
     allow_new_levels = allow_new_levels,
     sample_new_levels = sample_new_levels,
-    trend = is_trend
+    row_units = function() {
+      if (is_trend) {
+        trend_row_units(mvgam_fit, newdata)
+      } else {
+        obs_row_units(mvgam_fit, newdata)
+      }
+    },
+    impute = function(var, mu, rows) {
+      trend <- if (!is.null(impute_trend)) impute_trend(var)
+      draw_observations(
+        mvgam_fit,
+        if (is.null(trend)) mu else mu + trend[, rows, drop = FALSE],
+        newdata[rows, , drop = FALSE], draw_ids, resp = var,
+        re_formula = re_formula, allow_new_levels = allow_new_levels,
+        sample_new_levels = sample_new_levels
+      )
+    }
   )
   # The trend's brms model has one response, shared by every response
   # of the observation model.
   list(prep = prep, resp = if (!is_trend) resp,
        dpar = if (!component %in% c("obs", "trend")) component,
        projection = NULL)
+}
+
+
+#' The responses a model imputes that a frame misses a value of
+#'
+#' @param object A fitted `mvgam` object
+#' @param newdata The prediction frame
+#' @return The responses' keys
+#' @noRd
+missing_imputed <- function(object, newdata) {
+  imputed <- imputed_responses(object)
+  columns <- response_columns(object)
+  keys <- names(imputed)[imputed]
+  keys[vapply(columns[keys], function(column) {
+    any(response_gaps(newdata, column))
+  }, logical(1L))]
+}
+
+
+#' The rows of a frame missing a response's value
+#'
+#' A frame without the column misses every value.
+#'
+#' @param frame A data frame
+#' @param column The response's column
+#' @return Logical vector along the rows of `frame`
+#' @noRd
+response_gaps <- function(frame, column) {
+  if (column %in% names(frame)) {
+    is.na(frame[[column]])
+  } else {
+    rep(TRUE, nrow(frame))
+  }
+}
+
+
+#' The time and series of each row of a frame
+#'
+#' The raw time, which a frame holding part of a series keeps. The
+#' series as the fit numbers it, for each `get_observation_structure()`
+#' series source. A row of a wide frame takes the first response's
+#' column.
+#'
+#' @param object A fitted `mvgam` object
+#' @param frame The frame
+#' @return A data frame with columns `.time` and `.series`
+#' @noRd
+row_placement <- function(object, frame) {
+  frame <- prediction_frame(object, frame)
+  placed <- get_observation_structure(
+    object, frame, resp = names(response_columns(object))[1L]
+  )
+  data.frame(.time = frame[[axis_vars(object)$time_var]],
+             .series = placed$series_levels[placed$series_int])
+}
+
+
+#' The units of the observation model's rows
+#'
+#' brms keeps the rows of the fitted data each response's likelihood
+#' covers.
+#'
+#' @param object A fitted `mvgam` object
+#' @param newdata The prediction frame
+#' @return List: frames `new` and `fitted` from `row_placement()`
+#' @noRd
+obs_row_units <- function(object, newdata) {
+  kept <- Reduce(`&`, response_rows(object, object$data))
+  if (sum(kept) != nrow(object$obs_model$data)) {
+    stop_mvgam_fault(
+      "The observation model's row count differs from the likelihood's.",
+      paste0(sum(kept), " rows covered, ", nrow(object$obs_model$data),
+             " held.")
+    )
+  }
+  list(new = row_placement(object, newdata),
+       fitted = row_placement(object, object$data)[kept, , drop = FALSE])
+}
+
+
+#' The units of the trend model's rows
+#'
+#' The trend's data holds one row per cell, sorted by time. A cell is
+#' one occasion of one series, or of one factor under `by = lv_axis()`.
+#' A wide frame holds one row per occasion.
+#'
+#' @inheritParams obs_row_units
+#' @return List: frames `new` and `fitted` with the columns of a cell
+#' @noRd
+trend_row_units <- function(object, newdata) {
+  times <- mvgam_axes(object)$time$values
+  meta <- object$trend_metadata
+  if (isTRUE(meta$has_by_lv)) {
+    fitted <- expand_factor_axis(as.integer(meta$n_lv_for_grain),
+                                 .time = times)
+    new <- newdata[c(axis_vars(object)$time_var, factor_axis_column)]
+    names(new) <- names(fitted)
+  } else if (is_response_keyed(object)) {
+    fitted <- data.frame(.time = times)
+    new <- row_placement(object, newdata)[".time"]
+  } else {
+    fitted <- tidyr::expand_grid(.time = times,
+                                 .series = fitted_series_levels(object))
+    new <- row_placement(object, newdata)
+  }
+  if (nrow(fitted) != nrow(object$trend_model$data)) {
+    stop_mvgam_fault(
+      "The trend model's row count differs from its cells.",
+      paste0(nrow(fitted), " cells, ", nrow(object$trend_model$data),
+             " rows.")
+    )
+  }
+  list(new = as.data.frame(new), fitted = as.data.frame(fitted))
 }
 
 
@@ -542,7 +677,8 @@ prepare_by_lv_trend <- function(mvgam_fit, newdata, full_draws,
     draws = trend_draws, brmsfit = trend_model,
     newdata = lv_newdata, re_formula = re_formula,
     allow_new_levels = allow_new_levels,
-    sample_new_levels = sample_new_levels, trend = TRUE
+    sample_new_levels = sample_new_levels,
+    row_units = function() trend_row_units(mvgam_fit, lv_newdata)
   )
   # `mu_factor` is the per-factor predictor over the latent axis. It
   # belongs to the `Z` the model sampled. Stan folds it inside the

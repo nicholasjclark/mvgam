@@ -604,21 +604,15 @@ smooth_pred <- function(draws, sdata, sfx, n_obs, objects) {
 #' factor. The term's correlation block `id` and its place `cn` in that
 #' block name its data. Its design is `Z_<id><sfx>_<cn>`, its
 #' coefficients are `r_<id><sfx>_<cn>[level]` and its grouping index
-#' is `J_<id>` suffixed by the response alone.
+#' is `J_<id>` suffixed by the response alone. A multi-membership term
+#' has a design and an index per membership, suffixed `_<k>`. Its
+#' weights `W_<id>_<k>` are suffixed as the index is.
 #'
 #' @inheritParams linear_terms_pred
 #' @param block The rows of the fit's `ranef` table sharing one `id`
 #' @return A `[ndraws x nobs]` matrix
 #' @noRd
 block_pred <- function(prep, draws, block, predictor) {
-  if (identical(blank_if_na(block$gtype[1L]), "mm")) {
-    stop(insight::format_error(c(
-      "mvgam cannot predict from this group-level term.",
-      x = paste0("Grouping factor '", block$group[1L],
-                 "' is written as a multi-membership term."),
-      i = "Write it as an ordinary '(term | group)'."
-    )), call. = FALSE)
-  }
   Reduce(`+`, lapply(seq_len(nrow(block)), function(k) {
     group_term_pred(prep, draws, block[k, , drop = FALSE], predictor)
   }))
@@ -636,34 +630,238 @@ block_pred <- function(prep, draws, block, predictor) {
 #' @noRd
 group_term_pred <- function(prep, draws, row, predictor) {
   checkmate::assert_data_frame(row, nrows = 1L)
-  stem <- paste0(row$id, predictor$suffix, "_", row$cn)
-  Z <- if (identical(blank_if_na(row$type), "sp")) {
-    1
-  } else {
-    as.vector(sdata_entry(prep$sdata, paste0("Z_", stem)))
-  }
-  J <- as.integer(sdata_entry(
-    prep$sdata, paste0("J_", row$id, predictor_suffix(predictor$resp))
-  ))
+  stem <- group_term_stem(row, row$data_id, row$data_cn)
+  index <- paste0(row$data_id, predictor_suffix(predictor$resp))
   group <- as.character(row$group)
   n_levels <- length(attr(prep$ranef, "levels")[[group]])
-  if (length(J) > 0L && max(J) > n_levels) {
+  # A new level's coefficients follow the fitted levels' columns
+  r <- cbind(
+    draw_columns(draws, paste0("r_", group_term_stem(row), "[",
+                               seq_len(n_levels), "]")),
+    prep$new_levels[[rownames(row)]]
+  )
+  member <- function(tail) {
+    Z <- if (identical(blank_if_na(row$type), "sp")) {
+      1
+    } else {
+      as.vector(sdata_entry(prep$sdata, paste0("Z_", stem, tail)))
+    }
+    if (nzchar(tail)) {
+      Z <- Z * as.vector(sdata_entry(prep$sdata, paste0("W_", index, tail)))
+    }
+    J <- as.integer(sdata_entry(prep$sdata, paste0("J_", index, tail)))
+    if (length(J) > 0L && max(J) > ncol(r)) {
+      stop(insight::format_error(c(
+        "A new grouping level needs 'allow_new_levels = TRUE'.",
+        x = paste0("Grouping factor '", group, "' was fitted with ",
+                   n_levels, " level", if (n_levels != 1L) "s",
+                   " and 'newdata' asks for level ", max(J), "."),
+        i = "Or use 're_formula = NA' for the population effects."
+      )), call. = FALSE)
+    }
+    # A group-level intercept has a design of ones
+    if (all(Z == 1)) {
+      return(r[, J, drop = FALSE])
+    }
+    r[, J, drop = FALSE] * rep(Z, each = nrow(draws))
+  }
+  Reduce(`+`, lapply(membership_suffixes(row), member))
+}
+
+
+#' The suffix of each membership of a group-level term
+#'
+#' @param row One row of the fit's `ranef` table
+#' @return `""` for an ordinary term. `_<k>` per group of a
+#'   multi-membership term.
+#' @noRd
+membership_suffixes <- function(row) {
+  if (!identical(row$gtype, "mm")) return("")
+  paste0("_", seq_along(row$gcall[[1L]]$groups))
+}
+
+
+#' The Stan data naming a group-level term's levels
+#'
+#' @param row One row of the fit's `ranef` table
+#' @return `J_<id>` suffixed by the response, one per membership
+#' @noRd
+group_index_names <- function(row) {
+  paste0("J_", row$data_id, predictor_suffix(blank_if_na(row$resp)),
+         membership_suffixes(row))
+}
+
+
+#' Coefficients for the grouping levels a prediction adds
+#'
+#' Each new level takes coefficients per draw. `"uncertainty"` takes
+#' those of a fitted level chosen anew in each draw. `"old_levels"`
+#' takes those of one fitted level chosen for all draws. `"gaussian"`
+#' draws them from the group's own normal distribution. The first two
+#' choose among the levels sharing the new level's `by` value. All the
+#' terms of a group take one choice, which keeps their correlation.
+#'
+#' @param prep A `mvgam_prep`
+#' @param sample_new_levels The rule to apply
+#' @return List of `[ndraws x n_new]` matrices, one per row of the
+#'   fit's `ranef` table that a new level reaches, named by its row name
+#' @noRd
+new_level_coefs <- function(prep, sample_new_levels) {
+  checkmate::assert_class(prep, "mvgam_prep")
+  ranef <- prep$ranef
+  if (NROW(ranef) == 0L || checkmate::test_scalar_na(prep$re_formula)) {
+    return(list())
+  }
+  draws <- as_plain_matrix(prep$draws)
+  out <- list()
+  for (group in unique(as.character(ranef$group))) {
+    rows <- ranef[ranef$group == group, , drop = FALSE]
+    old <- attr(ranef, "levels")[[group]]
+    indices <- unlist(lapply(rownames(rows), function(key) {
+      group_index_names(rows[key, , drop = FALSE])
+    }))
+    J <- as.integer(unlist(prep$sdata[indices], use.names = FALSE))
+    new <- sort(unique(J[J > length(old)]))
+    if (length(new) == 0L) next
+    by <- rows$gcall[[1L]]$by
+    # `J` runs over the rows once per term and membership
+    by_level <- if (nzchar(by)) {
+      rep_len(as.character(prep$newdata[[by]]), length(J))[match(new, J)]
+    }
+    out <- c(out, if (identical(sample_new_levels, "gaussian")) {
+      gaussian_level_coefs(draws, rows, length(new), by_level)
+    } else {
+      chosen_level_coefs(draws, rows, old, length(new), by_level,
+                         anew = identical(sample_new_levels, "uncertainty"))
+    })
+  }
+  out
+}
+
+
+#' New levels' coefficients taken from fitted levels
+#'
+#' @param draws Plain `[ndraws x npar]` matrix of the posterior
+#' @param rows The fit's `ranef` rows of one group
+#' @param old The group's fitted levels
+#' @param n_new Number of new levels
+#' @param by_level Each new level's `by` value, or `NULL`
+#' @param anew Whether each draw chooses its own level
+#' @return List of `[ndraws x n_new]` matrices named by row name
+#' @noRd
+chosen_level_coefs <- function(draws, rows, old, n_new, by_level, anew) {
+  checkmate::assert_matrix(draws, mode = "numeric")
+  checkmate::assert_count(n_new, positive = TRUE)
+  checkmate::assert_flag(anew)
+  n_draws <- nrow(draws)
+  choice <- vapply(seq_len(n_new), function(j) {
+    pool <- if (is.null(by_level)) {
+      seq_along(old)
+    } else {
+      which(attr(old, "by") == by_level[j])
+    }
+    pool[sample.int(length(pool), n_draws, TRUE)[
+      if (anew) seq_len(n_draws) else rep(1L, n_draws)
+    ]]
+  }, integer(n_draws))
+  choice <- matrix(choice, n_draws, n_new)
+  lapply(stats::setNames(nm = rownames(rows)), function(key) {
+    row <- rows[key, , drop = FALSE]
+    r <- draw_columns(draws, paste0(
+      "r_", group_term_stem(row), "[", seq_along(old), "]"
+    ))
+    matrix(r[cbind(rep(seq_len(n_draws), n_new), as.vector(choice))],
+           n_draws, n_new)
+  })
+}
+
+
+#' New levels' coefficients from the group's normal distribution
+#'
+#' Each correlation block takes its own SDs and correlations, those of
+#' the new level's `by` value on a group split by one.
+#'
+#' @inheritParams chosen_level_coefs
+#' @return List of `[ndraws x n_new]` matrices named by row name
+#' @noRd
+gaussian_level_coefs <- function(draws, rows, n_new, by_level) {
+  checkmate::assert_matrix(draws, mode = "numeric")
+  checkmate::assert_count(n_new, positive = TRUE)
+  if (!all(rows$dist %in% "gaussian")) {
     stop(insight::format_error(c(
-      paste0("Prediction for a grouping level the model never saw is ",
-             "not supported."),
-      x = paste0("Grouping factor '", group, "' was fitted with ",
-                 n_levels, " level", if (n_levels != 1L) "s",
-                 " and 'newdata' asks for level ", max(J), "."),
-      i = paste0("Use 're_formula = NA' for the population effects or ",
-                 "supply 'newdata' with fitted levels.")
+      "'sample_new_levels = \"gaussian\"' requires gaussian group effects.",
+      x = paste0("Grouping factor '", rows$group[1L], "' is ",
+                 rows$dist[1L], "."),
+      i = "Use 'uncertainty' or 'old_levels'."
     )), call. = FALSE)
   }
-  r <- draw_columns(draws, paste0("r_", stem, "[", seq_len(n_levels), "]"))
-  # A group-level intercept has a design of ones
-  if (all(Z == 1)) {
-    return(r[, J, drop = FALSE])
+  out <- lapply(stats::setNames(nm = rownames(rows)), function(key) {
+    matrix(0, nrow(draws), n_new)
+  })
+  for (id in unique(rows$id)) {
+    block <- rows[rows$id == id, , drop = FALSE]
+    for (j in seq_len(n_new)) {
+      by <- if (!is.null(by_level)) {
+        match(by_level[j], block$bylevels[[1L]])
+      }
+      values <- gaussian_block_draws(draws, block, by)
+      for (k in seq_len(nrow(block))) {
+        out[[rownames(block)[k]]][, j] <- values[, k]
+      }
+    }
   }
-  r[, J, drop = FALSE] * rep(Z, each = nrow(draws))
+  out
+}
+
+
+#' One new level's coefficients for a correlation block
+#'
+#' @param draws Plain `[ndraws x npar]` matrix of the posterior
+#' @param block The fit's `ranef` rows of one correlation block
+#' @param by The position of the level's `by` value, or `NULL`
+#' @return A `[ndraws x nrow(block)]` matrix
+#' @noRd
+gaussian_block_draws <- function(draws, block, by) {
+  checkmate::assert_data_frame(block, min.rows = 1L)
+  checkmate::assert_int(by, lower = 1L, null.ok = TRUE)
+  n_draws <- nrow(draws)
+  size <- nrow(block)
+  id <- block$id[1L]
+  sds <- draw_columns(draws, paste0(
+    "sd_", id, "[", block$cn, if (!is.null(by)) paste0(",", by), "]"
+  ))
+  cors <- paste0("cor_", id, if (!is.null(by)) paste0("_", by), "[",
+                 seq_len(choose(size, 2L)), "]")
+  cors <- if (size > 1L && all(cors %in% colnames(draws))) {
+    draw_columns(draws, cors)
+  } else {
+    matrix(0, n_draws, choose(size, 2L))
+  }
+  cov <- assemble_cov_array(
+    matrix(sds, n_draws, size),
+    assemble_cor_array(cors, size, rownames(block)), rownames(block)
+  )
+  matrix(
+    vapply(seq_len(n_draws), function(d) {
+      as.vector(crossprod(chol(cov[d, , ]), stats::rnorm(size)))
+    }, numeric(size)),
+    n_draws, size, byrow = TRUE
+  )
+}
+
+
+#' The stem naming a group-level term's Stan objects
+#'
+#' @param row One row of the fit's `ranef` table
+#' @param id,cn The term's block and place. The draws take the row's own.
+#'   The Stan data takes `kept_group_terms()`'s.
+#' @return `<id><sfx>_<cn>`
+#' @noRd
+group_term_stem <- function(row, id = row$id, cn = row$cn) {
+  paste0(id, predictor_suffix(blank_if_na(row$resp),
+                              blank_if_na(row$dpar),
+                              blank_if_na(row$nlpar)),
+         "_", cn)
 }
 
 
@@ -673,7 +871,7 @@ group_term_pred <- function(prep, draws, row, predictor) {
 #' `(cs(1) | g)`, is `"cs"`. It shifts an ordinal response's thresholds,
 #' outside the predictor. A special term's varying slope, `(mo(x) | g)`,
 #' is `"sp"`. `special_pred()` adds it with the term. Every other term
-#' is `""`.
+#' is `""`. A multi-membership slope `mmc()` counts among those.
 #'
 #' @inheritParams linear_terms_pred
 #' @param type The kind of term
@@ -698,7 +896,8 @@ group_level_rows <- function(prep, predictor, type = "") {
   ranef[blank_if_na(ranef$resp) == (predictor$resp %||% "") &
           mean_as_blank(ranef$dpar) == mean_as_blank(predictor$dpar %||% "") &
           blank_if_na(ranef$nlpar) == (predictor$nlpar %||% "") &
-          blank_if_na(ranef$type) == type, , drop = FALSE]
+          blank_if_na(ranef$type) %in% c(type, if (type == "") "mmc"),
+        , drop = FALSE]
 }
 
 
@@ -723,9 +922,9 @@ group_level_blocks <- function(prep, predictor, type = "") {
 #'
 #' Each kind of term in the block has its own one-sided formula `form`.
 #' `(mo(x) | g)` holds `~1` for its ordinary terms and `~0 + mo(x)` for
-#' its special ones. A block with ordinary terms lists its special
-#' terms after them. An uncorrelated block, `(1 + x || g)`, has
-#' `cor = FALSE`.
+#' its special ones. A block with ordinary terms lists its special and
+#' `mmc()` terms after them. An uncorrelated block, `(1 + x || g)`, has
+#' `cor = FALSE`. A multi-membership block writes its `mm()` grouping.
 #'
 #' @param block Every row of a fit's `ranef` table sharing one `id`
 #' @return A label such as `"(1 + x | g)"`
@@ -735,19 +934,33 @@ group_block_label <- function(block) {
                           must.include = c("group", "form", "cor", "type"))
   type <- blank_if_na(block$type)
   rhs <- function(kind) deparse1(block$form[[match(kind, type)]][[2L]])
+  after <- function(kind) {
+    if (!kind %in% type) return(NULL)
+    if ("" %in% type) {
+      formula_term_labels(block$form[[match(kind, type)]])
+    } else {
+      rhs(kind)
+    }
+  }
   terms <- c(
     if ("" %in% type) rhs(""),
-    if ("sp" %in% type) {
-      if ("" %in% type) {
-        formula_term_labels(block$form[[match("sp", type)]])
-      } else {
-        rhs("sp")
-      }
-    },
+    after("sp"),
+    after("mmc"),
     if ("cs" %in% type) paste0("cs(", rhs("cs"), ")")
   )
   bar <- if (isTRUE(block$cor[1L])) " | " else " || "
-  paste0("(", paste(terms, collapse = " + "), bar, block$group[1L], ")")
+  group <- block$group[1L]
+  if (identical(block$gtype[1L], "mm")) {
+    call <- block$gcall[[1L]]
+    weights <- call$weights
+    group <- paste0("mm(", paste(c(
+      call$groups,
+      if (inherits(weights, "formula")) {
+        paste0("weights = ", deparse1(weights[[2L]]))
+      }
+    ), collapse = ", "), ")")
+  }
+  paste0("(", paste(terms, collapse = " + "), bar, group, ")")
 }
 
 
@@ -987,10 +1200,11 @@ special_value <- function(prep, draws, predictor, j, n_obs) {
       mo_value(draws, sdata, sfx, m, n_obs)
     }),
     lapply(match(special$calls_me[[j]], prep$me$term), function(k) {
-      me_value(prep, draws, k)
+      latent_once(prep, paste0("Xme_", k), me_value(prep, draws, k))
     }),
-    Map(function(var, idx) mi_value(prep, draws, var, idx, sfx),
-        special$vars_mi[[j]], special$idx2_mi[[j]])
+    lapply(special$vars_mi[[j]], function(var) {
+      latent_once(prep, paste0("Yl_", var), mi_value(prep, draws, var))
+    })
   )
   names(values) <- paste0(".sp", seq_along(values))
   value <- eval(replace_calls(expr, stats::setNames(names(values), calls)),
@@ -1052,19 +1266,20 @@ mo_value <- function(draws, sdata, sfx, m, n_obs) {
 #'
 #' The fit samples some quantities per fitted row or per level, such as
 #' the noise-free value of an `me()` covariate. It keeps those draws
-#' under `save_pars(latent = TRUE)`. A prediction row repeating a
-#' fitted row takes the fit's draws. Every other row takes fresh
-#' values.
+#' under `save_pars(latent = TRUE)`. A prediction row in a fitted unit
+#' takes the fit's draws, moved by `change` where the row changes the
+#' unit's measurement. Every other row takes fresh values.
 #'
 #' @param draws Plain `[ndraws x npar]` matrix of the posterior
 #' @param name The quantity's parameter name, such as `Xme_1`
-#' @param at Integer vector along the rows: the quantity's entry each
-#'   repeated row takes, `NA` for a new row
+#' @param at Integer vector along the rows: the quantity's entry for
+#'   each row in a fitted unit, `NA` for a new unit
+#' @param change What `measurement_change()` gives
 #' @param fresh Function of no arguments returning fresh values, a
 #'   `[ndraws x length(at)]` matrix
 #' @return A `[ndraws x length(at)]` matrix
 #' @noRd
-latent_draws <- function(draws, name, at, fresh) {
+latent_draws <- function(draws, name, at, change, fresh) {
   checkmate::assert_integerish(at, lower = 1L)
   checkmate::assert_function(fresh)
   seen <- !is.na(at)
@@ -1080,18 +1295,76 @@ latent_draws <- function(draws, name, at, fresh) {
   }
   out <- if (all(seen)) matrix(0, nrow(draws), length(at)) else fresh()
   if (any(seen)) {
-    out[, seen] <- draw_columns(draws, latent)[, at[seen], drop = FALSE]
+    moved <- draw_columns(draws, latent)[, at[seen], drop = FALSE]
+    out[, seen] <- sweep(sweep(moved, 2L, change$scale[seen], `*`),
+                         2L, change$shift[seen], `+`)
   }
   out
+}
+
+
+#' How a row's measurement moves its unit's latent value
+#'
+#' A latent value is the measurement plus an error. A row changing the
+#' measurement keeps the error of its unit, in units of the known SD.
+#' The value for a new measurement `x` with SD `s` is then
+#' `x + (latent - x0) * s / s0`, for the fitted `x0` and `s0`.
+#'
+#' @param value,noise The prediction's measurements and their SDs
+#' @param fitted_value,fitted_noise The same in the fitted data
+#' @param home The fitted row of each prediction row, `NA` for a new
+#'   unit
+#' @return List of vectors along `value`: the `scale` multiplying a
+#'   latent draw and the `shift` added to it
+#' @noRd
+measurement_change <- function(value, noise, fitted_value, fitted_noise,
+                               home) {
+  scale <- noise / fitted_noise[home]
+  shift <- value - fitted_value[home] * scale
+  list(scale = replace(scale, is.na(shift), 1),
+       shift = replace(shift, is.na(shift), 0))
+}
+
+
+#' A data expression's value at each fitted row
+#'
+#' The expression sees what the model's formula saw.
+#'
+#' @param prep A `mvgam_prep`
+#' @param expr The expression, such as a term's `sdx`
+#' @return Numeric vector along the rows of the fitted data
+#' @noRd
+row_values <- function(prep, expr) {
+  env <- environment(response_formulas(prep$formula)[[1L]]$formula)
+  rep_len(as.numeric(eval(expr, prep$data, env)), nrow(prep$data))
+}
+
+
+#' A prediction's latent values, drawn once
+#'
+#' A latent value enters every term that uses it. Terms such as
+#' `mi(x) + mi(x):z` and two responses using `x` share one draw.
+#'
+#' @param prep A `mvgam_prep`
+#' @param key The values' name
+#' @param value The values, evaluated at their first use alone
+#' @return The values
+#' @noRd
+latent_once <- function(prep, key, value) {
+  if (is.null(prep$latents[[key]])) {
+    assign(key, value, envir = prep$latents)
+  }
+  prep$latents[[key]]
 }
 
 
 #' The noise-free values of one `me()` covariate at each row
 #'
 #' The fit samples the noise-free value `Xme_<k>` of each row it was
-#' given, or of each level of a grouping factor `gr`, indexed by
-#' `Jme`. A new row draws its value from the observed `Xn_<k>` with
-#' its known SD `noise_<k>`.
+#' given, or of each level of a grouping factor `gr`. A row of a new
+#' unit draws its value from the observed `Xn_<k>` with its known SD
+#' `noise_<k>`. Rows of one new unit share one standard normal error,
+#' which keeps a contrast between them free of that error.
 #'
 #' @inheritParams special_value
 #' @param k The term's number among the model's `me()` terms
@@ -1100,24 +1373,32 @@ latent_draws <- function(draws, name, at, fresh) {
 me_value <- function(prep, draws, k) {
   checkmate::assert_count(k, positive = TRUE)
   sdata <- prep$sdata
-  group <- prep$me$grname[[k]]
-  J <- if (nzchar(group)) {
-    groups <- unique(prep$me$grname[nzchar(prep$me$grname)])
-    as.integer(sdata_entry(sdata, paste0("Jme_", match(group, groups))))
+  spec <- me_call_spec(str2lang(prep$me$term[[k]]))
+  grouped <- !is.na(spec$gr)
+  Xn <- as.numeric(sdata_entry(sdata, paste0("Xn_", k)))
+  noise <- as.numeric(sdata_entry(sdata, paste0("noise_", k)))
+  level <- if (grouped) as.character(prep$newdata[[spec$gr]])
+  home <- if (grouped) {
+    match(level, as.character(prep$data[[spec$gr]]))
+  } else {
+    unit_rows(prep)
   }
-  # A grouped value belongs to the row's level, which the prediction
-  # numbers as the fit does
-  at <- if (is.null(J)) prep$fitted_row else {
-    replace(J, is.na(prep$fitted_row), NA_integer_)
+  at <- if (grouped) {
+    match(level, attr(prep$me, "levels")[[spec$gr]])
+  } else {
+    home
   }
-  latent_draws(draws, paste0("Xme_", k), at, function() {
-    Xn <- as.numeric(sdata_entry(sdata, paste0("Xn_", k)))
+  change <- measurement_change(
+    Xn, noise, row_values(prep, str2lang(spec$var)),
+    row_values(prep, str2lang(spec$sdvar)), home
+  )
+  latent_draws(draws, paste0("Xme_", k), at, change, function() {
+    keys <- level %||% row_keys(prep$units$new, names(prep$units$new))
+    units <- unique(keys)
+    error <- matrix(stats::rnorm(nrow(draws) * length(units)), nrow(draws))
     dims <- c(nrow(draws), length(Xn))
-    noise <- as.numeric(sdata_entry(sdata, paste0("noise_", k)))
-    X <- matrix(stats::rnorm(prod(dims), data2draws(Xn, dims),
-                             data2draws(noise, dims)), dims[1L])
-    # Fresh values follow the levels of the prediction's own data
-    if (is.null(J)) X else X[, as.integer(factor(J)), drop = FALSE]
+    data2draws(Xn, dims) +
+      data2draws(noise, dims) * error[, match(keys, units), drop = FALSE]
   })
 }
 
@@ -1125,48 +1406,53 @@ me_value <- function(prep, draws, k) {
 #' The values one `mi()` variable takes at each of its rows
 #'
 #' The variable is the response of a predictor of its own. Its observed
-#' values fill `Yl`. A row repeating a fitted row whose value was
-#' missing takes that value's imputed draw `Ymi`. A variable observed
-#' with noise samples every value, `Yl`. A new row draws it from the
-#' observed value with its noise, within the variable's bounds.
-#' `mi(x, idx)` takes the rows `idxl` names.
+#' values fill `Yl`. A row of a fitted unit whose value was missing
+#' takes that value's imputed draw `Ymi`. A variable observed with noise
+#' samples every value, `Yl`. A new unit draws it from the observed
+#' value with its noise, within the variable's bounds. A row of a new
+#' unit missing its value takes `prep$impute` of the variable's own
+#' predictor.
 #'
 #' @inheritParams special_value
 #' @param var The key of the variable's response
-#' @param idx The index `mi(x, idx)` takes, or `NA` for none
-#' @return A `[ndraws x n]` matrix, one column per row of the variable
+#' @return A `[ndraws x nrow]` matrix
 #' @noRd
-mi_value <- function(prep, draws, var, idx, sfx) {
+mi_value <- function(prep, draws, var) {
   sdata <- prep$sdata
   Y <- as.numeric(sdata_entry(sdata, paste0("Y_", var)))
   dims <- c(nrow(draws), length(Y))
   noise <- sdata[[paste0("noise_", var)]]
-  column <- form_response_column(response_formulas(prep$formula)[[var]])
-  at <- prep$fitted_row
+  form <- response_formulas(prep$formula)[[var]]
+  column <- form_response_column(form)
+  at <- unit_rows(prep)
+  gaps <- response_gaps(prep$newdata, column)
+  fitted <- prep$data[[column]]
   if (is.null(noise)) {
-    new_gaps <- which(is.na(prep$newdata[[column]]) & is.na(at))
-    if (length(new_gaps) > 0L) {
-      stop(insight::format_error(c(
-        paste0("Prediction at a new row needs a value of '", column, "'."),
-        x = paste0("Missing in 'newdata' rows ",
-                   paste(utils::head(new_gaps, 5L), collapse = ", "),
-                   if (length(new_gaps) > 5L) ", ...", "."),
-        i = "The imputed draws cover the fitted rows alone."
-      )), call. = FALSE)
-    }
+    # A row holding a value of its own uses that value
+    held <- match(replace(at, !gaps, NA_integer_), which(is.na(fitted)))
     Yl <- data2draws(Y, dims)
-    # A repeated fitted row whose value was missing takes its draw
-    k <- match(at, which(is.na(prep$data[[column]])))
-    take <- !is.na(k)
+    take <- !is.na(held)
     if (any(take)) {
-      Yl[, take] <- draw_columns(draws, paste0("Ymi_", var, "[", k[take],
+      Yl[, take] <- draw_columns(draws, paste0("Ymi_", var, "[", held[take],
                                                "]"))
     }
   } else {
     noise <- as.numeric(noise)
-    Yl <- latent_draws(draws, paste0("Yl_", var), at, function() {
+    latent <- paste0("Yl_", var)
+    held <- if (length(param_draw_columns(colnames(draws), latent))) {
+      at
+    } else {
+      rep(NA_integer_, length(at))
+    }
+    change <- measurement_change(
+      Y, noise, fitted,
+      row_values(prep, form_noise(form)),
+      at
+    )
+    measured <- replace(Y, gaps, 0)
+    Yl <- latent_draws(draws, latent, at, change, function() {
       fresh <- function() {
-        stats::rnorm(prod(dims), data2draws(Y, dims),
+        stats::rnorm(prod(dims), data2draws(measured, dims),
                      data2draws(noise, dims))
       }
       apply_truncation(
@@ -1174,14 +1460,17 @@ mi_value <- function(prep, draws, var, idx, sfx) {
         sdata[[paste0("ubmi_", var)]], ntrys = 1L, ndraws = dims[1L],
         nobs = dims[2L], redraw = fresh,
         spec = list(dist = "norm", args = function(i) {
-          list(mean = Y[[i]], sd = noise[[i]])
+          list(mean = measured[[i]], sd = noise[[i]])
         })
       )
     })
   }
-  if (is.na(idx)) return(Yl)
-  rows <- sdata_entry(sdata, paste0("idxl", sfx, "_", var, "_", idx))
-  Yl[, rows, drop = FALSE]
+  new_gaps <- which(gaps & is.na(held))
+  if (length(new_gaps) > 0L) {
+    mu <- linear_terms_pred(prep, draws, find_predictor(prep, var), dims[2L])
+    Yl[, new_gaps] <- prep$impute(var, mu[, new_gaps, drop = FALSE], new_gaps)
+  }
+  Yl
 }
 
 

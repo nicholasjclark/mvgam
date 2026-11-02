@@ -15,7 +15,10 @@
   coef_uncertainty = TRUE,
   trend_uncertainty = TRUE,
   obs_uncertainty = TRUE,
-  resp = NULL
+  resp = NULL,
+  re_formula = NULL,
+  allow_new_levels = FALSE,
+  sample_new_levels = "uncertainty"
 )
 }
 \arguments{
@@ -90,6 +93,10 @@ observation.}
 \item{resp}{Character specifying which response variable for
 multivariate models. NULL (default) returns predictions for all
 responses.}
+
+\item{re_formula, allow_new_levels, sample_new_levels}{As in
+\code{\link[=posterior_epred.mvgam]{posterior_epred.mvgam()}}. A formula applies to the observation and
+the trend formulas alike.}
 }
 \value{
 An object of class \link[=mvgam]{mvgam_forecast-class}.

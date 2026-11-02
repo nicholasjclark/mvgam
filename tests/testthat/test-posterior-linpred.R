@@ -398,6 +398,8 @@ mk_ranef <- function(rows, levels) {
     stringsAsFactors = FALSE
   )
   ranef$form <- rep(list(~1), nrow(ranef))
+  ranef$data_id <- ranef$id
+  ranef$data_cn <- ranef$cn
   attr(ranef, "levels") <- levels
   ranef
 }
@@ -525,24 +527,23 @@ test_that("each formula term's part sums to the linear predictor", {
 })
 
 
-test_that("re_formula takes NULL or NA and refuses a formula", {
-  # brms numbers the group-level terms a formula keeps afresh, and the
-  # fitted draws keep the numbers the whole model gave them. On
-  # `(1 | g) + (0 + x || g)`, `re_formula = ~ (0 + x || g)` writes the
-  # slope's design as block 1, and reading it against the fitted block
-  # 1 pairs the slope's design with the intercept's coefficients.
-  expect_null(validate_group_level_args(NULL, FALSE, "uncertainty"))
-  expect_null(validate_group_level_args(NA, FALSE, "uncertainty"))
-  expect_error(
-    validate_group_level_args(~ (0 + x || g), FALSE, "uncertainty"),
-    "takes NULL or NA"
+test_that("re_formula keeps the terms it names", {
+  # brms numbers the kept slope as block 1 in the data. Its draws keep
+  # block 2.
+  dat <- data.frame(y = 0, x = c(1, 2, 3, 4), g = c("a", "b", "a", "b"))
+  fit <- brms::brm(y ~ 0 + (1 | g) + (0 + x || g), dat, empty = TRUE)
+  pars <- c("r_1_1[1]", "r_1_1[2]", "r_2_1[1]", "r_2_1[2]")
+  draws <- posterior::as_draws_matrix(
+    matrix(c(1, 2, 3, 5), 1L, dimnames = list(NULL, pars))
   )
+  prep <- prepare_linpred_data(draws, fit, dat, re_formula = ~ (0 + x || g))
+  expect_equal(as.numeric(extract_linpred_from_prep(prep)),
+               c(3, 5, 3, 5) * dat$x)
   # brms changes how a new level is sampled only when it is allowed one.
   expect_error(
     validate_group_level_args(NULL, FALSE, "gaussian"),
     "'allow_new_levels' is TRUE"
   )
-  expect_null(validate_group_level_args(NULL, TRUE, "gaussian"))
 })
 
 
@@ -606,6 +607,85 @@ test_that("a monotonic term reads each level as brms codes it", {
                     sdata, "", 1L, 2L)),
     matrix(2 * (0.25 + 0.75), 1L, 2L)
   )
+})
+
+
+test_that("a multi-membership term sums over its memberships", {
+  # Each row weighs its two levels by its own scaled weights. Its slope
+  # takes a covariate per membership.
+  set.seed(6)
+  n <- 8L
+  dat <- data.frame(y = 0, g1 = gl(3L, 1L, n), g2 = gl(3L, 2L, n),
+                    w1 = runif(n), w2 = runif(n), x1 = rnorm(n),
+                    x2 = rnorm(n))
+  fit <- brms::brm(
+    y ~ 1 + (1 + mmc(x1, x2) | mm(g1, g2, weights = cbind(w1, w2))), dat,
+    empty = TRUE
+  )
+  pars <- c("b_Intercept", paste0("r_1_1[", 1:3, "]"),
+            paste0("r_1_2[", 1:3, "]"))
+  draws <- posterior::as_draws_matrix(matrix(
+    runif(2L * length(pars)), 2L, dimnames = list(NULL, pars)
+  ))
+  plain <- as_plain_matrix(draws)
+  prep <- prepare_linpred_data(draws, fit, dat)
+  label <- "(1 + mmc(x1, x2) | mm(g1, g2, weights = cbind(w1, w2)))"
+  part <- linear_terms_parts(prep, plain, prep$predictors[[1L]], n)[[label]]
+  share <- dat$w1 / (dat$w1 + dat$w2)
+  u <- unname(plain[, paste0("r_1_1[", 1:3, "]")])
+  v <- unname(plain[, paste0("r_1_2[", 1:3, "]")])
+  i1 <- as.integer(dat$g1)
+  i2 <- as.integer(dat$g2)
+  expect_equal(
+    part[2L, ],
+    share * (u[2L, i1] + v[2L, i1] * dat$x1) +
+      (1 - share) * (u[2L, i2] + v[2L, i2] * dat$x2)
+  )
+})
+
+
+test_that("a new grouping level takes coefficients as brms draws them", {
+  set.seed(7)
+  dat <- data.frame(y = 0, x = c(1, 2, 3, 2), g = c("a", "b", "c", "a"))
+  fit <- brms::brm(y ~ 0 + (1 + x | g), dat, empty = TRUE)
+  pars <- c(paste0("r_1_1[", 1:3, "]"), paste0("r_1_2[", 1:3, "]"),
+            "sd_1[1]", "sd_1[2]", "cor_1[1]")
+  draws <- posterior::as_draws_matrix(matrix(
+    runif(40L * length(pars), 0.2, 0.9), 40L, dimnames = list(NULL, pars)
+  ))
+  plain <- as_plain_matrix(draws)
+  new <- data.frame(y = 0, x = 1, g = "z")
+  prep_for <- function(rule) {
+    prepare_linpred_data(draws, fit, new, allow_new_levels = TRUE,
+                         sample_new_levels = rule)
+  }
+  coefs <- function(prep) unname(cbind(prep$new_levels[["1"]],
+                                       prep$new_levels[["2"]]))
+  level_of <- function(row, draw) {
+    which(abs(plain[draw, 1:3] - row[1L]) + abs(plain[draw, 4:6] - row[2L]) <
+            1e-12)
+  }
+
+  # Each draw takes both coefficients from one fitted level
+  picked <- coefs(prep_for("uncertainty"))
+  chosen <- vapply(1:40, function(d) level_of(picked[d, ], d), integer(1L))
+  expect_setequal(chosen, 1:3)
+
+  # One fitted level serves every draw
+  picked <- coefs(prep_for("old_levels"))
+  chosen <- vapply(1:40, function(d) level_of(picked[d, ], d), integer(1L))
+  expect_length(unique(chosen), 1L)
+
+  # Each draw takes the group's own covariance
+  set.seed(8)
+  picked <- coefs(prep_for("gaussian"))
+  set.seed(8)
+  z <- matrix(rnorm(80L), 2L)
+  rho <- unname(plain[, "cor_1[1]"])
+  expect_equal(picked[, 1L], unname(plain[, "sd_1[1]"]) * z[1L, ])
+  expect_equal(picked[, 2L],
+               unname(plain[, "sd_1[2]"]) * (rho * z[1L, ] +
+                                       sqrt(1 - rho^2) * z[2L, ]))
 })
 
 
@@ -694,18 +774,24 @@ test_that("special terms compose as brms writes them", {
     linear_terms_parts(prep, plain, find_predictor(prep, "y"), n)[["mi(x)"]],
     take("bsp_y[1]") * x
   )
-  # Reordered rows keep their own draws. A new row needs the value.
+  # Reordered rows keep their own draws.
   prep <- prepare_linpred_data(draws, fit, dat[c(7L, 1L, 2L), ])
   expect_equal(
     linear_terms_parts(prep, plain, find_predictor(prep, "y"), 3L)[["mi(x)"]],
     take("bsp_y[1]") * x[, c(7L, 1L, 2L)]
   )
+  # A missing value at a new row comes from its own predictor
   new <- dat[2L, ]
   new$z <- 9
-  prep <- prepare_linpred_data(draws, fit, new)
-  expect_error(
-    linear_terms_parts(prep, plain, find_predictor(prep, "y"), 1L),
-    "needs a value of 'x'"
+  draws <- draws_for(c("b_y_Intercept", "bsp_y[1]", vec("Ymi_x", 2L),
+                       "b_x_Intercept", "b_x[1]"))
+  plain <- as_plain_matrix(draws)
+  prep <- prepare_linpred_data(
+    draws, fit, new, impute = function(var, mu, rows) mu + 1
+  )
+  expect_equal(
+    linear_terms_parts(prep, plain, find_predictor(prep, "y"), 1L)[["mi(x)"]],
+    take("bsp_y[1]") * matrix(take("b_x_Intercept") + 9 * take("b_x[1]") + 1)
   )
 })
 
@@ -1087,11 +1173,9 @@ test_that("diagnostic_surface_args names the surface as incl_autocor", {
 
 
 test_that("a grouping level the model never saw is named, not indexed", {
-  # brms extends the grouping index under `allow_new_levels = TRUE`,
-  # but no coefficient was ever drawn for the new level. Indexing
-  # past the end of the draws would give `subscript out of bounds`,
-  # an internal message even though `allow_new_levels` is brms's own
-  # documented way to handle this case.
+  # Without `allow_new_levels` no coefficient exists for the new level.
+  # Indexing past the end of the draws would give `subscript out of
+  # bounds`.
   J <- c(1L, 2L, 4L)
   prep <- mk_prep(
     list(Z_1_1 = rep(1, 3), J_1 = J),
@@ -1103,7 +1187,7 @@ test_that("a grouping level the model never saw is named, not indexed", {
   )
   # The message names the factor and the way out.
   expect_error(extract_linpred_from_prep(prep),
-               "grouping level the model never saw")
+               "'allow_new_levels = TRUE'", fixed = TRUE)
   expect_error(extract_linpred_from_prep(prep), "'grp'")
   expect_error(extract_linpred_from_prep(prep), "re_formula = NA",
                fixed = TRUE)

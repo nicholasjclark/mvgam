@@ -63,6 +63,18 @@ find_response.mvgam <- function(x, combine = TRUE, ...) {
 }
 
 
+#' The columns describing an `me()` term's measurement
+#'
+#' @param term The `me()` call as text
+#' @return The variables of its known SD and grouping factor
+#' @noRd
+me_measurement_vars <- function(term) {
+  spec <- me_call_spec(str2lang(term))
+  all.vars(str2lang(paste(stats::na.omit(c(spec$sdvar, spec$gr)),
+                          collapse = " + ")))
+}
+
+
 # The variables one parsed formula contributes, by the part of the
 # model they belong to. brms has already separated them: `fe` holds
 # the parametric terms, `sm` the smooths, `gp` the Gaussian
@@ -90,29 +102,33 @@ mvgam_brmsterms_parts <- function(bt) {
   # A non-linear predictor has no `fe`. Its own terms list parameter
   # names. brms records the covariates those parameters use under
   # `covars`.
+  # An `me()` term's error SD and grouping describe the measurement.
+  # Neither takes a slope.
+  me_terms <- unlist(lapply(dpars, function(d) find_calls(d[["sp"]], "me")))
+  measurement <- unique(unlist(lapply(me_terms, me_measurement_vars)))
   conditional <- setdiff(
     unique(c(from_slot("fe"), from_slot("sm"), from_slot("gp"),
-             from_slot("sp"), from_slot("cs"), from_slot("covars"))),
+             setdiff(from_slot("sp"), measurement), from_slot("cs"),
+             from_slot("covars"))),
     c(offset, names(nlpars))
   )
   # Indexed exactly. A distributional parameter with no group-level
   # term has no `re` entry. `$` would partial-match `re` to `resp` and
   # return a character vector, as though the parameter had one.
-  groups <- unique(unlist(
-    lapply(dpars, function(d) {
-      re <- d[["re"]]
-      if (NROW(re) == 0L) NULL else as.character(re$group)
-    }),
-    use.names = FALSE
-  ))
+  res <- Filter(NROW, lapply(dpars, function(d) d[["re"]]))
+  forms <- unlist(lapply(res, function(re) re$form), recursive = FALSE)
+  gcalls <- unlist(lapply(res, function(re) re$gcall), recursive = FALSE)
+  # A multi-membership term names a level set no column holds. Its
+  # call lists the columns.
+  groups <- unique(unlist(lapply(gcalls, function(call) call$groups),
+                          use.names = FALSE))
   # A covariate whose slope varies by group may appear in no other
-  # term. The design of the group-level term still needs its column.
-  slopes <- unique(unlist(
-    lapply(dpars, function(d) {
-      re <- d[["re"]]
-      if (NROW(re) == 0L) NULL else lapply(re$form, all.vars)
-    }),
-    use.names = FALSE
+  # term, as may a membership weight. The design of the group-level
+  # term still needs its column.
+  slopes <- unique(c(
+    unlist(lapply(forms, all.vars), use.names = FALSE),
+    unlist(lapply(gcalls, function(call) all.vars(call$weightvars)),
+           use.names = FALSE)
   ))
   # The terms as written key the drawn effects. An interaction is one
   # effect over two columns. A smooth of two covariates is one effect
@@ -136,8 +152,8 @@ mvgam_brmsterms_parts <- function(bt) {
     # A `trials()` denominator or a truncation bound is a column the
     # likelihood uses. It is no predictor. brms refuses a grid that
     # lacks it.
-    aterms = unique(unlist(lapply(bt$adforms, all.vars),
-                           use.names = FALSE)),
+    aterms = unique(c(unlist(lapply(bt$adforms, all.vars),
+                             use.names = FALSE), measurement)),
     offset = offset,
     labels = setdiff(labels, names(nlpars)),
     all = all.vars(bt$allvars)

@@ -312,21 +312,37 @@ trend_state_rows <- function(object, newdata, draw_idx, resp = NULL,
 #' @noRd
 latent_trend_parts <- function(object, newdata, draw_idx, resp = NULL) {
   checkmate::assert_class(object, "mvgam")
+  specs <- latent_part_specs(object)
+  values <- lapply(seq_len(nrow(specs)), function(i) {
+    part <- specs$part[i]
+    # A missing factor is the whole state's share
+    share <- if (!is.na(specs$factor[i])) specs$factor[i]
+    if (identical(part, "state")) {
+      return(path_rows(object, newdata, "lv_trend", draw_idx, resp, share))
+    }
+    trend_state_rows(object, newdata, draw_idx, resp, component = part,
+                     factor = share)
+  })
+  stats::setNames(values, specs$label)
+}
+
+
+#' The parts of a fit's latent state
+#'
+#' @param object A fitted `mvgam` object
+#' @return Data frame, one row per part: its `label`, the `part` of the
+#'   state it takes and the `factor` whose share it is, `NA` without
+#'   factors
+#' @noRd
+latent_part_specs <- function(object) {
   components <- additive_paths(trend_components(object))
   n_lv <- detect_factor_n_lv(object,
                              as.integer(object$standata$N_series_trend))
-  factors <- if (is.null(n_lv)) list(NULL) else as.list(seq_len(n_lv))
-  out <- list()
-  for (nm in if (length(components)) components else "state") {
-    for (f in factors) {
-      label <- if (is.null(f)) nm else paste0(nm, " (Factor ", f, ")")
-      out[[label]] <- if (identical(nm, "state")) {
-        path_rows(object, newdata, "lv_trend", draw_idx, resp, f)
-      } else {
-        trend_state_rows(object, newdata, draw_idx, resp, component = nm,
-                         factor = f)
-      }
-    }
-  }
-  out
+  specs <- as.data.frame(tidyr::expand_grid(
+    part = if (length(components)) components else "state",
+    factor = if (is.null(n_lv)) NA_integer_ else seq_len(n_lv)
+  ))
+  specs$label <- ifelse(is.na(specs$factor), specs$part,
+                        paste0(specs$part, " (Factor ", specs$factor, ")"))
+  specs
 }

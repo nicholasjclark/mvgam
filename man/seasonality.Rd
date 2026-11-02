@@ -10,7 +10,15 @@
 \usage{
 seasonality(object, ...)
 
-\method{seasonality}{mvgam}(object, newdata = NULL, ..., ndraws = NULL, draw_ids = NULL)
+\method{seasonality}{mvgam}(
+  object,
+  newdata = NULL,
+  ...,
+  ndraws = NULL,
+  draw_ids = NULL,
+  scale = c("link", "response", "ratio"),
+  resp = NULL
+)
 
 \method{summary}{mvgam_seasonality}(object, probs = c(0.025, 0.975), ...)
 
@@ -38,6 +46,15 @@ series.}
 
 \item{ndraws, draw_ids}{The posterior draws to use, as
 \code{\link[=hindcast.mvgam]{hindcast.mvgam()}} takes them. \code{NULL} for both uses every draw.}
+
+\item{scale}{\code{"link"} (the default) reports the latent season.
+\code{"response"} reports its contribution to the expected value: the
+expected value with the season less the expected value without it.
+\code{"ratio"} reports the first of those over the second. Under a log
+link that ratio is the season's multiplicative effect.}
+
+\item{resp}{The response to report, needed by \code{scale = "response"}
+and \code{scale = "ratio"} on a model with several.}
 
 \item{probs}{Interval probabilities of the tables. Defaults to
 \code{c(0.025, 0.975)}.}
@@ -77,7 +94,8 @@ Lays out the posterior season of an \code{\link[=LLT]{LLT()}} trend by position
 within its period. It reports the size of the seasonal swing and
 where in the period it peaks, cycle by cycle. With \code{newdata} the
 season continues into the forecast horizon. The season is part of
-the latent trend, on the link scale.
+the latent trend, on the link scale. \code{scale} reports it on the scale
+of the expected value.
 }
 \details{
 \emph{Positions}. A position counts steps within one period. Data from
@@ -96,6 +114,12 @@ the season within it. Its peak is the position of the largest
 value. Both are computed draw by draw. A change between the first
 and the last complete cycle then comes with its posterior
 probability.
+
+\emph{Scale}. The expected value comes from the fit's own family, draw by
+draw, with every other part of the predictor at its fitted or
+forecast value. Under a non-linear link the response-scale season
+then moves with the level. Its amplitude can grow while the latent
+season stays fixed.
 
 A trend with several periods, such as \code{LLT(season = c(7, 365.25))},
 reports each period's season separately.
@@ -125,6 +149,9 @@ plot(s, type = "positions")
 
 # How the swing and its peak changed between the first and last year
 summary(s)$change
+
+# The season as a multiple of the expected passenger count
+plot(seasonality(mod, scale = "ratio"))
 }
 
 }

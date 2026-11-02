@@ -738,6 +738,7 @@ test_that("an unknown series is refused, and named", {
 
 test_that("the predictor's parts sum to it: a fixed map's factors", {
   expect_parts_sum(fit, c("state (Factor 1)", "state (Factor 2)"))
+  expect_forecast_parts_sum(fit, c("state (Factor 1)", "state (Factor 2)"))
 })
 
 cat("\nDone.\n")

@@ -262,8 +262,10 @@ mvgam_imputation_forwarded <- c(
 #'
 #' @param formula Main observation model formula (supports brms syntax).
 #'   Smooth specials `s()`, `t2()`, `gp()`, varying intercepts and
-#'   slopes, monotonic `mo()`, measurement-error `me()`, distributional
-#'   `dpar` sub-formulas and `offset()` are all available. `gp()`
+#'   slopes, multi-membership `mm()`, monotonic `mo()`, measurement-error
+#'   `me()`, imputed `mi()`, distributional `dpar` sub-formulas and
+#'   `offset()` are all available. A response leaves rows out by holding
+#'   `NA` there. `subset()` and `index()` are not supported. `gp()`
 #'   accepts both the approximate Hilbert-space form
 #'   (`gp(x, k = 20)`) and the exact full-covariance form
 #'   (`gp(x)`, no `k`). Prediction at `newdata` requires the
@@ -379,8 +381,8 @@ mvgam_imputation_forwarded <- c(
 #'   mixture is identified by. Those are left out by default, as brms
 #'   leaves them out. `save_pars(all = TRUE)` keeps every one. `group`
 #'   and `latent` keep the per-level deviations and the latent values
-#'   of a `me()` covariate. `manual` names individual parameters to
-#'   keep.
+#'   of a `me()` covariate or a `mi()` response with known noise.
+#'   `manual` names individual parameters to keep.
 #' @param ... Further arguments for the model and its sampler.
 #'
 #'   `prior` takes a `brmsprior` built with [brms::prior()]. Its rows

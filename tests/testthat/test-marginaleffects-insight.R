@@ -76,6 +76,23 @@ test_that("find_predictors takes terms from both submodels", {
   expect_setequal(insight::find_predictors(stub)$conditional, c("x1", "x2"))
 })
 
+test_that("special terms and memberships file their columns", {
+  # A prediction grid needs each membership, weight and measurement
+  # column. A slope is taken over the covariate alone.
+  stub <- structure(
+    list(
+      formula = y ~ me(x, sdx, gr = s) +
+        (1 | mm(g1, g2, weights = cbind(w1, w2))),
+      trend_formula = NULL, trend_metadata = NULL
+    ),
+    class = "mvgam"
+  )
+  expect_identical(insight::find_predictors(stub)$conditional, "x")
+  expect_identical(insight::find_random(stub)$random, c("g1", "g2"))
+  expect_setequal(insight::find_predictors(stub)$grid,
+                  c("sdx", "s", "w1", "w2"))
+})
+
 test_that("non-linear sub-formulas give terms and a grouping", {
   # The top-level right-hand side of a non-linear formula names the
   # parameters `a` and `b`. Their sub-formulas hold the covariates.

@@ -1236,6 +1236,7 @@ test_that("per-factor slopes are reported in the identified basis", {
 test_that("the predictor's parts sum to it: by-factor trend terms and factors", {
   expect_parts_sum(fit, c("state (Factor 1)", "state (Factor 2)"),
                    newdata = dat_obs)
+  expect_forecast_parts_sum(fit, c("state (Factor 1)", "state (Factor 2)"))
 })
 
 cat("\nDone.\n")

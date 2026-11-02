@@ -1922,9 +1922,7 @@ complete_simplex_grid <- function(object, newdata,
                   c(vars$series_var, vars$time_var, "visit", "cap",
                     "rowid", resp))
   key <- if (length(held)) {
-    do.call(paste, c(lapply(held, function(v) {
-      as.character(newdata[[v]])
-    }), list(sep = "\r")))
+    row_keys(newdata, held)
   } else {
     rep("1", nrow(newdata))
   }

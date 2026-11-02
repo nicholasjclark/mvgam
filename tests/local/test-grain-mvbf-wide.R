@@ -410,7 +410,8 @@ test_that("the prediction methods refuse an unused argument by name", {
 
   # `alpha` reaches the kernel. `process_error` reaches the prediction
   # method.
-  expect_drawn(pp_check(fit, resp = "count", ndraws = 10L, alpha = 0.5))
+  expect_drawn(pp_check(fit, type = "dens_overlay", resp = "count",
+                        ndraws = 10L, alpha = 0.5))
   expect_drawn(
     pp_check(fit, resp = "count", ndraws = 10L, process_error = FALSE)
   )

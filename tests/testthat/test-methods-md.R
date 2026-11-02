@@ -393,6 +393,19 @@ test_that("each special coefficient renders its own parts", {
     paste0("\\tilde{x}_{g} &\\sim \\text{Normal}\\!\\left(",
            "\\mu^{(\\text{me})}_{x}, \\sigma^{(\\text{me})}_{x}\\right)")
   ))
+
+  # A multi-membership term sums over each observation's memberships
+  dat$g2 <- rev(dat$g)
+  dat$w <- 1
+  mod <- make_methods_md_prefit(
+    y ~ (1 | mm(g, g2)) + (0 + mmc(z, x) | mm(g, g2, weights = cbind(w, w))),
+    data = dat
+  )
+  out <- methods_md(mod)
+  expect_match(out, "\\sum_{m=1}^{2} \\frac{1}{2} \\alpha_{\\mathrm{mmgg2}[i,m]}",
+               fixed = TRUE)
+  expect_match(out, "\\sum_{m=1}^{2} w_{i,t,m} \\beta^{(", fixed = TRUE)
+  expect_match(out, "\\mathrm{mmczx}_{i,t,m}", fixed = TRUE)
 })
 
 test_that("dpar second-formula renders its own linear predictor", {
@@ -793,7 +806,7 @@ test_that("how_to_cite cites each family a model has", {
                     cited(mv)))
   # The paragraph names each response's family and link
   expect_match(how_to_cite(mv)$methods_text,
-               "amount: tweedie with a log link; count: poisson with a log link",
+               "amount: tweedie with the log link; count: poisson with the log link",
                fixed = TRUE)
 })
 
@@ -818,7 +831,7 @@ test_that("how_to_cite cites a prefit's trend", {
   expect_match(hier_cite$methods_text, "exchangeable prior")
   # The paragraph names the trend and its correlated innovations
   expect_match(how_to_cite(mod)$methods_text,
-               "poisson family with a log link. The latent process followed VAR(1) dynamics",
+               "poisson family with the log link. The latent process followed VAR(1) dynamics",
                fixed = TRUE)
   expect_match(hier_cite$methods_text,
                "dynamics with correlated innovations.", fixed = TRUE)
@@ -1257,4 +1270,20 @@ test_that("an unfitted model prints each family by its own name", {
   printed <- capture.output(print(mv))
   expect_true(any(grepl("count: poisson", printed, fixed = TRUE)))
   expect_true(any(grepl("seen: bernoulli", printed, fixed = TRUE)))
+})
+
+
+test_that("me() arguments count as R matches them", {
+  # A grouping factor written by position may follow a named SD
+  for (term in c("me(x, sdx = s, g)", "me(x, g, sdx = s)",
+                 "me(gr = g, s, x = x)")) {
+    expect_identical(
+      mvgam:::me_call_spec(str2lang(term)),
+      list(var = "x", sdvar = "s", gr = "g")
+    )
+    expect_identical(
+      mvgam:::me_call_spec(mvgam:::ungroup_me_terms(str2lang(term))),
+      list(var = "x", sdvar = "s", gr = NA_character_)
+    )
+  }
 })

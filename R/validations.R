@@ -2182,17 +2182,22 @@ validate_obs_formula_brms <- function(formula) {
   # The Stan likelihood includes a `rate()` denominator and an `se()`
   # standard error. Predictions, residuals and log-likelihoods are
   # computed in R from the predictor and the family's parameters. Those
-  # computations would leave both terms out.
-  for (aterm in c("rate", "se")) {
+  # computations would leave both terms out. `subset()` gives a response
+  # rows of its own. `index()` looks those rows up by unit. Neither has
+  # a place on the time and series axes every trend runs over.
+  for (aterm in c("rate", "se", "subset", "index")) {
     if (any(vapply(forms, function(f) {
       !is.null(find_aterm_call(f, aterm))
     }, logical(1L)))) {
       stop(insight::format_error(c(
         paste0("'", aterm, "()' is not supported in the observation ",
                "'formula'."),
-        i = if (aterm == "rate") {
-          "Write the exposure as an offset, as in '+ offset(log(area))'."
-        }
+        i = switch(
+          aterm,
+          rate = paste0("Write the exposure as an offset, as in ",
+                        "'+ offset(log(area))'."),
+          subset = "Set the response to NA on the rows it leaves out."
+        )
       )), call. = FALSE)
     }
   }

@@ -26,8 +26,9 @@ covariate of the model. \code{NULL} (the default) takes the training
 data.}
 
 \item{re_formula}{Group-level terms to include: \code{NULL} (the default)
-for every one, \code{NA} for none. A formula choosing some of them is not
-supported.}
+for every one, \code{NA} for none, or a formula naming the terms to keep,
+such as \code{~ (1 | g)}. A formula applies to the observation and the
+trend formulas alike. Any term it does not name is dropped.}
 
 \item{resp}{Optional name of one response of a multivariate model.}
 

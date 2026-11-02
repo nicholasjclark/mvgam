@@ -31,8 +31,9 @@
 NULL, uses original training data stored in the model object.}
 
 \item{re_formula}{Group-level terms to include: \code{NULL} (the default)
-for every one, \code{NA} for none. A formula choosing some of them is not
-supported.}
+for every one, \code{NA} for none, or a formula naming the terms to keep,
+such as \code{~ (1 | g)}. A formula applies to the observation and the
+trend formulas alike. Any term it does not name is dropped.}
 
 \item{scale}{Character; one of \code{"response"} (default) or \code{"linear"}.
 \code{"response"} returns expected values on the response scale via
@@ -108,15 +109,15 @@ latent trend state the model inferred at each time. Defaults to
 \code{FALSE} with \code{newdata}. Under \code{TRUE} the observed response minus
 the fitted value is the ordinary residual of \code{\link[=residuals.mvgam]{residuals.mvgam()}}.}
 
-\item{allow_new_levels}{Logical; accepted for brms compatibility.
-A grouping level the model never saw is refused whatever this is
-set to. A new level has no fitted random effect. For a new series,
-it has no latent state to propagate. Predict for levels the fit
-knows, or refit with the new levels included.}
+\item{allow_new_levels}{Logical. \code{TRUE} predicts for grouping levels
+the model never saw, with coefficients \code{sample_new_levels} draws.
+A new series stays refused: it has no latent state to propagate.}
 
-\item{sample_new_levels}{Character; accepted for brms
-compatibility. It has no effect, because new levels are refused.
-See \code{allow_new_levels}.}
+\item{sample_new_levels}{How a new level's coefficients are drawn:
+\code{"uncertainty"} (the default) takes those of a fitted level chosen
+in each draw, \code{"old_levels"} those of one fitted level for all
+draws and \code{"gaussian"} draws them from the group's normal
+distribution. Each distributional parameter draws its own.}
 
 \item{...}{Unused. Anything passed here is refused.}
 }

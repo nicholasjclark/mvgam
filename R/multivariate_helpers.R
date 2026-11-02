@@ -71,6 +71,16 @@ form_imputes <- function(form) {
   length(find_calls(form$formula[[2L]], "mi")) > 0L
 }
 
+#' The known noise SD of a response written `y | mi(sdy)`
+#'
+#' @inheritParams form_response_column
+#' @return The SD's expression, or `NULL` for a response without one
+#' @noRd
+form_noise <- function(form) {
+  call <- find_aterm_call(form, "mi")
+  if (length(call) > 1L) call[[2L]]
+}
+
 #' Each response's own formula, keyed as brms keys it
 #'
 #' A multivariate formula holds one `bf()` per response in `$forms`,
@@ -288,6 +298,8 @@ subset_obj_to_response <- function(obj, r) {
   checkmate::assert_string(r)
   out <- obj
   out$methods_md_resp <- r
+  # Each response of a wide frame is one series, indexed by time alone
+  if (is_response_keyed(obj)) out$methods_md_index <- "t"
   out$family <- model_families(obj, r)
   out$formula <- obj$formula$forms[[r]]
   prior <- obj$prior

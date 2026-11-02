@@ -184,18 +184,9 @@ ranef_coef_pars <- function(reframe) {
   if (nrow(reframe) == 0L) {
     return(character(0L))
   }
-  sfx <- vapply(
-    seq_len(nrow(reframe)),
-    function(i) {
-      predictor_suffix(
-        resp = null_if_blank(reframe$resp[i]),
-        dpar = null_if_blank(reframe$dpar[i]),
-        nlpar = null_if_blank(reframe$nlpar[i])
-      )
-    },
-    character(1L)
-  )
-  paste0("r_", reframe$id, sfx, "_", reframe$cn)
+  paste0("r_", vapply(seq_len(nrow(reframe)), function(i) {
+    group_term_stem(reframe[i, , drop = FALSE])
+  }, character(1L)))
 }
 
 

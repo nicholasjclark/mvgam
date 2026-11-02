@@ -63,7 +63,7 @@ test_that("trials() plumbs through to mvgam stancode and standata", {
 
 # mvgam computes predictions and log-likelihoods in R without either
 # term. A fit would report predictions that leave them out.
-test_that("se() and rate() are refused in the observation formula", {
+test_that("addition terms outside the row model are refused", {
   expect_error(
     specials_program(y | se(sex, sigma = TRUE) ~ x, gaussian()),
     "'se\\(\\)' is not supported"
@@ -72,6 +72,14 @@ test_that("se() and rate() are refused in the observation formula", {
     specials_program(ybin | rate(ntrials) ~ x, poisson()),
     "offset\\(log"
   )
+  # A `subset()` response leaves the time and series axes
+  d <- make_specials_data()
+  d$keep <- TRUE
+  d$unit <- seq_len(nrow(d))
+  expect_error(specials_program(y | subset(keep) ~ x, gaussian(), d),
+               "Set the response to NA")
+  expect_error(specials_program(y | index(unit) ~ x, gaussian(), d),
+               "'index\\(\\)' is not supported")
 })
 
 test_that("cens() plumbs through and produces censored-likelihood blocks", {

@@ -33,8 +33,8 @@ through \code{gp()}.
 Some terms describe how the response was observed. They belong in
 the observation formula. A trend formula refuses them:
 \itemize{
-\item addition terms such as \code{weights()}, \code{se()}, \code{cens()},
-\code{trunc()}, \code{trials()}, \code{rate()}, \code{subset()} and \code{thres()}
+\item addition terms such as \code{weights()}, \code{cens()}, \code{trunc()},
+\code{trials()} and \code{thres()}
 \item \code{offset()}
 \item \code{mi()}, which brms imputes as a response of the model
 \item the brms autocorrelation terms \code{ar()}, \code{ma()}, \code{arma()},

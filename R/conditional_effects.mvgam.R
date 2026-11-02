@@ -516,14 +516,25 @@ with_series_grouping <- function(cond, detected, series_var) {
 # Split a single formula term label into a list of variable
 # groupings suitable for plot_predictions(condition = ...). Handles
 # `:` / `*` interactions, smooth wrappers (`s`, `te`, `t2`, `ti`,
-# `gp`, `mo`) and bare terms. For three-variable smooths returns the
-# three pairwise marginal groupings.
+# `gp`), the special terms `mo()`, `me()` and `mi()` and bare terms.
+# For three-variable smooths returns the three pairwise marginal
+# groupings.
 split_term_labels <- function(lab) {
-  if (grepl(":", lab, fixed = TRUE)) {
-    return(list(strsplit(lab, ":", fixed = TRUE)[[1L]]))
-  }
   # A label `terms()` wrote always parses.
   expr <- rlang::parse_expr(lab)
+  parts <- interaction_parts(expr)
+  if (length(parts) > 1L) {
+    return(list(unlist(lapply(parts, function(part) {
+      split_term_labels(deparse1(part))[[1L]]
+    }))))
+  }
+  # A special term's first argument is its covariate
+  if (is.call(expr) && call_head_name(expr) %in% c("mo", "mi")) {
+    return(list(all.vars(expr[[2L]])))
+  }
+  if (is.call(expr) && identical(call_head_name(expr), "me")) {
+    return(list(all.vars(str2lang(me_call_spec(expr)$var))))
+  }
   # `terms()` expands a formula's `a * b` into its main effects and
   # `a:b` before the label arrives here. A `*` that remains belongs to
   # an expression such as `exp(b2 * x)`, which names one covariate.
@@ -535,7 +546,7 @@ split_term_labels <- function(lab) {
     return(list(vapply(as.list(expr)[-1L], deparse, character(1L))))
   }
   if (!is.call(expr) || !is.name(expr[[1L]]) ||
-        !as.character(expr[[1L]]) %in% c(MVGAM_SMOOTH_CALLS, "mo")) {
+        !as.character(expr[[1L]]) %in% MVGAM_SMOOTH_CALLS) {
     return(list(all.vars(expr)))
   }
   # A smooth names its covariates as unnamed arguments and its

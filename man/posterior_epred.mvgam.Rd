@@ -75,18 +75,19 @@ draw indices to use. NULL (default) uses all draws (subject to
 \code{ndraws}).}
 
 \item{re_formula}{Group-level terms to include: \code{NULL} (the default)
-for every one, \code{NA} for none. A formula choosing some of them is not
-supported.}
+for every one, \code{NA} for none, or a formula naming the terms to keep,
+such as \code{~ (1 | g)}. A formula applies to the observation and the
+trend formulas alike. Any term it does not name is dropped.}
 
-\item{allow_new_levels}{Logical; accepted for brms compatibility.
-A grouping level the model never saw is refused whatever this is
-set to. A new level has no fitted random effect. For a new series,
-it has no latent state to propagate. Predict for levels the fit
-knows, or refit with the new levels included.}
+\item{allow_new_levels}{Logical. \code{TRUE} predicts for grouping levels
+the model never saw, with coefficients \code{sample_new_levels} draws.
+A new series stays refused: it has no latent state to propagate.}
 
-\item{sample_new_levels}{Character; accepted for brms
-compatibility. It has no effect, because new levels are refused.
-See \code{allow_new_levels}.}
+\item{sample_new_levels}{How a new level's coefficients are drawn:
+\code{"uncertainty"} (the default) takes those of a fitted level chosen
+in each draw, \code{"old_levels"} those of one fitted level for all
+draws and \code{"gaussian"} draws them from the group's normal
+distribution. Each distributional parameter draws its own.}
 
 \item{resp}{Character specifying which response variable for
 multivariate models. NULL (default) returns predictions for all
@@ -160,6 +161,16 @@ ggplot(simdat$data_train, aes(time, y)) +
 # prediction
 c(fixed = mean(ep),
   innovations = mean(posterior_epred(mod, process_error = TRUE)))
+
+# A site the fit never saw takes the spread of the fitted sites
+train <- simdat$data_train
+train$site <- rep(paste0("site", 1:6), length.out = nrow(train))
+mod_site <- mvgam(y ~ (1 | site), trend_formula = ~ AR(p = 1),
+                  data = train, family = poisson(),
+                  chains = 2, silent = 2)
+new_site <- transform(train[1:3, ], site = "unseen")
+posterior_epred(mod_site, newdata = new_site, allow_new_levels = TRUE,
+                sample_new_levels = "gaussian", ndraws = 3)
 
 # Next: posterior_predict() adds observation noise to these means
 }

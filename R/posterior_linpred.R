@@ -53,19 +53,21 @@ get_combined_linpred <- function(mvgam_fit, newdata,
                                  resp = NULL) {
   trend_state <- match.arg(trend_state)
   has_trend <- has_trend_formula(mvgam_fit)
-
-  obs_linpred <- extract_component_linpred(
-    mvgam_fit = mvgam_fit,
-    newdata = newdata,
-    component = "obs",
-    resp = resp,
-    draw_ids = draw_ids,
-    re_formula = re_formula,
-    allow_new_levels = allow_new_levels,
-    sample_new_levels = sample_new_levels
-  )
+  observation <- function(impute_trend = NULL) {
+    extract_component_linpred(
+      mvgam_fit = mvgam_fit,
+      newdata = newdata,
+      component = "obs",
+      resp = resp,
+      draw_ids = draw_ids,
+      re_formula = re_formula,
+      allow_new_levels = allow_new_levels,
+      sample_new_levels = sample_new_levels,
+      impute_trend = impute_trend
+    )
+  }
   if (!has_trend) {
-    return(obs_linpred)
+    return(observation())
   }
 
   # The conditional surface takes the fitted `trend[t, s]` draws. The
@@ -80,8 +82,13 @@ get_combined_linpred <- function(mvgam_fit, newdata,
   # fit whose series axis is a column of the frame holds one state that
   # every response takes. The function extracts that state once. The
   # process noise below follows the same rule.
-  per_response <- is_response_keyed(mvgam_fit) &&
-    is_per_response(obs_linpred)
+  #
+  # A missing `mi()` value joins the trend of its own response. A call
+  # scoped to one response of a wide fit then holds them all.
+  keys <- names(response_columns(mvgam_fit))
+  imputing <- length(missing_imputed(mvgam_fit, newdata)) > 0L
+  per_response <- is_response_keyed(mvgam_fit) && length(keys) > 1L &&
+    (is.null(resp) || imputing)
   trend_noise <- NULL
   if (identical(trend_state, "conditional")) {
     draw_idx <- resolve_draw_indices(posterior::ndraws(mvgam_fit), NULL,
@@ -90,13 +97,13 @@ get_combined_linpred <- function(mvgam_fit, newdata,
       trend_state_rows(mvgam_fit, newdata, draw_idx, resp = r)
     }
     trend_linpred <- if (per_response) {
-      lapply(stats::setNames(nm = names(obs_linpred)), state_for)
+      lapply(stats::setNames(nm = keys), state_for)
     } else {
       state_for(resp)
     }
     # Every trend writes `trend[t, s]` and every fit keeps it
-    if (is.null(trend_linpred) || any(vapply(trend_linpred, is.null,
-                                             logical(1L)))) {
+    states <- if (per_response) trend_linpred else list(trend_linpred)
+    if (any(vapply(states, is.null, logical(1L)))) {
       stop_mvgam_fault(
         "A fit with a trend must hold the fitted 'trend[t, s]' draws.",
         "The conditional surface is built from the fitted trend."
@@ -120,21 +127,25 @@ get_combined_linpred <- function(mvgam_fit, newdata,
                          has_stochastic_trend(mvgam_fit)) {
       sample_process_errors(
         mvgam_fit, newdata = newdata, draw_ids = draw_ids,
-        resp = if (per_response) names(obs_linpred) else resp
+        resp = if (per_response) keys else resp
       )
     }
   }
 
+  # The trend and its noise each arrive as one matrix or as one per
+  # response. One matrix serves every response. The marginal surface
+  # of a wide fit gives that for the deterministic part. The trend
+  # design of a wide frame runs at time grain. A covariate column
+  # there holds one value per time. A list holds each response's own
+  # trend, as the conditional state and a wide frame's noise do.
+  own <- function(x, r) {
+    if (is_per_response(x)) x[[r]] else x
+  }
+  obs_linpred <- observation(if (imputing) {
+    function(var) own(trend_linpred, var) + (own(trend_noise, var) %||% 0)
+  })
+
   if (is_per_response(obs_linpred)) {
-    # The trend and its noise each arrive as one matrix or as one per
-    # response. One matrix serves every response. The marginal surface
-    # of a wide fit gives that for the deterministic part. The trend
-    # design of a wide frame runs at time grain. A covariate column
-    # there holds one value per time. A list holds each response's own
-    # trend, as the conditional state and a wide frame's noise do.
-    own <- function(x, r) {
-      if (is_per_response(x)) x[[r]] else x
-    }
     return(lapply(stats::setNames(nm = names(obs_linpred)), function(r) {
       compose_linpred_with_noise(
         obs_mat = obs_linpred[[r]], trend_mat = own(trend_linpred, r),
@@ -143,8 +154,8 @@ get_combined_linpred <- function(mvgam_fit, newdata,
     }))
   }
   compose_linpred_with_noise(
-    obs_mat = obs_linpred, trend_mat = trend_linpred,
-    trend_noise = trend_noise, resp_name = NULL
+    obs_mat = obs_linpred, trend_mat = own(trend_linpred, resp),
+    trend_noise = own(trend_noise, resp), resp_name = NULL
   )
 }
 

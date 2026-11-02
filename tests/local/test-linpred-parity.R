@@ -128,27 +128,18 @@ for (nm in names(fits)) {
 
   test_that(paste0(nm, ": every predictor is brms's own"), {
     for (re_formula in list(NULL, NA)) {
-      gaps <- predictor_gap(fit, fit$data, re_formula)
-      expect_true(length(gaps) > 0L)
-      expect_lt(max(gaps), 1e-8)
+      expect_lt(max(predictor_gap(fit, fit$data, re_formula)), 1e-8)
     }
   })
 }
 
 
-test_that("a formula choosing some group-level terms is refused", {
-  # brms numbers the terms such a formula keeps afresh, and the fitted
-  # draws keep the whole model's numbers. A formula is refused on every
-  # fit, including one where the two numberings happen to agree.
-  expect_error(
-    posterior_epred(fits$uni, draw_ids = ids, re_formula = ~ (1 | g)),
-    "takes NULL or NA"
-  )
-  expect_error(
-    posterior_linpred(fits$mv, draw_ids = ids, resp = "y2",
-                      re_formula = ~ (1 | g)),
-    "takes NULL or NA"
-  )
+test_that("a formula keeps its terms under a parameter's or response's name", {
+  # Keeping `(1 | g)` drops the slope from the mean of `uni` and of `mv`,
+  # while the terms keep their own draws
+  for (fit in fits[c("uni", "mv")]) {
+    expect_lt(max(predictor_gap(fit, fit$data, ~ (1 | g))), 1e-8)
+  }
 })
 
 
@@ -262,7 +253,12 @@ test_that("the mean and the likelihood follow the predictors", {
 test_that("the predictor's parts sum to it: trend formula terms and state", {
   for (nm in c("trend", "trend_intercept")) {
     expect_parts_sum(fits[[nm]], "state")
+    expect_forecast_parts_sum(fits[[nm]], "state")
   }
+})
+
+test_that("a trendless forecast's parts are its observation terms", {
+  expect_forecast_parts_sum(fits$smooths, NULL)
 })
 
 test_that("each part's response-scale share uses the fit's expectation", {

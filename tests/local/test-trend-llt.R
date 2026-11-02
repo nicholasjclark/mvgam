@@ -809,6 +809,42 @@ test_that("the predictor's parts sum to it: the LLT level and season", {
                             "season (Factor 1)", "season (Factor 2)"))
 })
 
+test_that("the forecast's parts sum to it: the LLT level and season", {
+  expect_forecast_parts_sum(fit_f, c("level", "season"))
+  expect_forecast_parts_sum(fit_g, c("level (Factor 1)", "level (Factor 2)",
+                                     "season (Factor 1)", "season (Factor 2)"))
+})
+
+test_that("seasonality() reports the season on the expected value", {
+  # Under a log link the ratio is the exponential of the latent season,
+  # at the fitted times and over the forecast. The forecast's trend and
+  # predictor take one set of innovations, which makes the ratio exact.
+  ids <- 1:20
+  rows <- future_rows(fit_f, 12L)
+  draws <- function(scale) {
+    set.seed(71L)
+    seasonality(fit_f, newdata = rows, draw_ids = ids, scale = scale)$seasons
+  }
+  link <- draws("link")$season
+  ratio <- draws("ratio")$season
+  response <- draws("response")$season
+  for (s in names(link)) {
+    expect_equal(ratio[[s]], exp(link[[s]]), ignore_attr = TRUE)
+  }
+  # The contribution is the expectation less the same without the season
+  fitted <- get_epred_parts(fit_f, fit_f$data[fit_f$data$series == "s1", ],
+                            draw_ids = ids)
+  expect_equal(response$s1[, seq_len(ncol(fitted$latent$season))],
+               fitted$latent$season, ignore_attr = TRUE, tolerance = 1e-5)
+  # A period of its own takes its own season
+  two <- seasonality(fit_g, draw_ids = ids, scale = "ratio")
+  latent <- seasonality(fit_g, draw_ids = ids)
+  for (p in names(two$seasons)) {
+    expect_equal(two$seasons[[p]][[1L]], exp(latent$seasons[[p]][[1L]]),
+                 ignore_attr = TRUE)
+  }
+})
+
 test_that("each part's response-scale share is the fit's own: poisson LLT", {
   expect_epred_parts(fit_b, exp)
   expect_epred_parts(fit_g, exp)

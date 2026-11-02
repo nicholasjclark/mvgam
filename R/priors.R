@@ -1498,8 +1498,8 @@ get_trend_parameter_prior <- function(prior = NULL, param_name,
 #' Some terms describe how the response was observed. They belong in
 #' the observation formula. A trend formula refuses them:
 #' \itemize{
-#'   \item addition terms such as `weights()`, `se()`, `cens()`,
-#'     `trunc()`, `trials()`, `rate()`, `subset()` and `thres()`
+#'   \item addition terms such as `weights()`, `cens()`, `trunc()`,
+#'     `trials()` and `thres()`
 #'   \item `offset()`
 #'   \item `mi()`, which brms imputes as a response of the model
 #'   \item the brms autocorrelation terms `ar()`, `ma()`, `arma()`,

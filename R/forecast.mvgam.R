@@ -60,6 +60,9 @@
 #'   coefficients), the last fitted state and the trend formula's
 #'   predictor at that same draw. Each draw still takes new
 #'   innovations. The spread then shows innovation noise alone.
+#' @param re_formula,allow_new_levels,sample_new_levels As in
+#'   [posterior_epred.mvgam()]. A formula applies to the observation and
+#'   the trend formulas alike.
 #' @param obs_uncertainty Logical, `TRUE` by default. `FALSE` returns
 #'   the family's mean under `type = "response"`, in place of a sampled
 #'   observation.
@@ -122,7 +125,10 @@ forecast.mvgam <- function(object,
                            coef_uncertainty = TRUE,
                            trend_uncertainty = TRUE,
                            obs_uncertainty = TRUE,
-                           resp = NULL) {
+                           resp = NULL,
+                           re_formula = NULL,
+                           allow_new_levels = FALSE,
+                           sample_new_levels = "uncertainty") {
   checkmate::assert_class(object, "mvgam")
   require_fitted_model(object, "forecast")
   require_series_axis(object, "forecast")
@@ -130,7 +136,6 @@ forecast.mvgam <- function(object,
   # `...` and leave its default in force.
   rlang::check_dots_empty()
   type <- match.arg(type)
-  validate_draw_selectors(ndraws, draw_ids)
   checkmate::assert_flag(coef_uncertainty)
   checkmate::assert_flag(trend_uncertainty)
   checkmate::assert_flag(obs_uncertainty)
@@ -139,55 +144,14 @@ forecast.mvgam <- function(object,
   if (!is.null(fan)) {
     return(fan)
   }
-  newdata <- ensure_obs_placeholder(
-    jsdgam_axis_columns(object, newdata %||% object$test_data), object
-  )
-
-  trend_specs <- object$mv_spec$trend_specs
-  # A trendless fit forecasts its observation predictor at the new
-  # occasions. With no latent state, `type = "trend"` names nothing.
-  is_trendless <- is.null(trend_specs)
-  if (is_trendless && identical(type, "trend")) {
-    stop(insight::format_error(c(
-      "'type = \"trend\"' is not defined for trendless fits.",
-      i = paste0("Use 'type = \"link\"', 'type = \"expected\"' ",
-                 "or 'type = \"response\"' (the default).")
-    )), call. = FALSE)
-  }
+  setup <- forecast_setup(object, newdata, type, resp, ndraws, draw_ids,
+                          re_formula, allow_new_levels, sample_new_levels)
   component <- resolve_trend_component(object, component, type)
-  # The trend-type guard below refuses anything unsupported
-  trend_model <- if (is_trendless) NULL else trend_spec_head(trend_specs)
-  meta <- if (is_trendless) NULL else object$trend_metadata
-
-  # The horizon comes from the caller's frame or the held-out data
-  # stored at fit time. A fit cannot invent occasions. Every
-  # covariate the model uses must be in that frame.
-  if (is.null(newdata)) {
-    stop(insight::format_error(c(
-      "'newdata' is required to forecast.",
-      x = "The fit stores no held-out data from 'mvgam(newdata = )'.",
-      i = paste0("Pass a frame with times after the training grid and ",
-                 "every covariate the model uses."),
-      i = "For the training occasions, use 'hindcast()'."
-    )), call. = FALSE)
-  }
-
-  series_levels <- fitted_series_levels(object)
-  reported <- reported_series(object, resp, series_levels)
-
-  draw_idx <- resolve_draw_indices(posterior::ndraws(object), ndraws,
-                                   draw_ids)
-
-  training <- build_training_arms(object, series_levels, resp = resp)
-  fc_grid <- resolve_forecast_grid(object, newdata, training,
-                                     series_levels, resp = resp)
-
-  # A discrete-time trend takes one step per forecast row. The
-  # propagator cannot tell a gap from a shorter horizon. The rows
-  # are checked here.
-  if (!is.null(fc_grid)) {
-    assert_forecast_times_steppable(fc_grid$times, object)
-  }
+  is_trendless <- is.null(setup$trend_model)
+  draw_idx <- setup$draw_idx
+  training <- setup$training
+  fc_grid <- setup$fc_grid
+  reported <- setup$reported
 
   # The hindcast slot holds the fitted states, as hindcast() does with
   # `process_error = FALSE`. The two then agree on the training grid.
@@ -207,13 +171,14 @@ forecast.mvgam <- function(object,
       draw_idx = draw_idx,
       obs_uncertainty = obs_uncertainty,
       series_levels = reported,
-      resp = resp
+      resp = resp,
+      group_level = setup$group_level
     )
   } else {
     build_forecast_arms(
       object = object,
-      trend_model = trend_model,
-      meta = meta,
+      trend_model = setup$trend_model,
+      meta = object$trend_metadata,
       training = training,
       fc_grid = fc_grid,
       type = type,
@@ -222,10 +187,11 @@ forecast.mvgam <- function(object,
       coef_uncertainty = coef_uncertainty,
       trend_uncertainty = trend_uncertainty,
       obs_uncertainty = obs_uncertainty,
-      series_levels = series_levels,
+      series_levels = setup$series_levels,
       resp = resp,
       reported = reported,
-      component = component
+      component = component,
+      group_level = setup$group_level
     )
   }
 
@@ -239,6 +205,130 @@ forecast.mvgam <- function(object,
     object, type, resp, reported, training,
     hindcasts = hindcasts, forecasts = forecasts, fc_grid = fc_grid,
     family_pars = family_pars, component = component
+  )
+}
+
+
+#' What a forecast and its parts share before any draw is taken
+#'
+#' @param object A fitted `mvgam` object
+#' @param newdata The caller's frame, or `NULL` for the held-out data
+#' @param type The prediction type
+#' @param resp A response name, or NULL
+#' @param ndraws,draw_ids The draws to take
+#' @param re_formula,allow_new_levels,sample_new_levels As
+#'   `validate_group_level_args()` takes them
+#' @return List of `trend_model`, `NULL` for a trendless fit,
+#'   `series_levels`, `reported`, `draw_idx`, `training`, `fc_grid` and
+#'   `group_level`, the last three arguments as one list
+#' @noRd
+forecast_setup <- function(object, newdata, type, resp, ndraws, draw_ids,
+                           re_formula, allow_new_levels, sample_new_levels) {
+  validate_draw_selectors(ndraws, draw_ids)
+  validate_group_level_args(re_formula, allow_new_levels, sample_new_levels)
+  newdata <- ensure_obs_placeholder(
+    jsdgam_axis_columns(object, newdata %||% object$test_data), object
+  )
+  trend_specs <- object$mv_spec$trend_specs
+  # A trendless fit forecasts its observation predictor at the new
+  # occasions. With no latent state, `type = "trend"` names nothing.
+  if (is.null(trend_specs) && identical(type, "trend")) {
+    stop(insight::format_error(c(
+      "'type = \"trend\"' is not defined for trendless fits.",
+      i = paste0("Use 'type = \"link\"', 'type = \"expected\"' ",
+                 "or 'type = \"response\"' (the default).")
+    )), call. = FALSE)
+  }
+  # The horizon comes from the caller's frame or the held-out data
+  # stored at fit time. A fit cannot invent occasions. Every
+  # covariate the model uses must be in that frame.
+  if (is.null(newdata)) {
+    stop(insight::format_error(c(
+      "'newdata' is required to forecast.",
+      x = "The fit stores no held-out data from 'mvgam(newdata = )'.",
+      i = paste0("Pass a frame with times after the training grid and ",
+                 "every covariate the model uses."),
+      i = "For the training occasions, use 'hindcast()'."
+    )), call. = FALSE)
+  }
+  series_levels <- fitted_series_levels(object)
+  training <- build_training_arms(object, series_levels, resp = resp)
+  fc_grid <- resolve_forecast_grid(object, newdata, training,
+                                   series_levels, resp = resp)
+  # A discrete-time trend takes one step per forecast row. The
+  # propagator cannot tell a gap from a shorter horizon. The rows
+  # are checked here.
+  if (!is.null(fc_grid)) {
+    assert_forecast_times_steppable(fc_grid$times, object)
+  }
+  list(
+    # A later guard refuses an unsupported trend
+    trend_model = if (!is.null(trend_specs)) trend_spec_head(trend_specs),
+    series_levels = series_levels,
+    reported = reported_series(object, resp, series_levels),
+    draw_idx = resolve_draw_indices(posterior::ndraws(object), ndraws,
+                                    draw_ids),
+    training = training,
+    fc_grid = fc_grid,
+    group_level = list(re_formula = re_formula,
+                       allow_new_levels = allow_new_levels,
+                       sample_new_levels = sample_new_levels)
+  )
+}
+
+
+#' Each part of the forecast link predictor
+#'
+#' The forecast's own parts: the observation terms and the trend terms
+#' at the future rows, with the latent state from the propagated paths.
+#' Each part of `latent_part_specs()` takes one path per draw. Within
+#' each draw and series the parts sum to `forecast(type = "link")`.
+#' An ordinal response's threshold shifts stay outside the predictor.
+#'
+#' @inheritParams forecast.mvgam
+#' @return A list of `obs`, `trend` and `latent`, each a named list of
+#'   parts, each part a list of `[ndraws x h]` matrices named by series.
+#'   A fit without a trend leaves `trend` and `latent` empty. A
+#'   multivariate model with `resp = NULL` gives one such list per
+#'   response.
+#' @noRd
+get_forecast_parts <- function(object, newdata = NULL, ndraws = NULL,
+                               draw_ids = NULL, coef_uncertainty = TRUE,
+                               trend_uncertainty = TRUE, resp = NULL,
+                               re_formula = NULL, allow_new_levels = FALSE,
+                               sample_new_levels = "uncertainty") {
+  checkmate::assert_class(object, "mvgam")
+  require_fitted_model(object, "forecast")
+  require_series_axis(object, "forecast")
+  checkmate::assert_flag(coef_uncertainty)
+  checkmate::assert_flag(trend_uncertainty)
+  fan <- mv_resp_fan_out(object, resp)
+  if (!is.null(fan)) {
+    return(fan)
+  }
+  setup <- forecast_setup(object, newdata, "link", resp, ndraws, draw_ids,
+                          re_formula, allow_new_levels, sample_new_levels)
+  if (is.null(setup$fc_grid)) {
+    stop(insight::format_error(c(
+      "Forecast parts need rows after the training grid.",
+      i = "Pass a frame holding future times in 'newdata'."
+    )), call. = FALSE)
+  }
+  if (is.null(setup$trend_model)) {
+    return(build_trendless_forecast_arms(
+      object, setup$fc_grid, "link", setup$draw_idx, TRUE, setup$reported,
+      resp, setup$group_level, parts = TRUE
+    ))
+  }
+  build_forecast_arms(
+    object = object, trend_model = setup$trend_model,
+    meta = object$trend_metadata, training = setup$training,
+    fc_grid = setup$fc_grid, type = "link",
+    draws_mat = forecast_draws(object, setup$draw_idx),
+    draw_idx = setup$draw_idx, coef_uncertainty = coef_uncertainty,
+    trend_uncertainty = trend_uncertainty, obs_uncertainty = TRUE,
+    series_levels = setup$series_levels, resp = resp,
+    reported = setup$reported, group_level = setup$group_level, parts = TRUE
   )
 }
 
@@ -893,26 +983,43 @@ predictor_for_type <- function(type, sample_family) {
 #'   family
 #' @param series_levels The series to report
 #' @param resp A response name, or NULL
+#' @param group_level List of `re_formula`, `allow_new_levels` and
+#'   `sample_new_levels`
+#' @param parts Whether to return the parts `get_forecast_parts()`
+#'   gives, in place of their sum
 #' @return Named list of draws matrices, one per series
 #' @noRd
 build_trendless_forecast_arms <- function(object, fc_grid, type,
                                           draw_idx,
                                           obs_uncertainty,
                                           series_levels,
-                                          resp = NULL) {
+                                          resp = NULL,
+                                          group_level = list(),
+                                          parts = FALSE) {
   checkmate::assert_choice(type, c("link", "expected", "response"))
   checkmate::assert_list(fc_grid)
+  checkmate::assert_flag(parts)
   fc_data <- fc_grid$data
+  structure <- get_observation_structure(object, newdata = fc_data,
+                                         resp = resp)
+  arms_of <- function(mat) {
+    slice_per_series(mat, fc_grid, structure, length(draw_idx), series_levels,
+                     per_row = hindcast_per_row(object, type, resp))
+  }
+  if (parts) {
+    obs <- do.call(extract_component_parts, c(
+      list(mvgam_fit = object, newdata = fc_data, resp = resp,
+           draw_ids = draw_idx),
+      group_level
+    ))
+    return(list(obs = lapply(obs, arms_of), trend = list(), latent = list()))
+  }
   # Scoped to one response, which gives one draws matrix
-  full <- predictor_for_type(type, type == "response" && obs_uncertainty)(
-    object, newdata = fc_data, draw_ids = draw_idx, resp = resp
-  )
-  slice_per_series(
-    full, fc_grid,
-    get_observation_structure(object, newdata = fc_data, resp = resp),
-    length(draw_idx), series_levels,
-    per_row = hindcast_per_row(object, type, resp)
-  )
+  arms_of(do.call(
+    predictor_for_type(type, type == "response" && obs_uncertainty),
+    c(list(object, newdata = fc_data, draw_ids = draw_idx, resp = resp),
+      group_level)
+  ))
 }
 
 
@@ -939,6 +1046,13 @@ build_trendless_forecast_arms <- function(object, fc_grid, type,
 #' @param reported The series to report
 #' @param component State components of the trend, or `NULL` for the
 #'   summed trend. A component needs `type = "trend"`.
+#' @param group_level List of `re_formula`, `allow_new_levels` and
+#'   `sample_new_levels`
+#' @param parts Whether to return the parts `get_forecast_parts()`
+#'   gives, in place of their sum
+#' @param effect_of Function of the whole predictor, the `component` and
+#'   the frame, all in the rows of the grid. It gives the draws to
+#'   return. `NULL` returns the draws of `type`.
 #' @return Named list of draws matrices, one per reported series
 #' @noRd
 build_forecast_arms <- function(object, trend_model, meta,
@@ -950,9 +1064,14 @@ build_forecast_arms <- function(object, trend_model, meta,
                                 series_levels,
                                 resp = NULL,
                                 reported = series_levels,
-                                component = NULL) {
+                                component = NULL,
+                                group_level = list(),
+                                parts = FALSE,
+                                effect_of = NULL) {
   checkmate::assert_list(fc_grid)
   checkmate::assert_integerish(draw_idx, lower = 1L, min.len = 1L)
+  checkmate::assert_flag(parts)
+  checkmate::assert_function(effect_of, null.ok = TRUE)
   checkmate::assert_flag(coef_uncertainty)
   checkmate::assert_flag(trend_uncertainty)
   checkmate::assert_flag(obs_uncertainty)
@@ -984,23 +1103,33 @@ build_forecast_arms <- function(object, trend_model, meta,
     if (coef_uncertainty || is.null(lp)) {
       return(lp)
     }
+    if (is.list(lp)) {
+      return(lapply(lp, pin_coefs))
+    }
     matrix(lp[1L, ], nrow = nrow(lp), ncol = ncol(lp), byrow = TRUE)
   }
-  trend_lp_fc <- pin_coefs(extract_component_linpred(
-    mvgam_fit = object, newdata = fc_grid$data, component = "trend",
-    draw_ids = draw_idx
-  ))
-  trend_lp_tail <- if (!is.null(tail_data)) {
-    pin_coefs(extract_component_linpred(
-      mvgam_fit = object, newdata = tail_data, component = "trend",
-      draw_ids = draw_idx
-    ))
+  component_lp <- function(newdata, component, resp = NULL,
+                           impute_trend = NULL,
+                           extract = extract_component_linpred) {
+    pin_coefs(do.call(extract, c(
+      list(mvgam_fit = object, newdata = newdata, component = component,
+           resp = resp, draw_ids = draw_idx, impute_trend = impute_trend),
+      group_level
+    )))
   }
-  obs_full <- if (type != "trend") {
-    pin_coefs(extract_component_linpred(
-      mvgam_fit = object, newdata = fc_grid$data,
-      component = "obs", resp = resp, draw_ids = draw_idx
-    ))
+  # A random draw such as a new level's coefficients enters once. The
+  # predictor is then the sum of the parts.
+  trend_parts <- if (parts) {
+    component_lp(fc_grid$data, "trend",
+                 extract = extract_component_parts)
+  }
+  trend_lp_fc <- if (parts) {
+    Reduce(`+`, trend_parts, matrix(0, ndraws_use, nobs_fc))
+  } else {
+    component_lp(fc_grid$data, "trend")
+  }
+  trend_lp_tail <- if (!is.null(tail_data)) {
+    component_lp(tail_data, "trend")
   }
 
   # What the trend's kernel takes from the new times, the same in
@@ -1038,6 +1167,17 @@ build_forecast_arms <- function(object, trend_model, meta,
   # `trend_flat[i, j]` is the trend of draw `draw_idx[i]` at row `j`
   # of the forecast grid, in the order of `obs_struct_fc`.
   trend_flat <- matrix(NA_real_, nrow = ndraws_use, ncol = nobs_fc)
+  # A missing `mi()` value joins the trend of its own response
+  imputed <- if (type != "trend") missing_imputed(object, fc_grid$data)
+  imputed_struct <- lapply(stats::setNames(nm = imputed), function(var) {
+    get_observation_structure(object, newdata = fc_grid$data, resp = var)
+  })
+  imputed_trend <- lapply(imputed_struct, function(struct) trend_flat)
+  latent_specs <- if (parts || !is.null(effect_of)) {
+    latent_part_specs(object)
+  }
+  latent_flat <- lapply(stats::setNames(nm = latent_specs$label),
+                        function(label) trend_flat)
   for (i in seq_len(ndraws_use)) {
     d <- if (trend_uncertainty) i else 1L
     # A single factor drops `Z[d, , ]` to a vector. The reshape keeps
@@ -1060,15 +1200,40 @@ build_forecast_arms <- function(object, trend_model, meta,
       context = context,
       Z_slice = Z_slice,
       component = component,
-      components = components
+      components = components,
+      latent_specs = latent_specs
     )
+    for (label in latent_specs$label) {
+      latent_flat[[label]][i, ] <- flatten_grid_to_obs_order(
+        attr(fc_trend, "latent")[[label]], obs_struct_fc
+      )
+    }
     trend_flat[i, ] <- flatten_grid_to_obs_order(fc_trend, obs_struct_fc)
+    for (var in imputed) {
+      imputed_trend[[var]][i, ] <- flatten_grid_to_obs_order(
+        fc_trend, imputed_struct[[var]]
+      )
+    }
   }
 
   if (type == "trend") {
     return(arms_of(trend_flat))
   }
-  eta_full <- obs_full + trend_flat
+  impute_trend <- if (length(imputed)) function(var) imputed_trend[[var]]
+  if (!is.null(effect_of)) {
+    whole <- component_lp(fc_grid$data, "obs", resp, impute_trend) +
+      Reduce(`+`, latent_flat, trend_lp_fc)
+    return(arms_of(effect_of(whole, trend_flat, fc_grid$data)))
+  }
+  if (parts) {
+    obs_parts <- component_lp(fc_grid$data, "obs", resp, impute_trend,
+                              extract_component_parts)
+    return(list(obs = lapply(obs_parts, arms_of),
+                trend = lapply(trend_parts, arms_of),
+                latent = lapply(latent_flat, arms_of)))
+  }
+  eta_full <- component_lp(fc_grid$data, "obs", resp, impute_trend) +
+    trend_flat
   if (type == "link") {
     return(arms_of(eta_full))
   }
@@ -1077,14 +1242,16 @@ build_forecast_arms <- function(object, trend_model, meta,
   # subsample would pair `mu` with a `zi` or `shape` from another
   # draw.
   if (type == "expected" || !obs_uncertainty) {
-    return(arms_of(response_epred(
-      object, eta_full, newdata = fc_grid$data, draw_ids = draw_idx,
-      resp = resp, ordinal = "mean"
-    )))
+    return(arms_of(do.call(response_epred, c(
+      list(object, eta_full, newdata = fc_grid$data, draw_ids = draw_idx,
+           resp = resp, ordinal = "mean"),
+      group_level
+    ))))
   }
-  arms_of(draw_observations(
-    object, eta_full, fc_grid$data, draw_idx, resp = resp
-  ))
+  arms_of(do.call(draw_observations, c(
+    list(object, eta_full, fc_grid$data, draw_idx, resp = resp),
+    group_level
+  )))
 }
 
 
@@ -1119,6 +1286,8 @@ build_forecast_arms <- function(object, trend_model, meta,
 #' @param component State components of the trend, or `NULL` for the
 #'   summed trend
 #' @param components Named list from `trend_components()`
+#' @param latent_specs What `latent_part_specs()` gives, to attach each
+#'   part's grid as the `latent` attribute, or `NULL`
 #' @return Numeric matrix `[h_max, n_series]`
 #' @noRd
 propagate_one_draw <- function(object, trend_model, meta, state, d,
@@ -1126,7 +1295,8 @@ propagate_one_draw <- function(object, trend_model, meta, state, d,
                                trend_lp_tail, trend_lp_fc,
                                obs_struct_tail, obs_struct_fc,
                                context = list(), Z_slice = NULL,
-                               component = NULL, components = list()) {
+                               component = NULL, components = list(),
+                               latent_specs = NULL) {
   checkmate::assert_list(state)
   checkmate::assert_int(d, lower = 1L)
   checkmate::assert_int(h_max, lower = 1L)
@@ -1167,8 +1337,43 @@ propagate_one_draw <- function(object, trend_model, meta, state, d,
     stats::setNames(nm = component_parts(components, component)),
     function(nm) project(paths[[nm]])
   )
-  trend_component_values(project(fc_state) + lp_forecast, parts,
-                         component, components)
+  out <- trend_component_values(project(fc_state) + lp_forecast, parts,
+                                component, components)
+  if (!is.null(latent_specs)) {
+    attr(out, "latent") <- latent_part_grids(
+      fc_state, paths, latent_specs, trend_components(object),
+      if (in_factor_mode) Z_slice
+    )
+  }
+  out
+}
+
+
+#' One draw's forecast latent state by part
+#'
+#' A factor's share is its path projected through that factor's loadings
+#' alone. A fit without factors stores each path by series.
+#'
+#' @param state The draw's propagated state, before any projection
+#' @param paths The propagator's `components` attribute
+#' @param specs What `latent_part_specs()` gives
+#' @param components Named list from `trend_components()`
+#' @param Z The draw's `[n_series, n_lv]` loadings, or `NULL`
+#' @return Named list of `[h, n_series]` matrices
+#' @noRd
+latent_part_grids <- function(state, paths, specs, components, Z) {
+  attr(state, "components") <- NULL
+  grid <- function(part, k) {
+    path <- if (identical(part, "state")) {
+      state
+    } else {
+      trend_component_values(NULL, paths, part, components)
+    }
+    if (is.null(Z)) return(path)
+    Z[, -k] <- 0
+    path %*% t(Z)
+  }
+  stats::setNames(Map(grid, specs$part, specs$factor), specs$label)
 }
 
 

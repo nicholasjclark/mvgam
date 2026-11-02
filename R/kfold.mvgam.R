@@ -443,9 +443,8 @@ aggregate_loglik_by_group <- function(loglik, col_group) {
 #'
 #' The refit goes through `update()` without a `prior` argument. The
 #' refit then inherits the parent's prior table, keeping the Stan code
-#' and the compiled model. Held-out rows are scored with
-#' `re_formula = NA`, dropping group-level effects for levels the refit
-#' never saw.
+#' and the compiled model. A level the refit never saw takes the
+#' coefficients of a fitted level, chosen in each draw.
 #'
 #' @param object Fitted `mvgam` object
 #' @param data Data frame of training data
@@ -475,13 +474,7 @@ refit_score_one_fold <- function(object, data, fold_ids,
 
   refit <- refit_on_held_out(object, train_data, silent)
 
-  # A held-out group may hold grouping levels the refit never saw.
-  # `re_formula = NA` scores it without the group-level effects.
-  held_loglik <- log_lik(
-    refit, newdata = held_data,
-    re_formula = NA,
-    allow_new_levels = TRUE
-  )
+  held_loglik <- log_lik(refit, newdata = held_data, allow_new_levels = TRUE)
   # The groups are mapped at the width `log_lik()` returned and then
   # narrowed with the matrix, as on the full-data path above. A fold
   # with a missing response then scores the rows it observed.

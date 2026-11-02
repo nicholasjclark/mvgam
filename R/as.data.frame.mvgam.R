@@ -267,6 +267,9 @@ mvgam_smooth_aliases <- function(x, raw) {
 #'   special terms' design
 #' * `simo<p>_<i>[m]` becomes `simo<p>_<coef><n>[m]` for the `n`-th
 #'   `mo()` call of a coefficient
+#' * `Xme_<k>[m]` becomes `Xme_<coef>[m]`, indexed by level for a term
+#'   with a grouping factor
+#' * `Ymi_<resp>[m]` takes the data row its missing value belongs to
 #'
 #' A GP label joins `gp`, its covariates, its `by` variable and each
 #' level of a `by` factor. A trend-side name takes `_trend` before its
@@ -279,7 +282,7 @@ mvgam_smooth_aliases <- function(x, raw) {
 mvgam_special_aliases <- function(x, raw) {
   checkmate::assert_class(x, "mvgam")
   checkmate::assert_character(raw)
-  if (!any(grepl("^(sdgp|lscale|zgp|bsp|simo)(_|\\[)", raw))) {
+  if (!any(grepl("^(sdgp|lscale|zgp|bsp|simo|Xme|Ymi)(_|\\[)", raw))) {
     return(character(0L))
   }
   rename_block <- function(old_prefix, new_names, sfx) {
@@ -296,15 +299,34 @@ mvgam_special_aliases <- function(x, raw) {
     }
     stats::setNames(old, paste0(new_names, sfx))
   }
-  rename_vector <- function(old_prefix, new_prefix, sfx) {
+  rename_vector <- function(old_prefix, new_prefix, sfx, labels = NULL) {
     old <- raw[startsWith(raw, paste0(old_prefix, sfx, "["))]
-    stats::setNames(old, paste0(new_prefix, sfx, "[", stan_index(old), "]"))
+    if (length(old) == 0L) {
+      return(character(0L))
+    }
+    index <- as.integer(stan_index(old))
+    stats::setNames(old, paste0(new_prefix, sfx, "[",
+                                if (is.null(labels)) index else labels[index],
+                                "]"))
   }
   out <- character(0L)
   for (side in c("obs", "trend")) {
     model <- side_model(x, side)
     if (is.null(model)) next
     sfx <- if (identical(side, "trend")) "_trend" else ""
+    me <- me_term_frame(model$formula, model$data)
+    for (k in seq_len(nrow(me))) {
+      out <- c(out, rename_vector(
+        paste0("Xme_", k), paste0("Xme_", me$coef[[k]]), sfx,
+        attr(me, "levels")[[me$grname[[k]]]]
+      ))
+    }
+    forms <- response_formulas(model$formula)
+    for (key in names(forms)[vapply(forms, form_imputes, logical(1L))]) {
+      column <- form_response_column(forms[[key]])
+      out <- c(out, rename_vector(paste0("Ymi_", key), paste0("Ymi_", key),
+                                  sfx, which(is.na(model$data[[column]]))))
+    }
     for (lp in model_predictors(model$formula)) {
       p <- lp$suffix
       gp_terms <- brms_gp_terms(lp$pred[["gp"]])
@@ -873,13 +895,11 @@ extract_mvgam_draws <- function(x, variable = NULL, regex = FALSE,
   keep <- user_map[selected]
   drws <- stanfit_draws(x$fit, inc_warmup, pars = unname(keep))
   drws <- posterior::subset_draws(drws, variable = unname(keep))
-  renames <- keep[names(keep) != keep]
-  if (length(renames) > 0L) {
-    drws <- do.call(
-      posterior::rename_variables,
-      c(list(drws), as.list(renames))
-    )
-  }
+  # One assignment renames every variable at once. A name such as
+  # `Ymi_x[2]` may be another variable's old name.
+  posterior::variables(drws) <- names(keep)[
+    match(posterior::variables(drws), keep)
+  ]
   drws
 }
 

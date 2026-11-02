@@ -686,8 +686,7 @@ mvgam_smooth_eta <- function(object, hit, newdata, draw_ids = NULL) {
     brmsfit = side_model(object, hit$side),
     newdata = newdata %||% mvgam_side_data(object, hit$side),
     re_formula = NA,
-    req_vars = setdiff(c(hit$covars, hit$by_var), NA_character_),
-    trend = identical(hit$side, "trend")
+    req_vars = setdiff(c(hit$covars, hit$by_var), NA_character_)
   )
   smooth_pred(
     as_plain_matrix(prep$draws), prep$sdata,

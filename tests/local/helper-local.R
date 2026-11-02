@@ -323,6 +323,47 @@ expect_parts_sum <- function(fit, latent, newdata = fit$data) {
 }
 
 
+# Rows after the training grid, each series keeping its last row's
+# covariates
+#
+# @param fit A fitted mvgam object
+# @param h Number of future times
+future_rows <- function(fit, h = 3L) {
+  time_var <- axis_vars(fit)$time_var
+  last <- fit$data[fit$data[[time_var]] == max(fit$data[[time_var]]), ]
+  do.call(rbind, lapply(seq_len(h), function(k) {
+    last[[time_var]] <- last[[time_var]] + k
+    last
+  }))
+}
+
+
+# The forecast's parts sum to its link predictor, draw by draw. One seed
+# gives both calls one set of innovations.
+#
+# @param fit A fitted mvgam object
+# @param latent The expected names of the latent parts
+# @param newdata Future rows
+expect_forecast_parts_sum <- function(fit, latent,
+                                      newdata = future_rows(fit)) {
+  ids <- 1:10
+  responses <- names(response_columns(fit))
+  for (r in if (length(responses) > 1L) responses else list(NULL)) {
+    set.seed(61L)
+    parts <- get_forecast_parts(fit, newdata, draw_ids = ids, resp = r)
+    set.seed(61L)
+    whole <- forecast(fit, newdata = newdata, type = "link", draw_ids = ids,
+                      resp = r)$forecasts
+    expect_identical(names(parts$latent), latent)
+    for (s in names(whole)) {
+      total <- Reduce(`+`, lapply(c(parts$obs, parts$trend, parts$latent),
+                                  function(part) part[[s]]))
+      expect_equal(total, whole[[s]], ignore_attr = TRUE)
+    }
+  }
+}
+
+
 # The response-scale parts take the fit's own expectation. The
 # expectation from the whole predictor is posterior_epred()'s from the
 # fitted state, an ordinal response's as its expected level. Given

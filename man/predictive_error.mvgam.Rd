@@ -24,8 +24,9 @@
 NULL, uses original training data stored in the model object.}
 
 \item{re_formula}{Group-level terms to include: \code{NULL} (the default)
-for every one, \code{NA} for none. A formula choosing some of them is not
-supported.}
+for every one, \code{NA} for none, or a formula naming the terms to keep,
+such as \code{~ (1 | g)}. A formula applies to the observation and the
+trend formulas alike. Any term it does not name is dropped.}
 
 \item{re.form}{The \pkg{lme4} name for \code{re_formula}.}
 

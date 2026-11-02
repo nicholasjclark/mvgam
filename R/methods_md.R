@@ -155,7 +155,8 @@ render_data_section <- function(obj) {
     paste0(
       "$\\mathbf{Y} = (",
       paste0(responses, collapse = ", "),
-      ")$, observed jointly per (i, t): ",
+      ")$, observed jointly per ",
+      if (is_response_keyed(obj)) "t" else "(i, t)", ": ",
       paste0("$", responses, "$ ", labels, collapse = "; ")
     )
   } else {
@@ -376,6 +377,7 @@ render_model_section <- function(obj) {
   rows <- c(
     index_range_rows(obj),
     likelihood_rows(obj),
+    measured_response_rows(obj),
     unlist(lapply(response_views(obj), term_definition_rows),
            recursive = FALSE),
     sub_predictor_rows(obj),
@@ -385,6 +387,38 @@ render_model_section <- function(obj) {
   )
   paste(c("## Model", "", align_block(rows), "", model_glossary(obj)),
         collapse = "\n")
+}
+
+#' The symbols of each response observed with known noise
+#'
+#' A response written `y | mi(sdy)` models a true value. The data hold
+#' that value's noisy measurement.
+#'
+#' @param obj An `mvgam` object
+#' @return List of `true`, `measured` and `sd` LaTeX symbols, one
+#'   element per such response
+#' @noRd
+measured_response_specs <- function(obj) {
+  noise <- Filter(Negate(is.null), lapply(response_formulas(obj), form_noise))
+  Map(function(key, sd) {
+    tag <- escape_math_text(key)
+    list(true = indexed(obj, tag),
+         measured = indexed(obj, paste0(tag, "^{\\text{obs}}")),
+         sd = indexed(obj, escape_math_text(deparse1(sd))))
+  }, names(noise), noise)
+}
+
+#' The measurement rows of the responses observed with known noise
+#'
+#' @param obj An `mvgam` object
+#' @return List of statements
+#' @noRd
+measured_response_rows <- function(obj) {
+  unname(lapply(measured_response_specs(obj), function(spec) {
+    list(lhs = spec$measured, op = "\\sim",
+         rhs = paste0("\\text{Normal}\\!\\left(", spec$true, ", ", spec$sd,
+                      "\\right)"))
+  }))
 }
 
 #' The likelihood and the link of the mean
@@ -607,8 +641,9 @@ nl_top_linpred_rhs <- function(obj) {
 #' @noRd
 response_mean_symbols <- function(obj) {
   tag <- unname(escape_math_text(names(response_columns(obj))))
-  list(tag = tag, y = paste0(tag, "_{i,t}"),
-       mu = paste0("\\mu^{(", tag, ")}_{i,t}"))
+  index <- index_braces(if (is_response_keyed(obj)) "t" else c("i", "t"))
+  list(tag = tag, y = paste0(tag, "_", index),
+       mu = paste0("\\mu^{(", tag, ")}_", index))
 }
 
 #' One view per response of a multivariate model, or the model
@@ -975,6 +1010,11 @@ term_glossary <- function(obj) {
         ", each with its own hyper-SD"
       } else {
         paste0(" with hyper-SD $", cf$sd, "$")
+      },
+      if (!is.null(s$mm)) {
+        paste0("; $m$ indexes the memberships of each observation, one in ",
+               "each of ", paste0("$", escape_math_text(s$mm$groups), "$",
+                                  collapse = ", "))
       }
     ))
   }
@@ -1018,7 +1058,9 @@ model_glossary <- function(obj) {
   nouns <- axis_nouns(obj)
   defs <- c(
     paste0(
-      "- $i$ indexes ", nouns$series, ", ",
+      "- $i$ indexes ",
+      if (is_response_keyed(obj)) "the responses, each a " else "",
+      nouns$series, ", ",
       if (is_multi_season_family(obj$family)) {
         "$s$ indexes sites, $t$ indexes seasons"
       } else if (!is.null(mv_custom_family_kind(obj))) {
@@ -1030,6 +1072,10 @@ model_glossary <- function(obj) {
     closure_unit_glossary(obj),
     mv_custom_glossary(obj),
     means,
+    vapply(measured_response_specs(obj), function(spec) {
+      gloss(spec$measured, "measurement of $", spec$true,
+            "$ with known SD $", spec$sd, "$")
+    }, character(1L)),
     unlist(lapply(response_views(obj), function(v) {
       c(term_glossary(v), family_glossary(v))
     })),
@@ -2078,7 +2124,8 @@ sp_coef_spec <- function(obj, special, j) {
   })
   mi <- vapply(special$calls_mi[[j]], call_var, character(1L),
                USE.NAMES = FALSE)
-  pieces <- strsplit(special$term[[j]], ":", fixed = TRUE)[[1L]]
+  pieces <- vapply(interaction_parts(str2lang(special$term[[j]])), deparse1,
+                   character(1L))
   is_special <- vapply(pieces, function(p) {
     length(find_calls(str2lang(p), c("mo", "me", "mi"))) > 0L
   }, logical(1L))
@@ -2129,12 +2176,11 @@ sp_coef_spec <- function(obj, special, j) {
 #'   the call names none
 #' @noRd
 me_call_spec <- function(e) {
-  args <- call_args_as_written(e)
-  pos <- args$positional
-  list(var = args$named("x", pos[1L]),
-       sdvar = args$named("sdx",
-                          if (length(pos) >= 2L) pos[[2L]] else NA_character_),
-       gr = args$named("gr", NA_character_))
+  args <- as.list(match.call(brms::me, e))
+  text <- function(name) {
+    if (is.null(args[[name]])) NA_character_ else formula_arg_text(args[[name]])
+  }
+  list(var = text("x"), sdvar = text("sdx"), gr = text("gr"))
 }
 
 #' The latent true covariate of a measurement-error term
@@ -2261,8 +2307,10 @@ basis_label <- function(bs, fname) {
 #' @param obj An `mvgam` object or a view of one predictor
 #' @return List of specs, one per block, holding `group`, `resp` (the
 #'   response key of its prior rows), `cor`, `cs`, `lone` (whether the
-#'   group's one coefficient is its intercept) and `coefs`, a data frame
-#'   of each coefficient's brms `name`, design column `var`, `threshold`
+#'   group's one coefficient is its intercept), `mm` (a multi-membership
+#'   term's count `n`, `groups` and whether it is `weighted`, otherwise
+#'   `NULL`) and `coefs`, a data frame of each coefficient's brms
+#'   `name`, design column `var`, `threshold`
 #'   (`NA` outside a category-specific block), subscript `sub` and the
 #'   LaTeX `covariate` it multiplies (empty for an intercept)
 #' @noRd
@@ -2282,10 +2330,27 @@ obs_re_specs <- function(obj) {
       rows <- blocks[key == k, , drop = FALSE]
       group <- rows$group[[1L]]
       cs <- identical(blank_if_na(rows$type[[1L]]), "cs")
+      gcall <- rows$gcall[[1L]]
+      mm <- if (identical(gcall$type, "mm")) {
+        list(n = length(gcall$groups), groups = gcall$groups,
+             weighted = inherits(gcall$weights, "formula"))
+      }
+      # A membership slope has one column, which takes a covariate per
+      # membership
+      for (r in which(blank_if_na(rows$type) == "mmc")) {
+        name <- brms_rename(formula_term_labels(rows$form[[r]]))
+        special[[name]] <- list(
+          key = escape_math_text(name),
+          value = indexed(obj, escape_math_text(name), "m")
+        )
+      }
       # A special slope takes the coefficient names of its population
       # term, which every special slope has
       var <- unique(unlist(lapply(seq_len(nrow(rows)), function(r) {
         form <- rows$form[[r]]
+        if (identical(blank_if_na(rows$type[[r]]), "mmc")) {
+          return(brms_rename(formula_term_labels(form)))
+        }
         if (!identical(blank_if_na(rows$type[[r]]), "sp")) {
           return(names(design_columns(form, obj$data)))
         }
@@ -2307,7 +2372,7 @@ obs_re_specs <- function(obj) {
       terms <- re_coef_terms(obj, unique(coefs$var), special)
       coefs$sub <- terms$sub[match(coefs$var, terms$var)]
       coefs$covariate <- terms$covariate[match(coefs$var, terms$var)]
-      list(group = group, resp = resp, coefs = coefs,
+      list(group = group, resp = resp, coefs = coefs, mm = mm,
            cor = all(rows$cor) && nrow(coefs) > 1L, cs = cs,
            lone = identical(prior$coef[own & prior$group == group],
                             "Intercept"))
@@ -2381,7 +2446,9 @@ re_coef_symbols <- function(spec, obj = NULL) {
   }
   tag <- function(x) if (is.null(obj)) x else response_symbol(obj, x)
   data.frame(name = cf$name, coef = tag(coef_at(g, k)),
-             coef_i = tag(coef_at(paste0(g, "[i]"), at_c)),
+             coef_i = tag(coef_at(
+               paste0(g, if (is.null(spec$mm)) "[i]" else "[i,m]"), at_c
+             )),
              sd = tag(rep_len(sd, nrow(cf))))
 }
 
@@ -2800,7 +2867,9 @@ render_re_inline <- function(specs, obj) {
 #' The terms one group-level block adds to a predictor
 #'
 #' A category-specific block's coefficients of one covariate are one
-#' term, indexed by the threshold `c`.
+#' term, indexed by the threshold `c`. A multi-membership term sums
+#' over an observation's memberships `m`, each weighted equally unless
+#' the term gives weights.
 #'
 #' @param spec An `obs_re_specs()` spec
 #' @param obj An `mvgam` object or a view of one predictor
@@ -2809,7 +2878,15 @@ render_re_inline <- function(specs, obj) {
 re_inline_terms <- function(spec, obj) {
   covariate <- spec$coefs$covariate
   covariate <- ifelse(nzchar(covariate), paste0(" ", covariate), "")
-  unique(paste0(re_coef_symbols(spec, obj)$coef_i, covariate))
+  terms <- unique(paste0(re_coef_symbols(spec, obj)$coef_i, covariate))
+  mm <- spec$mm
+  if (is.null(mm)) return(terms)
+  weight <- if (mm$weighted) {
+    indexed(obj, "w", "m")
+  } else {
+    paste0("\\frac{1}{", mm$n, "}")
+  }
+  paste0("\\sum_{m=1}^{", mm$n, "} ", weight, " ", terms)
 }
 
 #' The threshold shifts of an ordinal mean's category-specific terms
@@ -2963,7 +3040,13 @@ trend_side_view <- function(obj) {
 #' @noRd
 trend_linpred_terms <- function(obj) {
   if (!has_latent_trend(obj)) return(character(0L))
-  c(if (!trend_mu_on_factors(obj)) trend_mu_symbol(obj), "\\eta_{i,t}")
+  # A wide frame's response takes the state of its own series
+  state <- if (identical(obj$methods_md_index, "t")) {
+    paste0("\\eta_{", escape_math_text(obj$methods_md_resp), ",t}")
+  } else {
+    "\\eta_{i,t}"
+  }
+  c(if (!trend_mu_on_factors(obj)) trend_mu_symbol(obj), state)
 }
 
 #' Whether the trend formula's predictor acts on the latent factors
