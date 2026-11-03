@@ -91,16 +91,21 @@
 #' of a share, which falls with `ndraws` and `n_replicates`.
 #'
 #' @return An object of class `mvgam_forecast_uncertainty`. `print()`
-#'   gives each series' overview. `summary()` returns a list of three
-#'   tibbles: `overview`, one row per series, with the forecast's SD at
-#'   its first and last horizons, the
-#'   `dominant` kind of source at the last horizon with the bootstrap
-#'   `support` for it (the fraction of resamples agreeing) and the
-#'   horizon `changes_at` which the dominant kind first differs from the
-#'   first horizon's;
-#'   `horizons`, the forecast's variance at each horizon; and `sources`, each source's `variance`, `contribution` and
-#'   `share` at each horizon with their interval. `plot()` stacks the
-#'   sources over the horizon. A negative contribution is drawn as zero.
+#'   gives each series' overview. `summary()` takes `probs` and returns
+#'   a list of three tibbles:
+#'   \describe{
+#'     \item{`overview`}{one row per series: the forecast's SD at its
+#'       first and last horizons, the `dominant` kind of source at the
+#'       last horizon, the share of resamples that agree (`support`) and
+#'       the horizon at which the dominant kind first `changes_at`}
+#'     \item{`horizons`}{the forecast's variance at each horizon}
+#'     \item{`sources`}{each source's `variance`, `contribution` and
+#'       `share` at each horizon, the share with its interval}
+#'   }
+#'   `plot()` stacks the sources over the horizon. A negative
+#'   contribution is drawn as zero. The object's `draws` element holds,
+#'   per series, the `[draws, horizons]` matrix of the forecast's mean
+#'   given each draw.
 #'
 #' A list of frames in `newdata` gives an object of class
 #' `mvgam_forecast_scenarios`. `print()` gives each difference at the
@@ -119,44 +124,7 @@
 #'   runs `forecast_uncertainty()` on rodent captures.
 #'
 #' @family forecasting
-#' @examples
-#' \dontrun{
-#' set.seed(21)
-#' simdat <- sim_mvgam(family = poisson(), n_series = 2L,
-#'                     n_timepoints = 120L, trend_model = AR(),
-#'                     proportional_train = 0.8)
-#' mod <- mvgam(
-#'   y ~ 1,
-#'   trend_formula = ~ s(x, k = 5) + AR(p = 1),
-#'   data = simdat$data_train,
-#'   family = poisson(),
-#'   chains = 2,
-#'   silent = 2
-#' )
-#'
-#' # The kind of source that dominates by horizon
-#' fu <- forecast_uncertainty(mod, newdata = simdat$data_test, ndraws = 200)
-#' fu
-#' plot(fu)
-#'
-#' # Fractions of the total, by term
-#' plot(fu, type = "share", by = "source")
-#'
-#' # Two possible futures of the covariate
-#' warmer <- simdat$data_test
-#' warmer$x <- warmer$x + 1
-#' scenarios <- forecast_uncertainty(
-#'   mod,
-#'   newdata = list(current = simdat$data_test, warmer = warmer),
-#'   ndraws = 200
-#' )
-#' scenarios
-#' plot(scenarios)
-#'
-#' # Include observation noise
-#' forecast_uncertainty(mod, newdata = simdat$data_test, ndraws = 200,
-#'                      scale = "response")
-#' }
+#' @inherit forecast.mvgam examples
 #'
 #' @author Nicholas J Clark
 #' @export
@@ -479,20 +447,18 @@ summary.mvgam_forecast_uncertainty <- function(object,
 }
 
 
-#' @param digits Number of decimal places to print. Defaults to `2`.
+#' @param digits Integer number of significant digits. Defaults to 2.
 #' @rdname forecast_uncertainty
 #' @method print mvgam_forecast_uncertainty
 #' @export
 print.mvgam_forecast_uncertainty <- function(x, digits = 2L, ...) {
-  checkmate::assert_count(digits)
-  overview <- forecast_overview(x)
-  cat("Forecast uncertainty by source, ", variance_scale_label(x$scale),
-      ", ", length(x$draw_ids), " draws, ", x$n_replicates, " replicates\n\n",
-      sep = "")
-  numbers <- vapply(overview, is.double, logical(1L))
-  overview[numbers] <- lapply(overview[numbers], round, digits = digits)
-  print(tibble::as_tibble(overview))
-  cat("\nsummary() gives every source at every horizon.\n")
+  cat_titled_table(
+    paste0("Forecast uncertainty by source, ", variance_scale_label(x$scale),
+           ", ", length(x$draw_ids), " draws, ", x$n_replicates,
+           " replicates"),
+    forecast_overview(x), digits,
+    "summary() gives every source at every horizon.", max_rows = 10L
+  )
   invisible(x)
 }
 
@@ -630,18 +596,18 @@ summary.mvgam_forecast_scenarios <- function(object,
 #' @method print mvgam_forecast_scenarios
 #' @export
 print.mvgam_forecast_scenarios <- function(x, digits = 2L, ...) {
-  checkmate::assert_count(digits)
   first <- x$scenarios[[1L]]
   contrasts <- as.data.frame(summary(x)$contrasts)
   last <- contrasts[contrasts$horizon == stats::ave(
     contrasts$horizon, contrasts$series, FUN = max
   ), ]
-  numbers <- c("Q50", "Q2.5", "Q97.5")
-  last[numbers] <- round(last[numbers], digits)
-  cat("Difference between scenarios, ", variance_scale_label(first$scale),
-      ", ", length(first$draw_ids), " draws, last horizon\n\n", sep = "")
-  print(tibble::as_tibble(last[c("contrast", "series", "horizon", numbers)]))
-  cat("\nsummary() gives every horizon.\n")
+  cat_titled_table(
+    paste0("Difference between scenarios, ",
+           variance_scale_label(first$scale), ", ",
+           length(first$draw_ids), " draws, last horizon"),
+    last[c("contrast", "series", "horizon", "Q50", "Q2.5", "Q97.5")],
+    digits, "summary() gives every horizon.", max_rows = 10L
+  )
   invisible(x)
 }
 
@@ -664,14 +630,15 @@ plot.mvgam_forecast_scenarios <- function(x, series = NULL, ...) {
   group <- factor(panel, levels = unique(panel))
   draws <- contrasts$draws[, keep, drop = FALSE]
   set_color_scheme_local()
-  ggplot2::ggplot() +
+  p <- ggplot2::ggplot() +
     mvgam_band_layer(draws, times = keys$horizon,
                      probs = c(0.2, 0.4, 0.6, 0.8), group = group) +
     mvgam_median_layer(draws, times = keys$horizon, group = group) +
     reference_line(yintercept = 0) +
-    mvgam_facet_series() +
     scale_x_steps("Forecast horizon") +
     ggplot2::labs(y = paste0("Difference in ",
                              variance_scale_label(first$scale))) +
     mvgam_theme()
+  if (nlevels(group) > 1L) p <- p + mvgam_facet_series()
+  p
 }

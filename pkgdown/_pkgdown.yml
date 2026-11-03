@@ -300,6 +300,7 @@ reference:
   - plot.mvgam_shared_variation
   - residual_cor
   - variance_partition
+  - community
   - forecast_uncertainty
   - mvgam_residcor-class
   - print.mvgam_residcor

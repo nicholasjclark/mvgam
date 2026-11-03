@@ -296,6 +296,55 @@ zero. A residual correlation may reflect a shared
 response to an unmeasured driver or an interaction between species.
 The model alone cannot tell the two apart.
 
+## The community along a gradient
+
+Ecologists report a community by its richness and the traits of its
+species. To see how canopy cover changes both, `community()` predicts
+every species along a gradient of canopy cover and combines the
+predictions draw by draw. It averages over the latent factors, which
+gives the expected community of a site with that cover:
+
+```{r community, fig.cap = "Posterior median expected richness along canopy cover, with nested 20%, 40%, 60% and 80% credible intervals."}
+canopy <- data.frame(Canopy.cover = seq(-1.5, 1.5, length.out = 25),
+                     Bare.ground = 0, Shrub.cover = 0, site = 1)
+cm <- community(mod_env, newdata = canopy, traits = traits)
+plot(cm)
+```
+
+```{r community-numbers, include = FALSE}
+ends <- c(1L, ncol(cm$richness))
+rich_med <- sprintf("%.1f", apply(cm$richness[, ends], 2, median))
+p_fewer <- sprintf("%.2f", mean(cm$richness[, ends[2]] <
+                                  cm$richness[, ends[1]]))
+shannon <- apply(cm$diversity$`Hill q = 1`, 2, median)
+peak <- canopy$Canopy.cover[which.max(shannon)]
+shannon_med <- sprintf("%.0f", c(max(shannon), shannon[ends[2]]))
+```
+
+Expected richness barely changes, from `r rich_med[1]` species at the
+most open sites to `r rich_med[2]` under the densest canopy. The
+posterior probability that dense canopy holds fewer species is
+`r p_fewer`.
+
+Richness counts species without regard to how common they are. Each
+species weighs into diversity and traits by its expected count. A Hill
+number gives how many equally common species would match the
+community's evenness. Each trait panel gives the trait of an average
+individual ant:
+
+```{r community-diversity, fig.asp = 1, fig.cap = "Hill numbers and abundance-weighted mean traits along canopy cover, with nested 20%, 40%, 60% and 80% credible intervals."}
+plot(cm, type = "diversity")
+```
+
+The exponential of Shannon entropy, the Hill number of order one,
+peaks at `r shannon_med[1]` species near a canopy cover of
+`r sprintf("%.1f", peak)` and falls to `r shannon_med[2]` under the
+densest canopy. Dense canopy keeps a list of species as long as open
+ground does, while a few of them come to dominate the counts.
+
+`plot(cm, type = "cooccurrence")` draws the pairs of species found
+together more or less often than canopy cover predicts.
+
 ## How many factors?
 
 The models so far fixed two factors. A multiplicative gamma process

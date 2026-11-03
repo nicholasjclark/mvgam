@@ -191,6 +191,33 @@ was `r round(min(test$mintemp), 2)`, below the coldest training month at
 `r round(min(train$mintemp, na.rm = TRUE), 2)`. The smooth extrapolates
 there, which widens the forecast.
 
+A forecast also depends on the future of its covariates.
+`forecast_uncertainty()` takes a named list of possible futures.
+Because every future takes the same draws and the same innovations,
+their difference isolates what the covariates change:
+
+```{r scenarios, fig.asp = 0.6, fig.cap = "Difference in the DO forecast's predictor between a future one standard deviation warmer and the observed one, with nested 20%, 40%, 60% and 80% credible intervals."}
+warmer <- test
+warmer$mintemp <- warmer$mintemp + 1
+sc <- forecast_uncertainty(mod_ar, newdata = list(observed = test,
+                                                  warmer = warmer),
+                           ndraws = 500)
+plot(sc, series = "DO")
+```
+
+```{r scenario-numbers, include = FALSE}
+warm <- summary(sc)$contrasts
+warm <- warm[warm$series == "DO", ]
+largest <- warm[which.max(abs(warm$Q50)), ]
+last <- warm[warm$horizon == max(warm$horizon), ]
+fe2 <- function(x) sprintf("%.2f", x)
+```
+
+The median difference at month 12 is `r fe2(last$Q50)`, with a 95%
+interval from `r fe2(last$Q2.5)` to `r fe2(last$Q97.5)`. The largest
+median difference, `r fe2(largest$Q50)`, falls at month
+`r largest$horizon`.
+
 ## Scoring the holdout
 
 `compare_scores()` scores several forecasts with one rule and returns

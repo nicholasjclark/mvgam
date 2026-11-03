@@ -282,7 +282,7 @@ print.mvgam_score <- function(x, digits = 2L, ...) {
                              round(100 * attr(x, "interval_width")),
                              "% interval."))
   }
-  cat_score_table(
+  cat_titled_table(
     paste(score_label(score), "of", nrow(tab) - 1L,
           "forecast series, lower is better"),
     tab, digits, notes
@@ -576,32 +576,4 @@ score_multivariate <- function(object, series_names, score,
     stringsAsFactors = FALSE
   )
   series_score
-}
-
-
-#' Print a table of scores under a title
-#'
-#' Shared by the print methods of `score()` and `compare_scores()`.
-#' Numeric columns print to `digits` significant digits. A missing
-#' cell prints blank.
-#'
-#' @param title Character title line
-#' @param tab Data frame to print
-#' @param digits Integer number of significant digits
-#' @param notes Character vector of lines printed after the table
-#' @return `NULL`, invisibly
-#' @noRd
-cat_score_table <- function(title, tab, digits, notes) {
-  checkmate::assert_string(title)
-  checkmate::assert_data_frame(tab)
-  checkmate::assert_int(digits, lower = 1L)
-  checkmate::assert_character(notes)
-  num <- vapply(tab, is.numeric, logical(1L))
-  tab[num] <- lapply(tab[num], function(v) {
-    ifelse(is.na(v), "", format(signif(v, digits)))
-  })
-  cat(title, "\n\n", sep = "")
-  print(tab, row.names = FALSE, right = FALSE)
-  cat("\n", paste0(notes, "\n"), sep = "")
-  invisible(NULL)
 }

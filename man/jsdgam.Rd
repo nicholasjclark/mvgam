@@ -234,6 +234,18 @@ plot(residual_cor(mod))
 # Site scores and species loadings on the two factors
 ordinate(mod, rotation = "varimax")
 
+# Expected richness along `env`. The second plot marks the pairs of
+# species found together more often than `env` predicts.
+gradient <- datagrid(model = mod, env = seq(-2, 2, length.out = 20))
+cm <- community(mod, newdata = gradient)
+plot(cm)
+plot(cm, type = "cooccurrence")
+
+# The draws, for any contrast: richness at the end of the gradient
+# less that at its start
+rv <- as_draws_rvars(cm)
+rv$richness[20] - rv$richness[1]
+
 # Next, compare n_lv = 1 with update(mod, n_lv = 1L) and loo()
 }
 
@@ -269,8 +281,9 @@ models. \emph{Statistics and Computing}, 34:143.
 \code{\link[=sim_closure_unit_data]{sim_closure_unit_data()}} simulates the \code{occ()} and \code{nmix()}
 case. \code{\link[=residual_cor]{residual_cor()}}, \code{\link[=ordinate]{ordinate()}}, \code{\link[=shared_variation]{shared_variation()}},
 \code{\link[=active_factors]{active_factors()}} and \code{\link[=compare_loadings]{compare_loadings()}} interpret the fitted
-factors. \code{\link[=lv_axis]{lv_axis()}} gives each factor its own covariate effect.
-\code{\link[=how_to_cite]{how_to_cite()}} drafts a methods paragraph for the fit and
+factors. \code{\link[=community]{community()}} gives richness, diversity and
+co-occurrence. \code{\link[=lv_axis]{lv_axis()}} gives each factor its own covariate
+effect. \code{\link[=how_to_cite]{how_to_cite()}} drafts a methods paragraph for the fit and
 \code{\link[=methods_md]{methods_md()}} writes its equations.
 The \href{https://nicholasjclark.github.io/mvgam/dev/articles/jsdgam.html}{JSDM article} fits a negative
 binomial model with a trait-informed loadings prior, ordination

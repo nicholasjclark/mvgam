@@ -173,7 +173,8 @@ hindcast_latent_state <- function(object, ndraws = NULL,
   total_draws <- posterior::ndraws(object)
   draw_idx <- resolve_draw_indices(total_draws, ndraws, draw_ids)
 
-  draws <- posterior_latent_N(object, draw_ids = draw_idx)
+  draws <- posterior_latent_N(object, draw_ids = draw_idx,
+                              incl_autocor = TRUE)
 
   checkmate::assert_matrix(draws, mode = "numeric",
                             any.missing = FALSE,

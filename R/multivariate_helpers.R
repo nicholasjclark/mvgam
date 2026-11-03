@@ -148,6 +148,15 @@ response_rows <- function(x, data) {
   rows
 }
 
+#' The rows of the training data the likelihood of every response covers
+#'
+#' @inheritParams response_columns
+#' @return Data frame
+#' @noRd
+fitted_data <- function(x) {
+  x$data[Reduce(`&`, response_rows(x, x$data)), , drop = FALSE]
+}
+
 #' Refuse a response that no row of the data observes
 #'
 #' @param response The response's column, or its key where the column

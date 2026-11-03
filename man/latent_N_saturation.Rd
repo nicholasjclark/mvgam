@@ -16,7 +16,7 @@ latent_N_saturation(
 \item{object}{A fitted \code{mvgam} with an \code{\link[=nmix]{nmix()}} or \code{\link[=occ]{occ()}} family}
 
 \item{newdata}{Optional \code{data.frame} of visits. \code{NULL} takes the
-training data.}
+training data, whose units take their fitted latent trend.}
 
 \item{threshold}{Number in \verb{[0, 1]}. A unit whose share of draws at
 its cap exceeds \code{threshold} is marked \code{saturated}.}

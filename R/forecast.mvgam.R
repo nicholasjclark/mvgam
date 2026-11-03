@@ -112,6 +112,14 @@
 #'
 #' # The sources of the forecast's variance at each horizon
 #' plot(forecast_uncertainty(mod, ndraws = 200))
+#'
+#' # How a future with higher `x` would change the forecast
+#' higher <- simdat$data_test
+#' higher$x <- higher$x + 1
+#' plot(forecast_uncertainty(
+#'   mod, newdata = list(observed = simdat$data_test, higher = higher),
+#'   ndraws = 200
+#' ))
 #' }
 #'
 #' @importFrom generics forecast

@@ -163,6 +163,8 @@ history:
 visit counts (Royle 2004).
 \item \code{occ()}: the occupancy probability \code{P(z = 1 | y_g)}.
 }
+\code{incl_autocor = TRUE} takes the state from the fitted latent
+trend, which a joint model shares across species.
 \item \code{"detection"}: for \code{nmix()} and \code{occ()}, the per-visit
 detection probability \eqn{p_{g,j}} on the response scale.
 }

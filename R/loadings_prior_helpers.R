@@ -112,14 +112,7 @@ encode_feature_column <- function(x, name) {
     if (is.ordered(x)) {
       return(zscore_matrix(as.numeric(x), name))
     }
-    levs <- levels(x)
-    mat <- vapply(
-      levs,
-      function(lvl) as.numeric(x == lvl),
-      numeric(length(x))
-    )
-    colnames(mat) <- paste0(name, ".", levs)
-    return(mat)
+    return(one_hot_columns(x, name))
   }
   if (is.logical(x)) {
     return(zscore_matrix(as.numeric(x), name))
@@ -137,6 +130,21 @@ encode_feature_column <- function(x, name) {
       "factor, unordered factor, character."
     )
   )))
+}
+
+
+#' One 0 / 1 column per level of a factor
+#'
+#' @param x A factor
+#' @param name The column's name, which prefixes each level
+#' @return Numeric matrix with one row per element of `x`
+#' @noRd
+one_hot_columns <- function(x, name) {
+  checkmate::assert_factor(x)
+  levs <- levels(x)
+  matrix(vapply(levs, function(lvl) as.numeric(x == lvl),
+                numeric(length(x))),
+         nrow = length(x), dimnames = list(NULL, paste0(name, ".", levs)))
 }
 
 

@@ -199,6 +199,16 @@ test_that("scenarios differ by what their covariates change", {
 })
 
 
+test_that("a continuous community counts the species above a threshold", {
+  ids <- 1:6
+  x <- community(fits$G, threshold = 0.5, latent = "zero", draw_ids = ids)
+  lp <- posterior_linpred(fits$G, newdata = x$frame, draw_ids = ids)
+  sigma <- as.vector(as_draws_matrix(fits$G)[ids, "sigma"])
+  expect_equal(x$presence, pnorm(0.5, lp, sigma, lower.tail = FALSE))
+  expect_error(community(fits$G, draw_ids = ids), "needs a 'threshold'")
+})
+
+
 test_that("re_formula refuses a term no formula holds", {
   for (rf in list(~ (1 | g3), ~ (1 + x | g2))) {
     expect_error(posterior_linpred(fits$G, newdata = dat[1:2, ],

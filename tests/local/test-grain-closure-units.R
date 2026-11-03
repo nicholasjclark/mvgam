@@ -1351,6 +1351,27 @@ test_that("jsdgam occ: the detection probability recovers the truth", {
 })
 
 
+test_that("jsdgam occ: a fitted site's occupancy uses its fitted factors", {
+  # By hand: psi from the fitted factors, discounted by every visit
+  # that missed the species at an undetected unit
+  ids <- 1:40
+  fit <- occ_jsdm_fit
+  frame <- closure_unit_frame(fit)
+  arrays <- closure_unit_arrays_for(fit)
+  rows <- closure_unit_row_split(arrays)
+  lp <- posterior_linpred(fit, draw_ids = ids, incl_autocor = TRUE)
+  psi <- plogis(lp[, closure_unit_first_rows(arrays)])
+  p <- as.vector(as_draws_matrix(fit)[ids, "p"])
+  y <- frame[[response_column(fit)]]
+  missed <- vapply(rows, function(r) all(y[r] == 0), logical(1L))
+  visits <- lengths(rows)[missed]
+  miss <- outer((1 - p), visits, `^`)
+  by_hand <- psi[, missed] * miss / (psi[, missed] * miss + 1 - psi[, missed])
+  state <- hindcast(fit, type = "latent_state", draw_ids = ids)$draws
+  expect_equal(unname(state[, missed]), unname(by_hand))
+})
+
+
 test_that("jsdgam occ: the loadings stay at the identified mode", {
   # A closure-unit family carries no simplex constraint, so the
   # loadings are not pinned to sum to zero the way the softmax

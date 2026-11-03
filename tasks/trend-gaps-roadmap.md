@@ -2,33 +2,9 @@
 
 Source: an analysis of monthly referral counts from two sources, which
 fitted `RW()` with drift, `PW()` and a Gaussian process and found each
-wrong in one respect. Correlated `CAR()` and `LLT()` are built.
-
-## 0. Shared foundations
-
-Each is built once, then every consumer reads it, including existing
-methods.
-
-**F4. Derived community quantities per draw.** One function maps
-predictive draws keyed by series (from `posterior_epred()`,
-`predict()`, `hindcast()` or `forecast()`) to a quantity computed
-across series within each draw:
-- richness, the expected number of species present;
-- community-weighted mean traits;
-- pairwise co-occurrence;
-- Hill numbers.
-
-The same function serves a covariate gradient (a `datagrid()` frame)
-and the forecast horizon. Consumers: community gradients, community
-forecasts.
-
-Posterior support comes from `sign_probabilities()` and summaries from
-`median_interval_cols()`. Matrix plots go through `matrix_heatmap()`.
+wrong in one respect.
 
 ## 1. Seasonal forecasting
-
-`seasonality()` gives the profile and per-position plots and the
-amplitude and peak of each cycle, with their change. Remaining:
 
 - **1e. Correlated seasonal shocks under `cor`.** They take the level's
   correlation matrix with their own scales, as the slope shocks do.
@@ -43,21 +19,13 @@ amplitude and peak of each cycle, with their change. Remaining:
 
 ## 4. Joint species distribution models
 
-Other packages: gllvm `VP()`, `predictSR()` richness,
-`predictPairwise()` co-occurrence, `coefplot()`, phylogenetic plots,
-constrained ordination and quadratic optima. Hmsc
-`computeVariancePartitioning()` (with the share of variation in
-species' responses that traits explain), `computeAssociations()` with
-support levels, `plotGradient()` for richness, species and CWM traits
-with posterior support, `plotBeta()` and `plotGamma()` sign-support
-heatmaps, and `evaluateModelFit()` per species. sjSDM splits variation
-into environment, space and associations, with ternary plots of sites
-and species. Only mvgam has dynamic factors, detection-corrected
-occupancy and abundance, VAR interactions and community forecasts.
+Reference points: gllvm `coefplot()`, and Hmsc `plotBeta()` and
+`plotGamma()` sign-support heatmaps, `computeAssociations()` support
+levels and `evaluateModelFit()` per species.
 
-- **4b. Community gradients and forecasts (F4).** Richness, CWM
-  traits and co-occurrence along a covariate gradient and over the
-  forecast horizon, with posterior support for change.
+- **4b. Community forecasts.** `community()` over the forecast
+  horizon, each draw's forecast state propagated with replicates as
+  `forecast_uncertainty()` propagates it.
 - **4c. Sign-support heatmaps.** Species by
   covariate effects, and trait by environment effects for
   `trait_slopes` fits.
@@ -72,8 +40,8 @@ occupancy and abundance, VAR interactions and community forecasts.
 
 ## 2. Sparse level shifts
 
-**2a. Heavy tails exist.** `RW(df = NA)` and `AR(df = NA)` give
-multivariate t innovations. Work: one vignette example. The t shares
+**2a. Heavy-tail example.** One vignette example of `RW(df = NA)` or
+`AR(df = NA)`, which give multivariate t innovations. The t shares
 its scale across series at each time, and a jump in one series loosens
 the others at that time. The example should say so.
 
@@ -115,7 +83,7 @@ dependency and stay out.
 
 ## Order
 
-1. F4, then community gradients and forecasts 4b
+1. Community forecasts 4b
 2. 4c, 4d, 4e, 1e, 4f
 3. Dummy seasonal form 1f
 4. Real-data seasonal check 1g, then 1h

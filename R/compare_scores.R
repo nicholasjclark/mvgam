@@ -461,7 +461,7 @@ print.mvgam_compare_scores <- function(x, digits = 2L, ...) {
                   numeric(1L))
   tab <- data.frame(model = names(means), mean_score = means,
                     difference = means - min(means, na.rm = TRUE))
-  cat_score_table(
+  cat_titled_table(
     paste(score_label(attr(x, "score")), "of", nrow(tab),
           "models, lower is better"),
     tab[order(tab$mean_score), ], digits,

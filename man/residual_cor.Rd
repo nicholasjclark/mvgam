@@ -155,6 +155,7 @@ Regression Analysis of Multivariate Abundance Data in R.
 }
 \seealso{
 \code{\link[=plot.mvgam_residcor]{plot.mvgam_residcor()}} draws the matrix as a heatmap.
+\code{\link[=community]{community()}} gives the same associations as excess co-occurrence.
 \code{\link[=summary.mvgam_residcor]{summary.mvgam_residcor()}} lists the pairs. \code{\link[=ordinate]{ordinate()}} draws the
 loadings as a biplot. The example of \link{trend_constructors} takes
 the correlations of a \code{CAR(cor = TRUE)} trend. The

@@ -1059,5 +1059,4 @@ test_that("the overview ranks kinds", {
   overview <- forecast_overview(x)
   # Term `a` leads alone. Its kind offsets to a third.
   expect_identical(overview$dominant, "process error")
-  expect_identical(overview$support, 1)
 })

@@ -90,6 +90,7 @@
 #' the factor rule above.
 #'
 #' @seealso [plot.mvgam_residcor()] draws the matrix as a heatmap.
+#'   [community()] gives the same associations as excess co-occurrence.
 #'   [summary.mvgam_residcor()] lists the pairs. [ordinate()] draws the
 #'   loadings as a biplot. The example of [trend_constructors] takes
 #'   the correlations of a `CAR(cor = TRUE)` trend. The
@@ -336,6 +337,49 @@ factor_model_draws <- function(object, n_lv, n_series, stationary = TRUE,
     ),
     draws_mat = cov_struct$draws_mat
   )
+}
+
+
+#' The stationary covariance of the trend across every series, per draw
+#'
+#' A factor fit takes its covariance from the loadings, as
+#' `factor_implied_cov_draws()` gives it. A hierarchical fit fills one
+#' block per group from that group's covariance. Series in different
+#' groups are independent. A deterministic trend such as `PW()` has
+#' none. Any other trend takes the covariance its structure carries, a
+#' diagonal one included.
+#'
+#' @param object A fitted `mvgam` object with a trend
+#' @param draw_ids Posterior draws to use, or `NULL` for every draw
+#' @return `[ndraws, n_series, n_series]` covariance draws, in the order
+#'   of the fitted series
+#' @noRd
+trend_series_cov_draws <- function(object, draw_ids = NULL) {
+  n_series <- length(fitted_series_levels(object))
+  n_lv <- detect_factor_n_lv(object)
+  if (!is.null(n_lv)) {
+    return(factor_implied_cov_draws(object, n_lv, n_series,
+                                    draw_ids = draw_ids))
+  }
+  cov_struct <- get_trend_covariance_structure(object, draw_ids = draw_ids,
+                                               stationary = TRUE)
+  ndraws <- length(draw_ids %||% seq_len(posterior::ndraws(object)))
+  out <- array(0, dim = c(ndraws, n_series, n_series))
+  if (identical(cov_struct$pattern, "none")) {
+    return(out)
+  }
+  if (!isTRUE(cov_struct$hierarchical)) {
+    return(extract_cov_draws_flat(cov_struct))
+  }
+  members <- cov_struct$group_info$members
+  for (d in seq_len(ndraws)) {
+    for (g in seq_along(members)) {
+      out[d, members[[g]], members[[g]]] <- tcrossprod(
+        group_trend_factor(cov_struct$params, d, g, length(members[[g]]))
+      )
+    }
+  }
+  out
 }
 
 

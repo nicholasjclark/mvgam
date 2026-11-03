@@ -4908,13 +4908,18 @@ closure_unit_arrays_for <- function(object, newdata = NULL) {
 #' @param newdata Long-format observation data; defaults to the
 #'   training data stored on `object`.
 #' @param draw_ids Optional vector of posterior draw indices.
+#' @param incl_autocor Logical. `TRUE` conditions the state on the
+#'   fitted latent trend, as [posterior_linpred.mvgam()] does. `FALSE`
+#'   takes the state from the covariates alone.
 #' @return Named list with `state` (`[S x N_unit]`), `p`
 #'   (`[S x N_visit]`), `arrays`, `ndraws`, `n_unit`, `n_visit`.
 #' @noRd
 extract_closure_unit_components <- function(object, newdata = NULL,
                                              draw_ids = NULL,
-                                             linpred = NULL) {
+                                             linpred = NULL,
+                                             incl_autocor = FALSE) {
   checkmate::assert_class(object, "mvgam")
+  checkmate::assert_flag(incl_autocor)
   if (!is_closure_unit_family(object$family)) {
     stop(insight::format_error(c(
       "extract_closure_unit_components() requires a closure-unit fit.",
@@ -4943,12 +4948,12 @@ extract_closure_unit_components <- function(object, newdata = NULL,
   # A caller holding its own predictor supplies it. A forecast propagates
   # the latent state forward and uses a predictor that no frame
   # reproduces. Recomputing that predictor here would give a different
-  # quantity. With `process_error = FALSE`, the recomputed path uses the
-  # state the sampler fitted. Every training-grid surface needs that state.
+  # quantity. `incl_autocor` chooses between the fitted latent trend and
+  # the covariates alone.
   if (is.null(linpred)) {
     linpred <- posterior_linpred(
       object, newdata = newdata, draw_ids = draw_ids,
-      process_error = FALSE
+      process_error = FALSE, incl_autocor = incl_autocor
     )
   }
   state_visit <- object$family$linkinv(linpred)
@@ -5503,19 +5508,21 @@ sum_within_closure_units <- function(arrays, x) {
 #' @param draw Logical. The occupancy kernel returns the probability
 #'   of occupancy unless `draw = TRUE`, which draws the 0 / 1 state.
 #'   The abundance kernels always draw.
+#' @param incl_autocor As `extract_closure_unit_components()` takes it
 #' @return `[S x N_unit]` matrix of latent state draws or occupancy
 #'   probabilities
 #' @noRd
 posterior_latent_N <- function(object, newdata = NULL,
                                 draw_ids = NULL,
-                                conditional = TRUE, draw = FALSE) {
+                                conditional = TRUE, draw = FALSE,
+                                incl_autocor = FALSE) {
   checkmate::assert_flag(draw)
   # Sharing the closure-unit pipeline does not mean exposing a latent
   # state. The registry records which families do.
   require_closure_unit_predict_type(object$family, "latent_state")
   kernel <- dispatch_closure_unit_method(object$family, "latent_state")
   args <- list(object, newdata = newdata, draw_ids = draw_ids,
-               conditional = conditional)
+               conditional = conditional, incl_autocor = incl_autocor)
   if ("draw" %in% names(formals(kernel))) args$draw <- draw
   do.call(kernel, args)
 }
@@ -5551,7 +5558,7 @@ expected_latent_state <- function(object, newdata = NULL,
 #'
 #' @param object A fitted `mvgam` with an [nmix()] or [occ()] family
 #' @param newdata Optional `data.frame` of visits. `NULL` takes the
-#'   training data.
+#'   training data, whose units take their fitted latent trend.
 #' @param threshold Number in `[0, 1]`. A unit whose share of draws at
 #'   its cap exceeds `threshold` is marked `saturated`.
 #' @param ndraws,draw_ids The number of posterior draws to use, or
@@ -5605,10 +5612,11 @@ latent_N_saturation <- function(object, newdata = NULL,
       )
     )), call. = FALSE)
   }
+  # The fitted units take their fitted latent trend
   draws <- posterior_latent_N(
     object, newdata = newdata,
     draw_ids = resolve_draw_ids(object, ndraws, draw_ids),
-    draw = TRUE
+    draw = TRUE, incl_autocor = is.null(newdata)
   )
   arrays <- closure_unit_arrays_for(object,
                                     closure_unit_frame(object, newdata))
@@ -5709,8 +5717,10 @@ reduce_closure_unit_joint <- function(family, y, state, p, arrays,
 #' @noRd
 posterior_latent_N_nmix <- function(object, newdata = NULL,
                                     draw_ids = NULL,
-                                    conditional = TRUE) {
-  comp <- extract_closure_unit_components(object, newdata, draw_ids)
+                                    conditional = TRUE,
+                                    incl_autocor = FALSE) {
+  comp <- extract_closure_unit_components(object, newdata, draw_ids,
+                                          incl_autocor = incl_autocor)
   if (!conditional) {
     return(matrix(stats::rpois(length(comp$state), comp$state),
                   nrow = comp$ndraws))
@@ -6338,15 +6348,18 @@ log_lik_categ <- function(linpred, link, y, family_pars, trials) {
 #' @param draw_ids Posterior draw indices, or `NULL`
 #' @param conditional Logical. `TRUE` conditions on the detections.
 #' @param draw Logical. `TRUE` returns 0 / 1 state draws.
+#' @param incl_autocor As `extract_closure_unit_components()` takes it
 #' @return `[S x N_unit]` matrix of probabilities, or of integer 0 / 1
 #'   draws with `draw = TRUE`
 #' @noRd
 posterior_occupancy <- function(object, newdata = NULL,
                                 draw_ids = NULL,
                                 conditional = TRUE,
-                                draw = FALSE) {
+                                draw = FALSE,
+                                incl_autocor = FALSE) {
   checkmate::assert_flag(draw)
-  comp <- extract_closure_unit_components(object, newdata, draw_ids)
+  comp <- extract_closure_unit_components(object, newdata, draw_ids,
+                                          incl_autocor = incl_autocor)
   probs <- if (conditional) {
     # The grid ends at z = 1. A unit with a detection has no z = 0.
     reduce_closure_unit_joint(

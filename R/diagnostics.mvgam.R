@@ -192,6 +192,41 @@ median_interval_cols <- function(draws, probs, prefix) {
 }
 
 
+#' Print a table under a title, with notes after it
+#'
+#' Every print method that shows a summary table calls it. Numeric
+#' columns print to `digits` significant digits. A missing cell prints
+#' blank. A table longer than `max_rows` prints its first rows and says
+#' how many remain.
+#'
+#' @param title Character title line
+#' @param tab Data frame to print
+#' @param digits Integer number of significant digits
+#' @param notes Character vector of lines printed after the table
+#' @param max_rows Number of rows to print
+#' @return `NULL`, invisibly
+#' @noRd
+cat_titled_table <- function(title, tab, digits, notes, max_rows = Inf) {
+  checkmate::assert_string(title)
+  checkmate::assert_data_frame(tab)
+  checkmate::assert_int(digits, lower = 1L)
+  checkmate::assert_character(notes)
+  checkmate::assert_number(max_rows, lower = 1)
+  tab <- as.data.frame(tab)
+  hidden <- max(nrow(tab) - max_rows, 0)
+  tab <- utils::head(tab, max_rows)
+  num <- vapply(tab, is.numeric, logical(1L))
+  tab[num] <- lapply(tab[num], function(v) {
+    ifelse(is.na(v), "", format(signif(v, digits)))
+  })
+  cat(title, "\n\n", sep = "")
+  print(tab, row.names = FALSE, right = FALSE)
+  if (hidden > 0) cat("... and", hidden, "more rows\n")
+  cat("\n", paste0(notes, "\n"), sep = "")
+  invisible(NULL)
+}
+
+
 #' @rdname mvgam_diagnostics
 #' @method coef mvgam
 #' @export

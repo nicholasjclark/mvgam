@@ -103,8 +103,7 @@ variance_partition.mvgam <- function(object, ..., ndraws = NULL,
   resolve_resp(object, resp, required = TRUE, caller = "variance_partition")
   draw_ids <- resolve_draw_indices(posterior::ndraws(object), ndraws,
                                    draw_ids)
-  frame <- object$data[Reduce(`&`, response_rows(object, object$data)), ,
-                       drop = FALSE]
+  frame <- fitted_data(object)
   sources <- predictor_sources(object, frame, draw_ids, resp, scale)
   series <- axis_row_series(object, frame) %||%
     factor(rep(resp, nrow(frame)))

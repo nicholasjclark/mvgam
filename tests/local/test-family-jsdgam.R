@@ -1558,3 +1558,84 @@ test_that("each part's response-scale share is the fit's own: each jsdgam family
     expect_epred_parts(get(nm, envir = built)$fit)
   }
 })
+
+
+test_that("community richness sums each species' chance of a count", {
+  fit <- get("nb", envir = built)$fit
+  ids <- 1:6
+  shape <- as.vector(as_draws_matrix(fit)[ids, "shape"])
+  # By hand at the fitted factors: one less the negative binomial zero
+  fitted <- community(fit, latent = "conditional", draw_ids = ids)
+  lp <- posterior_linpred(fit, newdata = fitted$frame, draw_ids = ids,
+                          incl_autocor = TRUE)
+  expect_equal(fitted$presence, 1 - dnbinom(0, size = shape, mu = exp(lp)))
+  # By hand over the factors: the integral against their variance
+  set.seed(1)
+  averaged <- community(fit, draw_ids = ids, n_nodes = 2000L)
+  lp <- posterior_linpred(fit, newdata = averaged$frame, draw_ids = ids)
+  cov <- trend_series_cov_draws(fit, ids)
+  series <- as.integer(axis_row_series(fit, averaged$frame))
+  by_hand <- vapply(c(3L, 20L), function(j) {
+    integrate(function(u) {
+      (1 - dnbinom(0, size = shape[2L], mu = exp(lp[2L, j] + u))) *
+        dnorm(u, 0, sqrt(cov[2L, series[j], series[j]]))
+    }, -Inf, Inf)$value
+  }, numeric(1L))
+  expect_equal(averaged$presence[2L, c(3L, 20L)], by_hand, tolerance = 0.03)
+  # Communities share their latent nodes. Equal rows give equal draws.
+  gradient <- data.frame(env = c(-1, 1, 1), time = 1)
+  along <- community(fit, newdata = gradient, draw_ids = ids)
+  expect_identical(along$richness[, 2L], along$richness[, 3L])
+  # By hand: a pair's joint presence over its latent covariance, by
+  # Gauss-Hermite quadrature on a 30 by 30 grid
+  set.seed(2)
+  one <- community(fit, newdata = data.frame(env = 0.5, time = 1),
+                   draw_ids = ids, n_nodes = 4000L)
+  lp <- posterior_linpred(fit, newdata = one$frame, draw_ids = ids)
+  pair <- c(3L, 4L)
+  rule <- statmod::gauss.quad.prob(30L, "normal")
+  grid <- expand.grid(a = seq_len(30L), b = seq_len(30L))
+  z <- cbind(rule$nodes[grid$a], rule$nodes[grid$b])
+  weight <- rule$weights[grid$a] * rule$weights[grid$b]
+  u <- z %*% chol(cov[2L, pair, pair])
+  p <- 1 - dnbinom(0, size = shape[2L],
+                   mu = exp(sweep(u, 2L, lp[2L, pair], `+`)))
+  by_hand <- sum(weight * p[, 1L] * p[, 2L]) -
+    sum(weight * p[, 1L]) * sum(weight * p[, 2L])
+  expect_equal(one$cooccurrence[2L, pair[1L], pair[2L]], by_hand,
+               tolerance = 0.1)
+  # By hand at a typical site: Hill numbers and mean traits from the
+  # relative expected counts
+  species <- fitted_series_levels(fit)
+  traits <- data.frame(series = species, size = seq_along(species),
+                       guild = rep(c("a", "b"), length.out = length(species)))
+  typical <- community(fit, newdata = data.frame(env = 0.3, time = 1),
+                       traits = traits, latent = "zero", draw_ids = ids)
+  share <- posterior_epred(fit, newdata = typical$frame, draw_ids = ids)
+  share <- share / rowSums(share)
+  expect_equal(drop(typical$diversity$`Hill q = 1`),
+               exp(-rowSums(share * log(share))))
+  expect_equal(drop(typical$diversity$`Hill q = 2`), 1 / rowSums(share^2))
+  expect_equal(drop(typical$diversity$size), drop(share %*% traits$size))
+  expect_equal(drop(typical$diversity$guild.a),
+               drop(share %*% (traits$guild == "a")))
+  # The rvars index each draw by community, then species or measure
+  row <- which(along$frame$env == -1 &
+                 along$frame[[along$species_column]] == species[3L])
+  expect_identical(
+    unname(posterior::draws_of(as_draws_rvars(along)$presence)[
+      , 1L, species[3L]
+    ]),
+    along$presence[, row]
+  )
+  expect_identical(
+    unname(posterior::draws_of(as_draws_rvars(typical)$diversity)[
+      , 1L, "size"
+    ]),
+    drop(typical$diversity$size)
+  )
+  # A fitted state exists at the fitted times alone
+  expect_error(community(fit, newdata = data.frame(env = 0, time = 999),
+                         latent = "conditional", draw_ids = ids),
+               "fitted at each time")
+})

@@ -61,6 +61,8 @@
 #'         visit counts (Royle 2004).
 #'       \item `occ()`: the occupancy probability `P(z = 1 | y_g)`.
 #'     }
+#'     `incl_autocor = TRUE` takes the state from the fitted latent
+#'     trend, which a joint model shares across species.
 #'   \item `"detection"`: for `nmix()` and `occ()`, the per-visit
 #'     detection probability \eqn{p_{g,j}} on the response scale.
 #' }
@@ -176,7 +178,8 @@ predict.mvgam <- function(object,
   if (type %in% c("latent_state", "detection")) {
     require_closure_unit_predict_type(object$family, type)
     pred <- if (identical(type, "latent_state")) {
-      posterior_latent_N(object, newdata = newdata, draw_ids = draw_ids)
+      posterior_latent_N(object, newdata = newdata, draw_ids = draw_ids,
+                         incl_autocor = incl_autocor)
     } else {
       posterior_detection(object, newdata = newdata, draw_ids = draw_ids)
     }

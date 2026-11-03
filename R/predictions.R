@@ -527,16 +527,16 @@ row_placement <- function(object, frame) {
 #' @return List: frames `new` and `fitted` from `row_placement()`
 #' @noRd
 obs_row_units <- function(object, newdata) {
-  kept <- Reduce(`&`, response_rows(object, object$data))
-  if (sum(kept) != nrow(object$obs_model$data)) {
+  fitted <- fitted_data(object)
+  if (nrow(fitted) != nrow(object$obs_model$data)) {
     stop_mvgam_fault(
       "The observation model's row count differs from the likelihood's.",
-      paste0(sum(kept), " rows covered, ", nrow(object$obs_model$data),
+      paste0(nrow(fitted), " rows covered, ", nrow(object$obs_model$data),
              " held.")
     )
   }
   list(new = row_placement(object, newdata),
-       fitted = row_placement(object, object$data)[kept, , drop = FALSE])
+       fitted = row_placement(object, fitted))
 }
 
 
@@ -796,6 +796,18 @@ trend_series_index <- function(object, series_int, resp) {
 }
 
 
+#' Each row's position on the grid of fitted times
+#'
+#' @param object A fitted `mvgam` object
+#' @param frame Frame holding the time column
+#' @return Integer vector along the rows, `NA` for a time the fit never
+#'   saw
+#' @noRd
+fitted_time_index <- function(object, frame) {
+  match(frame[[axis_vars(object)$time_var]], mvgam_axes(object)$time$values)
+}
+
+
 #' Extract per-observation latent trend state draws
 #'
 #' Takes the draws of a series-grain state `state[t, s]` and aligns
@@ -846,7 +858,7 @@ extract_trend_latent_states <- function(mvgam_fit, newdata, full_draws,
   time_var <- axis_vars(mvgam_fit)$time_var
   # The grid the trend was fitted on, from the record that owns it.
   raw_t_idx <- if (time_var %in% names(newdata)) {
-    match(newdata[[time_var]], mvgam_axes(mvgam_fit)$time$values)
+    fitted_time_index(mvgam_fit, newdata)
   }
   # A closure-unit family predicts on the unit grid. The raw lookup applies
   # only when that grid covers the same rows as the observation structure.

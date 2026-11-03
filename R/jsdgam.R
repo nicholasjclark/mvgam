@@ -126,8 +126,9 @@
 #'   [sim_closure_unit_data()] simulates the `occ()` and `nmix()`
 #'   case. [residual_cor()], [ordinate()], [shared_variation()],
 #'   [active_factors()] and [compare_loadings()] interpret the fitted
-#'   factors. [lv_axis()] gives each factor its own covariate effect.
-#'   [how_to_cite()] drafts a methods paragraph for the fit and
+#'   factors. [community()] gives richness, diversity and
+#'   co-occurrence. [lv_axis()] gives each factor its own covariate
+#'   effect. [how_to_cite()] drafts a methods paragraph for the fit and
 #'   [methods_md()] writes its equations.
 #'   The `r mvgam_article("jsdgam", "JSDM article")` fits a negative
 #'   binomial model with a trait-informed loadings prior, ordination
@@ -199,6 +200,18 @@
 #'
 #' # Site scores and species loadings on the two factors
 #' ordinate(mod, rotation = "varimax")
+#'
+#' # Expected richness along `env`. The second plot marks the pairs of
+#' # species found together more often than `env` predicts.
+#' gradient <- datagrid(model = mod, env = seq(-2, 2, length.out = 20))
+#' cm <- community(mod, newdata = gradient)
+#' plot(cm)
+#' plot(cm, type = "cooccurrence")
+#'
+#' # The draws, for any contrast: richness at the end of the gradient
+#' # less that at its start
+#' rv <- as_draws_rvars(cm)
+#' rv$richness[20] - rv$richness[1]
 #'
 #' # Next, compare n_lv = 1 with update(mod, n_lv = 1L) and loo()
 #' }

@@ -83,7 +83,7 @@ saw adds the spread among levels to \verb{random effects}.}
 \item{x}{An \code{mvgam_forecast_uncertainty} object from
 \code{\link[=forecast_uncertainty]{forecast_uncertainty()}}.}
 
-\item{digits}{Number of decimal places to print. Defaults to \code{2}.}
+\item{digits}{Integer number of significant digits. Defaults to 2.}
 
 \item{type}{\code{"variance"} (the default) stacks each source's absolute
 variance.
@@ -97,16 +97,21 @@ every series.}
 }
 \value{
 An object of class \code{mvgam_forecast_uncertainty}. \code{print()}
-gives each series' overview. \code{summary()} returns a list of three
-tibbles: \code{overview}, one row per series, with the forecast's SD at
-its first and last horizons, the
-\code{dominant} kind of source at the last horizon with the bootstrap
-\code{support} for it (the fraction of resamples agreeing) and the
-horizon \code{changes_at} which the dominant kind first differs from the
-first horizon's;
-\code{horizons}, the forecast's variance at each horizon; and \code{sources}, each source's \code{variance}, \code{contribution} and
-\code{share} at each horizon with their interval. \code{plot()} stacks the
-sources over the horizon. A negative contribution is drawn as zero.
+gives each series' overview. \code{summary()} takes \code{probs} and returns
+a list of three tibbles:
+\describe{
+\item{\code{overview}}{one row per series: the forecast's SD at its
+first and last horizons, the \code{dominant} kind of source at the
+last horizon, the share of resamples that agree (\code{support}) and
+the horizon at which the dominant kind first \code{changes_at}}
+\item{\code{horizons}}{the forecast's variance at each horizon}
+\item{\code{sources}}{each source's \code{variance}, \code{contribution} and
+\code{share} at each horizon, the share with its interval}
+}
+\code{plot()} stacks the sources over the horizon. A negative
+contribution is drawn as zero. The object's \code{draws} element holds,
+per series, the \verb{[draws, horizons]} matrix of the forecast's mean
+given each draw.
 
 A list of frames in \code{newdata} gives an object of class
 \code{mvgam_forecast_scenarios}. \code{print()} gives each difference at the
@@ -185,41 +190,43 @@ of a share, which falls with \code{ndraws} and \code{n_replicates}.
 }
 \examples{
 \dontrun{
-set.seed(21)
-simdat <- sim_mvgam(family = poisson(), n_series = 2L,
-                    n_timepoints = 120L, trend_model = AR(),
-                    proportional_train = 0.8)
+set.seed(11)
+simdat <- sim_mvgam(family = poisson(), n_series = 1L,
+                     n_timepoints = 120L, trend_model = AR(),
+                     proportional_train = 0.75)
+
 mod <- mvgam(
-  y ~ 1,
-  trend_formula = ~ s(x, k = 5) + AR(p = 1),
-  data = simdat$data_train,
-  family = poisson(),
-  chains = 2,
-  silent = 2
+  y ~ s(x, k = 5),
+  trend_formula = ~ AR(p = 1),
+  data    = simdat$data_train,
+  newdata = simdat$data_test,
+  family  = poisson(),
+  chains  = 2, silent = 2
 )
 
-# The kind of source that dominates by horizon
-fu <- forecast_uncertainty(mod, newdata = simdat$data_test, ndraws = 200)
-fu
-plot(fu)
+# The held-out data given to mvgam() set the forecast horizon
+fc <- forecast(mod)
+plot(fc)
 
-# Fractions of the total, by term
-plot(fu, type = "share", by = "source")
+# The latent AR(1) trend alone, on the log scale
+plot(forecast(mod, type = "trend"))
 
-# Two possible futures of the covariate
-warmer <- simdat$data_test
-warmer$x <- warmer$x + 1
-scenarios <- forecast_uncertainty(
-  mod,
-  newdata = list(current = simdat$data_test, warmer = warmer),
+# The expected counts, without the Poisson sampling noise
+plot(forecast(mod, type = "expected"))
+
+# Next, score the forecast against the held-out counts
+head(score(fc, score = "crps")[[1]])
+
+# The sources of the forecast's variance at each horizon
+plot(forecast_uncertainty(mod, ndraws = 200))
+
+# How a future with higher `x` would change the forecast
+higher <- simdat$data_test
+higher$x <- higher$x + 1
+plot(forecast_uncertainty(
+  mod, newdata = list(observed = simdat$data_test, higher = higher),
   ndraws = 200
-)
-scenarios
-plot(scenarios)
-
-# Include observation noise
-forecast_uncertainty(mod, newdata = simdat$data_test, ndraws = 200,
-                     scale = "response")
+))
 }
 
 }

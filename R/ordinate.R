@@ -85,7 +85,8 @@
 #'
 #' @seealso [plot.mvgam()] with `type = "factors"` plots each factor's
 #'   path. [residual_cor()] gives the correlations among series the
-#'   factors imply. The
+#'   factors imply. [community()] gives how often species occur together.
+#'   The
 #'   `r mvgam_article("jsdgam", "JSDM article")` interprets a biplot
 #'   of species loadings.
 #'
@@ -424,7 +425,7 @@ resolve_auto_traits <- function(traits, object) {
   if (is.null(found)) {
     insight::format_warning(c(
       "Argument 'traits = \"auto\"' requires a fit built with traits.",
-      x = "The plot omits the trait overlay.",
+      x = "The traits are left out.",
       i = paste0("Pass a data.frame to 'traits' or refit with ",
                  "'jsdgam(traits = ...)'.")
     ))
