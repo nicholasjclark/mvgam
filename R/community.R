@@ -14,7 +14,10 @@
 #' @param newdata Data frame with one row per community, holding its
 #'   covariates. Each row is crossed with every fitted series, which
 #'   replaces any series column it holds. `NULL` takes the communities of
-#'   the training data.
+#'   the training data, or under `latent = "forecast"` those of the data
+#'   held out at fit time. Such a community is the rows sharing a time
+#'   and any other key of the family's units, such as the site of a
+#'   multi-season [occ()] fit.
 #' @param ... Unused. Anything passed here is refused.
 #' @param threshold A species counts as present when its response
 #'   exceeds `threshold`. `NULL` (the default) takes zero, which a count
@@ -26,10 +29,11 @@
 #'   (the default) computes none.
 #' @param latent How the latent state enters. `"marginal"` (the default)
 #'   averages over it. `"conditional"` takes the state the model fitted,
-#'   for communities in the training data. `"zero"` sets it to zero, a
-#'   typical site. See *Latent state*.
+#'   for communities in the training data. `"forecast"` propagates the
+#'   fitted state to communities after the training data. `"zero"` sets
+#'   it to zero, a typical site. See *Latent state*.
 #' @param n_nodes Number of latent states each draw averages over under
-#'   `latent = "marginal"`.
+#'   `latent = "marginal"` or `"forecast"`.
 #' @param ndraws,draw_ids The posterior draws to use, as
 #'   [hindcast.mvgam()] takes them. `NULL` for both uses every draw.
 #' @param resp The response to report, needed on a model with several.
@@ -51,6 +55,13 @@
 #' which makes a difference between communities free of their noise. A
 #' `RW()` or `LLT()` trend has no stationary covariance. Each draw then
 #' averages over the latent states it fitted at the training times.
+#'
+#' Under `latent = "forecast"` each draw propagates its last fitted state
+#' `n_nodes` times with fresh innovations, as [forecast_uncertainty()]
+#' does. Presence is averaged over these paths. The communities need
+#' times after the training data. Communities at one time share the
+#' paths. A pair's excess co-occurrence then comes from the uncertainty
+#' in the forecast state, which grows with the horizon.
 #'
 #' *Diversity*. A family with an abundance, such as a count or a
 #' biomass, weights each species by its expected value. Under [nmix()]
@@ -113,7 +124,8 @@ community <- function(object, ...) {
 #' @export
 community.mvgam <- function(object, newdata = NULL, ..., threshold = NULL,
                             traits = NULL,
-                            latent = c("marginal", "conditional", "zero"),
+                            latent = c("marginal", "conditional", "forecast",
+                                       "zero"),
                             n_nodes = 100L, ndraws = NULL, draw_ids = NULL,
                             resp = NULL) {
   checkmate::assert_class(object, "mvgam")
@@ -139,11 +151,34 @@ community.mvgam <- function(object, newdata = NULL, ..., threshold = NULL,
       )), call. = FALSE)
     }
   }
-  layout <- community_layout(object, newdata)
-  linpred <- posterior_linpred(object, newdata = layout$frame,
-                               draw_ids = draw_ids,
-                               incl_autocor = latent == "conditional",
-                               resp = resp)
+  forecasting <- latent == "forecast"
+  if (forecasting && is.null(newdata %||% object$test_data)) {
+    stop(insight::format_error(c(
+      "'latent = \"forecast\"' needs communities after the training data.",
+      x = "The fit stores no held-out data from 'mvgam(newdata = )'.",
+      i = "Pass the future times and their covariates in 'newdata'."
+    )), call. = FALSE)
+  }
+  layout <- community_layout(
+    object, newdata,
+    long = if (forecasting) object$test_data else fitted_data(object)
+  )
+  if (forecasting) {
+    paths <- community_forecast(object, layout$frame, draw_ids, n_nodes,
+                                resp)
+    linpred <- paths$linpred
+    states <- paths$states
+  } else {
+    linpred <- posterior_linpred(object, newdata = layout$frame,
+                                 draw_ids = draw_ids,
+                                 incl_autocor = latent == "conditional",
+                                 resp = resp)
+    states <- if (latent == "marginal") {
+      lapply(latent_nodes(object, draw_ids, n_nodes), function(state) {
+        state[, layout$series, drop = FALSE]
+      })
+    }
+  }
   present <- presence_map(object, layout$frame, draw_ids, resp, threshold,
                           dim(linpred))
   abundance <- abundance_map(object, layout$frame, draw_ids, resp,
@@ -151,19 +186,14 @@ community.mvgam <- function(object, newdata = NULL, ..., threshold = NULL,
   species <- fitted_series_levels(object)
   trait_rows <- community_traits(traits, object, species)[layout$series, ,
                                                           drop = FALSE]
-  # Every measure of one latent state, summed over the states
+  # Every measure of one latent state at the rows, summed over the states
   measure <- function(state) {
-    eta <- if (is.null(state)) linpred else {
-      linpred + state[, layout$series, drop = FALSE]
-    }
+    eta <- if (is.null(state)) linpred else linpred + state
     at <- present(eta)
     c(list(presence = at, joint = pairwise_presence(at, layout$cell)),
       community_diversity(if (is.null(abundance)) at else abundance(eta),
                           layout$incidence, trait_rows,
                           hill = !is.null(abundance)))
-  }
-  states <- if (latent == "marginal") {
-    latent_nodes(object, draw_ids, n_nodes)
   }
   states <- states %||% list(NULL)
   sums <- NULL
@@ -198,11 +228,13 @@ community.mvgam <- function(object, newdata = NULL, ..., threshold = NULL,
 
 #' The rows a community quantity is computed over
 #'
-#' A frame of communities is crossed with every fitted series. The
-#' training data group their rows by every axis but the series.
+#' A frame of communities is crossed with every fitted series. A long
+#' frame groups its rows by every axis but the series and by the other
+#' keys of the family's units.
 #'
 #' @param object A fitted `mvgam` object
 #' @param newdata Frame of communities, or `NULL`
+#' @param long The frame of series rows `NULL` groups
 #' @return List of `frame`, one row per community and series;
 #'   `communities`, one row per community; `series`, each row's series
 #'   index; `community`, each row's community index; `incidence`, the
@@ -210,7 +242,7 @@ community.mvgam <- function(object, newdata = NULL, ..., threshold = NULL,
 #'   community's rows; and `cell`, the `[communities, series]` matrix of
 #'   rows, `NA` where a community lacks a series
 #' @noRd
-community_layout <- function(object, newdata) {
+community_layout <- function(object, newdata, long) {
   vars <- axis_vars(object)
   training <- fitted_data(object)
   # A `jsdgam()` fit copies the user's species column into its own
@@ -220,13 +252,19 @@ community_layout <- function(object, newdata) {
     names(training)
   )
   if (is.null(newdata)) {
-    keys <- setdiff(intersect(unlist(vars), names(training)), series_cols)
-    row_series <- axis_row_series(object, training, required = TRUE)
+    long <- jsdgam_axis_columns(object, long)
+    keys <- setdiff(
+      intersect(c(unlist(vars), fit_closure_unit_keys(object)), names(long)),
+      series_cols
+    )
+    row_series <- axis_row_series(object, long, required = TRUE)
     # A unit's repeat visits share its state. One row per series stays.
-    keep <- !duplicated(cbind(training[keys], row_series))
-    frame <- training[keep, , drop = FALSE]
+    keep <- !duplicated(cbind(long[keys], row_series))
+    frame <- long[keep, , drop = FALSE]
     community <- interaction(frame[keys], drop = TRUE, lex.order = TRUE)
-    communities <- frame[!duplicated(community), keys, drop = FALSE]
+    # Community `i` is level `i`, which sorts the keys
+    communities <- frame[match(levels(community), community), keys,
+                         drop = FALSE]
   } else {
     species <- training[!duplicated(training[series_cols]), series_cols,
                         drop = FALSE]
@@ -254,11 +292,53 @@ community_layout <- function(object, newdata) {
 }
 
 
+#' Each draw's forecast predictor at the rows of the communities
+#'
+#' The state is propagated as `forecast_uncertainty()` propagates it.
+#' The forecast grid sorts its rows, which a row index maps back.
+#'
+#' @param object A fitted `mvgam` object
+#' @param frame The rows, one per community and series
+#' @param draw_ids Indices of the draws
+#' @param n_replicates Number of times each draw is propagated
+#' @param resp A response name, or `NULL`
+#' @return List of `linpred` and `states`. `linpred` is the
+#'   `[ndraws, rows]` predictor without the latent state. `states` holds
+#'   one such matrix of the state per replicate, or `NULL` for a fit
+#'   without a trend.
+#' @noRd
+community_forecast <- function(object, frame, draw_ids, n_replicates, resp) {
+  frame$.row_id <- seq_len(nrow(frame))
+  setup <- forecast_setup(object, frame, "link", resp, NULL, draw_ids,
+                          re_formula = NULL, allow_new_levels = FALSE,
+                          sample_new_levels = "uncertainty")
+  parts <- forecast_parts_of(object, setup, TRUE, TRUE, resp,
+                             replicates = as.integer(n_replicates))
+  rows <- match(frame$.row_id, parts$frame$.row_id)
+  if (anyNA(rows)) {
+    stop(insight::format_error(c(
+      "'latent = \"forecast\"' takes times after the training data.",
+      x = paste0(sum(is.na(rows)), " row(s) fall at or before the last ",
+                 "time their series was observed."),
+      i = "Use 'latent = \"conditional\"' for the fitted times."
+    )), call. = FALSE)
+  }
+  at_rows <- function(m) m[, rows, drop = FALSE]
+  list(
+    linpred = at_rows(Reduce(`+`, c(parts$obs, parts$trend))),
+    states = lapply(parts$latent, function(latent) {
+      if (length(latent)) at_rows(Reduce(`+`, latent))
+    })
+  )
+}
+
+
 #' The columns that tell communities apart
 #'
 #' A community is shown by the model's covariates and by any axis, such
 #' as time, that differs between communities. A response placeholder or
-#' a row number from [datagrid()] is left out.
+#' a row number from [datagrid()] is left out. A `jsdgam()` fit's own
+#' time column takes the name of the user's unit column it copies.
 #'
 #' @param object A fitted `mvgam` object
 #' @param communities Data frame, one row per community
@@ -271,8 +351,13 @@ community_columns <- function(object, communities) {
   varying <- axes[vapply(communities[axes], function(col) {
     length(unique(col)) > 1L
   }, logical(1L))]
-  communities[intersect(names(communities),
-                        union(varying, setdiff(covariates, axes)))]
+  shown <- communities[intersect(names(communities),
+                                 union(varying, setdiff(covariates, axes)))]
+  labels <- vapply(names(shown), function(col) user_axis_names(object, col),
+                   character(1L), USE.NAMES = FALSE)
+  shown <- shown[!duplicated(labels)]
+  names(shown) <- unique(labels)
+  shown
 }
 
 

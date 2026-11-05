@@ -23,9 +23,6 @@ Reference points: gllvm `coefplot()`, and Hmsc `plotBeta()` and
 `plotGamma()` sign-support heatmaps, `computeAssociations()` support
 levels and `evaluateModelFit()` per species.
 
-- **4b. Community forecasts.** `community()` over the forecast
-  horizon, each draw's forecast state propagated with replicates as
-  `forecast_uncertainty()` propagates it.
 - **4c. Sign-support heatmaps.** Species by
   covariate effects, and trait by environment effects for
   `trait_slopes` fits.
@@ -83,11 +80,10 @@ dependency and stay out.
 
 ## Order
 
-1. Community forecasts 4b
-2. 4c, 4d, 4e, 1e, 4f
-3. Dummy seasonal form 1f
-4. Real-data seasonal check 1g, then 1h
-5. Centred prototype and decision (5)
-6. Calendar helpers (6), heavy-tail example (2a)
+1. 4c, 4d, 4e, 1e, 4f
+2. Dummy seasonal form 1f
+3. Real-data seasonal check 1g, then 1h
+4. Centred prototype and decision (5)
+5. Calendar helpers (6), heavy-tail example (2a)
 
 Parked: horseshoe steps (2b). Not planned: combining trends (3).

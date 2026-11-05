@@ -25,7 +25,7 @@ mvgam now uses 'brms' to build its models. The observation model takes the full 
 * @jbogomolovas2 contributed the `com_binomial()` mathematics and tested the bounded count families
 * Multivariate responses through `mvbind()` and `mvbf()`
 * `forecast_uncertainty()` splits a forecast's variance by source and horizon. It also compares covariate scenarios. `variance_partition()` splits the fitted predictor's variance by source
-* `community()` gives richness, Hill numbers, community-weighted mean traits and excess co-occurrence, along gradients or at the fitted sites
+* `community()` gives richness, Hill numbers, community-weighted mean traits and excess co-occurrence, along gradients, at the fitted sites or over a forecast
 * Checks of a model and its data before fitting or prediction: `mvgam_formula()`, `mvgam_data()`, `check_newdata()`
 * Moving average terms in `AR()` and `VAR()`, coefficient pooling in `AR()` and partially fixed `trend_map`
 * `CAR()` gained `cor = TRUE`, takes series observed at their own times and takes `trend_formula` covariates on several series

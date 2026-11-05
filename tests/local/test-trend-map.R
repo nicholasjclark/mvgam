@@ -312,7 +312,6 @@ fit <- cached_fit(
 dm <- posterior::as_draws_matrix(fit$fit)
 
 
-
 test_that("the trend is the loadings times the factors, draw by draw", {
   # The axis chain, checked on values. `trend[t, s]` is declared as
   # `Z[s, ] . lv_trend[t, ]`, and because `Z` is data here both sides
@@ -741,8 +740,6 @@ test_that("the predictor's parts sum to it: a fixed map's factors", {
   expect_forecast_parts_sum(fit, c("state (Factor 1)", "state (Factor 2)"))
 })
 
-cat("\nDone.\n")
-
 
 test_that("update() refits this model and the refit forecasts", {
   # The refit rebuilds the trend from the call the user wrote, which
@@ -773,3 +770,5 @@ test_that("update() refits this model and the refit forecasts", {
   expect_identical(dim(posterior_epred(grown, draw_ids = 1:5)),
                    c(5L, nrow(dat)))
 })
+
+cat("\nDone.\n")

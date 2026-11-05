@@ -18,7 +18,7 @@ community(object, ...)
   ...,
   threshold = NULL,
   traits = NULL,
-  latent = c("marginal", "conditional", "zero"),
+  latent = c("marginal", "conditional", "forecast", "zero"),
   n_nodes = 100L,
   ndraws = NULL,
   draw_ids = NULL,
@@ -43,7 +43,10 @@ community(object, ...)
 \item{newdata}{Data frame with one row per community, holding its
 covariates. Each row is crossed with every fitted series, which
 replaces any series column it holds. \code{NULL} takes the communities of
-the training data.}
+the training data, or under \code{latent = "forecast"} those of the data
+held out at fit time. Such a community is the rows sharing a time
+and any other key of the family's units, such as the site of a
+multi-season \code{\link[=occ]{occ()}} fit.}
 
 \item{threshold}{A species counts as present when its response
 exceeds \code{threshold}. \code{NULL} (the default) takes zero, which a count
@@ -57,11 +60,12 @@ frame with one row per species, matched as \code{\link[=jsdgam]{jsdgam()}} match
 
 \item{latent}{How the latent state enters. \code{"marginal"} (the default)
 averages over it. \code{"conditional"} takes the state the model fitted,
-for communities in the training data. \code{"zero"} sets it to zero, a
-typical site. See \emph{Latent state}.}
+for communities in the training data. \code{"forecast"} propagates the
+fitted state to communities after the training data. \code{"zero"} sets
+it to zero, a typical site. See \emph{Latent state}.}
 
 \item{n_nodes}{Number of latent states each draw averages over under
-\code{latent = "marginal"}.}
+\code{latent = "marginal"} or \code{"forecast"}.}
 
 \item{ndraws, draw_ids}{The posterior draws to use, as
 \code{\link[=hindcast.mvgam]{hindcast.mvgam()}} takes them. \code{NULL} for both uses every draw.}
@@ -134,6 +138,13 @@ series. The draws of the latent state are shared by every community,
 which makes a difference between communities free of their noise. A
 \code{RW()} or \code{LLT()} trend has no stationary covariance. Each draw then
 averages over the latent states it fitted at the training times.
+
+Under \code{latent = "forecast"} each draw propagates its last fitted state
+\code{n_nodes} times with fresh innovations, as \code{\link[=forecast_uncertainty]{forecast_uncertainty()}}
+does. Presence is averaged over these paths. The communities need
+times after the training data. Communities at one time share the
+paths. A pair's excess co-occurrence then comes from the uncertainty
+in the forecast state, which grows with the horizon.
 
 \emph{Diversity}. A family with an abundance, such as a count or a
 biomass, weights each species by its expected value. Under \code{\link[=nmix]{nmix()}}

@@ -539,7 +539,6 @@ test_that("summary and the tidiers name the occupancy structure", {
 })
 
 
-
 # ----------------------------------------------------------------------
 # An abundance ceiling, and the grid the kernel numbers
 # ----------------------------------------------------------------------
@@ -1372,6 +1371,12 @@ test_that("jsdgam occ: a fitted site's occupancy uses its fitted factors", {
 })
 
 
+test_that("jsdgam occ: a community is named by the user's unit column", {
+  x <- community(occ_jsdm_fit, latent = "zero", draw_ids = 1:3)
+  expect_identical(names(x$communities), "site")
+})
+
+
 test_that("jsdgam occ: the loadings stay at the identified mode", {
   # A closure-unit family carries no simplex constraint, so the
   # loadings are not pinned to sum to zero the way the softmax
@@ -1529,6 +1534,23 @@ test_that("multi-season: every per-unit surface uses the unit axis", {
   expect_identical(ncol(posterior_predict(fit, ndraws = 5L)), sim$n_row)
   expect_identical(nrow(fitted(fit, ndraws = 5L)), sim$n_row)
   expect_identical(nrow(augment(fit)), sim$n_row)
+})
+
+
+test_that("multi-season: a community is a site in a season", {
+  sim <- sim_multi_season()
+  fit <- fit_multi_season()
+  fitted <- community(fit, latent = "conditional", draw_ids = 1:3)
+  expect_identical(nrow(fitted$communities), sim$J * sim$T_s)
+  # Each row's community holds its own site and season
+  keys <- c("site", "time")
+  expect_identical(as.list(fitted$communities[fitted$community, keys]),
+                   as.list(fitted$frame[keys]))
+  # Communities at one future season share the forecast paths
+  site <- fit$data[1L, c("site", "env")]
+  ahead <- community(fit, newdata = cbind(site[c(1L, 1L), ], time = 9L),
+                     latent = "forecast", draw_ids = 1:5, n_nodes = 20L)
+  expect_identical(ahead$richness[, 1L], ahead$richness[, 2L])
 })
 
 
@@ -1760,8 +1782,6 @@ test_that("each part's response-scale share is the fit's own: occ and nmix", {
   expect_epred_parts(nmix_fit)
 })
 
-cat("\nDone.\n")
-
 
 test_that("variance_partition() pools an effect that differs by site", {
   # `elev` holds one value per site. It moves no site over its own rows.
@@ -1776,3 +1796,5 @@ test_that("variance_partition() pools an effect that differs by site", {
   expect_equal(x$community[, "detection"], p / (p + occupancy))
   expect_identical(unique(as.vector(x$shares[[1L]][, "detection"])), 1)
 })
+
+cat("\nDone.\n")

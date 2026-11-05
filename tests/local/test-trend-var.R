@@ -1201,6 +1201,36 @@ test_that("a grouped VAR(2) is stationary, block by block", {
 })
 
 
+test_that("a forecast community takes each draw's propagated state", {
+  ids <- 1:8
+  # By hand: one replicate is the forecast. Presence is one less the
+  # Poisson zero of its predictor.
+  set.seed(1)
+  one <- community(gr_fit, newdata = data.frame(time = 81:83),
+                   latent = "forecast", draw_ids = ids, n_nodes = 1L)
+  set.seed(1)
+  fc <- forecast(gr_fit, newdata = one$frame, type = "link", draw_ids = ids)
+  series <- as.character(axis_row_series(gr_fit, one$frame))
+  link <- vapply(seq_len(nrow(one$frame)), function(j) {
+    times <- fc$test_times[[series[j]]]
+    fc$forecasts[[series[j]]][, match(one$frame$time[j], times)]
+  }, numeric(length(ids)))
+  expect_equal(one$presence, 1 - exp(-exp(link)))
+  # Data held out at fit time give the same communities
+  held <- gr_fit
+  held$test_data <- one$frame
+  set.seed(1)
+  expect_identical(
+    community(held, latent = "forecast", draw_ids = ids,
+              n_nodes = 1L)$presence,
+    one$presence
+  )
+  expect_error(community(gr_fit, newdata = data.frame(time = 80:81),
+                         latent = "forecast", draw_ids = ids),
+               "at or before")
+})
+
+
 test_that("the predictor's parts sum to it: obs, VAR state", {
   expect_parts_sum(fit, "state")
 })
