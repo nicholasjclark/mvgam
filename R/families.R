@@ -1425,10 +1425,10 @@ is_simplex_response_family <- function(family) {
 
 #' Whether a family's response is binary
 #'
-#' `occ()` and the Royle-Nichols `nmix()` score detections. Their
-#' response is binary while the latent state is a count or occupancy.
-#' `attr()` takes `exact = TRUE` here, as for the other family
-#' attributes. Without it `attr()` matches by prefix.
+#' `bernoulli()` is binary. `occ()` and the Royle-Nichols `nmix()` score
+#' detections. Their response is binary while the latent state is a
+#' count or occupancy. `attr()` takes `exact = TRUE` here, as for the
+#' other family attributes. Without it `attr()` matches by prefix.
 #'
 #' @param family Family object, or `NULL`
 #' @return Logical scalar
@@ -1436,7 +1436,8 @@ is_simplex_response_family <- function(family) {
 is_binary_response_family <- function(family) {
   checkmate::assert_list(family, null.ok = TRUE)
   if (is.null(family)) return(FALSE)
-  isTRUE(attr(family, "mvgam_binary_response", exact = TRUE))
+  identical(resolve_family_name(family), "bernoulli") ||
+    isTRUE(attr(family, "mvgam_binary_response", exact = TRUE))
 }
 
 

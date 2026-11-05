@@ -299,11 +299,10 @@ per_series_ic <- function(x, logliks,
   if (length(col_series) != ncol(logliks)) {
     stop(insight::format_error(c(
       "The log likelihood could not be split by series.",
-      x = paste0(
-        "The log likelihood has ", ncol(logliks), " scored columns. ",
-        "The data hold ",
-        length(col_series), " scored observations."
-      ),
+      x = paste0("The log likelihood has ", ncol(logliks),
+                 " scored columns."),
+      x = paste0("The data hold ", length(col_series),
+                 " scored observations."),
       i = "The fit's stored data may differ from the data it was fitted to."
     )), call. = FALSE)
   }
@@ -335,17 +334,35 @@ per_series_ic <- function(x, logliks,
 
 #' The series of each log-likelihood column
 #'
-#' The axis record assigns rows to series. A hierarchical fit derives
-#' them from its grouping columns. A closure-unit fit has one column
-#' per unit, labelled by the unit's first visit. Multi-response
-#' families hold every species in each row and are refused.
+#' A closure-unit fit has one column per unit, labelled by the unit's
+#' first visit.
 #'
 #' @param x Fitted `mvgam` object
 #' @return Character vector of series labels, one per column of
 #'   `log_lik(x)`
 #' @noRd
 per_obs_series_labels <- function(x) {
+  data <- x$data %||% data.frame()
+  # `loglik_col_values()` sets the closure-unit grain for every
+  # caller. `kfold()` passes its fold keys through the same call.
+  loglik_col_values(x, data, as.character(by_series_rows(x, data)))
+}
+
+#' The series of each row a `by_series = TRUE` result splits
+#'
+#' The axis record assigns rows to series. A hierarchical fit derives
+#' them from its grouping columns. Multi-response families hold every
+#' species in each row and are refused, as is a fit whose series are
+#' its responses.
+#'
+#' @param x Fitted `mvgam` object
+#' @param data The rows
+#' @return Factor of series, one per row, with the fitted series as
+#'   levels
+#' @noRd
+by_series_rows <- function(x, data) {
   checkmate::assert_class(x, "mvgam")
+  checkmate::assert_data_frame(data)
   if (is_multi_response_family(x$family)) {
     stop(insight::format_error(c(
       "'by_series = TRUE' is not supported for multi-response families.",
@@ -354,7 +371,6 @@ per_obs_series_labels <- function(x) {
       i = "Use 'by_series = FALSE'."
     )), call. = FALSE)
   }
-  data <- x$data %||% data.frame()
   series <- axis_row_series(x, data, required = TRUE)
   if (is.null(series)) {
     stop(insight::format_error(c(
@@ -364,9 +380,7 @@ per_obs_series_labels <- function(x) {
       i = "Pass 'resp' to score one response."
     )), call. = FALSE)
   }
-  # `loglik_col_values()` sets the closure-unit grain for every
-  # caller. `kfold()` passes its fold keys through the same call.
-  loglik_col_values(x, data, as.character(series))
+  series
 }
 
 #' Drop unscorable columns from a log-likelihood matrix

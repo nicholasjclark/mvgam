@@ -9,6 +9,7 @@
   type = c("correlation", "precision"),
   cluster = FALSE,
   rescale = FALSE,
+  supported_only = FALSE,
   ...
 )
 }
@@ -32,6 +33,9 @@ comparable. A correlation of 0.4 looks unlike one of 1. Set
 \code{TRUE} to scale colour to the entries present, for a fit whose
 correlations are all small. Defaults to \code{FALSE}.}
 
+\item{supported_only}{Logical. \code{TRUE} leaves blank every pair whose
+\code{prob_nonzero} is at most \code{prob_threshold}. Defaults to \code{FALSE}.}
+
 \item{...}{Unused. Anything passed here is refused.}
 }
 \value{
@@ -44,11 +48,12 @@ factor (\code{mvgam}) model.
 }
 \details{
 Only the lower triangle of off-diagonal entries is
-drawn; a symmetric matrix says everything once and the
-diagonal is \code{1} for any correlation. Fill shows the posterior
-point estimate. A black outline marks each pair whose credible
-interval excludes zero. \code{\link[=summary.mvgam_residcor]{summary.mvgam_residcor()}} reports each
-pair's interval and \code{prob_nonzero}.
+drawn. A symmetric matrix states each entry twice and the diagonal
+of a correlation is 1. Fill shows the posterior point estimate. A
+black outline marks each pair whose \code{prob_nonzero} exceeds the
+\code{prob_threshold} given to \code{\link[=residual_cor]{residual_cor()}}, the pairs \code{sig_cor}
+keeps. \code{\link[=summary.mvgam_residcor]{summary.mvgam_residcor()}} reports each pair's interval and
+\code{prob_nonzero}.
 }
 \seealso{
 \code{\link[=residual_cor]{residual_cor()}}, \code{\link[=summary.mvgam_residcor]{summary.mvgam_residcor()}}

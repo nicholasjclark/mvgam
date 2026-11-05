@@ -767,20 +767,16 @@ pretty_symmetric_breaks <- function(limits) {
 #' below the diagonal.
 #'
 #' @param estimate Symmetric matrix of posterior point estimates.
-#' @param cluster Reorder by `cluster_cormat()`.
-#' @param clear Optional logical matrix, `TRUE` where the interval of
-#'   an entry excludes zero. Reordered with `estimate`.
+#' @param clear Optional logical matrix, `TRUE` where an entry takes an
+#'   outline.
 #' @return Frame from `matrix_panel()`.
 #'
 #' @noRd
-residcor_panel_data <- function(estimate, cluster = FALSE, clear = NULL) {
+residcor_panel_data <- function(estimate, clear = NULL) {
   # A single series has no off-diagonal entry. The assertion names
   # that cause before an empty frame fails in ggplot2.
   checkmate::assert_matrix(estimate, mode = "numeric", min.rows = 2L)
-  checkmate::assert_flag(cluster)
-  idx <- if (cluster) cluster_cormat(estimate) else seq_len(nrow(estimate))
-  matrix_panel(estimate[idx, idx], clear = clear[idx, idx],
-               lower_only = TRUE)
+  matrix_panel(estimate, clear = clear, lower_only = TRUE)
 }
 
 

@@ -598,6 +598,33 @@ test_that("bayes_R2 compares the expectation with the observed rows", {
                "Choose a response with 'resp'")
 })
 
+test_that("bayes_R2(by_series = TRUE) scores each series on its rows", {
+  stub <- make_mvgam_stub()
+  stub$family <- brms::bernoulli()
+  stub$data$series <- factor(rep(c("a", "b"), each = 5L))
+  # Series b is observed as 1 alone
+  stub$data$y <- c(1, 0, 1, 0, 0, 1, 1, 1, 1, 1)
+  set.seed(2L)
+  epred <- matrix(runif(40L), 4L, 10L)
+  local_mocked_bindings(posterior_epred.mvgam = function(object, ...) epred)
+  draws <- bayes_R2(stub, by_series = TRUE, summary = FALSE)
+  p <- epred[, 1:5]
+  y <- stub$data$y[1:5]
+  resid <- sweep(p, 2L, y)
+  expect_equal(draws[, "R2[a]"],
+               apply(p, 1L, var) / (apply(p, 1L, var) + apply(resid, 1L, var)))
+  expect_equal(draws[, "Tjur_R2[a]"],
+               rowMeans(p[, y == 1]) - rowMeans(p[, y == 0]))
+  # By hand: the share of pairs of a 1 and a 0 ranked in that order
+  expect_equal(draws[, "AUC[a]"], apply(p, 1L, function(pr) {
+    mean(outer(pr[y == 1], pr[y == 0], ">"))
+  }))
+  expect_true(all(is.na(draws[, c("Tjur_R2[b]", "AUC[b]")])))
+  # Each summary row is the summary of its own column of draws
+  table <- bayes_R2(stub, by_series = TRUE)
+  expect_equal(table$Estimate, unname(colMeans(draws)))
+})
+
 test_that(
   "hidden_par_pattern hides rotation-indeterminate params", {
   # Free-Z factor fit: Z_tilde[ present means raw Z, raw lv_trend,

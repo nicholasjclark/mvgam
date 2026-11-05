@@ -4,7 +4,14 @@
 \alias{plot.mvgam_residcor_list}
 \title{Plot method for an \code{mvgam_residcor_list}}
 \usage{
-\method{plot}{mvgam_residcor_list}(x, include_global = TRUE, ncol = NULL, rescale = FALSE, ...)
+\method{plot}{mvgam_residcor_list}(
+  x,
+  include_global = TRUE,
+  ncol = NULL,
+  rescale = FALSE,
+  supported_only = FALSE,
+  ...
+)
 }
 \arguments{
 \item{x}{An \code{mvgam_residcor_list} returned by
@@ -22,6 +29,9 @@ comparable. A correlation of 0.4 looks unlike one of 1. Set
 \code{TRUE} to scale colour to the entries present, for a fit whose
 correlations are all small. Defaults to \code{FALSE}.}
 
+\item{supported_only}{Logical. \code{TRUE} leaves blank every pair whose
+\code{prob_nonzero} is at most \code{prob_threshold}. Defaults to \code{FALSE}.}
+
 \item{...}{Unused. Anything passed here is refused.}
 }
 \value{
@@ -32,8 +42,7 @@ Faceted heatmap panel across the per-group correlation
 matrices returned by \code{residual_cor(mod, by_group = TRUE)} on a
 hierarchical trend fit. Each panel is drawn as by
 \code{\link[=plot.mvgam_residcor]{plot.mvgam_residcor()}}, one per group, with fill showing the
-posterior point estimate and an outline on each pair whose interval
-excludes zero. The facets share colour limits. Panels are then
+posterior point estimate and an outline on each supported pair. The facets share colour limits. Panels are then
 directly comparable. The \verb{_global} reference matrix is included by
 default. Drop it with \code{include_global = FALSE}.
 }

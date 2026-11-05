@@ -26,11 +26,6 @@ levels and `evaluateModelFit()` per species.
 - **4c. Sign-support heatmaps.** Species by
   covariate effects, and trait by environment effects for
   `trait_slopes` fits.
-- **4d. Support levels on `residual_cor()`.** The support threshold
-  is fixed at 0.95. Let the user choose it, and let the plot show only
-  associations above it.
-- **4e. Per-species fit.** Tjur R2 and AUC for binary responses, R2
-  for counts, from the `bayes_R2()` path and `per_obs_series_labels()`.
 - **4f. Associations net of detection.** For `occ()` and `nmix()` fits,
   latent-state associations set against naive co-occurrence, showing
   what detection error alone would have suggested.
@@ -80,7 +75,7 @@ dependency and stay out.
 
 ## Order
 
-1. 4c, 4d, 4e, 1e, 4f
+1. 4c, 1e, 4f
 2. Dummy seasonal form 1f
 3. Real-data seasonal check 1g, then 1h
 4. Centred prototype and decision (5)

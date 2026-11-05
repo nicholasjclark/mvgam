@@ -45,6 +45,7 @@
   summary = TRUE,
   robust = FALSE,
   probs = c(0.025, 0.975),
+  by_series = FALSE,
   ...
 )
 
@@ -99,6 +100,15 @@ deviation.}
 
 \item{resp}{Optional name of one response of a multivariate model.}
 
+\item{by_series}{Logical, for \code{bayes_R2()}. \code{TRUE} computes the fit
+of each series from its own rows. A binary response, such as
+\code{\link[=bernoulli]{bernoulli()}} or the detections of \code{\link[=occ]{occ()}}, adds Tjur's R^2 and the
+AUC. Tjur's R^2 is the mean predicted probability of the rows
+observed as 1 less that of the rows observed as 0. The AUC is the
+probability that a row observed as 1 is predicted above a row
+observed as 0. A series observed at one value alone takes \code{NA} for
+both. Defaults to \code{FALSE}.}
+
 \item{variable}{Parameter names for \code{posterior_summary()}, the
 \pkg{brms} name of the argument. There \code{pars} is its deprecated
 alias.}
@@ -109,7 +119,10 @@ the coefficients. Defaults to \code{FALSE}, the covariance matrix.}
 \value{
 \code{fixef()}, \code{posterior_summary()} and \code{bayes_R2()} return a
 matrix with columns \code{Estimate}, \code{Est.Error} and one per quantile,
-or the draws with \code{summary = FALSE}. \code{coef()} returns the posterior
+or the draws with \code{summary = FALSE}. Under \code{by_series = TRUE}
+\code{bayes_R2()} returns a data frame with one row per series and
+measure, or draws in columns named \verb{<measure>[<series>]}, such as
+\code{AUC[sp1]}. \code{coef()} returns the posterior
 means. \code{vcov()} returns the covariance matrix of the coefficients.
 \code{rhat()} and \code{neff_ratio()} return a named vector with one value
 per parameter. \code{nuts_params()} and \code{log_posterior()} return the

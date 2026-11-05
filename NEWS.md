@@ -34,6 +34,7 @@ mvgam now uses 'brms' to build its models. The observation model takes the full 
 * AR factor models with estimated loadings give every draw one factor order and orientation. `summary()` reports their loadings as `Z` and their AR coefficients per factor
 * `jsdgam()` gained three arguments: `traits`, `trait_slopes`, `phylo`. `lv_axis()` in a `trend_formula` term gives each latent factor, or each series of a model without factors, its own effect
 * The 'brms' post-processing methods work on mvgam fits. Examples: `posterior_predict()`, `log_lik()`, `update()`, `hypothesis()`, `as_draws_*()`
+* `bayes_R2(by_series = TRUE)` scores each series, adding Tjur's R^2 and the AUC for binary responses. `residual_cor()` takes `prob_threshold`. `plot()` of its result outlines the pairs above it and can hide the rest
 * Model comparison: `bridge_sampler()`, `bayes_factor()`, `waic()`, `loo_model_weights()`, `pp_average()`, `compare_scores()`, `compare_elpds()`
 * `threads`, `init = "pathfinder"`, `mvgam_multiple()` for imputed data, and helpers to pivot wide occupancy and species data
 * `methods_md()` writes a model description. `bibtex()` extracts the citation

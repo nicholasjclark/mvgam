@@ -6,6 +6,7 @@
     list(
       cor = cor_mat,
       sig_cor = cor_mat,
+      prob_nonzero = cor_mat * 0 + 0.6,
       prob_threshold = 0.95,
       series_names = colnames(cor_mat) %||%
         paste0("s", seq_len(nrow(cor_mat))),
@@ -64,13 +65,14 @@ test_that("type = 'precision' works when the partial surface is present", {
     -0.1, 0.2, 1
   ), nrow = 3L, byrow = TRUE,
      dimnames = list(letters[1:3], letters[1:3]))
+  rc$prec_prob_nonzero <- rc$prec * 0 + 0.6
   p <- plot(rc, type = "precision")
   # The panel draws the partial correlations. The correlations are all 0.
   expect_setequal(p$data$value, c(0.3, -0.1, 0.2))
 })
 
 
-test_that("the panel draws the estimate, not the thresholded matrix", {
+test_that("the panel outlines the pairs whose sign is supported", {
   # `sig_cor` zeroes a pair whose evidence misses 0.95. The fill
   # carries the estimate of every pair.
   cor_mat <- matrix(c(
@@ -81,10 +83,8 @@ test_that("the panel draws the estimate, not the thresholded matrix", {
      dimnames = list(letters[1:3], letters[1:3]))
   rc <- .make_residcor(cor_mat)
   rc$sig_cor[] <- 0
-  # Only the pair c-b has an interval clear of zero
-  rc$cor_lower <- cor_mat - 0.5
-  rc$cor_upper <- cor_mat + 0.5
-  rc$cor_lower["c", "b"] <- 0.1
+  # Only the pair c-b has prob_nonzero above 0.95
+  rc$prob_nonzero["c", "b"] <- 0.99
   p <- plot(rc)
   # The panel holds the lower triangle with every estimate in it
   expect_equal(nrow(p$data), 3L)
@@ -92,6 +92,9 @@ test_that("the panel draws the estimate, not the thresholded matrix", {
   outlined <- p$layers[[2L]]$data
   expect_identical(as.character(c(outlined$Var1, outlined$Var2)),
                    c("c", "b"))
+  # The pairs below the threshold are left blank on request
+  expect_identical(is.na(plot(rc, supported_only = TRUE)$data$value),
+                   c(TRUE, TRUE, FALSE))
 })
 
 

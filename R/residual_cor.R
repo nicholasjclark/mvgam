@@ -43,6 +43,11 @@
 #' @param summary Logical. `TRUE` (the default) summarises each entry:
 #'   the point estimate, spread, credible interval and posterior sign
 #'   probabilities. `FALSE` returns the arrays of draws.
+#' @param prob_threshold The posterior probability of its sign a
+#'   correlation needs to count as supported, at least 0.5 and below 1.
+#'   Defaults to 0.95. It sets `sig_cor`, the `sig` column of
+#'   [summary.mvgam_residcor()] and the pairs [plot.mvgam_residcor()]
+#'   outlines.
 #' @param ... Unused. Anything passed here is refused.
 #'
 #' @return An [mvgam_residcor-class] object. Under `by_group = TRUE` on a
@@ -83,8 +88,7 @@
 #' matrices are valid correlation matrices. `prob_positive` and
 #' `prob_negative` are posterior sign probabilities. `prob_nonzero` is
 #' the larger of the two. `sig_cor` keeps the correlations whose
-#' `prob_nonzero` exceeds `prob_threshold`, fixed at 0.95. Its other
-#' entries are zero.
+#' `prob_nonzero` exceeds `prob_threshold`. Its other entries are zero.
 #'
 #' [jsdgam()] fits the same factor model. Its species covariance follows
 #' the factor rule above.
@@ -138,6 +142,7 @@ residual_cor.mvgam <- function(object,
                                summary = TRUE,
                                robust = FALSE,
                                probs = c(0.025, 0.975),
+                               prob_threshold = 0.95,
                                ndraws = NULL,
                                draw_ids = NULL,
                                ...) {
@@ -149,6 +154,13 @@ residual_cor.mvgam <- function(object,
   checkmate::assert_flag(robust)
   checkmate::assert_numeric(probs, len = 2L, lower = 0, upper = 1,
                             any.missing = FALSE, unique = TRUE)
+  checkmate::assert_number(prob_threshold, lower = 0.5)
+  if (prob_threshold >= 1) {
+    stop(insight::format_error(c(
+      "'prob_threshold' must be below 1.",
+      i = "A sign probability exceeds it only when it is below 1."
+    )), call. = FALSE)
+  }
   validate_draw_selectors(ndraws, draw_ids)
   rlang::check_dots_empty()
   probs <- sort(probs)
@@ -161,6 +173,7 @@ residual_cor.mvgam <- function(object,
     summary = summary,
     robust = robust,
     probs = probs,
+    prob_threshold = prob_threshold,
     draw_ids = resolve_draw_ids(object, ndraws, draw_ids)
   )
 }
@@ -190,7 +203,7 @@ residual_cor.mvgam <- function(object,
 #'
 #' @noRd
 compute_residual_cor <- function(object, covariance, by_group, partial,
-                                  summary, robust, probs,
+                                  summary, robust, probs, prob_threshold,
                                   draw_ids = NULL) {
   stationary <- identical(covariance, "stationary")
   # The factor check comes first. Loadings that share each latent
@@ -218,6 +231,7 @@ compute_residual_cor <- function(object, covariance, by_group, partial,
       summary = summary,
       robust = robust,
       probs = probs,
+      prob_threshold = prob_threshold,
       pattern = "factor_loadings",
       covariance = covariance,
       hierarchical = FALSE,
@@ -253,6 +267,7 @@ compute_residual_cor <- function(object, covariance, by_group, partial,
       summary = summary,
       robust = robust,
       probs = probs,
+      prob_threshold = prob_threshold,
       series_names = series_names
     ))
   }
@@ -265,6 +280,7 @@ compute_residual_cor <- function(object, covariance, by_group, partial,
     summary = summary,
     robust = robust,
     probs = probs,
+    prob_threshold = prob_threshold,
     pattern = cov_struct$pattern,
     covariance = covariance,
     hierarchical = FALSE,
@@ -524,7 +540,8 @@ extract_cov_draws_flat <- function(cov_struct) {
 #' @noRd
 compute_residcor_hierarchical <- function(object, cov_struct, covariance,
                                           by_group, partial, summary,
-                                          robust, probs, series_names) {
+                                          robust, probs, prob_threshold,
+                                          series_names) {
   ndraws <- cov_struct$ndraws
   n_sub <- as.integer(cov_struct$group_info$n_subgroups)
   n_groups <- as.integer(cov_struct$group_info$n_groups)
@@ -547,6 +564,7 @@ compute_residcor_hierarchical <- function(object, cov_struct, covariance,
     summary = summary,
     robust = robust,
     probs = probs,
+    prob_threshold = prob_threshold,
     pattern = "hierarchical_cholesky",
     covariance = "innovation",
     hierarchical = TRUE,
@@ -577,6 +595,7 @@ compute_residcor_hierarchical <- function(object, cov_struct, covariance,
       summary = summary,
       robust = robust,
       probs = probs,
+      prob_threshold = prob_threshold,
       pattern = "hierarchical_cholesky",
       covariance = covariance,
       hierarchical = TRUE,
@@ -591,18 +610,14 @@ compute_residcor_hierarchical <- function(object, cov_struct, covariance,
 }
 
 
-# The posterior mass on one sign above which a correlation enters
-# `sig_cor`
-residcor_prob_threshold <- 0.95
-
-
 #' Convert per-draw covariance arrays into the public mvgam_residcor
 #' return object, applying Fisher-z-based summaries for correlations.
 #'
 #' @noRd
 finalise_residcor <- function(cov_draws, series_names, partial,
-                              summary, robust, probs, pattern,
-                              covariance, hierarchical, group_label) {
+                              summary, robust, probs, prob_threshold,
+                              pattern, covariance, hierarchical,
+                              group_label) {
   checkmate::assert_array(cov_draws, d = 3L, any.missing = FALSE)
   checkmate::assert_choice(covariance, c("stationary", "innovation"))
   ndraws <- dim(cov_draws)[1L]
@@ -637,7 +652,7 @@ finalise_residcor <- function(cov_draws, series_names, partial,
   }
 
   cor_stats <- summarise_correlation_array(cor_draws, robust, probs,
-                                            series_names)
+                                            prob_threshold, series_names)
   cov_stats <- summarise_unconstrained_array(cov_draws, robust, probs,
                                               series_names)
 
@@ -664,7 +679,7 @@ finalise_residcor <- function(cov_draws, series_names, partial,
     hierarchical = hierarchical,
     group_label = group_label,
     probs = probs,
-    prob_threshold = residcor_prob_threshold
+    prob_threshold = prob_threshold
   )
 
   if (partial) {
@@ -672,7 +687,7 @@ finalise_residcor <- function(cov_draws, series_names, partial,
     # the Fisher-z summary of the correlations. That summary supplies
     # `sig_prec` for `plot(type = "precision")`.
     prec_stats <- summarise_correlation_array(prec_draws, robust, probs,
-                                               series_names)
+                                               prob_threshold, series_names)
     out$prec <- prec_stats$point
     out$prec_se <- prec_stats$se
     out$prec_lower <- prec_stats$lower
@@ -713,11 +728,13 @@ partial_cor_from_cor <- function(R) {
 #' and is set exactly, with zero SE.
 #'
 #' @inheritParams summarise_unconstrained_array
+#' @param prob_threshold The sign probability an entry of `sig` needs
 #' @return The list of `summarise_unconstrained_array()` plus the
 #'   matrices of `sign_probabilities()` and `sig`, the point
-#'   estimates with entries below `residcor_prob_threshold` set to 0
+#'   estimates with entries at or below `prob_threshold` set to 0
 #' @noRd
-summarise_correlation_array <- function(arr, robust, probs, series_names) {
+summarise_correlation_array <- function(arr, robust, probs, prob_threshold,
+                                        series_names) {
   eps <- 1e-7
   z <- atanh(pmin(pmax(arr, -1 + eps), 1 - eps))
   stats <- summarise_unconstrained_array(z, robust, probs, series_names,
@@ -732,7 +749,7 @@ summarise_correlation_array <- function(arr, robust, probs, series_names) {
   diag(signs$prob_negative) <- 0
   diag(signs$prob_nonzero) <- 1
   stats$sig <- stats$point
-  stats$sig[signs$prob_nonzero <= residcor_prob_threshold] <- 0
+  stats$sig[signs$prob_nonzero <= prob_threshold] <- 0
   c(stats, signs)
 }
 

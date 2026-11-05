@@ -15,6 +15,7 @@ residual_cor(object, ...)
   summary = TRUE,
   robust = FALSE,
   probs = c(0.025, 0.975),
+  prob_threshold = 0.95,
   ndraws = NULL,
   draw_ids = NULL,
   ...
@@ -57,6 +58,12 @@ deviation (MAD).}
 
 \item{probs}{Two probabilities for the lower and upper bounds of the
 credible interval. Default \code{c(0.025, 0.975)}, a 95\% interval.}
+
+\item{prob_threshold}{The posterior probability of its sign a
+correlation needs to count as supported, at least 0.5 and below 1.
+Defaults to 0.95. It sets \code{sig_cor}, the \code{sig} column of
+\code{\link[=summary.mvgam_residcor]{summary.mvgam_residcor()}} and the pairs \code{\link[=plot.mvgam_residcor]{plot.mvgam_residcor()}}
+outlines.}
 
 \item{ndraws}{Positive integer specifying number of posterior draws to
 use. NULL (default) uses all available draws.}
@@ -121,8 +128,7 @@ matrix, such as \code{\link[=chol]{chol()}}, takes \code{summary = FALSE}, whose
 matrices are valid correlation matrices. \code{prob_positive} and
 \code{prob_negative} are posterior sign probabilities. \code{prob_nonzero} is
 the larger of the two. \code{sig_cor} keeps the correlations whose
-\code{prob_nonzero} exceeds \code{prob_threshold}, fixed at 0.95. Its other
-entries are zero.
+\code{prob_nonzero} exceeds \code{prob_threshold}. Its other entries are zero.
 
 \code{\link[=jsdgam]{jsdgam()}} fits the same factor model. Its species covariance follows
 the factor rule above.

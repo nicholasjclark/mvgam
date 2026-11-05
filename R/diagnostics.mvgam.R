@@ -32,6 +32,14 @@
 #' @param probs Numeric vector of the two interval probabilities,
 #'   `c(0.025, 0.975)` by default.
 #' @param resp Optional name of one response of a multivariate model.
+#' @param by_series Logical, for `bayes_R2()`. `TRUE` computes the fit
+#'   of each series from its own rows. A binary response, such as
+#'   [bernoulli()] or the detections of [occ()], adds Tjur's R^2 and the
+#'   AUC. Tjur's R^2 is the mean predicted probability of the rows
+#'   observed as 1 less that of the rows observed as 0. The AUC is the
+#'   probability that a row observed as 1 is predicted above a row
+#'   observed as 0. A series observed at one value alone takes `NA` for
+#'   both. Defaults to `FALSE`.
 #' @param trend_effects Logical. `coef()`, `fixef()` and `vcov()`
 #'   report the coefficients of the observation formula by default.
 #'   `TRUE` reports those of the `trend_formula` instead. Their names
@@ -42,7 +50,10 @@
 #'
 #' @return `fixef()`, `posterior_summary()` and `bayes_R2()` return a
 #'   matrix with columns `Estimate`, `Est.Error` and one per quantile,
-#'   or the draws with `summary = FALSE`. `coef()` returns the posterior
+#'   or the draws with `summary = FALSE`. Under `by_series = TRUE`
+#'   `bayes_R2()` returns a data frame with one row per series and
+#'   measure, or draws in columns named `<measure>[<series>]`, such as
+#'   `AUC[sp1]`. `coef()` returns the posterior
 #'   means. `vcov()` returns the covariance matrix of the coefficients.
 #'   `rhat()` and `neff_ratio()` return a named vector with one value
 #'   per parameter. `nuts_params()` and `log_posterior()` return the
@@ -351,14 +362,18 @@ fixef.mvgam <- function(object, summary = TRUE, robust = FALSE,
 #' @export
 bayes_R2.mvgam <- function(object, resp = NULL, summary = TRUE,
                             robust = FALSE,
-                            probs = c(0.025, 0.975), ...) {
+                            probs = c(0.025, 0.975), by_series = FALSE,
+                            ...) {
   checkmate::assert_class(object, "mvgam")
   checkmate::assert_string(resp, null.ok = TRUE)
   checkmate::assert_flag(summary)
   checkmate::assert_flag(robust)
   checkmate::assert_numeric(probs, lower = 0, upper = 1, len = 2L)
+  checkmate::assert_flag(by_series)
   resolve_resp(object, resp, required = TRUE, caller = "bayes_R2()")
   y <- r2_response(object, resp, "bayes_R2()")
+  # Refused before any prediction is drawn
+  series <- if (by_series) by_series_rows(object, object$data)
   # The expectation conditions on the inferred latent state. Its
   # residual is then the one the observed series leaves.
   epred <- do.call(posterior_epred, c(
@@ -368,10 +383,77 @@ bayes_R2.mvgam <- function(object, resp = NULL, summary = TRUE,
   # As brms does, the rows without a response are left out
   observed <- !is.na(y)
   epred <- epred[, observed, drop = FALSE]
-  resid <- sweep(epred, 2L, y[observed], FUN = "-")
+  y <- y[observed]
+  if (!by_series) {
+    return(r2_result(r2_draws(epred, y), summary, robust, probs))
+  }
+  binary <- is_binary_response_family(model_families(object, resp))
+  series <- droplevels(series[observed])
+  draws <- do.call(cbind, lapply(levels(series), function(lv) {
+    rows <- series == lv
+    fit_measure_draws(epred[, rows, drop = FALSE], y[rows], lv, binary)
+  }))
+  if (!summary) {
+    return(draws)
+  }
+  stats <- mvgam_post_summary(draws, robust = robust, probs = probs)
+  measures <- if (binary) c("R2", "Tjur_R2", "AUC") else "R2"
+  data.frame(
+    series = rep(levels(series), each = length(measures)),
+    measure = rep(measures, nlevels(series)),
+    stats, row.names = NULL, check.names = FALSE
+  )
+}
+
+
+#' Draws of the Bayesian R-squared
+#'
+#' @param epred `[ndraws, rows]` expected values
+#' @param y The observed response of the rows
+#' @return Numeric vector, one per draw
+#' @noRd
+r2_draws <- function(epred, y) {
+  resid <- sweep(epred, 2L, y, FUN = "-")
   var_ep <- row_var(epred)
-  r2_result(var_ep / (var_ep + row_var(resid)),
-            summary, robust, probs)
+  var_ep / (var_ep + row_var(resid))
+}
+
+
+#' Draws of a series' fit measures
+#'
+#' A binary response adds two measures. Tjur's R-squared is the mean
+#' probability of the rows observed as 1 less that of the rows observed
+#' as 0. The area under the ROC curve comes from the ranks of the
+#' probabilities. Both need rows of each value. A series without them
+#' takes `NA`.
+#'
+#' @param epred `[ndraws, rows]` expected values of the series
+#' @param y Its observed response
+#' @param series The series, for the column names
+#' @param binary Whether the response is binary
+#' @return Matrix of draws, columns named `<measure>[<series>]`
+#' @noRd
+fit_measure_draws <- function(epred, y, series, binary) {
+  out <- cbind(R2 = r2_draws(epred, y))
+  if (binary) {
+    ones <- y == 1
+    n_one <- sum(ones)
+    n_zero <- sum(!ones)
+    both <- n_one > 0L && n_zero > 0L
+    tjur <- if (both) {
+      rowMeans(epred[, ones, drop = FALSE]) -
+        rowMeans(epred[, !ones, drop = FALSE])
+    }
+    # The Mann-Whitney statistic of each draw's probabilities
+    auc <- if (both) {
+      ranks <- t(apply(epred, 1L, rank))
+      (rowSums(ranks[, ones, drop = FALSE]) - n_one * (n_one + 1) / 2) /
+        (n_one * n_zero)
+    }
+    out <- cbind(out, Tjur_R2 = tjur %||% NA_real_, AUC = auc %||% NA_real_)
+  }
+  colnames(out) <- paste0(colnames(out), "[", series, "]")
+  out
 }
 
 

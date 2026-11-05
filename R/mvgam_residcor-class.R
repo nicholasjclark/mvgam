@@ -103,14 +103,17 @@ NULL
 #'   comparable. A correlation of 0.4 looks unlike one of 1. Set
 #'   `TRUE` to scale colour to the entries present, for a fit whose
 #'   correlations are all small. Defaults to `FALSE`.
+#' @param supported_only Logical. `TRUE` leaves blank every pair whose
+#'   `prob_nonzero` is at most `prob_threshold`. Defaults to `FALSE`.
 #' @param ... Unused. Anything passed here is refused.
 #'
 #' @details Only the lower triangle of off-diagonal entries is
-#'   drawn; a symmetric matrix says everything once and the
-#'   diagonal is `1` for any correlation. Fill shows the posterior
-#'   point estimate. A black outline marks each pair whose credible
-#'   interval excludes zero. [summary.mvgam_residcor()] reports each
-#'   pair's interval and `prob_nonzero`.
+#'   drawn. A symmetric matrix states each entry twice and the diagonal
+#'   of a correlation is 1. Fill shows the posterior point estimate. A
+#'   black outline marks each pair whose `prob_nonzero` exceeds the
+#'   `prob_threshold` given to [residual_cor()], the pairs `sig_cor`
+#'   keeps. [summary.mvgam_residcor()] reports each pair's interval and
+#'   `prob_nonzero`.
 #'
 #' @return A `ggplot` object.
 #'
@@ -125,11 +128,13 @@ plot.mvgam_residcor <- function(
   type = c("correlation", "precision"),
   cluster = FALSE,
   rescale = FALSE,
+  supported_only = FALSE,
   ...
 ) {
   type <- match.arg(type)
   checkmate::assert_flag(cluster)
   checkmate::assert_flag(rescale)
+  checkmate::assert_flag(supported_only)
   rlang::check_dots_empty()
   set_color_scheme_local()
 
@@ -138,30 +143,37 @@ plot.mvgam_residcor <- function(
   } else {
     "Posterior\npartial\ncorrelation"
   }
-  residcor_heatmap(residcor_panel(x, type, cluster), scale_name, rescale)
+  residcor_heatmap(residcor_panel(x, type, cluster, supported_only),
+                   scale_name, rescale)
 }
 
 
 #' The lower triangle of a summarised residual correlation, with the
-#' pairs whose interval excludes zero marked
+#' supported pairs marked
+#'
+#' A pair is supported when its `prob_nonzero` exceeds the object's
+#' `prob_threshold`, the rule of `sig_cor`.
 #'
 #' @param x A summarised `mvgam_residcor`
 #' @param type `"correlation"` or `"precision"`
 #' @param cluster Reorder by `cluster_cormat()`
+#' @param supported_only Blank every pair that is not supported
 #' @return Frame from `residcor_panel_data()`
 #' @noRd
-residcor_panel <- function(x, type = "correlation", cluster = FALSE) {
+residcor_panel <- function(x, type = "correlation", cluster = FALSE,
+                           supported_only = FALSE) {
   assert_residcor_summarised(x)
   field <- if (type == "correlation") "cor" else "prec"
   estimate <- x[[field]] %||% stop(insight::format_error(c(
     "The 'mvgam_residcor' object holds no partial correlations.",
     i = "Pass 'partial = TRUE' to 'residual_cor()' to compute them."
   )), call. = FALSE)
-  residcor_panel_data(
-    estimate, cluster = cluster,
-    clear = interval_excludes_zero(x[[paste0(field, "_lower")]],
-                                   x[[paste0(field, "_upper")]])
-  )
+  prob <- x[[if (field == "cor") "prob_nonzero" else "prec_prob_nonzero"]]
+  supported <- prob > x[["prob_threshold"]]
+  # The cluster order comes from every estimate, blanked or not
+  idx <- if (cluster) cluster_cormat(estimate) else seq_len(nrow(estimate))
+  if (supported_only) estimate[!supported] <- NA_real_
+  residcor_panel_data(estimate[idx, idx], clear = supported[idx, idx])
 }
 
 
@@ -174,7 +186,9 @@ residcor_panel <- function(x, type = "correlation", cluster = FALSE) {
 #' @return A `ggplot` object
 #' @noRd
 residcor_heatmap <- function(panel, scale_name, rescale, ncol = NULL) {
-  lim <- if (rescale) max(abs(panel$value), na.rm = TRUE) else 1
+  # Every pair left blank leaves no entry to scale to
+  shown <- panel$value[!is.na(panel$value)]
+  lim <- if (rescale && length(shown)) max(abs(shown)) else 1
   matrix_heatmap(
     panel,
     mvgam_diverging_scale(name = scale_name, limits = c(-lim, lim)),
@@ -189,8 +203,7 @@ residcor_heatmap <- function(panel, scale_name, rescale, ncol = NULL) {
 #' matrices returned by `residual_cor(mod, by_group = TRUE)` on a
 #' hierarchical trend fit. Each panel is drawn as by
 #' [plot.mvgam_residcor()], one per group, with fill showing the
-#' posterior point estimate and an outline on each pair whose interval
-#' excludes zero. The facets share colour limits. Panels are then
+#' posterior point estimate and an outline on each supported pair. The facets share colour limits. Panels are then
 #' directly comparable. The `_global` reference matrix is included by
 #' default. Drop it with `include_global = FALSE`.
 #'
@@ -211,15 +224,16 @@ residcor_heatmap <- function(panel, scale_name, rescale, ncol = NULL) {
 #' @export
 plot.mvgam_residcor_list <- function(x, include_global = TRUE,
                                       ncol = NULL, rescale = FALSE,
-                                      ...) {
+                                      supported_only = FALSE, ...) {
   checkmate::assert_flag(include_global)
   checkmate::assert_flag(rescale)
+  checkmate::assert_flag(supported_only)
   rlang::check_dots_empty()
   set_color_scheme_local()
   keep <- if (isTRUE(include_global)) names(x) else
     setdiff(names(x), "_global")
   panel <- do.call(rbind, lapply(keep, function(g) {
-    df <- residcor_panel(x[[g]])
+    df <- residcor_panel(x[[g]], supported_only = supported_only)
     df$group <- g
     df
   }))

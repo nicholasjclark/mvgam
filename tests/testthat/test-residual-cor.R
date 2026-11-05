@@ -431,14 +431,20 @@ test_that("Fisher-z CIs stay strictly inside (-1, 1)", {
 
 # ---- prob_nonzero / sig_cor ------------------------------------------
 
-test_that("prob_nonzero and sig_cor reflect off-zero pairs", {
-  # Constant Sigma across draws => prob_positive == 1 for positive
-  # off-diagonal pairs.
-  Sigma <- matrix(c(1.0, 0.6, 0.6, 1.0), 2, 2)
-  mock_cov_struct(mk_full_cov_struct(Sigma))
-  res <- residual_cor(build_fake_mvgam())
-  expect_equal(res$prob_nonzero[1, 2], 1)
-  expect_equal(res$sig_cor[1, 2], 0.6)
+test_that("sig_cor keeps the pairs whose sign clears prob_threshold", {
+  # The correlation is positive in 90 of 100 draws
+  cov_struct <- mk_full_cov_struct(diag(2))
+  r <- rep(c(0.3, -0.3), c(90L, 10L))
+  cov_struct$params$Sigma_trend[, 1L, 2L] <- r
+  cov_struct$params$Sigma_trend[, 2L, 1L] <- r
+  mock_cov_struct(cov_struct)
+  strict <- residual_cor(build_fake_mvgam())
+  expect_equal(strict$prob_nonzero[1L, 2L], 0.9)
+  expect_identical(strict$sig_cor[1L, 2L], 0)
+  loose <- residual_cor(build_fake_mvgam(), prob_threshold = 0.85)
+  expect_identical(loose$sig_cor[1L, 2L], loose$cor[1L, 2L])
+  expect_error(residual_cor(build_fake_mvgam(), prob_threshold = 1),
+               "must be below 1")
 })
 
 
