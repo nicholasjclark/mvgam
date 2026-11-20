@@ -286,7 +286,9 @@ formula's covariates. Several names add their components:
 covariate effects it moves with. Level, season and predictor sum to
 the trend. A factor model reports each component at the series
 grain, through its loadings. A rotation of the factors leaves them
-unchanged.
+unchanged. \code{\link[=seasonality]{seasonality()}} summarises the swing and peak of the
+season in each cycle. It also reports how both changed over the
+series.
 }
 \examples{
 \dontrun{
@@ -360,6 +362,13 @@ fc_s <- forecast(mod_s, newdata = dat_s[109:120, ], type = "trend",
                  component = "season")
 plot(fc_s)
 
+# The swing of each year's season and its peak month. Comparing the
+# first and last years gives the widening and its probability
+s <- seasonality(mod_s, newdata = dat_s[109:120, ])
+s
+plot(s)
+summary(s)$change
+
 # Draws of the seasonal shock scale
 head(as.data.frame(mod_s, variable = "sigma_season_trend"))
 
@@ -409,6 +418,7 @@ Association}, 106:1513-1527.
 \code{\link[=RW]{RW()}}, \code{\link[=PW]{PW()}}, \link{trend_constructors}, \code{\link[=get_prior]{get_prior()}} for the
 scale of the default priors, \code{\link[=hindcast.mvgam]{hindcast.mvgam()}} and
 \code{\link[=forecast.mvgam]{forecast.mvgam()}} for the level, the slope and the season,
+\code{\link[=seasonality]{seasonality()}} for the swing and peak of each seasonal cycle,
 \code{\link[=series_to_mvgam]{series_to_mvgam()}} for the periods a \code{ts}, \code{msts} or \code{tsibble}
 carries
 

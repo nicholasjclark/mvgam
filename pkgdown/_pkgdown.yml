@@ -176,6 +176,7 @@ reference:
   - print.mvgam_latent_state
   - summary.mvgam_latent_state
   - plot.mvgam_latent_state
+  - seasonality
   - ensemble.mvgam_forecast
   - posterior_average.mvgam
   - posterior_interval.mvgam

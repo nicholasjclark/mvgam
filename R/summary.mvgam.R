@@ -219,6 +219,7 @@ summary.mvgam <- function(object, probs = c(0.025, 0.975),
 
   # A correlated `AR()` and an independent one share the bare type
   out$trend_has_cor <- isTRUE(object$trend_metadata$has_cor)
+  out$trend_has_season <- NROW(fitted_season_periods(object)) > 0L
 
   # The printed label names the trend's order. It needs the fit's
   # trend metadata, which the summary does not hold.
@@ -910,6 +911,9 @@ build_next_steps <- function(x) {
     # A biplot needs two factors
     list(when = isTRUE(x$n_lv >= 2L),
          text = "`ordinate(fit)`: biplot of the factor scores and loadings"),
+    list(when = isTRUE(x$trend_has_season),
+         text = paste0("`seasonality(fit)`: the season's swing and peak, ",
+                       "cycle by cycle")),
     list(when = forecastable,
          text = "`forecast(fit, newdata = ...)`: out-of-sample forecasts"),
     # PSIS-LOO leaves out an observation the latent state was fitted

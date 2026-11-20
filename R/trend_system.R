@@ -2036,7 +2036,9 @@ VAR <- function(time = NA, series = NA, p = 1, ma = FALSE, cor = TRUE,
 #' covariate effects it moves with. Level, season and predictor sum to
 #' the trend. A factor model reports each component at the series
 #' grain, through its loadings. A rotation of the factors leaves them
-#' unchanged.
+#' unchanged. [seasonality()] summarises the swing and peak of the
+#' season in each cycle. It also reports how both changed over the
+#' series.
 #'
 #' @return An object of class `mvgam_trend`.
 #'
@@ -2055,6 +2057,7 @@ VAR <- function(time = NA, series = NA, p = 1, ma = FALSE, cor = TRUE,
 #' @seealso [RW()], [PW()], [trend_constructors], [get_prior()] for the
 #'   scale of the default priors, [hindcast.mvgam()] and
 #'   [forecast.mvgam()] for the level, the slope and the season,
+#'   [seasonality()] for the swing and peak of each seasonal cycle,
 #'   [series_to_mvgam()] for the periods a `ts`, `msts` or `tsibble`
 #'   carries
 #'
@@ -2129,6 +2132,13 @@ VAR <- function(time = NA, series = NA, p = 1, ma = FALSE, cor = TRUE,
 #' fc_s <- forecast(mod_s, newdata = dat_s[109:120, ], type = "trend",
 #'                  component = "season")
 #' plot(fc_s)
+#'
+#' # The swing of each year's season and its peak month. Comparing the
+#' # first and last years gives the widening and its probability
+#' s <- seasonality(mod_s, newdata = dat_s[109:120, ])
+#' s
+#' plot(s)
+#' summary(s)$change
 #'
 #' # Draws of the seasonal shock scale
 #' head(as.data.frame(mod_s, variable = "sigma_season_trend"))

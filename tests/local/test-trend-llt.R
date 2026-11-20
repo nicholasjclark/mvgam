@@ -824,6 +824,13 @@ test_that("seasonality() measures each cycle from the season draws", {
   layouts <- seasonality(fit_g, draw_ids = ids)$layouts
   expect_identical(layouts$season_7$cycle[1:15], rep(1:3, c(7L, 7L, 1L)))
   expect_identical(layouts$season_12$cycle[1:13], rep(1:2, c(12L, 1L)))
+  # A seasonal fit's summary points to seasonality(). A fit without a
+  # season does not.
+  pointer <- "`seasonality(fit)`"
+  expect_true(any(grepl(pointer, capture.output(summary(fit_g)),
+                        fixed = TRUE)))
+  expect_false(any(grepl(pointer, capture.output(summary(fit_a)),
+                         fixed = TRUE)))
 })
 
 

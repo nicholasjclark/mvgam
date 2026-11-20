@@ -75,8 +75,10 @@ drive many series when $Z$ has fewer columns than there are series.
 
 ## What mvgam can model
 
-Every `brms` family works as the observation model. `mvgam` adds
-families for ecological and count data:
+Any single `brms` family can be the observation model. Mixtures are
+not supported. Categorical, multinomial and Dirichlet responses take
+the long-format families below. `mvgam` adds families for ecological
+and count data:
 
 | Family | Use case |
 |:-------|:---------|
@@ -108,10 +110,13 @@ innovations across series. `gr` with `subgr` pools correlation
 matrices across groups. `n_lv` sets a number of shared latent factors
 below the number of series. `df` gives the innovations
 Student-t tails. `ma = TRUE` adds a moving-average term to `RW()`,
-`AR()` or `VAR()`. `?trend_constructors` lists the options each
-constructor takes. `hindcast()` and `forecast()` return the parts of a
-state through `component`, such as the level, slope and season of
-`LLT()`.
+`AR()` or `VAR()`. Outside `VAR()` and `PW()`, `centred = TRUE`
+samples the states directly, which is faster when large counts pin
+them down. `?trend_constructors` lists
+the options each constructor takes. `hindcast()` and `forecast()`
+return the parts of a state through `component`, such as the level,
+slope and season of `LLT()`. `seasonality()` reports the swing and
+peak of an `LLT()` season in each cycle.
 
 `mvgam()` fits data in long format, one row per series and time.
 `jsdgam()` fits joint species distribution models to one row per site
@@ -322,9 +327,10 @@ source at each horizon:
 plot(forecast_uncertainty(fit_cor, ndraws = 200))
 ```
 
-`residual_cor()` returns the correlations among the species'
-innovations, which measure how strongly the species rise and fall
-together once temperature and vegetation are accounted for:
+`residual_cor()` returns the correlations among the species' latent
+states, which measure how strongly the species rise and fall together
+once temperature and vegetation are accounted for.
+`covariance = "innovation"` gives those of one month's shocks instead:
 
 ```{r cor-resid, fig.asp = 0.8, out.width = "60%"}
 rc <- residual_cor(fit_cor)

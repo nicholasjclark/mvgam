@@ -290,15 +290,26 @@ season_scale_labels <- function(scale) {
 }
 
 
+#' The seasonal periods of a fit
+#'
+#' @param object A fitted `mvgam` object
+#' @return Data frame from `llt_season_periods()`, or `NULL` for a trend
+#'   other than `LLT()`
+#' @noRd
+fitted_season_periods <- function(object) {
+  if (identical(get_trend_type(object), "LLT")) {
+    llt_season_periods(first_trend_spec(object))
+  }
+}
+
+
 #' The seasonal periods of a fit, or an error naming what is needed
 #'
 #' @param object A fitted `mvgam` object
 #' @return Data frame from `llt_season_periods()`
 #' @noRd
 require_llt_season <- function(object) {
-  periods <- if (identical(get_trend_type(object), "LLT")) {
-    llt_season_periods(first_trend_spec(object))
-  }
+  periods <- fitted_season_periods(object)
   if (NROW(periods) == 0L) {
     stop(insight::format_error(c(
       "'seasonality()' requires an 'LLT()' trend with a season.",
