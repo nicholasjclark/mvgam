@@ -52,6 +52,12 @@
 #'   Both forms take `ndraws` and `draw_ids`. A subset of the posterior
 #'   computes faster.
 #'
+#' @section Methods:
+#' `summary()` turns the draws into the `mvgam_fevd_summary` above, at
+#' the percentiles `probs` sets. `plot()` stacks the median share of
+#' each source in one panel per target, by horizon. A summary plots
+#' through [plot.mvgam_var_surface_summary()].
+#'
 #' @seealso [mvgam()], [VAR()], [fevd()], [irf()]
 #'
 #' @references Lutkepohl H (2005). New Introduction to Multiple Time Series
@@ -62,30 +68,12 @@
 #' @name mvgam_fevd-class
 NULL
 
-#' @title Posterior summary of forecast error variance decompositions
-#'
-#' @description This function takes an \code{mvgam_fevd} object and calculates
-#'   a posterior summary of the error variance decompositions of each series,
-#'   at all horizons
-#'
-#' @inheritParams summary.mvgam_irf
-#' @param object an object of class `mvgam_fevd` obtained using the
-#'   \code{fevd()} function. This object will contain draws from the posterior
-#'   distribution of the forecast error variance decompositions.
-#'
-#'
+#' @param object An `mvgam_fevd` object from `fevd(summary = FALSE)`.
+#' @param probs The lower and upper percentiles of the interval.
+#'   Defaults to `c(0.025, 0.975)`.
 #' @param ... Unused. Anything passed here is refused.
-#'
-#' @return A long-format `tibble` / `data.frame` reporting the posterior median,
-#'   upper and lower percentiles of the error variance decompositions of each
-#'   series at all horizons.
-#'
+#' @rdname mvgam_fevd-class
 #' @method summary mvgam_fevd
-#'
-#' @seealso \code{\link{fevd}}, \code{\link{plot.mvgam_fevd}}
-#'
-#' @author Nicholas J Clark
-#'
 #' @export
 summary.mvgam_fevd <- function(object, probs = c(0.025, 0.975), ...) {
   checkmate::assert_class(object, "mvgam_fevd")
@@ -98,37 +86,15 @@ summary.mvgam_fevd <- function(object, probs = c(0.025, 0.975), ...) {
   )
 }
 
-#'Plot forecast error variance decompositions from an `mvgam_fevd` object
-#'
-#'This function takes an \code{mvgam_fevd} object and produces
-#'a plot of the posterior median contributions to forecast variance for
-#'each series in the fitted Vector Autoregression
-#'
-#'@importFrom ggplot2 ggplot aes geom_bar facet_wrap labs
-#'
-#'@param x \code{list} object of class \code{mvgam_fevd}. See [fevd()]
-#'@param series Optional positions or names of the target processes
-#'  shown as facets. Useful on hierarchical VAR fits where the raw
-#'  K x K panel would run to dozens of panels. Defaults to all
-#'  processes.
-#'@param contributing Optional positions or names of the source
-#'  processes stacked as contributions to each target.
-#'  The shares of the sources drawn are renormalised to sum to one. On
-#'  a hierarchical VAR this isolates the dependencies within one group.
-#'  Defaults to all processes.
-#'
-#'@param ... Unused. Anything passed here is refused.
-#'
-#'@return A \code{\link[ggplot2]{ggplot}} object,
-#'  which can be further customized using the \pkg{ggplot2} package
-#'
-#'@seealso [fevd()], [irf()], [stability()],
-#'  [plot.mvgam_irf()], [plot.mvgam_stability()],
-#'  [plot.mvgam_forecast()]
-#'
-#'@author Nicholas J Clark
-#'
-#'@export
+#' @param x An `mvgam_fevd` object.
+#' @param series Optional positions or names of the target processes
+#'   drawn as panels. Defaults to every process.
+#' @param contributing Optional positions or names of the source
+#'   processes stacked in each panel. Their shares are renormalised to
+#'   sum to one. Defaults to every process.
+#' @rdname mvgam_fevd-class
+#' @importFrom ggplot2 ggplot aes geom_bar facet_wrap labs
+#' @export
 plot.mvgam_fevd <- function(x, series = NULL, contributing = NULL, ...) {
   checkmate::assert_class(x, "mvgam_fevd")
   rlang::check_dots_empty()

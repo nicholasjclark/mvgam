@@ -125,10 +125,10 @@ Other model fitting:
 \code{\link{jsdgam}()},
 \code{\link{mvgam}()},
 \code{\link{mvgam_data}()},
-\code{\link{mvgam_formula}()},
 \code{\link{mvgam_multiple}()},
 \code{\link{pivot_detection_array}()},
 \code{\link{pivot_species_matrix}()},
+\code{\link{print.mvgam_formula}()},
 \code{\link{stancode.mvgam_formula}()},
 \code{\link{update.mvgam}()}
 }

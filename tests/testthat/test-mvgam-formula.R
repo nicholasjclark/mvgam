@@ -27,7 +27,7 @@ test_that("mvgam_formula takes formulas alone", {
   }
   for (bad in list("not a formula", 123, list(~ 1))) {
     expect_error(mvgam_formula(y ~ x, trend_formula = bad),
-                 "Assertion on 'trend_formula' failed")
+                 "'trend_formula' must be a one-sided formula")
   }
 })
 

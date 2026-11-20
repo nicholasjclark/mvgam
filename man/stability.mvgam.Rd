@@ -3,6 +3,9 @@
 \name{stability.mvgam}
 \alias{stability.mvgam}
 \alias{stability}
+\alias{summary.mvgam_stability}
+\alias{plot.mvgam_stability_summary}
+\alias{plot.mvgam_stability}
 \title{Calculate measures of latent VAR community stability}
 \usage{
 stability(object, ...)
@@ -17,10 +20,28 @@ stability(object, ...)
   future = FALSE,
   ...
 )
+
+\method{summary}{mvgam_stability}(object, probs = c(0.025, 0.975), robust = TRUE, bins = 30L, ...)
+
+\method{plot}{mvgam_stability_summary}(
+  x,
+  variables = c("reactivity", "mean_return_rate", "var_return_rate"),
+  intervals = FALSE,
+  ...
+)
+
+\method{plot}{mvgam_stability}(
+  x,
+  variables = c("reactivity", "mean_return_rate", "var_return_rate"),
+  bins = 30L,
+  ...
+)
 }
 \arguments{
 \item{object}{An object of class \code{mvgam} fitted with a
-\code{VAR(p = 1)} latent process model}
+\code{VAR(p = 1)} latent process model.
+For \code{summary()}, an \code{mvgam_stability} object from
+\code{stability(summary = FALSE)}.}
 
 \item{...}{Unused. Anything passed here is refused.}
 
@@ -49,11 +70,35 @@ has set. The default \code{sequential} plan runs as base \code{lapply()}
 does. \code{plan(multisession, workers = N)} splits the draws across
 \code{N} R processes. Without the \pkg{future} package the draws
 run in turn, with a message.}
+
+\item{robust}{Logical, for \code{summary()}. \code{TRUE} (the default) reports
+the median and median absolute deviation. \code{FALSE} reports the mean
+and standard deviation.}
+
+\item{bins}{Number of histogram bins, which \code{summary()} records for
+\code{plot()}.}
+
+\item{x}{An \code{mvgam_stability} object or its summary.}
+
+\item{variables}{Character vector of the metrics to draw. Defaults
+to reactivity and the mean and variance return rates. Any column
+of \code{x} can be named.}
+
+\item{intervals}{Logical, for a summary. \code{TRUE} draws each metric as
+a median and interval. \code{FALSE} (the default) draws its binned
+posterior.}
 }
 \value{
 A \code{data.frame} with the posterior median and interval of
 each stability metric, or under \code{summary = FALSE} an object of class
 \code{mvgam_stability} holding one row of metrics per posterior draw.
+\code{summary()} turns the draws into the summary, one row per metric,
+or per panel and metric on a hierarchical VAR. \code{plot()} draws a
+histogram of each metric, with a dashed line at zero on the
+reactivity panel, above which the system amplifies a shock before
+it decays. A hierarchical VAR draws a median and interval for each
+panel. A summary plots the histograms from the bins it recorded, or
+under \code{intervals = TRUE} a median and interval.
 }
 \description{
 Compute reactivity, return rates and contributions of interactions to

@@ -2,7 +2,24 @@
 % Please edit documentation in R/mvgam_forecast-class.R
 \name{mvgam_forecast-class}
 \alias{mvgam_forecast-class}
+\alias{summary.mvgam_forecast}
+\alias{print.mvgam_forecast}
 \title{\code{mvgam_forecast} object description}
+\usage{
+\method{summary}{mvgam_forecast}(object, probs = c(0.025, 0.975), ...)
+
+\method{print}{mvgam_forecast}(x, ...)
+}
+\arguments{
+\item{object}{An \code{mvgam_forecast} object.}
+
+\item{probs}{The lower and upper quantiles reported with the median.
+Defaults to \code{c(0.025, 0.975)}.}
+
+\item{...}{Unused. Anything passed here is refused.}
+
+\item{x}{An \code{mvgam_forecast} object.}
+}
 \description{
 A \code{mvgam_forecast} object returned by function \code{\link{hindcast}}
 or \code{\link[generics]{forecast}}. Run
@@ -51,6 +68,18 @@ the \code{component} argument of \code{\link[=hindcast.mvgam]{hindcast.mvgam()}}
 \code{\link[=forecast.mvgam]{forecast.mvgam()}}.
 }
 }
+\section{Methods}{
+
+\code{print()} gives the family, the number of series, the sizes of the
+training and forecast windows and the number of draws. \code{summary()}
+returns a long tibble with one row per series and time: the median
+and the two quantiles of \code{probs}, the observed value for
+\code{type = "response"} and the prediction type. Trend components add a
+\code{component} column, their names joined by \code{" + "}. A multivariate
+fit on a long frame adds a leading \code{resp} column. \code{\link[=plot.mvgam_forecast]{plot.mvgam_forecast()}}
+draws the object.
+}
+
 \seealso{
 \link{mvgam}, \link{hindcast.mvgam}, \link{forecast.mvgam}
 }

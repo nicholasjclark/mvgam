@@ -32,11 +32,15 @@
 #'   \item `in_interval`: whether the observation fell in the central
 #'     interval, as [score.mvgam_forecast()] reports it.
 #' }
+#' `summary()` returns the scores wide, one column per model and one
+#' row per series and horizon, or per horizon for a joint score.
+#' `plot()` draws each model's score by horizon. A univariate score
+#' takes one panel per series and a joint score one panel. An ensemble
+#' plots as one more model.
 #'
 #' @author Nicholas J Clark
 #'
-#' @seealso [score.mvgam_forecast()],
-#'   [plot.mvgam_compare_scores()], [compare_elpds()],
+#' @seealso [score.mvgam_forecast()], [compare_elpds()],
 #'   [forecast.mvgam()], [ensemble.mvgam_forecast()]
 #'
 #' @template ex-forecast-models
@@ -136,12 +140,13 @@ compare_scores <- function(..., score = "crps", model_names = NULL,
 #'   \item `refit_here` -- logical, TRUE when the step triggered
 #'     a fresh refit (Pareto-k above threshold or initial fit).
 #' }
+#' `plot()` draws each model's ELPD by origin. Hollow points mark the
+#' origins where a Pareto k above the threshold forced a refit.
 #'
 #' @author Nicholas J Clark
 #'
 #' @seealso [lfo_cv()], [loo_compare.mvgam_lfo()],
-#'   [loo_model_weights.mvgam_lfo()],
-#'   [plot.mvgam_compare_elpds()], [compare_scores()]
+#'   [loo_model_weights.mvgam_lfo()], [compare_scores()]
 #'
 #' @template ex-forecast-models
 #' @templateVar seed 1
@@ -194,47 +199,15 @@ compare_elpds <- function(..., model_names = NULL) {
 }
 
 
-#' Plot per-model score trajectories from `compare_scores()`
-#'
-#' @description Draws a `ggplot2` line + point chart of forecast
-#'   scores from a `mvgam_compare_scores` object. The shape
-#'   adapts to the score type:
-#'   \itemize{
-#'     \item Univariate scores (`"crps"`, `"drps"`, `"logs"`,
-#'       `"brier"`, `"sis"`, `"dss"`, `"qs"`, `"twcrps"`) plot
-#'       per-series with one facet panel per series; toggle off
-#'       with `facet = FALSE` to overlay every series on one
-#'       panel.
-#'     \item Joint multivariate scores (`"energy"`,
-#'       `"variogram"`, `"twenergy"`) plot a single panel from
-#'       the `all_series` rows.
-#'   }
-#'   An ensemble passed to `compare_scores()` is plotted as one
-#'   more model and compared with its components.
-#'
-#' @param x A `mvgam_compare_scores` object from
-#'   [compare_scores()].
-#' @param relative Optional character name of a baseline model
-#'   already in `x$model`. When supplied, scores are differenced
-#'   against that model at each series x horizon cell and the
-#'   plot adds a dashed zero line; negative values then mean
-#'   "better than the baseline". The baseline model itself is
-#'   dropped from the plot since its values are identically
-#'   zero.
-#' @param facet Logical. When `TRUE` (default) univariate scores
-#'   are faceted by series; when `FALSE` series are overlaid on
-#'   one panel with linetype distinguishing them. Ignored for
-#'   joint scores.
-#' @param ... Unused. Anything passed here is refused.
-#'
-#' @return A `ggplot` object.
-#'
-#' @seealso [compare_scores()], [score.mvgam_forecast()],
-#'   [plot.mvgam_compare_elpds()],
-#'   [ensemble.mvgam_forecast()]
-#'
+#' @param relative Optional name of a model in `x$model`. Each score is
+#'   then drawn less that model's at the same series and horizon, with
+#'   a dashed zero line. Negative values favour the other model. The
+#'   baseline itself is left out.
+#' @param facet Logical. `TRUE` (the default) gives a univariate score
+#'   one panel per series. `FALSE` overlays the series, told apart by
+#'   line type. A joint score ignores it.
+#' @rdname compare_scores
 #' @method plot mvgam_compare_scores
-#' @author Nicholas J Clark
 #' @export
 plot.mvgam_compare_scores <- function(x, relative = NULL,
                                        facet = TRUE, ...) {
@@ -285,38 +258,16 @@ plot.mvgam_compare_scores <- function(x, relative = NULL,
 }
 
 
-#' Plot per-step LFO ELPDs from `compare_elpds()`
-#'
-#' @description Draws a `ggplot2` line + point chart of
-#'   leave-future-out ELPDs over the rolling-origin evaluation
-#'   grid. Each model gets a coloured line. Refit timepoints
-#'   (where Pareto-k crossed the threshold and the model was
-#'   refit) are highlighted with a hollow marker so the reader
-#'   can see where mvgam stopped trusting the PSIS
-#'   approximation.
-#'
-#' @param x A `mvgam_compare_elpds` object from
-#'   [compare_elpds()].
-#' @param relative Optional character name of a baseline model
-#'   already in `x$model`. When supplied, per-step ELPDs are
-#'   differenced against that model at each evaluation
-#'   timepoint and the plot adds a dashed zero line; positive
-#'   values then mean "better than the baseline". The baseline
-#'   itself is dropped from the plot.
-#' @param cumulative Logical. When `TRUE` (default `FALSE`) the
-#'   y-axis becomes the cumulative ELPD up to each evaluation
-#'   timepoint, which is the quantity `loo_compare()` sums
-#'   across folds.
-#' @param ... Unused. Anything passed here is refused.
-#'
-#' @return A `ggplot` object.
-#'
-#' @seealso [compare_elpds()], [lfo_cv()],
-#'   [loo_compare.mvgam_lfo()],
-#'   [plot.mvgam_compare_scores()]
-#'
+#' @param x An `mvgam_compare_elpds` object.
+#' @param relative Optional name of a model in `x$model`. Each ELPD is
+#'   then drawn less that model's at the same origin, with a dashed zero
+#'   line. Positive values favour the other model. The baseline itself
+#'   is left out.
+#' @param cumulative Logical. `TRUE` draws the running sum of the ELPD
+#'   over the origins, the quantity `loo_compare()` sums. Defaults to
+#'   `FALSE`.
+#' @rdname compare_elpds
 #' @method plot mvgam_compare_elpds
-#' @author Nicholas J Clark
 #' @export
 plot.mvgam_compare_elpds <- function(x, relative = NULL,
                                       cumulative = FALSE, ...) {
@@ -400,25 +351,9 @@ difference_from_baseline <- function(df, relative, value, by) {
 }
 
 
-#' Wide-format summary of a `compare_scores()` table
-#'
-#' @description Pivots the long-format `mvgam_compare_scores`
-#'   tibble to one row per evaluation cell (per series x horizon
-#'   for univariate scores, per horizon for joint scores) and one
-#'   column per model.
-#'
-#' @param object A `mvgam_compare_scores` object from
-#'   [compare_scores()].
-#' @param ... Unused. Anything passed here is refused.
-#'
-#' @return A `tibble` with one row per series x horizon cell
-#'   (univariate scores) or per horizon (joint scores), one
-#'   column of scores per model.
-#'
-#' @seealso [compare_scores()], [plot.mvgam_compare_scores()]
-#'
+#' @param object An `mvgam_compare_scores` object.
+#' @rdname compare_scores
 #' @method summary mvgam_compare_scores
-#' @author Nicholas J Clark
 #' @export
 summary.mvgam_compare_scores <- function(object, ...) {
   rlang::check_dots_empty()

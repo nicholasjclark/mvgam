@@ -2,13 +2,7 @@
 # `build_hindcast_arms()` from the fitted latent states.
 
 
-#' Generic for posterior hindcasts
-#'
-#' @param object A model fit object.
-#' @param ... Method-specific arguments.
-#'
-#' @return Method-specific.
-#'
+#' @rdname hindcast.mvgam
 #' @export
 hindcast <- function(object, ...) {
   UseMethod("hindcast", object)
@@ -24,14 +18,26 @@ hindcast <- function(object, ...) {
 #' unseen times.
 #'
 #' @inheritParams forecast.mvgam
-#' @param object A fitted [mvgam][mvgam::mvgam] object.
+#' @param object A fitted [mvgam][mvgam::mvgam] object, or for
+#'   `summary()` an `mvgam_latent_state` object.
 #' @param ... Unused. Anything passed here is refused.
+#' @param x An `mvgam_latent_state` object.
+#' @param probs For `summary()`, the four interval bounds, lowest
+#'   first. Defaults to `c(0.025, 0.25, 0.75, 0.975)`, the 50% and 95%
+#'   intervals.
+#' @param digits Integer number of digits in the printed range.
+#'   Defaults to 2.
+#' @param series Names or indices of the series to plot, or `NULL` for
+#'   every series.
 #' @param type The scale of the draws, as in [forecast.mvgam()], or
 #'   `"latent_state"` for a closure-unit family. `"latent_state"`
 #'   returns the occupancy probability `psi` of an [occ()] model or the
 #'   abundance `N` of an [nmix()] model at each closure unit, as an
-#'   `mvgam_latent_state` object with `print()`, `summary()`,
-#'   `as.data.frame()` and `plot()` methods.
+#'   `mvgam_latent_state` object. Its `print()` gives the range of the
+#'   unit medians. `summary()` and `as.data.frame()` return one row per
+#'   unit with the median and the 50% and 95% interval bounds. `plot()`
+#'   draws them per series, as a line with ribbons over time or as
+#'   points with interval bars over units without an order.
 #' @param process_error Logical. `FALSE` (the default) takes the
 #'   fitted latent state of each draw. `type = "response"` then adds
 #'   the observation noise alone. `TRUE` replaces the fitted states

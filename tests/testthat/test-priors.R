@@ -1105,14 +1105,16 @@ test_that("get_prior describes the loadings a trend_map leaves", {
   set.seed(1L)
   d <- sim_mvgam(family = poisson(), n_series = 4L,
                   n_timepoints = 20L)$data_train
-  mf <- mvgam_formula(y ~ 1, trend_formula = ~ AR(p = 1))
   fixed <- data.frame(series = factor(paste0("series_", 1:4)),
                       trend = c(1L, 1L, 2L, 2L))
   partial <- matrix(c(1, NA, 0, NA, 0, NA, 1, NA), 4, 2)
+  mapped <- function(tm) {
+    mvgam_formula(y ~ 1, trend_formula = ~ AR(p = 1, trend_map = tm))
+  }
   for (tm in list(fixed, partial)) {
-    tab <- get_prior(mf, data = d, family = poisson(), trend_map = tm)
-    sc <- stancode(mf, data = d, family = poisson(), trend_map = tm,
-                   validate = FALSE)
+    mf <- mapped(tm)
+    tab <- get_prior(mf, data = d, family = poisson())
+    sc <- stancode(mf, data = d, family = poisson(), validate = FALSE)
     expect_true("sigma_trend" %in% tab$class)
     expect_equal(stan_prior_on(sc, "sigma_trend"),
                  tab$prior[tab$class == "sigma_trend"])
@@ -1120,21 +1122,13 @@ test_that("get_prior describes the loadings a trend_map leaves", {
                  tab$prior[tab$class == "Z"])
   }
   # Only the partial map samples loadings.
-  expect_false("Z" %in% get_prior(mf, data = d, family = poisson(),
-                                   trend_map = fixed)$class)
+  expect_false("Z" %in% get_prior(mapped(fixed), data = d,
+                                   family = poisson())$class)
 
   # A user prior on `Z` reaches the free entries of a partial map.
-  sc <- stancode(mf, data = d, family = poisson(), trend_map = partial,
+  sc <- stancode(mapped(partial), data = d, family = poisson(),
                  prior = prior(normal(0, 3), class = Z), validate = FALSE)
   expect_equal(stan_prior_on(sc, "Z_free_vec"), "normal(0, 3)")
-
-  # Written on the constructor, the map gives the same table.
-  mf_con <- mvgam_formula(y ~ 1, trend_formula = ~ AR(p = 1,
-                                                      trend_map = fixed))
-  expect_equal(
-    get_prior(mf_con, data = d, family = poisson()),
-    get_prior(mf, data = d, family = poisson(), trend_map = fixed)
-  )
 })
 
 test_that("get_prior uses the axis columns the constructor names", {
@@ -1150,14 +1144,15 @@ test_that("get_prior uses the axis columns the constructor names", {
 })
 
 test_that("get_prior refuses a factor request the trend cannot take", {
-  # The top-level `trend_map` reaches a trend that has no factor
-  # form. `mvgam()` refuses it, and the prior table must agree.
+  # A `trend_map` asks a trend with no factor form for factors.
+  # `mvgam()` refuses it. The prior table must refuse it too.
   d <- data.frame(y = rpois(40, 5), time = rep(1:20, 2),
                   series = factor(rep(c("a", "b"), each = 20)))
-  mf <- mvgam_formula(y ~ 1, trend_formula = ~ CAR())
+  mf <- mvgam_formula(y ~ 1, trend_formula = ~ CAR(
+    trend_map = matrix(c(1, NA), 2, 1)
+  ))
   expect_error(
-    get_prior(mf, data = d, family = poisson(),
-              trend_map = matrix(c(1, NA), 2, 1)),
+    get_prior(mf, data = d, family = poisson()),
     "Factor models are not supported for CAR trends"
   )
 })

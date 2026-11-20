@@ -1160,7 +1160,7 @@ axis_matrix <- function() {
          ~ RW(cor = TRUE, gr = region, subgr = species), "sound", "uni"),
     list("hier / CAR", "hier_col",
          ~ CAR(gr = region, subgr = species), "refuse", "uni",
-         "unused argument"),
+         "Unknown argument 'gr' in 'CAR"),
 
     # `by = lv_axis()` moves the trend design onto the factor axis,
     # so the map Stan is given is one column per factor rather than

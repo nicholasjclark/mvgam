@@ -162,22 +162,17 @@ estimates $\log A$. The difference between the sightings and count
 intercepts estimates the log thinning:
 
 ```{r contrasts}
-b <- as_draws_df(
-  mod_joint,
-  variable = c("b_count_Intercept", "b_pa_Intercept", "b_po_Intercept")
-)
-contrasts <- data.frame(
-  `log area` = b$b_pa_Intercept - b$b_count_Intercept,
-  `log thinning` = b$b_po_Intercept - b$b_count_Intercept,
-  check.names = FALSE
-)
-round(t(apply(contrasts, 2, quantile, c(0.025, 0.5, 0.975))), 2)
+constants <- hypothesis(mod_joint, c(
+  `log area` = "pa_Intercept - count_Intercept = 0",
+  `log thinning` = "po_Intercept - count_Intercept = 0"
+))
+constants
 ```
 
 ```{r contrast-numbers, include = FALSE}
-ci <- apply(contrasts, 2, quantile, c(0.025, 0.975))
-n_cover <- sum(ci[1, ] < c(log(area), log_thinning) &
-                 ci[2, ] > c(log(area), log_thinning))
+ci <- constants$hypothesis
+n_cover <- sum(ci$CI.Lower < c(log(area), log_thinning) &
+                 ci$CI.Upper > c(log(area), log_thinning))
 fe_cover <- c("Neither interval covers its constant.",
               "One of the two intervals covers its constant.",
               "Both intervals cover them.")[n_cover + 1]

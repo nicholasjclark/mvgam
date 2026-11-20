@@ -2,7 +2,29 @@
 % Please edit documentation in R/mvgam_irf-class.R
 \name{mvgam_irf-class}
 \alias{mvgam_irf-class}
+\alias{summary.mvgam_irf}
+\alias{plot.mvgam_irf}
 \title{\code{mvgam_irf} object description}
+\usage{
+\method{summary}{mvgam_irf}(object, probs = c(0.025, 0.975), ...)
+
+\method{plot}{mvgam_irf}(x, series = 1, responses = NULL, ...)
+}
+\arguments{
+\item{object}{An \code{mvgam_irf} object from \code{irf(summary = FALSE)}.}
+
+\item{probs}{The lower and upper percentiles of the interval.
+Defaults to \code{c(0.025, 0.975)}.}
+
+\item{...}{Unused. Anything passed here is refused.}
+
+\item{x}{An \code{mvgam_irf} object.}
+
+\item{series}{Position or name of the process given the shock.}
+
+\item{responses}{Optional positions or names of the processes drawn
+as response panels. Defaults to every process.}
+}
 \description{
 The objects returned by \code{\link[=irf]{irf()}}. Run \code{methods(class = "mvgam_irf")}
 and \code{methods(class = "mvgam_irf_summary")} to see an overview of
@@ -44,6 +66,14 @@ element per posterior draw, each itself a \code{list} holding one
 Both forms take \code{ndraws} and \code{draw_ids}. A subset of the posterior
 shortens the computation.
 }
+\section{Methods}{
+
+\code{summary()} turns the draws into the \code{mvgam_irf_summary} above, at
+the percentiles \code{probs} sets. \code{plot()} draws the response of each
+process to a shock to \code{series}, with its median and interval by
+horizon. A summary plots through \code{\link[=plot.mvgam_var_surface_summary]{plot.mvgam_var_surface_summary()}}.
+}
+
 \references{
 Pesaran HH and Shin Y (1998). Generalized impulse
 response analysis in linear multivariate models. Economics Letters

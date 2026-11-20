@@ -2,9 +2,12 @@
 % Please edit documentation in R/compare_scores.R
 \name{compare_elpds}
 \alias{compare_elpds}
+\alias{plot.mvgam_compare_elpds}
 \title{Tidy comparison of leave-future-out ELPDs across mvgam_lfo runs}
 \usage{
 compare_elpds(..., model_names = NULL)
+
+\method{plot}{mvgam_compare_elpds}(x, relative = NULL, cumulative = FALSE, ...)
 }
 \arguments{
 \item{...}{Two or more \code{mvgam_lfo} objects from \code{\link[=lfo_cv]{lfo_cv()}}.
@@ -12,6 +15,17 @@ Argument names are taken from the call.}
 
 \item{model_names}{Optional character vector of model names, one per
 forecast. It replaces the names taken from the call.}
+
+\item{x}{An \code{mvgam_compare_elpds} object.}
+
+\item{relative}{Optional name of a model in \code{x$model}. Each ELPD is
+then drawn less that model's at the same origin, with a dashed zero
+line. Positive values favour the other model. The baseline itself
+is left out.}
+
+\item{cumulative}{Logical. \code{TRUE} draws the running sum of the ELPD
+over the origins, the quantity \code{loo_compare()} sums. Defaults to
+\code{FALSE}.}
 }
 \value{
 A \code{tibble} with columns:
@@ -23,6 +37,8 @@ A \code{tibble} with columns:
 \item \code{refit_here} -- logical, TRUE when the step triggered
 a fresh refit (Pareto-k above threshold or initial fit).
 }
+\code{plot()} draws each model's ELPD by origin. Hollow points mark the
+origins where a Pareto k above the threshold forced a refit.
 }
 \description{
 Stacks the per-step ELPDs from several \code{mvgam_lfo}
@@ -65,8 +81,7 @@ plot(elpds, relative = "GAM", cumulative = TRUE)
 }
 \seealso{
 \code{\link[=lfo_cv]{lfo_cv()}}, \code{\link[=loo_compare.mvgam_lfo]{loo_compare.mvgam_lfo()}},
-\code{\link[=loo_model_weights.mvgam_lfo]{loo_model_weights.mvgam_lfo()}},
-\code{\link[=plot.mvgam_compare_elpds]{plot.mvgam_compare_elpds()}}, \code{\link[=compare_scores]{compare_scores()}}
+\code{\link[=loo_model_weights.mvgam_lfo]{loo_model_weights.mvgam_lfo()}}, \code{\link[=compare_scores]{compare_scores()}}
 
 Other model comparison: 
 \code{\link{bridge_sampler.mvgam}()},

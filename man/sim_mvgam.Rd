@@ -2,6 +2,9 @@
 % Please edit documentation in R/sim_mvgam.R
 \name{sim_mvgam}
 \alias{sim_mvgam}
+\alias{summary.mvgam_sim}
+\alias{print.mvgam_sim_summary}
+\alias{print.mvgam_sim}
 \title{Simulate \code{mvgam}-shaped time-series data with known truth}
 \usage{
 sim_mvgam(
@@ -16,6 +19,12 @@ sim_mvgam(
   family_pars = list(),
   seed = NULL
 )
+
+\method{summary}{mvgam_sim}(object, ...)
+
+\method{print}{mvgam_sim_summary}(x, digits = 3L, ...)
+
+\method{print}{mvgam_sim}(x, ...)
 }
 \arguments{
 \item{type}{Integer in \code{1:7} selecting the observation-side
@@ -56,6 +65,14 @@ between 0 and 0.5. Defaults to \code{0}.}
 
 \item{seed}{Optional integer seed. The session's random state is
 restored when the call returns.}
+
+\item{object}{An \code{mvgam_sim} object.}
+
+\item{...}{Unused. Anything passed here is refused.}
+
+\item{x}{An \code{mvgam_sim} object or its summary.}
+
+\item{digits}{Integer number of significant digits. Defaults to 3.}
 }
 \value{
 A list of class \code{"mvgam_sim"}:
@@ -74,6 +91,10 @@ latent trend.}
 \item{\code{true_sigma_obs}}{The family's scale or dispersion, or
 \code{NA} for a family without one.}
 }
+\code{summary()} returns the design and these true parameters as an
+\code{mvgam_sim_summary} list, with the number of series, time points,
+training and test rows and the names of the true smooths.
+\code{print()} shows that summary.
 }
 \description{
 Simulates training and test data from one of seven

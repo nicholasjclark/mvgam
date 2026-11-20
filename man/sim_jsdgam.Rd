@@ -2,6 +2,8 @@
 % Please edit documentation in R/sim_jsdgam.R
 \name{sim_jsdgam}
 \alias{sim_jsdgam}
+\alias{summary.mvgam_sim_jsdgam}
+\alias{print.mvgam_sim_jsdgam_summary}
 \title{Simulate multi-species data for a joint species distribution model}
 \usage{
 sim_jsdgam(
@@ -12,6 +14,10 @@ sim_jsdgam(
   family_pars = list(),
   seed = NULL
 )
+
+\method{summary}{mvgam_sim_jsdgam}(object, ...)
+
+\method{print}{mvgam_sim_jsdgam_summary}(x, digits = 3L, ...)
 }
 \arguments{
 \item{family}{Observation family. Any family mvgam's response
@@ -33,6 +39,14 @@ negative binomial or \code{sigma} for a gaussian.}
 
 \item{seed}{Optional integer seed. The session's random state is
 restored when the call returns.}
+
+\item{object}{A \code{mvgam_sim_jsdgam} object.}
+
+\item{...}{Unused. Anything passed here is refused.}
+
+\item{x}{A \code{mvgam_sim_jsdgam_summary} object.}
+
+\item{digits}{Integer number of significant digits. Defaults to 3.}
 }
 \value{
 An object of class \code{mvgam_sim_jsdgam}, inheriting
@@ -52,6 +66,10 @@ simulators.}
 \code{\link[=diri]{diri()}} and \code{\link[=multi]{multi()}} these include the defaults
 \code{Psi = 0.5}, \code{nu = 5}, \code{phi = 30} and \code{unit_total = 30}.}
 }
+\code{summary()} returns an \code{mvgam_sim_jsdgam_summary} list: the design,
+the per-species generative parameters and the range of the
+residual correlations the loadings imply, which a fit of these data
+is asked to recover. \code{print()} shows it.
 }
 \description{
 Draws a site-by-species response matrix from a latent factor model

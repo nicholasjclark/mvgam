@@ -992,24 +992,8 @@ assert_residcor_summarised <- function(x) {
 }
 
 
-#' Tidy summary of an `mvgam_residcor` object
-#'
-#' Returns a tibble with one row per unique upper-triangle pair of
-#' series, sorted by `prob_nonzero` descending (so the most credibly
-#' non-zero pairs appear first).
-#'
-#' @param object An `mvgam_residcor` object returned by
-#'   [residual_cor()] with `summary = TRUE`.
-#' @param ... Unused. Anything passed here is refused.
-#'
-#' @return A `tibble::tibble` with columns `series_1`, `series_2`,
-#'   `Estimate`, `Est.Error`, `Q_lower`, `Q_upper`, `ESS`,
-#'   `prob_positive`, `prob_negative`, `prob_nonzero`, `sig` (whether
-#'   `prob_nonzero > prob_threshold`). `ESS` is the per-entry
-#'   effective sample size of the Fisher-z correlation draws. A low
-#'   value marks a pair the chains sampled poorly, however tight its
-#'   interval.
-#'
+#' @param object A summarised `mvgam_residcor` object.
+#' @rdname mvgam_residcor-class
 #' @method summary mvgam_residcor
 #' @export
 summary.mvgam_residcor <- function(object, ...) {
@@ -1058,15 +1042,8 @@ summary.mvgam_residcor <- function(object, ...) {
 }
 
 
-#' Print a concise overview of an `mvgam_residcor` object
-#'
-#' @param x An `mvgam_residcor` object.
-#' @param digits Integer; number of significant digits for printed
-#'   numbers. Default `2`.
-#' @param ... Unused.
-#'
-#' @return The `mvgam_residcor` object `x`, returned invisibly.
-#'
+#' @param digits Integer number of significant digits. Defaults to 2.
+#' @rdname mvgam_residcor-class
 #' @method print mvgam_residcor
 #' @export
 print.mvgam_residcor <- function(x, digits = 2L, ...) {

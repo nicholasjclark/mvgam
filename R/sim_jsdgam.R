@@ -118,6 +118,10 @@ sim_jsdgam_draw <- function(eta, family, pars) {
 #'       [diri()] and [multi()] these include the defaults
 #'       `Psi = 0.5`, `nu = 5`, `phi = 30` and `unit_total = 30`.}
 #'   }
+#'   `summary()` returns an `mvgam_sim_jsdgam_summary` list: the design,
+#'   the per-species generative parameters and the range of the
+#'   residual correlations the loadings imply, which a fit of these data
+#'   is asked to recover. `print()` shows it.
 #'
 #' @seealso [jsdgam()] fits the model these data come from.
 #'   [sim_closure_unit_data()] simulates occupancy and N-mixture data.
@@ -255,19 +259,9 @@ sim_jsdgam <- function(family = brms::negbinomial(),
 }
 
 
-#' Summary method for sim_jsdgam() output
-#'
-#' Reports the simulated design, the per-species generative
-#' parameters and the range of the residual correlations the
-#' loadings imply, which is what a fit of these data is asked to
-#' recover.
-#'
-#' @param object A `mvgam_sim_jsdgam` list returned by [sim_jsdgam()].
+#' @param object A `mvgam_sim_jsdgam` object.
 #' @param ... Unused. Anything passed here is refused.
-#'
-#' @return An object of class `mvgam_sim_jsdgam_summary`, with its own
-#'   [print()][print.mvgam_sim_jsdgam_summary] method.
-#'
+#' @rdname sim_jsdgam
 #' @method summary mvgam_sim_jsdgam
 #' @export
 summary.mvgam_sim_jsdgam <- function(object, ...) {
@@ -294,15 +288,9 @@ summary.mvgam_sim_jsdgam <- function(object, ...) {
 }
 
 
-#' Print method for sim_jsdgam() summary output
-#'
-#' @inheritParams print.mvgam_sim_summary
 #' @param x A `mvgam_sim_jsdgam_summary` object.
-#' @param ... Unused.
-#'
-#' @return The `mvgam_sim_jsdgam_summary` object `x`, returned
-#'   invisibly.
-#'
+#' @param digits Integer number of significant digits. Defaults to 3.
+#' @rdname sim_jsdgam
 #' @method print mvgam_sim_jsdgam_summary
 #' @export
 print.mvgam_sim_jsdgam_summary <- function(x, digits = 3L, ...) {

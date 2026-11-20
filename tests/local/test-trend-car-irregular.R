@@ -198,8 +198,9 @@ test_that("CAR refuses a factor decomposition, by every route", {
   # construction, and `n_lv` on the constructor.
   map_err <- expect_error(
     mvgam(
-      formula = y ~ temp, trend_formula = ~ CAR(),
-      trend_map = matrix(NA_real_, nrow = n_series, ncol = 2L),
+      formula = y ~ temp,
+      trend_formula = ~ CAR(trend_map = matrix(NA_real_, nrow = n_series,
+                                                ncol = 2L)),
       data = dat, family = poisson(), run_model = FALSE, silent = 2
     ),
     "Factor models are not supported for CAR trends"
@@ -298,9 +299,9 @@ test_that("CAR takes no grouping arguments at all", {
       trend_formula = ~ CAR(gr = series, subgr = series),
       data = dat, family = poisson(), run_model = FALSE, silent = 2
     ),
-    "unused argument"
+    "Unknown argument 'gr' in 'CAR()'", fixed = TRUE
   )
-  expect_match(conditionMessage(err), "gr", fixed = TRUE)
+  expect_match(conditionMessage(err), "?CAR", fixed = TRUE)
 })
 
 

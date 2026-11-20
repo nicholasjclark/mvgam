@@ -435,47 +435,9 @@ test_that("the threads getter yields a count, not a brmsthreads", {
   expect_null(entry$getter(list()))
 })
 
-test_that("trend_call_names_arg sees the argument, not its value", {
-  # `all.vars()` and `all.names()` return the values an argument was
-  # given. They do not return the argument's own name. The function walks
-  # the call.
-  tc <- ~ -1 + AR(p = 1, trend_map = Z_user, cor = TRUE)
-  expect_true(trend_call_names_arg(tc, "trend_map"))
-  expect_true(trend_call_names_arg(tc, "cor"))
-  expect_false(trend_call_names_arg(tc, "n_lv"))
-  # The value's own name differs from the argument's name.
-  expect_false(trend_call_names_arg(tc, "Z_user"))
-  expect_false(trend_call_names_arg(NULL, "trend_map"))
-  expect_false(trend_call_names_arg(~ AR(p = 1), "trend_map"))
-})
-
-test_that("trend_map is withheld when the constructor already has it", {
-  # Supplying it at both the constructor and the top level is a collision
-  # that `mvgam()` refuses. A refit hands back only what the original call
-  # put at the top level.
-  entry <- update_inheritance_table()$trend_map
-  Z <- matrix(c(1, 0, 0, 1), nrow = 2L)
-
-  on_constructor <- list(
-    trend_call = ~ AR(p = 1, trend_map = Z_user),
-    trend_metadata = list(fixed_Z = Z)
-  )
-  expect_null(entry$getter(on_constructor))
-
-  at_top_level <- list(
-    trend_call = ~ AR(p = 1),
-    trend_metadata = list(fixed_Z = Z)
-  )
-  expect_equal(entry$getter(at_top_level), Z)
-
-  # A fit with no fixed loadings hands back nothing either way.
-  expect_null(entry$getter(list(trend_call = ~ AR(p = 1),
-                                 trend_metadata = list())))
-})
-
 test_that("walk_trend_call_args visits every named argument once", {
-  # The one walk both readers use: `restore_trend_call_env()` looks at
-  # the values, `trend_call_names_arg()` at the names.
+  # The walk `restore_trend_call_env()` uses to pair each argument's
+  # name with its value.
   seen <- list()
   walk_trend_call_args(
     ~ -1 + AR(p = 1, trend_map = Z_user, cor = TRUE),
@@ -556,66 +518,6 @@ test_that("an updated fit reports the model call it now describes", {
   expect_identical(renamed$formula, quote(z ~ w))
   expect_identical(renamed$data, as.name("d2"))
   expect_false(any(c("formula.", "newdata") %in% names(renamed)))
-})
-
-test_that("a refit states an n_lv the trend formula does not name", {
-  # A factor count set by a top-level `trend_map` is on the fit. It does
-  # not appear in the expression the user wrote. Re-evaluating that
-  # expression alone builds a different model. In that model
-  # `by = lv_axis()` indexes the series axis. The refit must state what
-  # the fit resolved.
-  trend_call <- ~ s(elev, k = 5, by = lv_axis()) - 1 + ZMVN(cor = TRUE)
-  out <- state_resolved_trend_args(trend_call, list(n_lv = 2L))
-  # Stated on the constructor that owns it, leaving the rest of the
-  # expression as the user wrote it.
-  expect_identical(
-    deparse1(rlang::f_rhs(out)),
-    "s(elev, k = 5, by = lv_axis()) - 1 + ZMVN(cor = TRUE, n_lv = 2L)"
-  )
-})
-
-test_that("an n_lv the call already names is left as the user wrote it", {
-  # The expression settles it. Nothing needs restating. Binding the symbol
-  # is the job of `restore_trend_call_env()`.
-  trend_call <- ~ AR(p = 1, n_lv = k)
-  out <- state_resolved_trend_args(trend_call, list(n_lv = 2L))
-  expect_identical(deparse1(rlang::f_rhs(out)), "AR(p = 1, n_lv = k)")
-})
-
-test_that("a fit that resolved no n_lv is rebuilt unchanged", {
-  # Every non-factor fit takes this path. A value invented here would turn
-  # an ordinary trend into a factor model.
-  trend_call <- ~ AR(p = 1)
-  expect_identical(
-    state_resolved_trend_args(trend_call, list(n_lv = NULL)),
-    trend_call
-  )
-  expect_identical(
-    state_resolved_trend_args(trend_call, NULL),
-    trend_call
-  )
-})
-
-test_that("every trend constructor is told, not just the first", {
-  # A trend formula may carry one constructor per response. Stating
-  # the count on one of them would leave the others building a
-  # different model, which is the fault this whole path exists to
-  # prevent.
-  out <- state_resolved_trend_args(
-    ~ AR(p = 1) + VAR(cor = TRUE), list(n_lv = 2L)
-  )
-  txt <- deparse1(rlang::f_rhs(out))
-  expect_match(txt, "AR(p = 1, n_lv = 2L)", fixed = TRUE)
-  expect_match(txt, "VAR(cor = TRUE, n_lv = 2L)", fixed = TRUE)
-})
-
-test_that("a resolved count with nowhere to be stated is refused", {
-  # A rebuild without the count would give back a different model.
-  expect_error(
-    state_resolved_trend_args(~ s(env, by = lv_axis()) - 1,
-                              list(n_lv = 2L)),
-    "lacks a trend constructor"
-  )
 })
 
 test_that("a new iter drops a warmup the stored call recorded", {

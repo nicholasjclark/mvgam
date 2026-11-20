@@ -1928,17 +1928,19 @@ assemble_shared_innovation_trend <- function(dynamics, trend_specs,
 #' @noRd
 generate_common_trend_data <- function(n_obs, n_series, n_lv,
                                        is_factor_model, n_time = NULL) {
-  checkmate::assert_number(n_obs, lower = 1)
-  checkmate::assert_number(n_series, lower = 1)
-  checkmate::assert_number(n_lv, lower = 1)
+  checkmate::assert_count(n_obs, positive = TRUE)
+  checkmate::assert_count(n_series, positive = TRUE)
+  checkmate::assert_count(n_lv, positive = TRUE)
   checkmate::assert_flag(is_factor_model)
-  checkmate::assert_number(n_time, lower = 1, null.ok = TRUE)
+  checkmate::assert_count(n_time, positive = TRUE, null.ok = TRUE)
 
-  dims <- list(
+  # Stan declares these `int`. R parses `ZMVN(n_lv = 2)` with a double
+  # count.
+  dims <- lapply(list(
     N_series_trend = n_series,
     N_lv_trend = if (is_factor_model) n_lv else n_series,
     N_time_trend = n_time %||% n_obs
-  )
+  ), as.integer)
   do.call(combine_stanvars, lapply(names(dims), function(nm) {
     data_stanvar(dims[[nm]], nm, "int<lower=1>")
   }))

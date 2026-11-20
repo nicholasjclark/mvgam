@@ -3,6 +3,8 @@
 \name{pp_check.mvgam}
 \alias{pp_check.mvgam}
 \alias{pp_check}
+\alias{print.mvgam_ppc_fit_stat}
+\alias{plot.mvgam_ppc_fit_stat}
 \title{Posterior predictive checks for \pkg{mvgam} models}
 \usage{
 \method{pp_check}{mvgam}(
@@ -19,6 +21,10 @@
   series = NULL,
   ...
 )
+
+\method{print}{mvgam_ppc_fit_stat}(x, ...)
+
+\method{plot}{mvgam_ppc_fit_stat}(x, ...)
 }
 \arguments{
 \item{object}{An object of class \code{mvgam}}
@@ -45,9 +51,7 @@ replicates. \code{"ppd"} plots the replicates alone.}
 by which to stratify the ppc plot. This argument is required for
 ppc \code{*_grouped} types and ignored otherwise.}
 
-\item{x}{Optional name of a variable in the model.
-Only used for ppc types having an \code{x} argument
-and ignored otherwise.}
+\item{x}{An \code{mvgam_ppc_fit_stat} object.}
 
 \item{newdata}{Optional data frame of the variables in the model.
 \code{NULL} (the default) checks the training data. The residual types
@@ -81,7 +85,10 @@ refused. \code{type = "fit_stat"} takes \code{stat}, either \code{"chi_squared"}
 \value{
 A ggplot object. A multivariate model given no \code{resp}
 returns one figure with a panel per response. \code{type = "fit_stat"}
-returns an \code{mvgam_ppc_fit_stat} object with print and plot methods.
+returns an \code{mvgam_ppc_fit_stat} object. \code{print()} gives its
+discrepancy and Bayesian p-value. \code{plot()} draws the discrepancy of
+each draw's replicates against that of the observations, with the
+1:1 line and the p-value.
 }
 \description{
 Compares the observed response with replicates drawn from the fitted

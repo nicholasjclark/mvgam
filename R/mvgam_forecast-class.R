@@ -46,6 +46,16 @@
 #'     [forecast.mvgam()].
 #' }
 #'
+#' @section Methods:
+#' `print()` gives the family, the number of series, the sizes of the
+#' training and forecast windows and the number of draws. `summary()`
+#' returns a long tibble with one row per series and time: the median
+#' and the two quantiles of `probs`, the observed value for
+#' `type = "response"` and the prediction type. Trend components add a
+#' `component` column, their names joined by `" + "`. A multivariate
+#' fit on a long frame adds a leading `resp` column. [plot.mvgam_forecast()]
+#' draws the object.
+#'
 #' @seealso [mvgam], [hindcast.mvgam], [forecast.mvgam]
 #'
 #' @author Nicholas J Clark
@@ -53,34 +63,11 @@
 #' @name mvgam_forecast-class
 NULL
 
-#' @title Posterior summary of hindcast and forecast objects
-#'
-#' @description Posterior medians and quantiles of the hindcast and
-#'   forecast distributions of each series, with the observed values
-#'   in `data` and `newdata` when the object holds `type = 'response'`
-#'   predictions.
-#'
-#' @param object An `mvgam_forecast` object from [hindcast()] or
-#'   [forecast()].
-#'
-#' @param probs The lower and upper quantiles to report in addition to
-#'   the median.
-#'
-#' @param ... Unused. Anything passed here is refused.
-#'
-#' @return A long-format `tibble` with one row per series and time,
-#'   holding the posterior median and the two quantiles of the
-#'   predictions, the observed value for `type = 'response'` and the
-#'   prediction type. State components of the trend add a `component`
-#'   column, their names joined by `" + "`. A multivariate fit on a long
-#'   frame adds a leading `resp` column naming the response.
-#'
+#' @param object An `mvgam_forecast` object.
+#' @param probs The lower and upper quantiles reported with the median.
+#'   Defaults to `c(0.025, 0.975)`.
+#' @rdname mvgam_forecast-class
 #' @method summary mvgam_forecast
-#'
-#' @seealso \code{\link{forecast.mvgam}}, \code{\link{plot.mvgam_forecast}}
-#'
-#' @author Nicholas J Clark
-#'
 #' @export
 summary.mvgam_forecast <- function(object, probs = c(0.025, 0.975), ...) {
   rlang::check_dots_empty()
@@ -153,28 +140,9 @@ forecast_parts <- function(x) {
 is_forecast_list <- function(parts) !inherits(parts, "mvgam_forecast")
 
 
-#' Compact summary of an `mvgam_forecast` object
-#'
-#' Without a dedicated method, `print()` falls back to the default
-#' list printer and dumps every posterior matrix in the object,
-#' which is dozens of pages of numbers for any non-trivial fit.
-#' This method prints a single-screen header with the family, the
-#' number of series, the size of the training and forecast windows,
-#' and the number of posterior draws. Use [summary.mvgam_forecast()]
-#' for the per-timepoint posterior summary tibble or
-#' [plot.mvgam_forecast()] for the visual.
-#'
-#' @param x An `mvgam_forecast` object from [forecast.mvgam()],
-#'   [hindcast.mvgam()] or [ensemble.mvgam_forecast()].
-#' @param ... Ignored.
-#'
-#' @seealso [summary.mvgam_forecast()], [plot.mvgam_forecast()],
-#'   [forecast.mvgam()], [hindcast.mvgam()],
-#'   [ensemble.mvgam_forecast()], [score.mvgam_forecast()],
-#'   [compare_scores()]
-#'
-#' @return The `mvgam_forecast` object `x`, returned invisibly.
-#'
+#' @param x An `mvgam_forecast` object.
+#' @param ... Unused. Anything passed here is refused.
+#' @rdname mvgam_forecast-class
 #' @method print mvgam_forecast
 #' @export
 print.mvgam_forecast <- function(x, ...) {

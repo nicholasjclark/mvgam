@@ -68,6 +68,11 @@
 #' partial correlation suggests a more direct association.
 #'
 #' @references
+#' Gruvaeus G and Wainer H (1972). Two additions to hierarchical
+#' cluster analysis. British Journal of Mathematical and Statistical
+#' Psychology, 25, 200-206.
+#' \cr
+#' \cr
 #' Francis KC Hui (2016). BORAL - Bayesian ordination and regression
 #' analysis of multivariate abundance data in R. Methods in Ecology and
 #' Evolution. 7, 744-750.
@@ -77,50 +82,44 @@
 #' identify large networks of species-to-species associations at
 #' different spatial scales. Methods in Ecology and Evolution, 7,
 #' 549-555.
+#' @section Methods:
+#' `print()` gives the source and kind of covariance, the mean absolute
+#' correlation and the number of pairs whose `prob_nonzero` exceeds
+#' `prob_threshold`. `summary()` returns a tibble with one row per pair
+#' of series, sorted by `prob_nonzero`: `series_1`, `series_2`,
+#' `Estimate`, `Est.Error`, `Q_lower`, `Q_upper`, `ESS`, the three sign
+#' probabilities and `sig`. A low `ESS` marks a pair the chains sampled
+#' poorly, however tight its interval.
+#'
+#' `plot()` draws the lower triangle of the correlation matrix as a
+#' heatmap of the point estimates. A black outline marks each pair
+#' whose `prob_nonzero` exceeds `prob_threshold`, the pairs `sig_cor`
+#' keeps. The `mvgam_residcor_list` of `residual_cor(by_group = TRUE)`
+#' plots one facet per group, on shared colour limits.
+#'
 #' @seealso `jsdgam()`, [residual_cor()]
 #' @author Nicholas J Clark
 #' @name mvgam_residcor-class
 NULL
 
-#' Plot residual correlations or precisions from a `mvgam_residcor` object
-#'
-#' Heatmap of the residual correlations or partial correlations
-#' from a Joint Species Distribution (\code{jsdgam}) or dynamic
-#' factor (\code{mvgam}) model.
-#'
-#' @param x A `mvgam_residcor` object returned by
-#'   `residual_cor(..., summary = TRUE)`.
+#' @param x A summarised `mvgam_residcor` object, or for `plot()` an
+#'   `mvgam_residcor_list`.
 #' @param type Character. Which matrix to plot. `"correlation"` (the
 #'   default) draws `x$cor`. `"precision"` draws `x$prec`, the partial
-#'   correlations (Ovaskainen et al. 2016). `residual_cor()` computes
-#'   them under `partial = TRUE`.
-#' @param cluster Logical. When `TRUE`, the matrix is reordered by an
-#'   approximate Robinson ordering (Gruvaeus & Wainer 1972; average
-#'   linkage on the `1 - cormat` distance). Clusters of positive and
-#'   negative correlations then lie adjacent. Defaults to `FALSE`.
+#'   correlations, which `residual_cor()` computes under
+#'   `partial = TRUE`.
+#' @param cluster Logical. `TRUE` reorders the matrix by an approximate
+#'   Robinson ordering (Gruvaeus and Wainer 1972; average linkage on
+#'   the `1 - cormat` distance). Clusters of positive and negative
+#'   correlations then lie adjacent. Defaults to `FALSE`.
 #' @param rescale Logical. By default colour spans `[-1, 1]`, the full
-#'   range of a correlation. Panels from different fits are then
-#'   comparable. A correlation of 0.4 looks unlike one of 1. Set
-#'   `TRUE` to scale colour to the entries present, for a fit whose
-#'   correlations are all small. Defaults to `FALSE`.
+#'   range of a correlation, which keeps panels from different fits
+#'   comparable. `TRUE` scales colour to the entries present, for a fit
+#'   whose correlations are all small. Defaults to `FALSE`.
 #' @param supported_only Logical. `TRUE` leaves blank every pair whose
 #'   `prob_nonzero` is at most `prob_threshold`. Defaults to `FALSE`.
 #' @param ... Unused. Anything passed here is refused.
-#'
-#' @details Only the lower triangle of off-diagonal entries is
-#'   drawn. A symmetric matrix states each entry twice and the diagonal
-#'   of a correlation is 1. Fill shows the posterior point estimate. A
-#'   black outline marks each pair whose `prob_nonzero` exceeds the
-#'   `prob_threshold` given to [residual_cor()], the pairs `sig_cor`
-#'   keeps. [summary.mvgam_residcor()] reports each pair's interval and
-#'   `prob_nonzero`.
-#'
-#' @return A `ggplot` object.
-#'
-#' @seealso [residual_cor()], [summary.mvgam_residcor()]
-#'
-#' @author Nicholas J Clark
-#'
+#' @rdname mvgam_residcor-class
 #' @method plot mvgam_residcor
 #' @export
 plot.mvgam_residcor <- function(
@@ -194,30 +193,11 @@ residcor_heatmap <- function(panel, scale_name, rescale, ncol = NULL) {
 }
 
 
-#' Plot method for an `mvgam_residcor_list`
-#'
-#' Faceted heatmap panel across the per-group correlation
-#' matrices returned by `residual_cor(mod, by_group = TRUE)` on a
-#' hierarchical trend fit. Each panel is drawn as by
-#' [plot.mvgam_residcor()], one per group, with fill showing the
-#' posterior point estimate and an outline on each supported pair. The
-#' facets share colour limits. The panels are then directly comparable.
-#' The `_global` reference matrix is included by default.
-#' Drop it with `include_global = FALSE`.
-#'
-#' @param x An `mvgam_residcor_list` returned by
-#'   `residual_cor(mod, by_group = TRUE)`.
-#' @param include_global Logical. If `TRUE` (default), include
-#'   the `_global` reference correlation as one panel.
-#' @param ncol Optional integer. Number of facet columns; defaults
-#'   to `ceiling(sqrt(n_panels))`.
-#' @inheritParams plot.mvgam_residcor
-#'
-#' @return A [ggplot2::ggplot] object.
-#'
-#' @seealso [residual_cor()], [plot.mvgam_residcor()],
-#'   [plot.mvgam_var_matrix_list()].
-#' @author Nicholas J Clark
+#' @param include_global Logical, for an `mvgam_residcor_list`. `TRUE`
+#'   (the default) adds the `_global` correlation as one panel.
+#' @param ncol Optional number of facet columns. Defaults to
+#'   `ceiling(sqrt(n_panels))`.
+#' @rdname mvgam_residcor-class
 #' @method plot mvgam_residcor_list
 #' @export
 plot.mvgam_residcor_list <- function(x, include_global = TRUE,

@@ -77,24 +77,7 @@ closure_unit_labels <- function(family) {
 }
 
 
-#' Per-unit posterior summary for a `mvgam_latent_state` object
-#'
-#' Collapses the `[ndraws, n_unit]` draw matrix to one row per unit
-#' carrying the posterior median plus 50% and 95% credible interval
-#' endpoints. The returned `data.frame` is the same one that
-#' `as.data.frame.mvgam_latent_state()` returns and that
-#' [plot.mvgam_latent_state()] uses internally.
-#'
-#' @param object A `mvgam_latent_state` object.
-#' @param probs Numeric vector of length 4 giving the lower /
-#'   inner-lower / inner-upper / upper interval probabilities.
-#'   Defaults to `c(0.025, 0.25, 0.75, 0.975)` (50% and 95%
-#'   intervals).
-#' @param ... Unused. Anything passed here is refused.
-#'
-#' @return A `data.frame` with columns `series`, `time`, `median`,
-#'   `lower_50`, `upper_50`, `lower_95`, `upper_95`.
-#'
+#' @rdname hindcast.mvgam
 #' @method summary mvgam_latent_state
 #' @export
 summary.mvgam_latent_state <- function(object,
@@ -126,15 +109,7 @@ as.data.frame.mvgam_latent_state <- function(x, ...) {
 }
 
 
-#' Short print for a `mvgam_latent_state` object
-#'
-#' @param x A `mvgam_latent_state` object.
-#' @param digits Integer; rounding for the posterior-median range
-#'   shown in the print header. Defaults to 2.
-#' @param ... Ignored.
-#'
-#' @return The `mvgam_latent_state` object `x`, returned invisibly.
-#'
+#' @rdname hindcast.mvgam
 #' @method print mvgam_latent_state
 #' @export
 print.mvgam_latent_state <- function(x, digits = 2L, ...) {
@@ -160,20 +135,7 @@ print.mvgam_latent_state <- function(x, digits = 2L, ...) {
 }
 
 
-#' Plot the posterior latent state
-#'
-#' Faceted plot of the posterior median with its 50% and 95% credible
-#' intervals per series. Over a time axis the state is drawn as a line
-#' with ribbons. Units without an order, such as the sites of a
-#' single-season design, are drawn as points with interval bars.
-#'
-#' @param x A `mvgam_latent_state` object.
-#' @param series Names or indices of the series to plot, or `NULL`
-#'   for every series
-#' @param ... Unused. Anything passed here is refused.
-#'
-#' @return A `ggplot` object.
-#'
+#' @rdname hindcast.mvgam
 #' @method plot mvgam_latent_state
 #' @export
 plot.mvgam_latent_state <- function(x, series = NULL, ...) {

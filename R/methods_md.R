@@ -4382,7 +4382,6 @@ render_implementation_section <- function(obj) {
   } else {
     c(formula = formula_text(obj$formula),
       trend_formula = trend_formula_text(obj),
-      trend_map = call_arg_text(obj, "trend_map"),
       loadings_prior = call_arg_text(obj, "loadings_prior"),
       prior = call_arg_text(obj, "prior"))
   }

@@ -56,14 +56,7 @@ currency. The WDI package (Arel-Bundock
 economies Savage used: Australia, Canada, Chile, Ireland, New Zealand,
 South Africa, the United Kingdom and the United States.
 
-```{r cache-path, include = FALSE}
-# The download runs on the first knit. Later knits read the copy
-# saved in the user's cache directory.
-cache_file <- file.path(tools::R_user_dir("mvgam", "cache"),
-                        "wdi_growth_1970_2019.rds")
-```
-
-```{r wdi, eval = !file.exists(cache_file)}
+```{r wdi, eval = FALSE}
 raw <- WDI::WDI(
   country = c("AU", "CA", "CL", "IE", "NZ", "ZA", "GB", "US"),
   indicator = c(gdp = "NY.GDP.MKTP.KN", cons = "NE.CON.TOTL.KN",
@@ -72,13 +65,12 @@ raw <- WDI::WDI(
 )
 ```
 
-```{r wdi-cache, include = FALSE}
-if (file.exists(cache_file)) {
-  raw <- readRDS(cache_file)
-} else {
-  dir.create(dirname(cache_file), recursive = TRUE, showWarnings = FALSE)
-  saveRDS(raw, cache_file)
-}
+The World Bank revises these series as national accounts are
+updated. A saved copy of the download of 15 October 2026 keeps the
+results below fixed. We fitted the model to it.
+
+```{r wdi-saved, include = FALSE}
+raw <- readRDS("data/wdi_growth_1970_2019.rds")
 ```
 
 The panel ends in 2019. The contractions and rebounds of the pandemic
@@ -128,7 +120,7 @@ volatile <- names(sort(by_country, decreasing = TRUE))[1:2]
 ```
 
 Investment growth varies about `r fe_inv_ratio` times as much as GDP
-growth. GDP fell in 2009 in `r fe_fell09` of the eight economies. The
+growth. GDP fell in 2009 in `r fe_fell09` of the 8 economies. The
 largest rises in the panel are `r top_gdp$country`'s GDP growth of
 `r top_gdp$pct` in `r top_gdp$year` and `r top_inv$country`'s
 investment growth of `r top_inv$pct` in `r top_inv$year`.
@@ -222,7 +214,7 @@ fit <- mvgam(
   trend_formula = ~ VAR(p = 1, gr = country, subgr = outcome, cor = TRUE),
   family = gaussian(),
   data = growth,
-  priors = c(
+  prior = c(
     prior(inv_gamma(20, 3), class = sigma),
     prior(lkj_corr_cholesky(10), class = L_deviation_group_trend),
     prior(beta(2, 2), class = alpha_cor_trend)
@@ -492,14 +484,17 @@ n_halve <- sum(mrr$Estimate^2 < 0.5)
 fe_halve <- if (n_halve == nrow(mrr)) {
   "in every economy"
 } else {
-  paste0("in ", n_halve, " of the eight economies")
+  paste0("in ", n_halve, " of the 8 economies")
 }
 above <- as.character(react$group[react$Q2.5 > 0])
 fe_react <- if (length(above) == 0) {
   "No economy has a reactivity interval above zero."
 } else {
+  # Country names that take an article in running text
+  with_article <- ifelse(above %in% c("United States", "United Kingdom"),
+                         paste("the", above), above)
   paste0("Reactivity intervals lie above zero for ",
-         knitr::combine_words(above), ".")
+         knitr::combine_words(with_article), ".")
 }
 ```
 

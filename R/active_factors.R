@@ -70,6 +70,9 @@
 #'     \item `threshold`: list with `criterion`, `value` and `prob`.
 #'     \item `n_lv`: the number of factors the model was fitted with.
 #'   }
+#'   `print()` reports the posterior median count with its 95% interval.
+#'   `plot()` draws the posterior probability that each dimension is
+#'   active, largest first, with a dashed line at `prob`.
 #'
 #' @references
 #' Bhattacharya, A. and Dunson, D. B. (2011). Sparse Bayesian
@@ -237,24 +240,8 @@ active_factor_draws <- function(variance, criterion, threshold) {
 }
 
 
-#' Plot the posterior active-factor probabilities
-#'
-#' @description Bar plot of the posterior probability that each
-#' dimension of the factor covariance is active, largest first, under
-#' the rule [active_factors()] applied. A dashed line marks `prob`.
-#' `print()` reports the posterior median count with its 95% credible
-#' interval.
-#'
-#' @param x An `mvgam_active_factors` object returned by
-#'   [active_factors()].
-#' @param ... Unused. Anything passed here is refused.
-#'
-#' @return A `ggplot` object.
-#'
-#' @seealso [active_factors()]
-#'
-#' @author Nicholas J Clark
-#'
+#' @param x An `mvgam_active_factors` object.
+#' @rdname active_factors
 #' @method plot mvgam_active_factors
 #' @export
 plot.mvgam_active_factors <- function(x, ...) {

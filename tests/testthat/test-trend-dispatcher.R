@@ -217,7 +217,9 @@ test_that("trend registry works correctly", {
   expect_true("VAR" %in% choices)
 
   # A term calls a trend when its outermost function is registered
-  is_trend <- function(x) mvgam:::is_trend_constructor_call(x)
+  is_trend <- function(x) {
+    length(mvgam:::trend_constructor_calls(str2lang(x))) == 1L
+  }
   expect_true(is_trend("RW()"))
   expect_true(is_trend("AR(p=1)"))
   expect_true(is_trend("VAR()"))
@@ -391,6 +393,28 @@ test_that("multiple trend components are properly rejected", {
     mvgam:::validate_trend_formula(f2),
     "Multiple trend constructors found"
   )
+
+  # A constructor inside another term, or subtracted, sets no trend.
+  # The model frame would meet its list, or `- AR()` would fall back to
+  # `ZMVN()` unannounced.
+  for (f in list(~ x:AR(p = 1), ~ AR(p = 1) * x, ~ I(AR()),
+                 ~ s(x, by = AR()), ~ x - AR())) {
+    expect_error(mvgam:::validate_trend_formula(f),
+                 "must be a term of its own", label = deparse(f))
+  }
+  # Parentheses keep it a term. So does the namespace a package that
+  # calls mvgam writes.
+  for (f in list(~ x + (AR(p = 2)), ~ x + mvgam::AR(p = 2))) {
+    parsed <- mvgam:::parse_trend_formula(f)
+    expect_identical(parsed$trend_model$trend, "AR")
+    expect_identical(deparse1(parsed$base_formula), "~x")
+  }
+  # A misspelt argument names the constructor
+  expect_error(mvgam:::parse_trend_formula(~ AR(lags = 2)),
+               "Unknown argument 'lags' in 'AR()'", fixed = TRUE)
+  # The 1.x habit of passing the constructor itself
+  expect_error(mvgam:::validate_model_formulas(y ~ 1, AR()),
+               "Found an object of class 'mvgam_trend'", fixed = TRUE)
 })
 
 # Test edge cases inspired by brms testing
@@ -460,21 +484,17 @@ test_that("formula parsing error handling works comprehensively", {
 
   # Only a registered trend constructor is evaluated
   expect_error(
-    mvgam:::eval_trend_constructor("INVALID_TREND()", globalenv()),
+    mvgam:::eval_trend_constructor(quote(INVALID_TREND()), globalenv()),
     "Must be element of set"
   )
 
-  # Test malformed trend constructor syntax
-  expect_error(
-    mvgam:::eval_trend_constructor("RW(invalid_param = )", globalenv()),
-    "unused argument"
-  )
-
-  # Test unbalanced parentheses (should be caught by R's parser)
-  expect_error(
-    mvgam:::eval_trend_constructor("RW(cor = TRUE", globalenv()),
-    "unexpected end of input"
-  )
+  # The call is evaluated as written. A deparsed term label would turn
+  # `NA_real_` into a logical `NA` and `2L` into a double.
+  spec <- mvgam:::parse_trend_formula(
+    ~ s(x) - 1 + AR(n_lv = 2L, trend_map = matrix(NA_real_, 3L, 2L))
+  )$trend_model
+  expect_type(spec$trend_map, "double")
+  expect_type(spec$n_lv, "integer")
 })
 
 # Test boundary conditions and special inputs
@@ -511,14 +531,16 @@ test_that("trend terms are told apart by the function they call", {
   )
 
   # `GP()` is no registered trend, and the smooth is a regular term
-  is_trend <- vapply(complex_terms, mvgam:::is_trend_constructor_call,
-                     logical(1L), USE.NAMES = FALSE)
-  expect_equal(is_trend, c(TRUE, TRUE, TRUE, FALSE, FALSE))
+  is_trend <- function(x) {
+    length(mvgam:::trend_constructor_calls(str2lang(x))) == 1L
+  }
+  expect_equal(vapply(complex_terms, is_trend, logical(1L),
+                      USE.NAMES = FALSE),
+               c(TRUE, TRUE, TRUE, FALSE, FALSE))
 
   # A name that starts or ends with a constructor's name calls no trend
   fake_trends <- c("ARbitrary()", "VARious()", "RWanda()", "lagAR(x)")
-  expect_false(any(vapply(fake_trends, mvgam:::is_trend_constructor_call,
-                          logical(1L))))
+  expect_false(any(vapply(fake_trends, is_trend, logical(1L))))
 })
 
 # Test validation system edge cases

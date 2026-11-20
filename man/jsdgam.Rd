@@ -2,7 +2,7 @@
 % Please edit documentation in R/jsdgam.R
 \name{jsdgam}
 \alias{jsdgam}
-\title{Fit Joint Species Distribution Models in mvgam}
+\title{Fit a joint species distribution model}
 \usage{
 jsdgam(
   formula,
@@ -362,10 +362,10 @@ Other model fitting:
 \code{\link{check_newdata}()},
 \code{\link{mvgam}()},
 \code{\link{mvgam_data}()},
-\code{\link{mvgam_formula}()},
 \code{\link{mvgam_multiple}()},
 \code{\link{pivot_detection_array}()},
 \code{\link{pivot_species_matrix}()},
+\code{\link{print.mvgam_formula}()},
 \code{\link{series_to_mvgam}()},
 \code{\link{stancode.mvgam_formula}()},
 \code{\link{update.mvgam}()}

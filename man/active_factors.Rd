@@ -3,6 +3,7 @@
 \name{active_factors}
 \alias{active_factors}
 \alias{active_factors.mvgam}
+\alias{plot.mvgam_active_factors}
 \title{Posterior count of the latent factors a model uses}
 \usage{
 active_factors(object, ...)
@@ -14,6 +15,8 @@ active_factors(object, ...)
   prob = 0.5,
   ...
 )
+
+\method{plot}{mvgam_active_factors}(x, ...)
 }
 \arguments{
 \item{object}{A fitted \code{mvgam} object whose trend includes at
@@ -31,6 +34,8 @@ least two latent factors (\code{n_lv >= 2}).}
 \item{prob}{Numeric in \verb{(0, 1)}. A dimension is reported active
 when its posterior probability of activity is at least \code{prob}.
 Defaults to \code{0.5}.}
+
+\item{x}{An \code{mvgam_active_factors} object.}
 }
 \value{
 A list with class \code{mvgam_active_factors} containing:
@@ -45,6 +50,9 @@ variance and \code{is_active}.
 \item \code{threshold}: list with \code{criterion}, \code{value} and \code{prob}.
 \item \code{n_lv}: the number of factors the model was fitted with.
 }
+\code{print()} reports the posterior median count with its 95\% interval.
+\code{plot()} draws the posterior probability that each dimension is
+active, largest first, with a dashed line at \code{prob}.
 }
 \description{
 A factor model fitted with \code{n_lv} factors may need fewer. This

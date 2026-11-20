@@ -112,14 +112,16 @@ test_that("matrix with all-NA row passes (every entry free)", {
 })
 
 test_that("a trend_map with every entry free passes validation", {
-  # An all-NA matrix must be numeric: a bare NA is logical, which the
-  # matrix branch refuses. Free columns are identified after
-  # sampling, and validation raises no warning about them.
-  Z_in <- matrix(NA_real_, nrow = 3L, ncol = 2L)
-  expect_no_warning(
-    out <- mvgam:::normalise_trend_map(Z_in, .make_data(3L))
-  )
-  expect_equal(sum(is.na(out$Z)), 6L)
+  # Free columns are identified after sampling. Validation raises no
+  # warning about them. `matrix(NA, ...)` is logical and takes the same
+  # path as its numeric form.
+  for (Z_in in list(matrix(NA_real_, 3L, 2L), matrix(NA, 3L, 2L))) {
+    expect_no_warning(
+      out <- mvgam:::normalise_trend_map(Z_in, .make_data(3L))
+    )
+    expect_equal(sum(is.na(out$Z)), 6L)
+    expect_type(out$Z, "double")
+  }
 })
 
 
@@ -317,9 +319,9 @@ test_that("constructors fail-fast on malformed trend_map shapes", {
 })
 
 
-# ---- Top-level alias on mvgam() ------------------------
+# ---- The map on the constructor ------------------------
 
-test_that("mvgam(trend_map) reaches the Stan data through the trend", {
+test_that("a constructor's trend_map reaches the Stan data", {
   set.seed(1L)
   d <- data.frame(
     series = factor(rep(c("a", "b", "c"), each = 10L)),
@@ -328,28 +330,23 @@ test_that("mvgam(trend_map) reaches the Stan data through the trend", {
   )
   tm <- data.frame(series = factor(c("a", "b", "c")),
                    trend = c(1L, 1L, 2L))
-  # With no trend spec to hold it the mapping would be discarded
-  expect_error(
-    mvgam(y ~ 1, trend_map = tm, data = d, family = poisson(),
-          run_model = FALSE, validate = FALSE),
-    "requires a 'trend_formula'"
-  )
   prefit <- mvgam(
-    y ~ 1, trend_formula = ~ AR(p = 1), trend_map = tm, data = d,
+    y ~ 1, trend_formula = ~ AR(p = 1, trend_map = tm), data = d,
     family = poisson(), run_model = FALSE, validate = FALSE
   )
   expect_equal(unname(prefit$standata$Z),
                matrix(c(1, 1, 0, 0, 0, 1), nrow = 3L))
 })
 
-test_that("apply_trend_map_alias fills every response and refuses a clash", {
-  specs <- list(y1 = AR(), y2 = AR())
-  out <- mvgam:::apply_trend_map_alias(specs, "shared")
-  expect_equal(lapply(out, `[[`, "trend_map"),
-               list(y1 = "shared", y2 = "shared"))
-  expect_error(
-    mvgam:::apply_trend_map_alias(out, "identity"),
-    "given both to 'mvgam()' and to the trend constructor",
-    fixed = TRUE
-  )
+test_that("a top-level trend_map points to the trend constructor", {
+  # The map belongs on the constructor, which also takes `n_lv`
+  dat <- .make_data(3L)
+  for (call in list(
+    quote(mvgam(y ~ 1, trend_formula = ~ AR(), data = dat,
+                trend_map = "shared", run_model = FALSE)),
+    quote(get_prior(mvgam_formula(y ~ 1, ~ AR()), data = dat,
+                    trend_map = "shared"))
+  )) {
+    expect_error(eval(call), "AR(p = 1, trend_map = Z)", fixed = TRUE)
+  }
 })

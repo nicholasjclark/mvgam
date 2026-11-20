@@ -4,15 +4,7 @@
 # and an `all_series` summary.
 
 
-#' Generic for posterior forecast scoring
-#'
-#' Dispatches to a class-specific method to compute proper
-#' scoring rules on a forecast object. See
-#' [score.mvgam_forecast] for the mvgam method.
-#'
-#' @param object Object to score.
-#' @param ... Method-specific arguments.
-#' @return Method-dependent; see the relevant method.
+#' @rdname score.mvgam_forecast
 #' @export
 score <- function(object, ...) UseMethod("score")
 

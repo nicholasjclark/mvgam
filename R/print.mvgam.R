@@ -67,11 +67,9 @@ print.mvgam <- function(x, ...) {
   invisible(x)
 }
 
-#' Print method for mvgam_formula objects
-#'
-#' @param x An mvgam_formula object
-#' @param ... Ignored.
-#' @return The object invisibly
+#' @param x An `mvgam_formula` object.
+#' @param ... Unused.
+#' @rdname mvgam_formula
 #' @export
 print.mvgam_formula <- function(x, ...) {
   cat("mvgam_formula object\n")
@@ -250,15 +248,8 @@ nobs.mvgam <- function(object, ...) {
   nrow(object$data)
 }
 
-#' Print the Stan program of an mvgam model
-#'
-#' Writes the program of [stancode.mvgam_formula()] one line at a time.
-#'
 #' @param x An `mvgamstancode` object.
-#' @param ... Ignored.
-#'
-#' @return `x`, invisibly.
-#'
+#' @rdname stancode.mvgam_formula
 #' @export
 print.mvgamstancode <- function(x, ...) {
   cat(x, sep = '\n')

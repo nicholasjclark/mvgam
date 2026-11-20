@@ -9,7 +9,6 @@ mvgam(
   trend_formula = NULL,
   data = NULL,
   newdata = NULL,
-  trend_map = NULL,
   loadings_prior = NULL,
   backend = getOption("brms.backend", "cmdstanr"),
   combine = TRUE,
@@ -53,26 +52,6 @@ latent state forward. \code{plot(fit, type = "series")} overlays them.
 \code{posterior_predict()} on these data uses the covariate part alone.
 The section 'Which prediction function?' of \code{\link[=predict.mvgam]{predict.mvgam()}}
 compares the two.}
-
-\item{trend_map}{Optional fixed factor loadings, in one of three
-forms:
-\itemize{
-\item a numeric \verb{n_series x n_lv} matrix of loadings. \code{NA}
-entries are sampled. Finite entries stay fixed on \code{Z} in the
-posterior. An all-\code{NA} matrix fixes nothing and acts as
-\code{trend_map = NULL}
-\item a \code{data.frame(series, trend)} assigning each series to one
-latent process
-\item \code{"identity"}, one process per series, or \code{"shared"}, one
-process for every series
-}
-A factor model without a \code{trend_map} samples every loading. It
-identifies \code{Z} after sampling by a thin QR rotation (Heaps and
-Jermyn 2024). A \code{trend_map} with any fixed entry takes no
-rotation. The argument requires a \code{trend_formula}. The trend
-constructor takes a \code{trend_map} argument too. Supplying both is an
-error. \code{loadings_prior} lists the
-\code{trend_map} forms a structured loadings prior accepts.}
 
 \item{loadings_prior}{Optional named list giving a structured prior
 on the loadings of a factor model, such as species traits or a
@@ -277,7 +256,7 @@ Identification section of \link{trend_constructors} describes the
 rotation.
 
 A \code{trend_map} with no fixed entries, \code{NULL} or a matrix of \code{NA}, is
-compatible. \code{\link[=jsdgam]{jsdgam()}} passes the second form. A \code{trend_map} that
+compatible. A \code{trend_map} that
 fixes any loading is refused. Its free entries take the default
 prior of class \code{Z}, which the structured prior would duplicate.
 }
@@ -429,10 +408,10 @@ Other model fitting:
 \code{\link{check_newdata}()},
 \code{\link{jsdgam}()},
 \code{\link{mvgam_data}()},
-\code{\link{mvgam_formula}()},
 \code{\link{mvgam_multiple}()},
 \code{\link{pivot_detection_array}()},
 \code{\link{pivot_species_matrix}()},
+\code{\link{print.mvgam_formula}()},
 \code{\link{series_to_mvgam}()},
 \code{\link{stancode.mvgam_formula}()},
 \code{\link{update.mvgam}()}

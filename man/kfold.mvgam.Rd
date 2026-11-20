@@ -2,6 +2,9 @@
 % Please edit documentation in R/kfold.mvgam.R
 \name{kfold.mvgam}
 \alias{kfold.mvgam}
+\alias{print.mvgam_kfold}
+\alias{summary.mvgam_kfold}
+\alias{plot.mvgam_kfold}
 \title{K-fold cross-validation for \code{mvgam} fits}
 \usage{
 \method{kfold}{mvgam}(
@@ -16,9 +19,16 @@
   silent = 1L,
   ...
 )
+
+\method{print}{mvgam_kfold}(x, digits = 2L, ...)
+
+\method{summary}{mvgam_kfold}(object, ...)
+
+\method{plot}{mvgam_kfold}(x, ...)
 }
 \arguments{
-\item{x}{A fitted \code{mvgam} object.}
+\item{x}{A fitted \code{mvgam} object, or for the methods an
+\code{mvgam_kfold} object.}
 
 \item{K}{Integer number of folds. With \code{group} and \code{K = NULL} (the
 default), each group is a fold. A \code{K} below the number of groups
@@ -54,6 +64,10 @@ and its sampler start and finish lines. \code{1} (default) prints
 the refit count. \code{2} prints nothing.}
 
 \item{...}{Unused. Anything passed here is refused.}
+
+\item{digits}{Integer number of decimal places. Defaults to 2.}
+
+\item{object}{An \code{mvgam_kfold} object.}
 }
 \value{
 A \code{c("mvgam_kfold", "kfold", "loo")} object, which
@@ -75,6 +89,17 @@ given, or \code{NULL} for single rows.
 \code{pareto_k_threshold_adaptive} \code{TRUE} when the default rule set
 it.
 }
+\code{print()} shows the ELPD with its standard error, the folds and
+refits and the Pareto k of the PSIS estimates. It then names the
+groups with the lowest ELPD and the refitted groups whose ELPD moved
+most from the PSIS estimate. \code{summary()} returns a tibble with one
+row per held-out group: \code{group}, its \code{elpd} and \code{elpd_share} of the
+total, for a refitted group \code{elpd_psis} and the \code{lift} of the refit
+over it, \code{pareto_k} and \code{refit}. \code{plot()} draws the ELPD of each
+group and its Pareto k, as \code{\link[=plot.mvgam_lfo]{plot.mvgam_lfo()}} does for time blocks.
+Dark red points mark a Pareto k above the dashed threshold, where
+PSIS is unreliable. In the ELPD panel they mark the groups below the
+15\% quantile.
 }
 \description{
 Measures how well a model predicts groups of data it was not fitted

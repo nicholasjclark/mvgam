@@ -44,8 +44,8 @@ write_stan_program <- function(stancode, path) {
 #' @param silent Verbosity, 0 to 2
 #' @param stanvars User stanvars, or NULL
 #' @param validate Whether to parse the polished program
-#' @param trend_map,loadings_prior Factor loadings structure and prior,
-#'   from `mvgam()`
+#' @param loadings_prior Structured loadings prior from `mvgam()`, or
+#'   `NULL`
 #' @param ... Arguments for brms
 #'
 #' @return List of `combined_components` (the `stancode` and
@@ -61,7 +61,6 @@ build_stan_components <- function(formula, data, family = gaussian(),
                                  normalize = TRUE, save_model = NULL,
                                  silent = 1L,
                                  stanvars = NULL, validate = TRUE,
-                                 trend_map = NULL,
                                  loadings_prior = NULL, ...) {
 
   checkmate::assert_class(formula, "mvgam_formula")
@@ -159,7 +158,7 @@ build_stan_components <- function(formula, data, family = gaussian(),
   trend_stanvars_in <- stanvars
 
   mv_spec$trend_specs <- prepare_trend_specs(
-    mv_spec$trend_specs, trend_map, loadings_prior, data, data2
+    mv_spec$trend_specs, loadings_prior, data, data2
   )
 
   # `n_lv` belongs on the trend constructor inside `trend_formula`.

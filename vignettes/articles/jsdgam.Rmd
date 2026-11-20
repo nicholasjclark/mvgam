@@ -228,8 +228,7 @@ n_below <- sum(theta_med[short] <
 
 The median length scale of `r gsub("\\.", " ", shortest)`,
 `r sprintf("%.2f", theta_med[short])`, is the shortest of the traits.
-It falls below the 5% quantile of `r n_below` of the other
-`r length(theta_med) - 1` traits' length scales. A shorter length scale
+It falls below the 5% quantile of `r if (n_below == length(theta_med) - 1) "every other trait's length scale" else paste(n_below, "of the other", length(theta_med) - 1, "traits' length scales")`. A shorter length scale
 gives a trait's differences between species more weight in the
 loadings prior. `compare_loadings()`
 aligns the two fits' loadings by a Procrustes rotation and draws how
@@ -368,8 +367,8 @@ plot(af)
 n_active <- sum(af$per_factor$is_active)
 ```
 
-In this fit, `r n_active` of the six factors are active, against the
-two the earlier models fixed.
+In this fit, `r n_active` of the 6 factors are active, against the 2
+the earlier models fixed.
 
 ## Summary
 
@@ -377,8 +376,8 @@ The trait prior and column shrinkage tested two assumptions of the
 first ant community models: independent loadings and two factors.
 Leave-one-out ranked the `r loo_first` prior first, by `r fe_diff` in
 expected log predictive density against a standard error of
-`r fe_se`. Given a ceiling of six factors, the shrinkage prior kept
-`r n_active` active, against the two the first models assumed. Each
+`r fe_se`. Given a ceiling of 6 factors, the shrinkage prior kept
+`r n_active` active, against the 2 the first models assumed. Each
 extension is one argument to a single `jsdgam()` call, as are the
 environmental slopes that gave all 41 species a canopy response from
 three covariates.
@@ -416,10 +415,6 @@ Heaps SE and Jermyn IH (2024). Structured prior distributions for the
 covariance matrix in latent factor models. *Statistics and Computing*
 34, 143.
 [doi:10.1007/s11222-024-10454-0](https://doi.org/10.1007/s11222-024-10454-0)
-
-Legramanti S, Durante D and Dunson DB (2020). Bayesian cumulative
-shrinkage for infinite factorizations. *Biometrika* 107(3), 745-752.
-[doi:10.1093/biomet/asaa008](https://doi.org/10.1093/biomet/asaa008)
 
 Ovaskainen O, Tikhonov G, Norberg A, Blanchet FG, Duan L, Dunson D,
 Roslin T and Abrego N (2017). How to make more out of community data?

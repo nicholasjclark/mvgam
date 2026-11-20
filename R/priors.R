@@ -1511,7 +1511,14 @@ validate_model_formulas <- function(formula, trend_formula) {
                  "'bf()' in the observation 'formula'.")
     )), call. = FALSE)
   }
-  checkmate::assert_formula(trend_formula, .var.name = "trend_formula")
+  if (!inherits(trend_formula, "formula")) {
+    stop(insight::format_error(c(
+      "'trend_formula' must be a one-sided formula such as '~ x + AR()'.",
+      x = paste0("Found an object of class '", class(trend_formula)[1L],
+                 "'."),
+      i = "Write the trend constructor inside the formula: '~ AR()'."
+    )), call. = FALSE)
+  }
   validate_trend_formula(trend_formula)
   invisible(NULL)
 }
@@ -1549,14 +1556,18 @@ validate_model_formulas <- function(formula, trend_formula) {
 #'     over time.
 #' }
 #'
-#' A trend formula holds one trend constructor ([trend_constructors])
-#' and covariates of the latent state: smooths such as `s()` and
+#' A trend formula holds one trend constructor ([trend_constructors]),
+#' added as a term of its own, as in `~ x + AR()` or
+#' `~ x + mvgam::AR()`. It also holds covariates of the latent state:
+#' smooths such as `s()` and
 #' `t2()`, random effects such as `(1 | group)` and Gaussian processes
 #' through `gp()`. [lv_axis()] in a term varies its effect by latent
 #' factor, or by series in a model without factors. It refuses:
 #' \itemize{
 #'   \item a response, a second trend constructor and `bf()`
 #'     sub-formulas
+#'   \item a constructor inside another term, as in `x:AR()` or
+#'     `s(x, by = AR())`, or subtracted, as in `- AR()`
 #'   \item the series column. `lv_axis()` takes its place.
 #'   \item a response of the observation formula as a covariate
 #'   \item `offset()` and addition terms such as `weights()`,
@@ -1578,6 +1589,7 @@ validate_model_formulas <- function(formula, trend_formula) {
 #'
 #' @return An object of class `mvgam_formula` holding `formula` and
 #'   `trend_formula`.
+#'   `print()` shows the two formulas.
 #'
 #' @seealso [get_prior.mvgam_formula()] lists the priors of the pair.
 #'   [stancode()] and [standata()] return its Stan program and data.
@@ -1910,10 +1922,10 @@ default_prior.mvgam <- function(object, ...) {
 #' @export
 get_prior.mvgam_formula <- function(object, data, family = gaussian(),
                                     loadings_prior = NULL,
-                                    data2 = NULL,
-                                    trend_map = NULL, ...) {
+                                    data2 = NULL, ...) {
   checkmate::assert_class(object, "mvgam_formula")
   checkmate::assert_data_frame(data, min.rows = 1)
+  reject_removed_args(list(...), fn = "get_prior")
 
   # `object$formula` would trigger S3 dispatch on the formula class
   formula <- object[[1]]
@@ -1946,7 +1958,7 @@ get_prior.mvgam_formula <- function(object, data, family = gaussian(),
   mv_spec <- parse_multivariate_trends(formula, trend_formula)
 
   mv_spec$trend_specs <- prepare_trend_specs(
-    mv_spec$trend_specs, trend_map, loadings_prior, data, data2
+    mv_spec$trend_specs, loadings_prior, data, data2
   )
 
   # The spec and trend data Stan generation builds from. The base

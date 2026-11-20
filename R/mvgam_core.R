@@ -29,6 +29,10 @@ mvgam_removed_args <- c(
     "a dynamic factor model is requested with 'n_lv' on the trend ",
     "constructor, as in 'trend_formula = ~ AR(p = 1, n_lv = 3)'"
   ),
+  trend_map = paste0(
+    "the map of series onto latent processes is given on the trend ",
+    "constructor, as in 'trend_formula = ~ AR(p = 1, trend_map = Z)'"
+  ),
   noncentred = paste0(
     "the states are non-centred by default. 'centred' on the trend ",
     "constructor samples them centred, as in ",
@@ -241,7 +245,7 @@ translate_samples_burnin <- function(dots) {
 #'
 #' @noRd
 mvgam_imputation_forwarded <- c(
-  "formula", "trend_formula", "newdata", "trend_map", "loadings_prior",
+  "formula", "trend_formula", "newdata", "loadings_prior",
   "backend", "family", "threads", "save_pars", "run_model"
 )
 
@@ -293,25 +297,6 @@ mvgam_imputation_forwarded <- c(
 #'   `posterior_predict()` on these data uses the covariate part alone.
 #'   The section 'Which prediction function?' of [predict.mvgam()]
 #'   compares the two.
-#' @param trend_map Optional fixed factor loadings, in one of three
-#'   forms:
-#'   \itemize{
-#'     \item a numeric `n_series x n_lv` matrix of loadings. `NA`
-#'       entries are sampled. Finite entries stay fixed on `Z` in the
-#'       posterior. An all-`NA` matrix fixes nothing and acts as
-#'       `trend_map = NULL`
-#'     \item a `data.frame(series, trend)` assigning each series to one
-#'       latent process
-#'     \item `"identity"`, one process per series, or `"shared"`, one
-#'       process for every series
-#'   }
-#'   A factor model without a `trend_map` samples every loading. It
-#'   identifies `Z` after sampling by a thin QR rotation (Heaps and
-#'   Jermyn 2024). A `trend_map` with any fixed entry takes no
-#'   rotation. The argument requires a `trend_formula`. The trend
-#'   constructor takes a `trend_map` argument too. Supplying both is an
-#'   error. `loadings_prior` lists the
-#'   `trend_map` forms a structured loadings prior accepts.
 #' @param loadings_prior Optional named list giving a structured prior
 #'   on the loadings of a factor model, such as species traits or a
 #'   phylogeny. Most models leave it `NULL`. The section 'Structured
@@ -490,7 +475,7 @@ mvgam_imputation_forwarded <- c(
 #' rotation.
 #'
 #' A `trend_map` with no fixed entries, `NULL` or a matrix of `NA`, is
-#' compatible. [jsdgam()] passes the second form. A `trend_map` that
+#' compatible. A `trend_map` that
 #' fixes any loading is refused. Its free entries take the default
 #' prior of class `Z`, which the structured prior would duplicate.
 #'
@@ -635,7 +620,6 @@ mvgam_imputation_forwarded <- c(
 #' @export
 mvgam <- function(formula, trend_formula = NULL, data = NULL,
                            newdata = NULL,
-                           trend_map = NULL,
                            loadings_prior = NULL,
                            backend = getOption("brms.backend", "cmdstanr"),
                            combine = TRUE, family = gaussian(),
@@ -659,7 +643,6 @@ mvgam <- function(formula, trend_formula = NULL, data = NULL,
           trend_formula = trend_formula,
           data = data,
           newdata = newdata,
-          trend_map = trend_map,
           loadings_prior = loadings_prior,
           backend = backend,
           combine = combine,
@@ -684,8 +667,7 @@ mvgam <- function(formula, trend_formula = NULL, data = NULL,
   # shows once.
   warn_once_per_call(mvgam_from_data(
     formula = formula, trend_formula = trend_formula, data = data,
-    newdata = newdata, trend_map = trend_map,
-    loadings_prior = loadings_prior, backend = backend,
+    newdata = newdata, loadings_prior = loadings_prior, backend = backend,
     combine = combine, family = family, threads = threads,
     save_pars = save_pars, run_model = run_model,
     user_call = user_call, ...
@@ -702,7 +684,7 @@ mvgam <- function(formula, trend_formula = NULL, data = NULL,
 #' @return What `mvgam()` returns
 #' @noRd
 mvgam_from_data <- function(formula, trend_formula, data, newdata,
-                            trend_map, loadings_prior, backend, combine,
+                            loadings_prior, backend, combine,
                             family, threads, save_pars, run_model,
                             user_call, ...) {
   checkmate::assert_class(user_call, "call")
@@ -791,7 +773,6 @@ mvgam_from_data <- function(formula, trend_formula, data, newdata,
     trend_formula = trend_formula,
     data = data,
     newdata = newdata,
-    trend_map = trend_map,
     loadings_prior = loadings_prior,
     backend = backend,
     family = family,
@@ -931,7 +912,6 @@ check_newdata <- function(newdata, data, trend_formula = NULL) {
 #' @param family Family specification
 #' @param data_name Name of the data in the user's call, or `NULL`
 #' @param newdata Held-out data frame to store on the fit, or `NULL`
-#' @param trend_map Fixed factor-loading specification, or `NULL`
 #' @param loadings_prior Structured loadings prior, or `NULL`
 #' @param save_pars A [brms::save_pars()] object
 #' @param run_model Logical. `FALSE` returns an unfitted stub.
@@ -940,7 +920,7 @@ check_newdata <- function(newdata, data, trend_formula = NULL) {
 #' @noRd
 mvgam_single <- function(formula, trend_formula, data, backend,
                         family, data_name = NULL, newdata = NULL,
-                        trend_map = NULL, loadings_prior = NULL,
+                        loadings_prior = NULL,
                         save_pars = brms::save_pars(),
                         run_model = TRUE, ...) {
   checkmate::assert_data_frame(data)
@@ -974,7 +954,6 @@ mvgam_single <- function(formula, trend_formula, data, backend,
         data = data,
         family = family,
         backend = backend,
-        trend_map = trend_map,
         loadings_prior = loadings_prior
       ),
       forward_dots

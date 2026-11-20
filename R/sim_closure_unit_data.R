@@ -103,6 +103,10 @@
 #'     \item{`loadings`, `lv`}{`Z` and the factor scores, when
 #'       `n_lv > 0L`.}
 #'   }
+#'   `summary()` returns an `mvgam_sim_closure_unit_summary` list: the
+#'   dimensions, the recipe, the ranges of the true state and detection
+#'   parameters and the share of non-zero observations. A share of 0 or
+#'   1 marks data with no information on detection. `print()` shows it.
 #'
 #' @author Nicholas J Clark
 #'
@@ -398,20 +402,9 @@ closure_unit_sample <- function(family, state_lp, det_lp, K_max) {
 }
 
 
-#' Summary method for sim_closure_unit_data() output
-#'
-#' The dimensions, the recipe, the ranges of the true state and
-#' detection parameters and the share of non-zero observations. A share
-#' of 0 or 1 marks data with no information on detection.
-#'
-#' @param object A `mvgam_sim_closure_unit` list returned by
-#'   [sim_closure_unit_data()].
+#' @param object A `mvgam_sim_closure_unit` object.
 #' @param ... Unused. Anything passed here is refused.
-#'
-#' @return An object of class `mvgam_sim_closure_unit_summary`: a list
-#'   of per-unit detection and abundance summaries with its own
-#'   [print()][print.mvgam_sim_closure_unit_summary] method.
-#'
+#' @rdname sim_closure_unit_data
 #' @method summary mvgam_sim_closure_unit
 #' @export
 summary.mvgam_sim_closure_unit <- function(object, ...) {
@@ -440,15 +433,9 @@ summary.mvgam_sim_closure_unit <- function(object, ...) {
 }
 
 
-#' Print method for sim_closure_unit_data() summary output
-#'
-#' @inheritParams print.mvgam_sim_summary
 #' @param x A `mvgam_sim_closure_unit_summary` object.
-#' @param ... Unused.
-#'
-#' @return The `mvgam_sim_closure_unit_summary` object `x`, returned
-#'   invisibly.
-#'
+#' @param digits Integer number of significant digits. Defaults to 3.
+#' @rdname sim_closure_unit_data
 #' @method print mvgam_sim_closure_unit_summary
 #' @export
 print.mvgam_sim_closure_unit_summary <- function(x, digits = 3L,

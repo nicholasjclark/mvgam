@@ -114,8 +114,8 @@ per-factor trait and covariate effects.
 Other trend models: 
 \code{\link{LLT}()},
 \code{\link{PW}()},
-\code{\link{RW}()},
 \code{\link{ZMVN}()},
-\code{\link{list_trend_types}()}
+\code{\link{list_trend_types}()},
+\code{\link{print.mvgam_trend}()}
 }
 \concept{trend models}

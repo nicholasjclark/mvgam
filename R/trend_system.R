@@ -118,7 +118,7 @@ get_trend_info <- function(name) {
   trend_registry[[name]]
 }
 
-#' List Available Trend Types
+#' List the available trend types
 #'
 #' @description
 #' List all registered trend types and their factor model support.
@@ -1182,42 +1182,82 @@ parse_trend_formula <- function(trend_formula) {
   checkmate::assert_class(trend_formula, "formula")
   ensure_registry_initialized()
 
-  tf_terms <- stats::terms(trend_formula, keep.order = TRUE)
-
-  labels <- attr(tf_terms, "term.labels")
-  is_trend <- vapply(labels, is_trend_constructor_call, logical(1L),
-                     USE.NAMES = FALSE)
-  trend_terms <- labels[is_trend]
-  trend_model <- if (length(trend_terms) > 0L) {
+  # The call is evaluated as written. A deparsed term label would turn
+  # `NA_real_` into `NA` and `2L` into `2`.
+  calls <- trend_constructor_calls(rlang::f_rhs(trend_formula))
+  trend_model <- if (length(calls) > 0L) {
     eval_trend_constructor(
-      trend_terms[1L],
+      calls[[1L]],
       formula_env = environment(trend_formula) %||% globalenv()
     )
   } else {
     ZMVN()
   }
+  base_formula <- parse_base_formula_safe(
+    trend_formula, vapply(calls, deparse1, character(1L))
+  )
 
   list(
     trend_model = trend_model,
-    base_formula = parse_base_formula_safe(trend_formula, trend_terms),
-    regular_terms = labels[!is_trend]
+    base_formula = base_formula,
+    regular_terms = attr(
+      stats::terms(base_formula, keep.order = TRUE), "term.labels"
+    )
   )
 }
 
-
-#' Is a term label a call to a registered trend constructor?
+#' The trend constructor calls among the terms of a formula
 #'
-#' A covariate whose name ends in a constructor's name, such as
-#' `lagAR(x)`, is a regular term.
+#' Walks the added terms of the right-hand side, in the order they are
+#' written. A subtracted term removes itself from the model and is not
+#' one of them. Neither is a constructor inside another term. A call
+#' counts by its function name, with or without `mvgam::`. A covariate
+#' such as `lagAR(x)` does not.
 #'
-#' @param label One term label of a trend formula
-#' @return Logical scalar
+#' @param expr The right-hand side of a trend formula
+#' @return List of the constructor calls, as written
 #' @noRd
-is_trend_constructor_call <- function(label) {
-  checkmate::assert_string(label)
-  expr <- str2lang(label)
-  is.call(expr) && is.name(expr[[1L]]) &&
-    as.character(expr[[1L]]) %in% mvgam_trend_registry()
+trend_constructor_calls <- function(expr) {
+  if (!rlang::is_call(expr)) return(list())
+  fn_name <- rlang::call_name(expr)
+  if (is.null(fn_name)) return(list())
+  if (fn_name %in% mvgam_trend_registry()) return(list(expr))
+  args <- rlang::call_args(expr)
+  added <- switch(fn_name,
+    "+" = args,
+    "(" = args,
+    # `a - b` keeps `a`. A unary minus keeps nothing.
+    "-" = if (length(args) == 2L) args[1L],
+    NULL
+  )
+  do.call(c, c(list(list()), lapply(added, trend_constructor_calls)))
+}
+
+#' Set arguments on every trend constructor of a trend formula
+#'
+#' The trend registry decides which calls are constructors. The rest of
+#' the formula stays as written.
+#'
+#' @param formula A trend formula
+#' @param values Named list of argument values to set
+#' @return `formula`, its constructors given `values`
+#' @noRd
+set_trend_constructor_args <- function(formula, values) {
+  checkmate::assert_formula(formula)
+  checkmate::assert_list(values, names = "unique")
+  rewrite <- function(expr) {
+    if (!rlang::is_call(expr)) return(expr)
+    fn_name <- rlang::call_name(expr)
+    if (!is.null(fn_name) && fn_name %in% mvgam_trend_registry()) {
+      args <- rlang::call_args(expr)
+      args[names(values)] <- values
+      return(rlang::call2(fn_name, !!!args))
+    }
+    parts <- as.list(expr)
+    rlang::call2(parts[[1L]], !!!lapply(parts[-1L], rewrite))
+  }
+  rlang::new_formula(NULL, rewrite(rlang::f_rhs(formula)),
+                     env = environment(formula))
 }
 
 #' Evaluate a trend constructor call
@@ -1226,33 +1266,35 @@ is_trend_constructor_call <- function(label) {
 #' `mvgam::mvgam()` need not attach. The arguments evaluate in the
 #' formula's environment, where an inline `trend_map` matrix is found.
 #'
-#' @param trend_call Character string containing a call to a registered
-#'   trend constructor, as `is_trend_constructor_call()` accepts
+#' @param trend_call A call to a registered trend constructor, as
+#'   `trend_constructor_calls()` returns it
 #' @param formula_env The environment of the originating formula
 #' @return A validated mvgam_trend object
 #' @noRd
 eval_trend_constructor <- function(trend_call, formula_env) {
-  checkmate::assert_string(trend_call)
+  checkmate::assert_true(is.call(trend_call))
   checkmate::assert_environment(formula_env)
-  expr <- str2lang(trend_call)
-  name <- as.character(expr[[1L]])
+  name <- rlang::call_name(trend_call)
   checkmate::assert_choice(name, mvgam_trend_registry())
-  expr[[1L]] <- get(name, envir = asNamespace("mvgam"), mode = "function",
-                    inherits = FALSE)
-  eval(expr, envir = formula_env)
+  constructor <- get(name, envir = asNamespace("mvgam"),
+                     mode = "function", inherits = FALSE)
+  # R's own message names neither the constructor nor its arguments
+  given <- setdiff(names(rlang::call_args(trend_call)), "")
+  unknown <- setdiff(given, names(formals(constructor)))
+  if (length(unknown)) {
+    stop(insight::format_error(c(
+      paste0("Unknown argument '", unknown[1L], "' in '", name, "()'."),
+      did_you_mean(unknown[1L], names(formals(constructor))),
+      i = paste0("See ?", name, " for its arguments.")
+    )), call. = FALSE)
+  }
+  trend_call[[1L]] <- constructor
+  eval(trend_call, envir = formula_env)
 }
 
-#' Print method for mvgam trend objects
-#'
-#' Shows the trend label a fit would print, such as `AR({1, 12})`, with
-#' the columns and settings the constructor holds. Settings left at
-#' their defaults are omitted.
-#'
-#' @param x A mvgam_trend object
-#' @param ... Ignored.
-#'
-#' @return The `mvgam_trend` object `x`, returned invisibly.
-#'
+#' @param x An `mvgam_trend` object.
+#' @param ... Unused.
+#' @rdname trend_constructors
 #' @export
 print.mvgam_trend <- function(x, ...) {
   label <- trend_metadata_label(list(
@@ -1581,6 +1623,8 @@ print.mvgam_trend <- function(x, ...) {
 #'
 #' @return An object of class \code{mvgam_trend} holding the
 #'   constructor's arguments. [mvgam()] builds the trend from it.
+#'   `print()` shows the label a fit would print, such as `AR({1, 12})`,
+#'   with the columns and the settings that differ from their defaults.
 #'
 #' @section AR coefficient sharing:
 #' Each `coef_sharing` setting samples its own Stan parameters:
@@ -1608,10 +1652,25 @@ print.mvgam_trend <- function(x, ...) {
 #'   the latent processes are modelled as `n_lv` factors with estimated
 #'   loadings onto the series. Defaults to `NULL`, in which case one
 #'   latent process is used per series.
-#' @param trend_map Optional specification of which latent process each
-#'   series maps onto. It fixes the loadings of a dynamic factor model.
-#'   See \code{\link{mvgam}} for the accepted formats. Defaults to
-#'   `NULL`.
+#' @param trend_map Optional map of the series onto the latent
+#'   processes, which fixes some or all loadings of a dynamic factor
+#'   model. One of three forms:
+#'   \itemize{
+#'     \item a numeric `n_series x n_lv` matrix of loadings. `NA`
+#'       entries are sampled and finite entries stay fixed. An all-`NA`
+#'       matrix, such as `matrix(NA, n_series, 2)`, fixes nothing and
+#'       sets two factors.
+#'     \item a `data.frame(series, trend)` placing each series on one
+#'       process, with a loading of one.
+#'     \item `"identity"`, one process per series, or `"shared"`, one
+#'       process for every series.
+#'   }
+#'   Its columns set the number of factors, which an `n_lv` given too
+#'   must match. Without a `trend_map` every loading is sampled and
+#'   identified after sampling by a thin QR rotation (Heaps and Jermyn
+#'   2024). A map that fixes any loading takes no rotation. The
+#'   `loadings_prior` of [mvgam()] accepts a map with no fixed entries.
+#'   Defaults to `NULL`.
 #'
 #' @rdname trend_constructors
 #' @aliases trend_constructors
@@ -1897,7 +1956,7 @@ VAR <- function(time = NA, series = NA, p = 1, ma = FALSE, cor = TRUE,
   )
 }
 
-#' Specify local linear trends in \pkg{mvgam} models
+#' Local linear trends, with optional damping and seasons
 #'
 #' @description
 #' A latent level that moves with a latent growth rate, the local

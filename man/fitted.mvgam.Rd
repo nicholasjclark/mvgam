@@ -189,7 +189,7 @@ data. \code{\link[=hindcast.mvgam]{hindcast.mvgam()}} returns the fitted latent 
 Other predictions: 
 \code{\link{conditional_effects.mvgam}()},
 \code{\link{conditional_smooths.mvgam}()},
-\code{\link{hindcast.mvgam}()},
+\code{\link{hindcast}()},
 \code{\link{posterior_epred.mvgam}()},
 \code{\link{posterior_linpred.mvgam}()},
 \code{\link{posterior_predict.mvgam}()},

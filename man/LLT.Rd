@@ -2,7 +2,7 @@
 % Please edit documentation in R/trend_system.R
 \name{LLT}
 \alias{LLT}
-\title{Specify local linear trends in \pkg{mvgam} models}
+\title{Local linear trends, with optional damping and seasons}
 \usage{
 LLT(
   time = NA,
@@ -100,10 +100,25 @@ the latent processes are modelled as \code{n_lv} factors with estimated
 loadings onto the series. Defaults to \code{NULL}, in which case one
 latent process is used per series.}
 
-\item{trend_map}{Optional specification of which latent process each
-series maps onto. It fixes the loadings of a dynamic factor model.
-See \code{\link{mvgam}} for the accepted formats. Defaults to
-\code{NULL}.}
+\item{trend_map}{Optional map of the series onto the latent
+processes, which fixes some or all loadings of a dynamic factor
+model. One of three forms:
+\itemize{
+\item a numeric \verb{n_series x n_lv} matrix of loadings. \code{NA}
+entries are sampled and finite entries stay fixed. An all-\code{NA}
+matrix, such as \code{matrix(NA, n_series, 2)}, fixes nothing and
+sets two factors.
+\item a \code{data.frame(series, trend)} placing each series on one
+process, with a loading of one.
+\item \code{"identity"}, one process per series, or \code{"shared"}, one
+process for every series.
+}
+Its columns set the number of factors, which an \code{n_lv} given too
+must match. Without a \code{trend_map} every loading is sampled and
+identified after sampling by a thin QR rotation (Heaps and Jermyn
+2024). A map that fixes any loading takes no rotation. The
+\code{loadings_prior} of \code{\link[=mvgam]{mvgam()}} accepts a map with no fixed entries.
+Defaults to \code{NULL}.}
 
 \item{df}{Degrees of freedom for the latent process innovations.
 Defaults to \code{Inf}, which gives Gaussian innovations: a t with
@@ -424,9 +439,9 @@ carries
 
 Other trend models: 
 \code{\link{PW}()},
-\code{\link{RW}()},
 \code{\link{ZMVN}()},
 \code{\link{list_trend_types}()},
-\code{\link{lv_axis}()}
+\code{\link{lv_axis}()},
+\code{\link{print.mvgam_trend}()}
 }
 \concept{trend models}

@@ -156,37 +156,44 @@ plot(A_post)
 
 ```{r var-numbers, include = FALSE}
 fmt <- function(x) sprintf("%.2f", x)
-irfs <- irf(mod_var, h = 12)
-irf_summary <- summary(irfs)
-prey_shock <- subset(irf_summary, shock == "prey -> predator")
-pred_shock <- subset(irf_summary, shock == "predator -> prey")
-fevds <- fevd(mod_var, h = 12)
-fevd_summary <- summary(fevds)
-fevd_12 <- subset(fevd_summary, horizon == 12)
-share <- function(label) {
-  sprintf("%.0f%%", 100 * fevd_12$fevdQ50[fevd_12$shock == label])
-}
 ```
 
 The model recovered the simulated interactions. The predators' effect on the prey has a posterior mean of `r fmt(A_post$A["prey", "predator"])` against a true value of `r fmt(A["prey", 2])`. The prey's effect on the predators has a mean of `r fmt(A_post$A["predator", "prey"])` against `r fmt(A["predator", 1])`.
 
-`irf()` traces how a shock to one process spreads through the system. A shock of one standard deviation to the prey raises the predators, whose response peaks `r prey_shock$horizon[which.max(prey_shock$irfQ50)]` months later at `r fmt(max(prey_shock$irfQ50))` on the log scale:
+`irf()` traces how a shock to one process spreads through the system. Each panel follows one process after a shock of one standard deviation:
 
-```{r var-irf-prey, fig.height = 3.5, fig.alt = "Impulse responses of both species to a shock to the prey"}
+```{r var-irf, fig.height = 3.5, fig.alt = "Impulse responses of both species to a shock to the prey"}
+irfs <- irf(mod_var, h = 12)
 plot(irfs, series = 1)
 ```
 
-The same shock to the predators lowers the prey, reaching `r fmt(min(pred_shock$irfQ50))` after `r pred_shock$horizon[which.min(pred_shock$irfQ50)]` months:
+```{r irf-numbers, include = FALSE}
+irf_summary <- summary(irfs)
+prey_shock <- subset(irf_summary, shock == "prey -> predator")
+pred_shock <- subset(irf_summary, shock == "predator -> prey")
+```
+
+A shock to the prey raises the predators, whose response peaks `r prey_shock$horizon[which.max(prey_shock$irfQ50)]` months later at `r fmt(max(prey_shock$irfQ50))` on the log scale. The same shock to the predators lowers the prey, reaching `r fmt(min(pred_shock$irfQ50))` after `r pred_shock$horizon[which.min(pred_shock$irfQ50)]` months:
 
 ```{r var-irf-predator, fig.height = 3.5, fig.alt = "Impulse responses of both species to a shock to the predator"}
 plot(irfs, series = 2)
 ```
 
-`fevd()` splits the forecast variance of each process among the shocks that produce it. At a 12-month horizon, shocks to the predators account for `r share("predator -> prey")` of the prey's forecast variance. Shocks to the prey account for `r share("prey -> predator")` of the predators' forecast variance:
+`fevd()` splits the forecast variance of each process among the shocks that produce it:
 
 ```{r var-fevd, fig.height = 3.5, fig.alt = "Forecast error variance decompositions of the predator-prey VAR"}
+fevds <- fevd(mod_var, h = 12)
 plot(fevds)
 ```
+
+```{r fevd-numbers, include = FALSE}
+fevd_12 <- subset(summary(fevds), horizon == 12)
+share <- function(label) {
+  sprintf("%.0f%%", 100 * fevd_12$fevdQ50[fevd_12$shock == label])
+}
+```
+
+At a 12-month horizon, shocks to the predators account for `r share("predator -> prey")` of the prey's forecast variance. Shocks to the prey account for `r share("prey -> predator")` of the predators' forecast variance.
 
 The [VAR article](https://nicholasjclark.github.io/mvgam/articles/var.html){target="_blank"} covers higher-order and hierarchical VARs.
 
@@ -263,7 +270,7 @@ mod_beta <- mvgam(
 )
 ```
 
-The posterior holds an estimate of the `Beta` precision parameter $\phi$ for each series:
+The three series share one `Beta` precision parameter $\phi$. The summary reports it with the smooths and the trend parameters:
 
 ```{r beta-summary}
 summary(mod_beta)

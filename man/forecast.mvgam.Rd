@@ -168,8 +168,8 @@ Other forecasting:
 \code{\link{compare_scores}()},
 \code{\link{ensemble.mvgam_forecast}()},
 \code{\link{forecast_uncertainty}()},
-\code{\link{hindcast.mvgam}()},
+\code{\link{hindcast}()},
 \code{\link{lfo_cv.mvgam}()},
-\code{\link{score.mvgam_forecast}()}
+\code{\link{score}()}
 }
 \concept{forecasting}

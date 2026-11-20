@@ -2,6 +2,8 @@
 % Please edit documentation in R/sim_closure_unit_data.R
 \name{sim_closure_unit_data}
 \alias{sim_closure_unit_data}
+\alias{summary.mvgam_sim_closure_unit}
+\alias{print.mvgam_sim_closure_unit_summary}
 \title{Simulate closure-unit detection data with known truth}
 \usage{
 sim_closure_unit_data(
@@ -14,6 +16,10 @@ sim_closure_unit_data(
   K_max = 30L,
   seed = NULL
 )
+
+\method{summary}{mvgam_sim_closure_unit}(object, ...)
+
+\method{print}{mvgam_sim_closure_unit_summary}(x, digits = 3L, ...)
 }
 \arguments{
 \item{type}{Integer in \code{1:2} selecting the covariate recipe.
@@ -40,6 +46,14 @@ family. Defaults to \code{30L}.}
 
 \item{seed}{Optional integer seed. The session's random state is
 restored when the call returns.}
+
+\item{object}{A \code{mvgam_sim_closure_unit} object.}
+
+\item{...}{Unused. Anything passed here is refused.}
+
+\item{x}{A \code{mvgam_sim_closure_unit_summary} object.}
+
+\item{digits}{Integer number of significant digits. Defaults to 3.}
 }
 \value{
 A list of class \code{c("mvgam_sim_closure_unit", "mvgam_sim")}:
@@ -131,6 +145,10 @@ of each predictor. A named vector for one species, an
 \item{\code{loadings}, \code{lv}}{\code{Z} and the factor scores, when
 \code{n_lv > 0L}.}
 }
+\code{summary()} returns an \code{mvgam_sim_closure_unit_summary} list: the
+dimensions, the recipe, the ranges of the true state and detection
+parameters and the share of non-zero observations. A share of 0 or
+1 marks data with no information on detection. \code{print()} shows it.
 }
 
 \examples{

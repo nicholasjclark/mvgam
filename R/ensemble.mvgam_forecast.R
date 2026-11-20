@@ -16,8 +16,8 @@
 #'   supplied forecast. The weights are normalised to sum to 1.
 #'   Strategies such as stacking need the fitted models. Compute them
 #'   with [loo_model_weights.mvgam()] on the fits, or with
-#'   [loo_model_weights.mvgam_lfo()] on their [lfo_cv()] results. Pass
-#'   the numeric result here.
+#'   [loo_model_weights.mvgam_lfo()] on their [lfo_cv()] results.
+#'   `weights` takes either result as it is.
 #' @param ndraws Positive integer giving the total number of
 #'   ensemble draws to return per series. Defaults to `5000`.
 #'   A model allocated more draws than it holds is sampled with

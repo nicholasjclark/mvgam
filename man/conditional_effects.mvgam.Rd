@@ -154,7 +154,7 @@ effects in both formulas.
 Other predictions: 
 \code{\link{conditional_smooths.mvgam}()},
 \code{\link{fitted.mvgam}()},
-\code{\link{hindcast.mvgam}()},
+\code{\link{hindcast}()},
 \code{\link{posterior_epred.mvgam}()},
 \code{\link{posterior_linpred.mvgam}()},
 \code{\link{posterior_predict.mvgam}()},

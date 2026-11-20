@@ -24,7 +24,8 @@
 #' `group` takes several columns, such as `c("site", "season")`. Every
 #' row of one combination stays in the same fold.
 #'
-#' @param x A fitted `mvgam` object.
+#' @param x A fitted `mvgam` object, or for the methods an
+#'   `mvgam_kfold` object.
 #' @param K Integer number of folds. With `group` and `K = NULL` (the
 #'   default), each group is a fold. A `K` below the number of groups
 #'   bins the groups into `K` folds with [loo::kfold_split_grouped()].
@@ -71,6 +72,17 @@
 #'       `pareto_k_threshold_adaptive` `TRUE` when the default rule set
 #'       it.
 #'   }
+#'   `print()` shows the ELPD with its standard error, the folds and
+#'   refits and the Pareto k of the PSIS estimates. It then names the
+#'   groups with the lowest ELPD and the refitted groups whose ELPD moved
+#'   most from the PSIS estimate. `summary()` returns a tibble with one
+#'   row per held-out group: `group`, its `elpd` and `elpd_share` of the
+#'   total, for a refitted group `elpd_psis` and the `lift` of the refit
+#'   over it, `pareto_k` and `refit`. `plot()` draws the ELPD of each
+#'   group and its Pareto k, as [plot.mvgam_lfo()] does for time blocks.
+#'   Dark red points mark a Pareto k above the dashed threshold, where
+#'   PSIS is unreliable. In the ELPD panel they mark the groups below the
+#'   15% quantile.
 #'
 #' @references
 #' Burkner, P.-C., Gabry, J. and Vehtari, A. (2020). Approximate
@@ -572,19 +584,8 @@ kfold_refit_folds <- function(object, data, fold_ids, group_key,
 }
 
 
-#' Print an `mvgam_kfold` object
-#'
-#' Prints the ELPD with its standard error, the folds and refits and
-#' the Pareto k of the PSIS estimates. The first list below names the
-#' groups with the lowest ELPD. The second names the refitted groups
-#' whose ELPD moved most from the PSIS estimate.
-#'
-#' @param x An `mvgam_kfold` object.
 #' @param digits Integer number of decimal places. Defaults to 2.
-#' @param ... Unused.
-#'
-#' @return `x`, invisibly.
-#'
+#' @rdname kfold.mvgam
 #' @method print mvgam_kfold
 #' @export
 print.mvgam_kfold <- function(x, digits = 2L, ...) {
@@ -630,22 +631,8 @@ print.mvgam_kfold <- function(x, digits = 2L, ...) {
 }
 
 
-#' Tibble summary of an `mvgam_kfold` object
-#'
 #' @param object An `mvgam_kfold` object.
-#' @param ... Unused. Anything passed here is refused.
-#'
-#' @return A tibble with one row per held-out group.
-#'   \describe{
-#'     \item{`group`}{The group label.}
-#'     \item{`elpd`, `elpd_share`}{The group's ELPD and its share of
-#'       the total.}
-#'     \item{`elpd_psis`, `lift`}{For a refitted group, the PSIS
-#'       estimate before the refit and the refit's change from it.}
-#'     \item{`pareto_k`, `refit`}{The Pareto k of the PSIS estimate and
-#'       whether the group's fold was refitted.}
-#'   }
-#'
+#' @rdname kfold.mvgam
 #' @method summary mvgam_kfold
 #' @export
 summary.mvgam_kfold <- function(object, ...) {
@@ -673,20 +660,7 @@ summary.mvgam_kfold <- function(object, ...) {
 }
 
 
-#' Diagnostic plot for an `mvgam_kfold` object
-#'
-#' One panel for the ELPD of each group and one for its Pareto k, as
-#' in [plot.mvgam_lfo()]. Dark red points mark a Pareto k above the
-#' dashed threshold, where PSIS is unreliable. In the ELPD panel they
-#' mark the groups below the 15% quantile.
-#'
-#' @param x An `mvgam_kfold` object.
-#' @param ... Unused. Anything passed here is refused.
-#'
-#' @return A `ggplot` object.
-#'
-#' @seealso [plot.mvgam_lfo()] for the matching time-block CV plot.
-#'
+#' @rdname kfold.mvgam
 #' @method plot mvgam_kfold
 #' @export
 plot.mvgam_kfold <- function(x, ...) {

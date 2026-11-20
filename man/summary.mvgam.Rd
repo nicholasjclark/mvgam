@@ -2,9 +2,12 @@
 % Please edit documentation in R/summary.mvgam.R
 \name{summary.mvgam}
 \alias{summary.mvgam}
+\alias{print.mvgam_summary}
 \title{Summary of mvgam model fits}
 \usage{
 \method{summary}{mvgam}(object, probs = c(0.025, 0.975), robust = FALSE, matrices = FALSE, ...)
+
+\method{print}{mvgam_summary}(x, digits = 2, ...)
 }
 \arguments{
 \item{object}{An object of class \code{mvgam}.}
@@ -27,6 +30,10 @@ sampled parameters alone, among them \code{sigma_trend},
 \code{\link[=residual_cor]{residual_cor()}} summarise the matrices a cell at a time.}
 
 \item{...}{Unused. Anything passed here is refused.}
+
+\item{x}{An \code{mvgam_summary} object.}
+
+\item{digits}{Integer number of decimal places. Defaults to 2.}
 }
 \value{
 An object of class \code{mvgam_summary}. Each block is a
@@ -56,6 +63,8 @@ dynamics, \code{loadings} for the factor loadings and
 \code{loadings_prior} for the hyperparameters of their prior. The
 formula, family, draw counts and data dimensions are stored with
 them.
+\code{print()} sets the blocks out under their headings, followed by the
+sampler diagnostics and suggested next steps.
 }
 \description{
 Provides posterior summary statistics for mvgam model parameters,

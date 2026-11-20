@@ -293,9 +293,22 @@ var_process_labels <- function(object, K) {
 #'   matrices `A`, `A_se`, `A_lower`, `A_upper`, `A_ess`,
 #'   `prob_positive`, `prob_negative` and `prob_nonzero`, with
 #'   `n_series`, `series_names`, `group_label`, `probs`,
-#'   `prob_threshold` and `lag`. It has `print()` and `plot()` methods.
-#'   With `summary = FALSE`, the array of draws. Several panels give a
-#'   list of either.
+#'   `prob_threshold` and `lag`. With `summary = FALSE`, the array of
+#'   draws. Several panels give a list of either, an
+#'   `mvgam_var_matrix_list` when summarised.
+#'
+#'   `print()` gives the panel, the dimension, the mean absolute
+#'   off-diagonal cell and the estimate of the matrix. For several
+#'   panels it lists each panel's mean absolute off-diagonal cell. The
+#'   panel with the largest has the strongest effects between processes.
+#'
+#'   `plot()` draws the matrix as a heatmap. Row \eqn{i}, column
+#'   \eqn{j} is the effect of process \eqn{j} at time \eqn{t - l} on
+#'   process \eqn{i} at time \eqn{t}. A black outline marks each cell
+#'   whose `prob_nonzero` exceeds `prob_threshold`. The colour scale is
+#'   symmetric about zero. Several panels share one scale. Under
+#'   `type = "diagonal"` they draw the persistence of each process as a
+#'   point with its interval.
 #'
 #' @examples
 #' \dontrun{
@@ -508,24 +521,11 @@ finalise_transition_matrix <- function(arr, group_label, robust, probs,
   )
 }
 
-#' Print a VAR transition matrix
-#'
-#' Prints the panel, the dimension, the mean absolute off-diagonal
-#' cell and the posterior estimate of the matrix. The interval of each
-#' cell is in `A_lower` and `A_upper`.
-#'
-#' @param x An `mvgam_var_matrix` object returned by
-#'   [posterior_transition_matrix()].
-#' @param digits Integer. Digits used when rounding the printed
-#'   matrix.
-#' @param ... Ignored.
-#'
-#' @return `x`, invisibly.
-#'
-#' @seealso [posterior_transition_matrix()],
-#'   [plot.mvgam_var_matrix()],
-#'   [print.mvgam_var_matrix_list()].
-#' @author Nicholas J Clark
+#' @param x An `mvgam_var_matrix` or `mvgam_var_matrix_list`.
+#' @param digits Integer number of digits in the printed matrix.
+#'   Defaults to 2.
+#' @param ... Unused. Anything passed here is refused.
+#' @rdname posterior_transition_matrix
 #' @method print mvgam_var_matrix
 #' @export
 print.mvgam_var_matrix <- function(x, digits = 2L, ...) {
@@ -543,28 +543,11 @@ print.mvgam_var_matrix <- function(x, digits = 2L, ...) {
   invisible(x)
 }
 
-#' Plot a VAR transition matrix
-#'
-#' Draws the posterior estimate of the matrix as a heatmap. Row
-#' \eqn{i}, column \eqn{j} is the effect of process \eqn{j} at time
-#' \eqn{t - l} on process \eqn{i} at time \eqn{t}. A black outline
-#' marks each cell whose `prob_nonzero` exceeds the `prob_threshold`
-#' given to [posterior_transition_matrix()]. The colour scale is
-#' symmetric about zero and spans the largest absolute cell.
-#'
-#' @inheritParams print.mvgam_var_matrix
 #' @param cluster Logical. `TRUE` orders the processes by a Robinson
 #'   clustering of `1 - A`, which suits a matrix close to symmetric.
 #' @param supported_only Logical. `TRUE` leaves blank every cell whose
 #'   `prob_nonzero` is at most `prob_threshold`. Defaults to `FALSE`.
-#' @param ... Unused. Anything passed here is refused.
-#'
-#' @return A [ggplot2::ggplot] object.
-#'
-#' @seealso [posterior_transition_matrix()],
-#'   [print.mvgam_var_matrix()],
-#'   [plot.mvgam_var_matrix_list()], [plot.mvgam_residcor()].
-#' @author Nicholas J Clark
+#' @rdname posterior_transition_matrix
 #' @method plot mvgam_var_matrix
 #' @export
 plot.mvgam_var_matrix <- function(x, cluster = FALSE,
@@ -612,22 +595,7 @@ var_matrix_heatmap <- function(panel, lag, ncol = NULL) {
   )
 }
 
-#' Print the VAR transition matrices of several panels
-#'
-#' Prints the number of panels, the dimension and the mean absolute
-#' off-diagonal cell of each panel. The panel with the largest mean
-#' has the strongest effects between processes.
-#'
-#' @param x An `mvgam_var_matrix_list` returned by
-#'   [posterior_transition_matrix()] with `groups` set.
-#' @param ... Ignored.
-#'
-#' @return `x`, invisibly.
-#'
-#' @seealso [posterior_transition_matrix()],
-#'   [plot.mvgam_var_matrix_list()],
-#'   [print.mvgam_var_matrix()].
-#' @author Nicholas J Clark
+#' @rdname posterior_transition_matrix
 #' @method print mvgam_var_matrix_list
 #' @export
 print.mvgam_var_matrix_list <- function(x, ...) {
@@ -642,26 +610,11 @@ print.mvgam_var_matrix_list <- function(x, ...) {
   invisible(x)
 }
 
-#' Plot the VAR transition matrices of several panels
-#'
-#' `type = "heatmap"` draws one heatmap per panel, as
-#' [plot.mvgam_var_matrix()] draws one, with fill limits shared across
-#' panels. `type = "diagonal"` draws the persistence of each process in
-#' each panel as a point with its interval.
-#'
-#' @inheritParams print.mvgam_var_matrix_list
-#' @param type `"heatmap"` (default) or `"diagonal"`.
+#' @param type For several panels, `"heatmap"` (the default) or
+#'   `"diagonal"`.
 #' @param ncol The number of facet columns of the heatmaps, or `NULL`
 #'   for `ceiling(sqrt(length(x)))`.
-#' @inheritParams plot.mvgam_var_matrix
-#' @param ... Unused. Anything passed here is refused.
-#'
-#' @return A [ggplot2::ggplot] object.
-#'
-#' @seealso [posterior_transition_matrix()],
-#'   [plot.mvgam_var_matrix()],
-#'   [plot.mvgam_residcor_list()].
-#' @author Nicholas J Clark
+#' @rdname posterior_transition_matrix
 #' @method plot mvgam_var_matrix_list
 #' @export
 plot.mvgam_var_matrix_list <- function(x, type = c("heatmap",

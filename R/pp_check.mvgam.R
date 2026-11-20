@@ -62,7 +62,10 @@
 #'
 #' @return A ggplot object. A multivariate model given no `resp`
 #'   returns one figure with a panel per response. `type = "fit_stat"`
-#'   returns an `mvgam_ppc_fit_stat` object with print and plot methods.
+#'   returns an `mvgam_ppc_fit_stat` object. `print()` gives its
+#'   discrepancy and Bayesian p-value. `plot()` draws the discrepancy of
+#'   each draw's replicates against that of the observations, with the
+#'   1:1 line and the p-value.
 #'
 #' @details
 #' Replicates of the training data are drawn under the latent trend
@@ -1207,13 +1210,8 @@ closure_unit_fit_stat_ppc <- function(object, newdata, stat, group,
 }
 
 
-#' Print a closure-unit GOF discrepancy result
-#'
-#' @param x A `mvgam_ppc_fit_stat` object returned by
-#'   `pp_check(fit, type = "fit_stat")`.
-#' @param ... Ignored.
-#' @return Invisibly returns `x`.
-#' @author Nicholas J Clark
+#' @param x An `mvgam_ppc_fit_stat` object.
+#' @rdname pp_check.mvgam
 #' @method print mvgam_ppc_fit_stat
 #' @export
 print.mvgam_ppc_fit_stat <- function(x, ...) {
@@ -1250,16 +1248,7 @@ fit_stat_label <- function(stat) {
 }
 
 
-#' Plot a closure-unit GOF discrepancy result
-#'
-#' Scatter of `T(y_rep, theta)` against `T(y_obs, theta)` per
-#' posterior draw, with the 1:1 reference line and the Bayesian
-#' p-value printed in the top-left corner.
-#'
-#' @param x A `mvgam_ppc_fit_stat` object.
-#' @param ... Unused. Anything passed here is refused.
-#' @return A `ggplot` object.
-#' @author Nicholas J Clark
+#' @rdname pp_check.mvgam
 #' @method plot mvgam_ppc_fit_stat
 #' @export
 plot.mvgam_ppc_fit_stat <- function(x, ...) {

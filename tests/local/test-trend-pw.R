@@ -554,8 +554,8 @@ test_that("a factor model is refused on every route PW offers", {
     "Factor models are not supported for PW trends"
   )
   by_map <- expect_error(
-    build(trend_formula = ~ PW(n_changepoints = 5),
-          trend_map = matrix(NA_real_, n_series, 1L)),
+    build(trend_formula = ~ PW(n_changepoints = 5,
+                              trend_map = matrix(NA_real_, n_series, 1L))),
     "Factor models are not supported for PW trends"
   )
   by_jsdgam <- expect_error(
@@ -595,8 +595,7 @@ test_that("a factor-capable trend still takes every factor route", {
     as.integer(on_constructor$standata$N_lv_trend), 1L
   )
   by_trend_map <- build(
-    trend_formula = ~ AR(p = 1),
-    trend_map = matrix(NA_real_, n_series, 1L)
+    trend_formula = ~ AR(p = 1, trend_map = matrix(NA_real_, n_series, 1L))
   )
   expect_identical(as.integer(by_trend_map$standata$N_lv_trend), 1L)
   # And a piecewise trend with no factor asked for is untouched: it

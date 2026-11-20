@@ -2,10 +2,16 @@
 % Please edit documentation in R/compare_scores.R
 \name{compare_scores}
 \alias{compare_scores}
+\alias{plot.mvgam_compare_scores}
+\alias{summary.mvgam_compare_scores}
 \alias{print.mvgam_compare_scores}
 \title{Tidy comparison of forecast scores across mvgam models}
 \usage{
 compare_scores(..., score = "crps", model_names = NULL, score_args = list())
+
+\method{plot}{mvgam_compare_scores}(x, relative = NULL, facet = TRUE, ...)
+
+\method{summary}{mvgam_compare_scores}(object, ...)
 
 \method{print}{mvgam_compare_scores}(x, digits = 2L, ...)
 }
@@ -27,6 +33,17 @@ forecast. It replaces the names taken from the call.}
 
 \item{x}{An \code{mvgam_compare_scores} object.}
 
+\item{relative}{Optional name of a model in \code{x$model}. Each score is
+then drawn less that model's at the same series and horizon, with
+a dashed zero line. Negative values favour the other model. The
+baseline itself is left out.}
+
+\item{facet}{Logical. \code{TRUE} (the default) gives a univariate score
+one panel per series. \code{FALSE} overlays the series, told apart by
+line type. A joint score ignores it.}
+
+\item{object}{An \code{mvgam_compare_scores} object.}
+
 \item{digits}{Integer number of significant digits. Defaults to 2.}
 }
 \value{
@@ -42,6 +59,11 @@ held-out time.
 \item \code{in_interval}: whether the observation fell in the central
 interval, as \code{\link[=score.mvgam_forecast]{score.mvgam_forecast()}} reports it.
 }
+\code{summary()} returns the scores wide, one column per model and one
+row per series and horizon, or per horizon for a joint score.
+\code{plot()} draws each model's score by horizon. A univariate score
+takes one panel per series and a joint score one panel. An ensemble
+plots as one more model.
 }
 \description{
 Scores the forecasts of several models of the same
@@ -87,17 +109,16 @@ plot(scores, relative = "GAM")
 
 }
 \seealso{
-\code{\link[=score.mvgam_forecast]{score.mvgam_forecast()}},
-\code{\link[=plot.mvgam_compare_scores]{plot.mvgam_compare_scores()}}, \code{\link[=compare_elpds]{compare_elpds()}},
+\code{\link[=score.mvgam_forecast]{score.mvgam_forecast()}}, \code{\link[=compare_elpds]{compare_elpds()}},
 \code{\link[=forecast.mvgam]{forecast.mvgam()}}, \code{\link[=ensemble.mvgam_forecast]{ensemble.mvgam_forecast()}}
 
 Other forecasting: 
 \code{\link{ensemble.mvgam_forecast}()},
 \code{\link{forecast.mvgam}()},
 \code{\link{forecast_uncertainty}()},
-\code{\link{hindcast.mvgam}()},
+\code{\link{hindcast}()},
 \code{\link{lfo_cv.mvgam}()},
-\code{\link{score.mvgam_forecast}()}
+\code{\link{score}()}
 }
 \author{
 Nicholas J Clark

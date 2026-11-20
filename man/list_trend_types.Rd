@@ -2,7 +2,7 @@
 % Please edit documentation in R/trend_system.R
 \name{list_trend_types}
 \alias{list_trend_types}
-\title{List Available Trend Types}
+\title{List the available trend types}
 \usage{
 list_trend_types()
 }
@@ -16,8 +16,8 @@ List all registered trend types and their factor model support.
 Other trend models: 
 \code{\link{LLT}()},
 \code{\link{PW}()},
-\code{\link{RW}()},
 \code{\link{ZMVN}()},
-\code{\link{lv_axis}()}
+\code{\link{lv_axis}()},
+\code{\link{print.mvgam_trend}()}
 }
 \concept{trend models}

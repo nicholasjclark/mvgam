@@ -24,7 +24,8 @@
 #' @name lfo_cv.mvgam
 #' @importFrom stats update logLik quantile
 #'
-#' @param object A fitted [mvgam][mvgam::mvgam] object.
+#' @param object A fitted [mvgam][mvgam::mvgam] object, or for
+#'   `summary()` an `mvgam_lfo` object.
 #' @param newdata Optional `data.frame` holding the response, the time
 #'   and series columns and the covariates. `NULL` (the default) takes
 #'   the training data. Every series must share its observed times,
@@ -73,6 +74,16 @@
 #'   * `fc_horizon`: the horizon.
 #'   * `log_lik`: the held-out log densities when `save_log_lik = TRUE`,
 #'     otherwise `NULL`.
+#'
+#'   `print()` shows the horizon, the Pareto k threshold and the counts
+#'   of evaluations and refits, with each score's sum and mean over the
+#'   origins. `summary()` returns a tibble with one row per origin:
+#'   `eval_time`, `refit_here`, `pareto_k` (`NA` at a refit), `n_obs`
+#'   and one column per score. `plot()` draws the Pareto k of each
+#'   origin and each score. The dashed line marks the threshold above
+#'   which points are highlighted: the Pareto k threshold, the 15%
+#'   quantile of the ELPD (lower values highlighted) or the 85% quantile
+#'   of any other score.
 #'
 #' @references
 #' Burkner, P.-C., Gabry, J. and Vehtari, A. (2020). Approximate
@@ -651,18 +662,7 @@ rows_at_times <- function(data, time_var, times) {
 }
 
 
-#' Plot Pareto-k and per-fold scores from an `mvgam_lfo` object
-#'
-#' @description One panel for the Pareto k of each fold and one for
-#'   each score. The dashed line in each panel is the threshold above
-#'   which points are highlighted. For Pareto k it is the threshold
-#'   [lfo_cv()] used. For ELPD it is the 15% quantile, with lower
-#'   values highlighted. For the other scores it is the 85% quantile.
-#'
-#' @param x An object of class `mvgam_lfo`.
-#' @param ... Unused. Anything passed here is refused.
-#' @return A `ggplot` object.
-#'
+#' @rdname lfo_cv.mvgam
 #' @export
 plot.mvgam_lfo <- function(x, ...) {
   rlang::check_dots_empty()
@@ -681,19 +681,7 @@ plot.mvgam_lfo <- function(x, ...) {
 }
 
 
-#' Posterior summary of an `mvgam_lfo` object
-#'
-#' @description One row per evaluation time. `refit_here` is `TRUE`
-#'   where the model was refitted for that origin. `pareto_k` is the
-#'   Pareto k of the importance weights, `NA` at a refit. `n_obs`
-#'   counts the responses scored. One column follows for each score
-#'   requested from [lfo_cv()].
-#'
-#' @param object An object of class `mvgam_lfo`.
-#' @param ... Unused. Anything passed here is refused.
-#' @return A `tibble` with columns `eval_time`, `refit_here`,
-#'   `pareto_k`, `n_obs` and one per score.
-#'
+#' @rdname lfo_cv.mvgam
 #' @method summary mvgam_lfo
 #' @export
 summary.mvgam_lfo <- function(object, ...) {
@@ -1010,18 +998,8 @@ stack_mvgam_lfo <- function(models, model_names) {
 }
 
 
-#' Print headline summary of an `mvgam_lfo` object
-#'
-#' @description Prints the horizon, the Pareto k threshold and the
-#'   counts of evaluations and refits. Each score is given as its sum
-#'   and mean over folds.
-#'   [summary.mvgam_lfo()] returns the per-fold table.
-#'
-#' @param x An object of class `mvgam_lfo`.
-#' @param ... Unused.
-#'
-#' @return The `mvgam_lfo` object `x`, returned invisibly.
-#'
+#' @param x An `mvgam_lfo` object.
+#' @rdname lfo_cv.mvgam
 #' @method print mvgam_lfo
 #' @export
 print.mvgam_lfo <- function(x, ...) {

@@ -55,6 +55,10 @@
 #'       dimensions and series labels.
 #'     \item `probs`, `robust`: the summary settings.
 #'   }
+#'   `plot()` draws the point estimate, or under `type = "uncertainty"`
+#'   the per-entry spread, as a heatmap. The diagonal shows the variance
+#'   the factors capture in each series. The fill scale is symmetric
+#'   about zero.
 #'
 #' @references
 #' Heaps, S. E. and Jermyn, I. H. (2024). Structured prior
@@ -179,28 +183,10 @@ print.mvgam_shared_variation <- function(x, digits = 3L, ...) {
 }
 
 
-#' Plot the factor-implied shared variation matrix
-#'
-#' Heatmap of the posterior point estimate of
-#' \eqn{\Delta = Z \Sigma Z^\top}. Diagonal cells show the variance
-#' the factors capture in each series. Off-diagonal cells show the
-#' covariance between series, positive or negative. The fill scale is
-#' symmetric around zero. A positive and a negative covariance of equal
-#' size take colours of equal intensity.
-#'
-#' @param x A `mvgam_shared_variation` object returned by
-#'   [shared_variation()].
-#' @param type One of `"point"` (default) showing the posterior
-#'   point estimate, or `"uncertainty"` showing the per-entry
-#'   posterior spread (`delta_se`).
-#' @param ... Unused. Anything passed here is refused.
-#'
-#' @return A `ggplot` object.
-#'
-#' @seealso [shared_variation()],
-#'   [plot.mvgam_residcor()] for the implied correlation
-#'   structure as a residual-correlation heatmap.
-#' @author Nicholas J Clark
+#' @param x An `mvgam_shared_variation` object.
+#' @param type `"point"` (the default) draws the point estimate.
+#'   `"uncertainty"` draws the per-entry spread, `delta_se`.
+#' @rdname shared_variation
 #' @method plot mvgam_shared_variation
 #' @export
 plot.mvgam_shared_variation <- function(x,

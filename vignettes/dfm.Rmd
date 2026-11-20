@@ -50,7 +50,8 @@ dynamic factor model describes that common variation with a small
 number of latent trends. It writes each series as a weighted sum of
 them (Zuur et al. [2003](https://doi.org/10.1002/env.611); Holmes et
 al. [2012](https://doi.org/10.32614/RJ-2012-002)). In mvgam the
-`trend_map` argument sets which series load on which trend. This
+`trend_map` argument of the trend constructor sets which series load
+on which trend. This
 vignette simulates six series from three trends and fits three
 models: one given the true loadings, one that estimates them and one
 that pools every series onto a single trend. Forecast scores on
@@ -99,9 +100,10 @@ Z_partial <- rbind(
 )
 ```
 
-Passed as `trend_map = Z_partial`, the fit estimates the three `NA`
-entries. `summary()` lists them under `Factor Loadings`. A matrix
-of all `NA` estimates every loading, as shown later in this vignette.
+Passed as `AR(trend_map = Z_partial)`, the fit estimates the three
+`NA` entries. `summary()` lists them under `Factor Loadings`. A
+matrix of all `NA` estimates every loading, as `n_lv` alone does
+later in this vignette.
 
 ## Simulated data
 
@@ -169,16 +171,16 @@ tm_known <- data.frame(
 tm_known
 ```
 
-The observation formula holds an intercept alone. `AR(p = 1)`
-gives each of the three trends its own AR(1) process. Passing
+The observation formula holds an intercept alone.
+`AR(p = 1, trend_map = tm_known)` gives each of the three trends its
+own AR(1) process and places the series on them. Passing
 `newdata = test` stores the held-out data on the fit for `forecast()`
 to use later.
 
 ```{r fit-known, results = "hide"}
 fit_known <- mvgam(
   formula = y ~ 1,
-  trend_formula = ~ AR(p = 1),
-  trend_map = tm_known,
+  trend_formula = ~ AR(p = 1, trend_map = tm_known),
   data = train,
   newdata = test,
   family = gaussian(),
@@ -219,8 +221,8 @@ plot(fc_known)
 
 ## Estimating the loadings
 
-When the grouping is unknown, a matrix of `NA` asks mvgam to estimate
-every loading. The loadings take a Student-t prior. The innovation
+When the grouping is unknown, `n_lv` asks mvgam to estimate every
+loading of that many factors. The loadings take a Student-t prior. The innovation
 SD of every factor is fixed at one to set the scale of the loadings.
 Because each factor has its own AR coefficient, the model
 distinguishes the factors by their dynamics. Only their order and
@@ -230,8 +232,7 @@ explain and gives each a positive largest loading.
 ```{r fit-free, results = "hide"}
 fit_free <- mvgam(
   formula = y ~ 1,
-  trend_formula = ~ AR(p = 1),
-  trend_map = matrix(NA_real_, nrow = n_series, ncol = n_lv),
+  trend_formula = ~ AR(p = 1, n_lv = n_lv),
   data = train,
   newdata = test,
   family = gaussian(),
@@ -285,13 +286,12 @@ ordinate(fit_free)
 ## Pooling every series
 
 To see what a wrong grouping costs, the third model puts all six
-series on one trend with `trend_map = "shared"`:
+series on one trend with `AR(trend_map = "shared")`:
 
 ```{r fit-pooled, results = "hide"}
 fit_pooled <- mvgam(
   formula = y ~ 1,
-  trend_formula = ~ AR(p = 1),
-  trend_map = "shared",
+  trend_formula = ~ AR(p = 1, trend_map = "shared"),
   data = train,
   newdata = test,
   family = gaussian(),
@@ -355,8 +355,9 @@ fit both and compare their scores.
 
 ## Where to next
 
-- `?mvgam` describes `trend_map` and `loadings_prior`, which sets a
-  structured prior on estimated loadings.
+- `?trend_constructors` describes `trend_map`. `?mvgam` describes
+  `loadings_prior`, which sets a structured prior on estimated
+  loadings.
 - `?compare_scores` and `?score` list the available scoring rules.
 - `?residual_cor` and `?shared_variation` give the correlations and
   covariances among series, with their intervals.

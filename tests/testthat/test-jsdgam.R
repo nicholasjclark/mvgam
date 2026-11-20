@@ -456,21 +456,15 @@ jsdgam_loadings_fixture <- function() {
   rownames(d_mat) <- colnames(d_mat) <- series_levels
   mf <- mvgam_formula(
     y ~ 1,
-    trend_formula = ~ ZMVN(cor = TRUE, subgr = series)
+    trend_formula = ~ ZMVN(cor = TRUE, subgr = series, n_lv = 2L)
   )
-  tm <- matrix(NA_real_, n_species, 2L)
-  rownames(tm) <- series_levels
-  list(
-    data = data, traits = traits, d_mat = d_mat,
-    mf = mf, trend_map = tm
-  )
+  list(data = data, traits = traits, d_mat = d_mat, mf = mf)
 }
 
 test_that("traits + phylo route through standata.mvgam_formula cleanly", {
   fx <- jsdgam_loadings_fixture()
   sd <- standata(
     fx$mf, data = fx$data, family = poisson(),
-    trend_map = fx$trend_map,
     loadings_prior = list(
       features = fx$traits,
       distances = list(phylo = fx$d_mat)
@@ -486,8 +480,7 @@ test_that("traits + phylo route through standata.mvgam_formula cleanly", {
 test_that("default (no aliases) yields no row_features / dist_* slots", {
   fx <- jsdgam_loadings_fixture()
   sd <- standata(
-    fx$mf, data = fx$data, family = poisson(),
-    trend_map = fx$trend_map
+    fx$mf, data = fx$data, family = poisson()
   )
   expect_false("dist_phylo" %in% names(sd))
   expect_false("row_features" %in% names(sd))

@@ -7,7 +7,9 @@
 #' @name stability.mvgam
 #'
 #' @param object An object of class \code{mvgam} fitted with a
-#'   `VAR(p = 1)` latent process model
+#'   `VAR(p = 1)` latent process model.
+#'   For `summary()`, an `mvgam_stability` object from
+#'   `stability(summary = FALSE)`.
 #' @param groups Hierarchical VAR fits only. The panels to summarise,
 #'   by name or by index into the levels of `gr`. The default `NULL`
 #'   summarises every panel. A non-hierarchical fit accepts `NULL`
@@ -81,6 +83,13 @@
 #' @return A \code{data.frame} with the posterior median and interval of
 #'   each stability metric, or under `summary = FALSE` an object of class
 #'   `mvgam_stability` holding one row of metrics per posterior draw.
+#'   `summary()` turns the draws into the summary, one row per metric,
+#'   or per panel and metric on a hierarchical VAR. `plot()` draws a
+#'   histogram of each metric, with a dashed line at zero on the
+#'   reactivity panel, above which the system amplifies a shock before
+#'   it decays. A hierarchical VAR draws a median and interval for each
+#'   panel. A summary plots the histograms from the bins it recorded, or
+#'   under `intervals = TRUE` a median and interval.
 #'
 #' @references
 #'   AR Ives, B Dennis, KL Cottingham & SR Carpenter (2003). Estimating
@@ -291,27 +300,12 @@ offdiag_share <- function(off, diag_vals) {
 }
 
 
-#' Summarise posterior stability metrics
-#'
-#' Reports the posterior median and interval of each stability metric.
-#' `stability()` returns this summary by default, as the other post-fit
-#' summaries of a VAR do. `stability(summary = FALSE)` returns the
-#' draws.
-#'
-#' @param object An object of class `mvgam_stability`
-#' @param probs The lower and upper percentiles of the interval
-#'   reported with the median
-#' @param robust Logical. `TRUE` (the default) reports the median and
-#'   median absolute deviation. `FALSE` reports the mean and standard
-#'   deviation.
-#' @param bins Number of bins that record the shape of each metric for
-#'   `plot()`
-#' @param ... Unused. Anything passed here is refused.
-#'
-#' @return A `data.frame` with one row per metric. On a hierarchical
-#'   VAR it holds one row per panel and metric, with the panel in
-#'   `group`.
-#'
+#' @param robust Logical, for `summary()`. `TRUE` (the default) reports
+#'   the median and median absolute deviation. `FALSE` reports the mean
+#'   and standard deviation.
+#' @param bins Number of histogram bins, which `summary()` records for
+#'   `plot()`.
+#' @rdname stability.mvgam
 #' @method summary mvgam_stability
 #' @export
 summary.mvgam_stability <- function(object, probs = c(0.025, 0.975),
@@ -385,21 +379,10 @@ bin_draws <- function(draws, bins) {
 }
 
 
-#' Plot summarised stability metrics
-#'
-#' Draws the histogram of each metric from the bins `summary()`
-#' recorded. A histogram shows whether the mass of reactivity crosses
-#' zero. Pass `intervals = TRUE` for a median and interval instead. A
-#' hierarchical VAR draws a median and interval for each panel.
-#'
-#' @param x An object of class `mvgam_stability_summary`
-#' @param variables Metrics to draw
-#' @param intervals Logical. `TRUE` draws each metric as a median and
-#'   interval. `FALSE` (the default) draws its binned posterior.
-#' @param ... Unused. Anything passed here is refused.
-#'
-#' @return A `ggplot` object
-#'
+#' @param intervals Logical, for a summary. `TRUE` draws each metric as
+#'   a median and interval. `FALSE` (the default) draws its binned
+#'   posterior.
+#' @rdname stability.mvgam
 #' @method plot mvgam_stability_summary
 #' @export
 plot.mvgam_stability_summary <- function(
@@ -421,25 +404,11 @@ plot.mvgam_stability_summary <- function(
 }
 
 
-#' Plot posterior distributions of latent VAR stability metrics
-#'
-#' Draws a histogram of the posterior draws of each metric
-#' `stability.mvgam()` returned. A dashed line at zero on the
-#' reactivity panel marks the threshold above which the system
-#' amplifies a shock before it decays. A hierarchical VAR draws a
-#' median and interval for each panel.
-#'
-#' @param x A `mvgam_stability` object returned by [stability()].
+#' @param x An `mvgam_stability` object or its summary.
 #' @param variables Character vector of the metrics to draw. Defaults
 #'   to reactivity and the mean and variance return rates. Any column
 #'   of `x` can be named.
-#' @param bins Number of histogram bins.
-#' @param ... Unused. Anything passed here is refused.
-#'
-#' @return A `ggplot` object.
-#' @seealso [stability()], [irf()], [fevd()],
-#'   [plot.mvgam_irf()], [plot.mvgam_fevd()],
-#'   [plot.mvgam_forecast()]
+#' @rdname stability.mvgam
 #' @method plot mvgam_stability
 #' @export
 plot.mvgam_stability <- function(

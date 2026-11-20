@@ -32,9 +32,9 @@ per response and refuses the families mvgam does not support.
 observation formula and the trend formula and returns the
 multivariate specification: the response names, the trend
 specification per response, the trend formula's regular terms and
-whether the model has a trend. `prepare_trend_specs()` then attaches
-the `trend_map` and the loadings prior and refuses a factor request
-on a trend without a factor form.
+whether the model has a trend. `prepare_trend_specs()` then
+normalises the constructor's `trend_map`, refuses a factor request on
+a trend without a factor form and attaches the loadings prior.
 
 ### 2. Threading
 `suppress_brms_threading()` sets `threads = 1` for the brms calls

@@ -39,6 +39,12 @@
 #'   Both forms take `ndraws` and `draw_ids`. A subset of the posterior
 #'   shortens the computation.
 #'
+#' @section Methods:
+#' `summary()` turns the draws into the `mvgam_irf_summary` above, at
+#' the percentiles `probs` sets. `plot()` draws the response of each
+#' process to a shock to `series`, with its median and interval by
+#' horizon. A summary plots through [plot.mvgam_var_surface_summary()].
+#'
 #' @seealso [mvgam], [VAR], [irf], [stability]
 #'
 #' @references Pesaran HH and Shin Y (1998). Generalized impulse
@@ -50,31 +56,12 @@
 #' @name mvgam_irf-class
 NULL
 
-#' @title Posterior summary of impulse responses
-#'
-#' @description This function takes an \code{mvgam_irf} object and
-#'   calculates a posterior summary of the impulse responses of each
-#'   series to shocks from each of the other series, at all horizons
-#'
-#' @param object an object of class `mvgam_irf` obtained using the
-#'   \code{irf()} function. This object will contain draws from the posterior
-#'   distribution of the impulse responses.
-#'
-#' @param probs The upper and lower percentiles to be computed by the
-#'   `quantile` function, in addition to the median
-#'
+#' @param object An `mvgam_irf` object from `irf(summary = FALSE)`.
+#' @param probs The lower and upper percentiles of the interval.
+#'   Defaults to `c(0.025, 0.975)`.
 #' @param ... Unused. Anything passed here is refused.
-#'
-#' @return A long-format `tibble` / `data.frame` reporting the posterior median,
-#'   upper and lower percentiles of the impulse responses of each series to
-#'   shocks from each of the other series at all horizons.
-#'
+#' @rdname mvgam_irf-class
 #' @method summary mvgam_irf
-#'
-#' @seealso \code{\link{irf}}, \code{\link{plot.mvgam_irf}}
-#'
-#' @author Nicholas J Clark
-#'
 #' @export
 summary.mvgam_irf <- function(object, probs = c(0.025, 0.975), ...) {
   checkmate::assert_class(object, "mvgam_irf")
@@ -110,29 +97,11 @@ irf_draws <- function(x, series, resp_ids) {
   }))
 }
 
-#' Plot impulse responses from an `mvgam_irf` object
-#'
-#' This function takes an \code{mvgam_irf} object and produces plots of
-#' Impulse Response Functions
-#'
-#' @param x \code{list} object of class \code{mvgam_irf}. See [irf()]
-#'
-#' @param series Position or name of the process given the shock
+#' @param x An `mvgam_irf` object.
+#' @param series Position or name of the process given the shock.
 #' @param responses Optional positions or names of the processes drawn
-#'   as response panels. Useful for hierarchical VAR fits where the
-#'   raw K-panel grid is unreadable. Defaults to all processes.
-#'
-#' @param ... Unused. Anything passed here is refused.
-#'
-#' @return A `ggplot` object showing the expected response of each latent time
-#'   series to a shock of the focal `series`
-#'
-#' @seealso [irf()], [fevd()], [stability()],
-#'   [plot.mvgam_fevd()], [plot.mvgam_stability()],
-#'   [plot.mvgam_forecast()]
-#'
-#' @author Nicholas J Clark
-#'
+#'   as response panels. Defaults to every process.
+#' @rdname mvgam_irf-class
 #' @export
 plot.mvgam_irf <- function(x, series = 1, responses = NULL, ...) {
   checkmate::assert_class(x, "mvgam_irf")

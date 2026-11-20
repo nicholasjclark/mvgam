@@ -71,10 +71,15 @@ lv_dat <- function(seed) {
   dat$y <- rnorm(nrow(dat))
   dat
 }
+# A formula naming no constructor takes `ZMVN()`. `n_lv` adds it with
+# that many factors.
 lv_prefit <- function(trend_formula, n_lv = NULL, dat = lv_dat(1)) {
+  if (!is.null(n_lv)) {
+    trend_formula <- update(trend_formula,
+                            bquote(~ . + ZMVN(n_lv = .(n_lv))))
+  }
   mvgam(y ~ -1, trend_formula = trend_formula, data = dat,
         family = gaussian(), run_model = FALSE, silent = 2,
-        trend_map = if (!is.null(n_lv)) matrix(NA_real_, 3L, n_lv),
         validate = FALSE)
 }
 

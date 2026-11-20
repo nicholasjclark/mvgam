@@ -2,16 +2,15 @@
 #
 # `jsdgam()` builds the `mvgam()` call of a joint species distribution
 # model. The latent factors form the trend. `trend_formula` is
-# `factor_formula`, where `~ -1` gives `ZMVN()`. `trend_map` is an
-# all-NA `n_species` by `n_lv` matrix, which samples every loading. The
-# fit is an mvgam fit with `jsdgam` after `mvgam` in its class. The
+# `factor_formula` with `ZMVN(n_lv = )` added, which samples every
+# loading. The fit is an mvgam fit with `jsdgam` after `mvgam` in its class. The
 # mvgam methods serve it, using the extra slots set below.
 #
 # The loadings are identified after sampling by the QR rotation of
 # Heaps and Jermyn. A `factor_formula` with `by = lv_axis()` constrains
 # them instead and skips the rotation.
 
-#' Fit Joint Species Distribution Models in mvgam
+#' Fit a joint species distribution model
 #'
 #' Fits a joint species distribution model (JSDM) to the presences,
 #' detections or counts of many species across many sampling units.
@@ -364,11 +363,6 @@ jsdgam <- function(formula,
   data_train <- jsdgam_fit_frame(data, unit_chr, species_chr,
                                  species_levels, is_mv_formula)
 
-  # An all-NA `n_species` by `n_lv` map samples every loading. Its
-  # column count sets `n_lv` in `normalise_trend_map()`.
-  trend_map_mat <- matrix(NA_real_, nrow = n_species, ncol = as.integer(n_lv))
-  rownames(trend_map_mat) <- species_levels
-
   # The deprecated `samples` and `burnin` become `iter` and `warmup`
   # here. `update()` merges new arguments into the stored ones. Under
   # the translated names, a new `iter` replaces the stored `iter`.
@@ -459,45 +453,36 @@ jsdgam <- function(formula,
     )
   }
 
-  # The trend is `factor_formula`. Its default `~ -1` gives `ZMVN()`.
-  # A multivariate formula has no series column to check `trend_map`
-  # against. Its factors are requested as `ZMVN(n_lv = )` on the trend
-  # formula instead. A `factor_formula` naming a constructor keeps the
-  # caller's `n_lv`.
-  trend_formula_out <- factor_formula
-  if (is_mv_formula) {
-    trend_map_mat <- NULL
-    spec <- stats::terms(factor_formula)
-    labels <- attr(spec, "term.labels")
-    if (!any(vapply(labels, is_trend_constructor_call, logical(1L)))) {
-      # `term.labels` omits the intercept. A `~ site - 1` keeps its
-      # `- 1` explicitly.
-      parts <- c(labels, paste0("ZMVN(n_lv = ", as.integer(n_lv), ")"))
-      if (identical(as.integer(attr(spec, "intercept")), 0L)) {
-        parts <- c(parts, "-1")
-      }
-      trend_formula_out <- stats::as.formula(
-        paste("~", paste(parts, collapse = " + ")),
-        env = environment(factor_formula)
+  # The trend is `factor_formula` with `ZMVN(n_lv = )` added. The call
+  # joins the formula as written, its other terms untouched.
+  if (!length(trend_constructor_calls(rlang::f_rhs(factor_formula)))) {
+    trend_formula_out <- rlang::new_formula(
+      NULL,
+      call("+", rlang::f_rhs(factor_formula),
+           call("ZMVN", n_lv = as.integer(n_lv))),
+      env = environment(factor_formula)
+    )
+  } else {
+    # A caller's constructor that sets `n_lv` keeps it, checked against
+    # the ceiling. One that does not takes `jsdgam()`'s `n_lv`.
+    trend_formula_out <- factor_formula
+    user_spec <- parse_trend_formula(factor_formula)$trend_model
+    if (is.null(user_spec$n_lv)) {
+      trend_formula_out <- set_trend_constructor_args(
+        factor_formula, list(n_lv = as.integer(n_lv))
       )
     } else {
-      # The caller's constructor sets the number of factors. The
-      # ceiling is checked against it.
-      user_spec <- parse_trend_formula(factor_formula)$trend_model
-      if (!is.null(user_spec$n_lv)) {
-        validate_n_lv_ceiling(
-          n_lv         = user_spec$n_lv,
-          n_species    = n_species,
-          fit_function = "jsdgam"
-        )
-      }
+      validate_n_lv_ceiling(
+        n_lv         = user_spec$n_lv,
+        n_species    = n_species,
+        fit_function = "jsdgam"
+      )
     }
   }
 
   forward_args <- list(
     formula = formula,
     trend_formula = trend_formula_out,
-    trend_map = trend_map_mat,
     data = data_train,
     backend = backend,
     threads = threads,

@@ -13,7 +13,7 @@
 #         8 per cent of rows dropped so the species are unbalanced,
 #         occasions numbered from 3 so a value is not its own rank
 #   by_lv    : trend_formula = ~ s(elev, k = 5, by = lv_axis()) - 1
-#              + ZMVN(cor = TRUE), trend_map = matrix(NA, 5, 2)
+#              + ZMVN(cor = TRUE, trend_map = matrix(NA, 5, 2))
 #   no_by_lv : the same without `by = lv_axis()`
 #
 # Run with:
@@ -150,8 +150,10 @@ sim_truth <- list(
   beta_depth = beta_depth
 )
 
-by_lv_formula <- ~ s(elev, k = 5, by = lv_axis()) - 1 + ZMVN(cor = TRUE)
-plain_formula <- ~ s(elev, k = 5) - 1 + ZMVN(cor = TRUE)
+by_lv_formula <- ~ s(elev, k = 5, by = lv_axis()) - 1 +
+  ZMVN(cor = TRUE, trend_map = trend_map)
+plain_formula <- ~ s(elev, k = 5) - 1 +
+  ZMVN(cor = TRUE, trend_map = trend_map)
 obs_formula <- y ~ region + depth
 
 
@@ -165,12 +167,12 @@ obs_formula <- y ~ region + depth
 
 built_by_lv <- with_warnings(mvgam(
   formula = obs_formula, trend_formula = by_lv_formula,
-  trend_map = trend_map, data = dat, family = gaussian(),
+  data = dat, family = gaussian(),
   run_model = FALSE, silent = 2
 ))
 built_plain <- with_warnings(mvgam(
   formula = obs_formula, trend_formula = plain_formula,
-  trend_map = trend_map, data = dat, family = gaussian(),
+  data = dat, family = gaussian(),
   run_model = FALSE, silent = 2
 ))
 prefit_by_lv <- built_by_lv$value
@@ -546,7 +548,7 @@ fit <- cached_fit(
   function() {
     with_warnings(mvgam(
       formula = obs_formula, trend_formula = by_lv_formula,
-      trend_map = trend_map, data = dat, family = gaussian(),
+      data = dat, family = gaussian(),
       chains = 2L, iter = 1000L, warmup = 500L,
       silent = 2, backend = "cmdstanr"
     ))$value
@@ -1109,11 +1111,10 @@ test_that("loo splits the likelihood it was given", {
 test_that("a refit rebuilds the model that was fitted", {
   # Every cross-validation method here refits through `update()`, so
   # what `update()` rebuilds is what `kfold()` and `lfo_cv()` score
-  # against. This fit's factor count came from a top-level
-  # `trend_map`, which the trend formula does not name: re-evaluating
-  # that formula alone loses it, `by = lv_axis()` then reads the
-  # series axis instead of the factor axis, and the refit carries one
-  # smooth per series where the fit has one per factor.
+  # against. This fit's factor count comes from the `trend_map` its
+  # constructor names. A refit that lost it would index
+  # `by = lv_axis()` by series. The refit would then carry one smooth
+  # per series where the fit has one per factor.
   #
   # The claim is a refit that builds the same model, and it is
   # asserted on the program. A call that names `n_lv` proves nothing.
@@ -1206,8 +1207,9 @@ fit_slope <- cached_fit(
   "val_mvgam_by_lv_slope.rds",
   function() {
     with_warnings(mvgam(
-      formula = obs_formula, trend_formula = ~ elev:lv_axis() - 1 + ZMVN(),
-      trend_map = trend_map, data = dat, family = gaussian(),
+      formula = obs_formula,
+      trend_formula = ~ elev:lv_axis() - 1 + ZMVN(trend_map = trend_map),
+      data = dat, family = gaussian(),
       chains = 2L, iter = 1000L, warmup = 500L, silent = 2
     ))$value
   },

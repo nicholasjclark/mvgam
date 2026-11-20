@@ -688,13 +688,15 @@ normalise_trend_map <- function(input, data, series_var = "series") {
     trend_map_from_character(input, n_series)
   } else if (is.data.frame(input)) {
     trend_map_from_dataframe(input, series_levels)
-  } else if (is.matrix(input) && is.numeric(input)) {
+  } else if (is.matrix(input) && (is.numeric(input) || all(is.na(input)))) {
+    # `matrix(NA, n, k)` is logical. Every entry is then sampled.
+    storage.mode(input) <- "double"
     trend_map_from_matrix(input, series_levels)
   } else {
     stop(insight::format_error(c(
-      "'trend_map' must be a matrix, data.frame or character code.",
-      x = paste0("Got: ", class(input)[1L], "."),
-      i = "See ?mvgam for accepted shapes."
+      "'trend_map' must be a numeric matrix, data.frame or character code.",
+      x = paste0("Got: ", class(input)[1L], " of ", typeof(input), "."),
+      i = "See ?trend_constructors for accepted shapes."
     )), call. = FALSE)
   }
   rownames(Z) <- series_levels
@@ -2292,6 +2294,18 @@ validate_trend_formula <- function(formula) {
     }
   }
   constructors <- find_calls(rhs, mvgam_trend_registry())
+  # A constructor inside another term, or subtracted, sets no trend.
+  # The model frame would then meet the constructor's list.
+  misplaced <- setdiff(constructors,
+                       vapply(trend_constructor_calls(rhs), deparse1,
+                              character(1L)))
+  if (length(misplaced) > 0L) {
+    stop(insight::format_error(c(
+      "A trend constructor must be a term of its own in 'trend_formula'.",
+      x = found(misplaced),
+      i = "Add it to the other terms, as in 'trend_formula = ~ x + AR()'."
+    )), call. = FALSE)
+  }
   if (length(constructors) > 1L) {
     stop(insight::format_error(c(
       "Multiple trend constructors found in 'trend_formula'.",
@@ -2735,68 +2749,23 @@ eval_silent <- function(expr, type = "output", silent = TRUE, ...) {
 #' Prepare parsed trend specs for the model build
 #'
 #' `mvgam()`, `stancode()`, `standata()` and `get_prior()` all build
-#' from specs prepared here. A top-level `trend_map` joins the spec
-#' and becomes the fixed loadings. A factor request meets the
-#' registry's record of the trend. The loadings prior attaches last.
+#' from specs prepared here. A constructor's `trend_map` becomes the
+#' fixed loadings. A factor request meets the registry's record of the
+#' trend. The loadings prior attaches last.
 #'
 #' @param trend_specs Parsed trend specs, or `NULL` for no trend.
-#' @param trend_map The top-level `trend_map` argument, or `NULL`.
 #' @param loadings_prior The `loadings_prior` argument, or `NULL`.
 #' @param data,data2 The training data and `data2`.
 #' @return The prepared specs.
 #' @noRd
-prepare_trend_specs <- function(trend_specs, trend_map, loadings_prior,
-                                data, data2) {
+prepare_trend_specs <- function(trend_specs, loadings_prior, data, data2) {
   checkmate::assert_list(trend_specs, null.ok = TRUE)
   checkmate::assert_data_frame(data)
   checkmate::assert_list(data2, null.ok = TRUE)
-  specs <- apply_trend_map_alias(trend_specs, trend_map)
-  specs <- normalise_trend_map_on_specs(specs, data)
+  specs <- normalise_trend_map_on_specs(trend_specs, data)
   enforce_factor_support_against_specs(specs)
   refuse_factor_cor(specs)
   attach_loadings_prior_spec(specs, loadings_prior, data, data2)
-}
-
-
-#' Apply the top-level `trend_map` alias to parsed trend specs
-#'
-#' Single point that lets users supply `trend_map` either at the
-#' trend constructor (`AR(trend_map = ...)`) or at `mvgam()`.
-#' Errors if both are populated (collision); otherwise sets the
-#' top-level alias on each spec when the constructor-level value
-#' is absent.
-#'
-#' @param trend_specs Parsed trend specs (single spec or named
-#'   list of specs for multi-response models).
-#' @param mvgam_trend_map The top-level `trend_map` value (may
-#'   be NULL).
-#'
-#' @return `trend_specs` with `$trend_map` populated when the
-#'   top-level alias was supplied. A mapping supplied with no trend
-#'   spec to hold it is refused here, the last point that still sees
-#'   it.
-#'
-#' @noRd
-apply_trend_map_alias <- function(trend_specs, mvgam_trend_map) {
-  checkmate::assert_list(trend_specs, null.ok = TRUE)
-  if (is.null(mvgam_trend_map)) {
-    return(trend_specs)
-  }
-  if (is.null(trend_specs)) {
-    stop(insight::format_error(
-      "Argument 'trend_map' requires a 'trend_formula'."
-    ), call. = FALSE)
-  }
-  if (!is.null(trend_spec_head(trend_specs)$trend_map)) {
-    stop(insight::format_error(c(
-      "'trend_map' is given both to 'mvgam()' and to the trend constructor.",
-      i = "Supply 'trend_map' in one place."
-    )), call. = FALSE)
-  }
-  map_trend_specs(trend_specs, function(spec) {
-    spec$trend_map <- mvgam_trend_map
-    spec
-  })
 }
 
 
@@ -2847,8 +2816,8 @@ attach_loadings_prior_spec <- function(trend_specs, loadings_prior,
 
 #' Normalise a raw `trend_map` and reconcile it with `n_lv`
 #'
-#' Called once in the Stan-code pipeline right after
-#' `apply_trend_map_alias()`. `normalise_trend_map()` converts the
+#' Called once in the Stan-code pipeline, from
+#' `prepare_trend_specs()`. `normalise_trend_map()` converts the
 #' spec's `trend_map` to the numeric Z stored on `spec$fixed_Z`.
 #' `spec$n_lv` takes `ncol(Z)`. An `n_lv` also set on the constructor
 #' must agree.
@@ -3367,7 +3336,6 @@ refuse_factor_hierarchical <- function(trend_name) {
 #'   remove
 #' @return A formula object with trend terms removed
 #' @noRd
-#' @noRd
 parse_base_formula_safe <- function(trend_formula, trend_terms) {
   checkmate::assert_class(trend_formula, "formula")
   checkmate::assert_character(trend_terms, min.len = 0)
@@ -3440,6 +3408,10 @@ remove_trend_expressions <- function(expr, trend_patterns, depth = 0) {
     } else {
       return(rlang::call2(op, lhs, rhs))
     }
+  } else if (rlang::is_call(expr, "(")) {
+    # `(AR())` is the term `AR()`
+    inner <- remove_trend_expressions(expr[[2L]], trend_patterns, depth + 1)
+    return(if (is.null(inner)) NULL else rlang::call2("(", inner))
   } else {
     # Check if this expression is a trend term
     if (is_trend_term(expr, trend_patterns)) {
@@ -3471,7 +3443,8 @@ is_trend_term <- function(expr, trend_patterns) {
   if (!rlang::is_call(expr)) return(FALSE)
   fn_name <- rlang::call_name(expr)
   if (is.null(fn_name)) return(FALSE)
-  trend_fn_names <- sub("\\(.*$", "", trend_patterns)
+  # `mvgam::AR(p = 1)` names `AR`
+  trend_fn_names <- sub("^.*::", "", sub("\\(.*$", "", trend_patterns))
   fn_name %in% trend_fn_names
 }
 

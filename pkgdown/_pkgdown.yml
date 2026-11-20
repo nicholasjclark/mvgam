@@ -32,8 +32,8 @@ articles:
   desc: >
     Prepare your data and fit a first state-space model.
   contents:
-  - data
   - mvgam_overview
+  - data
 
 - title: Latent dynamics
   desc: >
@@ -88,7 +88,6 @@ reference:
     process.
   contents:
   - mvgam_formula
-  - print.mvgam_formula
   - formula.mvgam
   - RW
   - LLT
@@ -96,7 +95,6 @@ reference:
   - ZMVN
   - lv_axis
   - is.mvgam_trend
-  - print.mvgam_trend
   - list_trend_types
   - mvgam_trend_specification
 
@@ -146,15 +144,8 @@ reference:
     recovery checks.
   contents:
   - sim_mvgam
-  - print.mvgam_sim
-  - summary.mvgam_sim
-  - print.mvgam_sim_summary
   - sim_closure_unit_data
-  - summary.mvgam_sim_closure_unit
-  - print.mvgam_sim_closure_unit_summary
   - sim_jsdgam
-  - summary.mvgam_sim_jsdgam
-  - print.mvgam_sim_jsdgam_summary
 
 - title: Prediction and forecasting
   desc: >
@@ -166,17 +157,13 @@ reference:
   - posterior_epred.mvgam
   - posterior_linpred.mvgam
   - posterior_predict.mvgam
-  - hindcast
   - hindcast.mvgam
   - forecast.mvgam
   - mvgam_forecast-class
-  - print.mvgam_forecast
-  - summary.mvgam_forecast
   - plot.mvgam_forecast
-  - print.mvgam_latent_state
-  - summary.mvgam_latent_state
-  - plot.mvgam_latent_state
   - seasonality
+  - forecast_uncertainty
+  - sample_innovations
   - ensemble.mvgam_forecast
   - posterior_average.mvgam
   - posterior_interval.mvgam
@@ -189,8 +176,6 @@ reference:
     cross-validation of forecasts.
   contents:
   - pp_check.mvgam
-  - print.mvgam_ppc_fit_stat
-  - plot.mvgam_ppc_fit_stat
   - residuals.mvgam
   - log_lik.mvgam
   - logLik.mvgam
@@ -199,22 +184,12 @@ reference:
   - mvgam_loo_extras
   - bridge_sampler.mvgam
   - kfold.mvgam
-  - print.mvgam_kfold
-  - summary.mvgam_kfold
-  - plot.mvgam_kfold
   - lfo_cv.mvgam
-  - print.mvgam_lfo
-  - summary.mvgam_lfo
-  - plot.mvgam_lfo
   - loo_compare.mvgam_lfo
   - loo_model_weights.mvgam_lfo
-  - score
   - score.mvgam_forecast
   - compare_scores
-  - summary.mvgam_compare_scores
-  - plot.mvgam_compare_scores
   - compare_elpds
-  - plot.mvgam_compare_elpds
 
 - title: Posterior summaries and diagnostics
   desc: >
@@ -222,7 +197,6 @@ reference:
     program and data that produced it.
   contents:
   - summary.mvgam
-  - print.mvgam_summary
   - summary.mvgam_pooled
   - print.mvgam_pooled_summary
   - tidy.mvgam
@@ -243,7 +217,6 @@ reference:
   - hypothesis.mvgam
   - stancode.mvgam_formula
   - stancode.formula
-  - print.mvgamstancode
 
 - title: Reporting a model
   desc: >
@@ -271,47 +244,33 @@ reference:
   contents:
   - irf.mvgam
   - mvgam_irf-class
-  - summary.mvgam_irf
-  - plot.mvgam_irf
   - fevd.mvgam
   - mvgam_fevd-class
-  - summary.mvgam_fevd
-  - plot.mvgam_fevd
   - stability.mvgam
-  - summary.mvgam_stability
-  - plot.mvgam_stability
-  - plot.mvgam_stability_summary
   - plot.mvgam_var_surface_summary
   - posterior_transition_matrix
-  - print.mvgam_var_matrix
-  - print.mvgam_var_matrix_list
-  - plot.mvgam_var_matrix
-  - plot.mvgam_var_matrix_list
+
+- title: Correlations among series
+  desc: >
+    The correlations a factor model, correlated innovations or a
+    hierarchical trend implies among the series.
+  contents:
+  - residual_cor
+  - mvgam_residcor-class
 
 - title: Latent factors and joint species distribution models
   desc: >
     Ordinations, loading comparisons, factor activity, each species'
-    responses to covariates and the residual correlations a factor
-    model implies.
+    responses to covariates and community summaries.
   contents:
   - ordinate
   - active_factors
-  - plot.mvgam_active_factors
   - compare_loadings
   - shared_variation
-  - plot.mvgam_shared_variation
   - species_effects
-  - residual_cor
   - variance_partition
   - community
-  - forecast_uncertainty
-  - mvgam_residcor-class
-  - print.mvgam_residcor
-  - summary.mvgam_residcor
-  - plot.mvgam_residcor
-  - plot.mvgam_residcor_list
   - trait_slopes_helpers
-  - sample_innovations
 
 - title: Plotting
   desc: >

@@ -3,11 +3,14 @@
 \name{shared_variation}
 \alias{shared_variation}
 \alias{shared_variation.mvgam}
+\alias{plot.mvgam_shared_variation}
 \title{Posterior summary of the factor-implied shared variation matrix}
 \usage{
 shared_variation(object, ...)
 
 \method{shared_variation}{mvgam}(object, probs = c(0.025, 0.975), robust = FALSE, ...)
+
+\method{plot}{mvgam_shared_variation}(x, type = c("point", "uncertainty"), ...)
 }
 \arguments{
 \item{object}{A fitted \code{mvgam} object whose trend model
@@ -21,6 +24,11 @@ credible interval. Default \code{c(0.025, 0.975)}, a 95\% interval.}
 \item{robust}{Logical. If \code{FALSE} (the default), uses mean and standard
 deviation for summaries. If \code{TRUE}, uses median and median absolute
 deviation (MAD).}
+
+\item{x}{An \code{mvgam_shared_variation} object.}
+
+\item{type}{\code{"point"} (the default) draws the point estimate.
+\code{"uncertainty"} draws the per-entry spread, \code{delta_se}.}
 }
 \value{
 An object of class \code{mvgam_shared_variation}, a list
@@ -37,6 +45,10 @@ bounds at \code{probs}.
 dimensions and series labels.
 \item \code{probs}, \code{robust}: the summary settings.
 }
+\code{plot()} draws the point estimate, or under \code{type = "uncertainty"}
+the per-entry spread, as a heatmap. The diagonal shows the variance
+the factors capture in each series. The fill scale is symmetric
+about zero.
 }
 \description{
 For a latent-factor \code{mvgam} fit, returns the posterior of the shared

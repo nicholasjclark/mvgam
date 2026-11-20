@@ -50,6 +50,8 @@
 #' \code{loadings_prior} for the hyperparameters of their prior. The
 #' formula, family, draw counts and data dimensions are stored with
 #' them.
+#'   `print()` sets the blocks out under their headings, followed by the
+#'   sampler diagnostics and suggested next steps.
 #'
 #' @details
 #' Each block has the columns:
@@ -616,14 +618,9 @@ print_family_links <- function(x) {
   invisible(fams)
 }
 
-#' Print method for mvgam_summary objects
-#'
-#' @param x An object of class \code{mvgam_summary}.
-#' @param digits Integer for decimal places. Default is 2.
-#' @param ... Unused.
-#'
-#' @return The \code{mvgam_summary} object invisibly.
-#'
+#' @param x An `mvgam_summary` object.
+#' @param digits Integer number of decimal places. Defaults to 2.
+#' @rdname summary.mvgam
 #' @export
 print.mvgam_summary <- function(x, digits = 2, ...) {
   checkmate::assert_class(x, "mvgam_summary")

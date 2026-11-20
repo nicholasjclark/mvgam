@@ -68,8 +68,16 @@ Lake Washington (Edmondson and Lehman
 phosphorus averaged over the twelve months to each month measures
 that nutrient loading.
 
-```{r data}
+```{r download, eval = FALSE}
 load(url("https://github.com/atsa-es/MARSS/raw/master/data/lakeWAplankton.rda"))
+```
+
+```{r saved, include = FALSE}
+# A copy saved with the article. A site build then needs no network.
+lakeWAplanktonTrans <- readRDS("data/lakeWAplanktonTrans.rds")
+```
+
+```{r data}
 lake <- as.data.frame(lakeWAplanktonTrans)
 lake$TP_annual <- as.numeric(
   stats::filter(lake$TP, rep(1 / 12, 12), sides = 1)
@@ -175,7 +183,7 @@ fit <- mvgam(
   data = train,
   newdata = test,
   knots = list(month = c(0.5, 12.5)),
-  priors = prior(normal(-1.4, 0.2), class = b, dpar = sigma),
+  prior = prior(normal(-1.4, 0.2), class = b, dpar = sigma),
   chains = 4,
   iter = 1500,
   warmup = 750,
@@ -318,7 +326,7 @@ probability above 0.95:
 plot(A)
 ```
 
-In this fit, `r n_clear` of the twenty off-diagonal cells clear zero.
+In this fit, `r n_clear` of the 20 off-diagonal cells clear zero.
 Two cells have an ecological interpretation. The first is grazing. A month
 with more *Daphnia* than expected is followed by `r dc_word`
 *Cryptomonas*, with a coefficient of `r fe_a_dc`. The effect of
@@ -544,19 +552,13 @@ plot(fc)
 `score()` compares the forecast distributions with the 1994
 observations. The continuous ranked probability score (CRPS) measures
 the distance between a forecast distribution and the observation, in
-the units of the data. Lower is better. `in_interval` records whether
-the observation fell inside the 90% forecast interval:
+the units of the data. Lower is better. Printing the scores gives each
+taxon's mean CRPS and the share of its observations inside the 90%
+forecast interval:
 
 ```{r score}
 sc <- score(fc, score = "crps")
-data.frame(
-  taxon = taxa,
-  mean_crps = vapply(taxa, function(t) mean(sc[[t]]$score, na.rm = TRUE),
-                     numeric(1)),
-  coverage = vapply(taxa, function(t) mean(sc[[t]]$in_interval,
-                                           na.rm = TRUE), numeric(1)),
-  row.names = NULL
-)
+sc
 ```
 
 ```{r score-numbers, include = FALSE}
@@ -575,7 +577,7 @@ works through that comparison with leave-future-out
 cross-validation.
 
 The plankton of Lake Washington rise and fall mostly with the seasons
-and with phosphorus. In this fit, `r n_clear` of the twenty lagged
+and with phosphorus. In this fit, `r n_clear` of the 20 lagged
 interactions among the taxa separate from zero. The community damps a perturbation within a season. The
 forecasts for the held-out year keep close to their stated
 coverage.

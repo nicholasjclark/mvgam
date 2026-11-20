@@ -4,7 +4,7 @@ mvgam now uses 'brms' to build its models. The observation model takes the full 
 
 ## Breaking changes
 * Trend constructors now go inside `trend_formula`, e.g. `trend_formula = ~ AR(p = 1)`. The `trend_model` argument has been removed
-* `n_lv` moved onto the trend constructors. Removed arguments: `use_lv`, `prior_simulation`, `return_model_data`, `save_all_pars`, `parallel`
+* `n_lv` and `trend_map` moved onto the trend constructors. Removed arguments: `use_lv`, `prior_simulation`, `return_model_data`, `save_all_pars`, `parallel`
 * The trend constructors take `centred` in place of `noncentred`. Latent states are sampled non-centred by default
 * Data for a model with a trend need a factor series column, even for one series
 * Renamed families: `nb()` is now `negbinomial()`, `student_t()` is now `student()`, `betar()` is now `Beta()`

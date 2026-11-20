@@ -131,10 +131,10 @@ compares a piecewise trend with other trends out of sample.
 
 Other trend models: 
 \code{\link{LLT}()},
-\code{\link{RW}()},
 \code{\link{ZMVN}()},
 \code{\link{list_trend_types}()},
-\code{\link{lv_axis}()}
+\code{\link{lv_axis}()},
+\code{\link{print.mvgam_trend}()}
 }
 \author{
 Nicholas J Clark

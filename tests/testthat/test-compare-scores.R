@@ -205,6 +205,11 @@ test_that("ensemble takes one set of draws across series and slots", {
                    c(fit_a = 10L, `mk(20L)` = 30L))
   expect_identical(ens$hindcasts$s1, ens$hindcasts$s2)
   expect_identical(ens$hindcasts$s1[, 1:2], ens$forecasts$s2)
+  # The weights loo_model_weights() returns pass as they are
+  stacked <- ensemble(fit_a, mk(20L), ndraws = 40L, seed = 1L,
+                      weights = structure(c(1, 3),
+                                          class = "stacking_weights"))
+  expect_identical(attr(stacked, "weights"), attr(ens, "weights"))
 
   # A `hindcast()` result has no forecasts to combine
   hc <- ensemble(mk(10L, fc = FALSE), mk(20L, fc = FALSE), ndraws = 8L)

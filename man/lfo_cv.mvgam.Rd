@@ -3,6 +3,9 @@
 \name{lfo_cv.mvgam}
 \alias{lfo_cv.mvgam}
 \alias{lfo_cv}
+\alias{plot.mvgam_lfo}
+\alias{summary.mvgam_lfo}
+\alias{print.mvgam_lfo}
 \title{Approximate leave-future-out cross-validation of fitted mvgam
 objects}
 \usage{
@@ -20,9 +23,16 @@ lfo_cv(object, ...)
   ...,
   data = NULL
 )
+
+\method{plot}{mvgam_lfo}(x, ...)
+
+\method{summary}{mvgam_lfo}(object, ...)
+
+\method{print}{mvgam_lfo}(x, ...)
 }
 \arguments{
-\item{object}{A fitted \link[=mvgam]{mvgam} object.}
+\item{object}{A fitted \link[=mvgam]{mvgam} object, or for
+\code{summary()} an \code{mvgam_lfo} object.}
 
 \item{...}{Unused. Anything passed here is refused.}
 
@@ -63,6 +73,8 @@ and its sampler start and finish lines. \code{1} (default) and \code{2}
 print nothing from the refits.}
 
 \item{data}{Deprecated alias for \code{newdata}.}
+
+\item{x}{An \code{mvgam_lfo} object.}
 }
 \value{
 A list of class \code{mvgam_lfo}, with one element per origin in
@@ -83,6 +95,16 @@ each vector.
 \item \code{log_lik}: the held-out log densities when \code{save_log_lik = TRUE},
 otherwise \code{NULL}.
 }
+
+\code{print()} shows the horizon, the Pareto k threshold and the counts
+of evaluations and refits, with each score's sum and mean over the
+origins. \code{summary()} returns a tibble with one row per origin:
+\code{eval_time}, \code{refit_here}, \code{pareto_k} (\code{NA} at a refit), \code{n_obs}
+and one column per score. \code{plot()} draws the Pareto k of each
+origin and each score. The dashed line marks the threshold above
+which points are highlighted: the Pareto k threshold, the 15\%
+quantile of the ELPD (lower values highlighted) or the 85\% quantile
+of any other score.
 }
 \description{
 Scores a model on its forecasts. The model is fitted to the times up
@@ -154,8 +176,8 @@ Other forecasting:
 \code{\link{ensemble.mvgam_forecast}()},
 \code{\link{forecast.mvgam}()},
 \code{\link{forecast_uncertainty}()},
-\code{\link{hindcast.mvgam}()},
-\code{\link{score.mvgam_forecast}()}
+\code{\link{hindcast}()},
+\code{\link{score}()}
 
 Other model comparison: 
 \code{\link{bridge_sampler.mvgam}()},

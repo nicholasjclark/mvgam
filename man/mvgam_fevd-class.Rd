@@ -2,7 +2,31 @@
 % Please edit documentation in R/mvgam_fevd-class.R
 \name{mvgam_fevd-class}
 \alias{mvgam_fevd-class}
+\alias{summary.mvgam_fevd}
+\alias{plot.mvgam_fevd}
 \title{\code{mvgam_fevd} object description}
+\usage{
+\method{summary}{mvgam_fevd}(object, probs = c(0.025, 0.975), ...)
+
+\method{plot}{mvgam_fevd}(x, series = NULL, contributing = NULL, ...)
+}
+\arguments{
+\item{object}{An \code{mvgam_fevd} object from \code{fevd(summary = FALSE)}.}
+
+\item{probs}{The lower and upper percentiles of the interval.
+Defaults to \code{c(0.025, 0.975)}.}
+
+\item{...}{Unused. Anything passed here is refused.}
+
+\item{x}{An \code{mvgam_fevd} object.}
+
+\item{series}{Optional positions or names of the target processes
+drawn as panels. Defaults to every process.}
+
+\item{contributing}{Optional positions or names of the source
+processes stacked in each panel. Their shares are renormalised to
+sum to one. Defaults to every process.}
+}
 \description{
 The objects returned by \code{\link[=fevd]{fevd()}}. Run
 \code{methods(class = "mvgam_fevd")} and
@@ -57,6 +81,14 @@ above.
 Both forms take \code{ndraws} and \code{draw_ids}. A subset of the posterior
 computes faster.
 }
+\section{Methods}{
+
+\code{summary()} turns the draws into the \code{mvgam_fevd_summary} above, at
+the percentiles \code{probs} sets. \code{plot()} stacks the median share of
+each source in one panel per target, by horizon. A summary plots
+through \code{\link[=plot.mvgam_var_surface_summary]{plot.mvgam_var_surface_summary()}}.
+}
+
 \references{
 Lutkepohl H (2005). New Introduction to Multiple Time Series
 Analysis. Springer, Berlin. \doi{10.1007/978-3-540-27752-1}

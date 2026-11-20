@@ -339,7 +339,7 @@ scores the ensemble with its components:
 weights <- loo_model_weights(lfo_gam, lfo_ar, lfo_pw, method = "stacking",
                              model_names = c("GAM", "AR", "PW"))
 weights
-fc_ens <- ensemble(fc_gam, fc_ar, fc_pw, weights = as.numeric(weights),
+fc_ens <- ensemble(fc_gam, fc_ar, fc_pw, weights = weights,
                    seed = 2026)
 crps_ens <- compare_scores(fc_gam, fc_ar, fc_pw, fc_ens, score = "crps",
                            model_names = c("GAM", "AR", "PW", "Ensemble"))

@@ -405,8 +405,8 @@ Multiplicative gamma process shrinkage derives the scale as
 A `trend_map` takes three input forms: a numeric matrix, a
 `data.frame(series, trend)` and the character codes `"identity"` and
 `"shared"`. All three normalise to a numeric `n_series x n_lv`
-matrix stored on `trend_metadata$fixed_Z`. A constructor takes it.
-`mvgam(trend_map = ...)` passes it to the constructor. An `NA`
+matrix stored on `trend_metadata$fixed_Z`. Only the trend constructor
+takes it, as it takes `n_lv`. An `NA`
 entry marks a loading to sample. A finite entry stays on `Z`
 exactly.
 

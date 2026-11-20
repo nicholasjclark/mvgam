@@ -2,6 +2,10 @@
 % Please edit documentation in R/var_param_extractors.R
 \name{posterior_transition_matrix}
 \alias{posterior_transition_matrix}
+\alias{print.mvgam_var_matrix}
+\alias{plot.mvgam_var_matrix}
+\alias{print.mvgam_var_matrix_list}
+\alias{plot.mvgam_var_matrix_list}
 \title{Posterior transition matrix of a VAR trend}
 \usage{
 posterior_transition_matrix(
@@ -12,6 +16,20 @@ posterior_transition_matrix(
   probs = c(0.025, 0.975),
   prob_threshold = 0.95,
   lag = 1L
+)
+
+\method{print}{mvgam_var_matrix}(x, digits = 2L, ...)
+
+\method{plot}{mvgam_var_matrix}(x, cluster = FALSE, supported_only = FALSE, ...)
+
+\method{print}{mvgam_var_matrix_list}(x, ...)
+
+\method{plot}{mvgam_var_matrix_list}(
+  x,
+  type = c("heatmap", "diagonal"),
+  ncol = NULL,
+  supported_only = FALSE,
+  ...
 )
 }
 \arguments{
@@ -40,15 +58,47 @@ needs to count as supported, at least 0.5 and below 1. Defaults to
 
 \item{lag}{The lag of the matrix, at most the order \code{p} of the
 fitted \code{VAR(p)}.}
+
+\item{x}{An \code{mvgam_var_matrix} or \code{mvgam_var_matrix_list}.}
+
+\item{digits}{Integer number of digits in the printed matrix.
+Defaults to 2.}
+
+\item{...}{Unused. Anything passed here is refused.}
+
+\item{cluster}{Logical. \code{TRUE} orders the processes by a Robinson
+clustering of \code{1 - A}, which suits a matrix close to symmetric.}
+
+\item{supported_only}{Logical. \code{TRUE} leaves blank every cell whose
+\code{prob_nonzero} is at most \code{prob_threshold}. Defaults to \code{FALSE}.}
+
+\item{type}{For several panels, \code{"heatmap"} (the default) or
+\code{"diagonal"}.}
+
+\item{ncol}{The number of facet columns of the heatmaps, or \code{NULL}
+for \code{ceiling(sqrt(length(x)))}.}
 }
 \value{
 With \code{summary = TRUE}, an \code{mvgam_var_matrix}: a list of the
 matrices \code{A}, \code{A_se}, \code{A_lower}, \code{A_upper}, \code{A_ess},
 \code{prob_positive}, \code{prob_negative} and \code{prob_nonzero}, with
 \code{n_series}, \code{series_names}, \code{group_label}, \code{probs},
-\code{prob_threshold} and \code{lag}. It has \code{print()} and \code{plot()} methods.
-With \code{summary = FALSE}, the array of draws. Several panels give a
-list of either.
+\code{prob_threshold} and \code{lag}. With \code{summary = FALSE}, the array of
+draws. Several panels give a list of either, an
+\code{mvgam_var_matrix_list} when summarised.
+
+\code{print()} gives the panel, the dimension, the mean absolute
+off-diagonal cell and the estimate of the matrix. For several
+panels it lists each panel's mean absolute off-diagonal cell. The
+panel with the largest has the strongest effects between processes.
+
+\code{plot()} draws the matrix as a heatmap. Row \eqn{i}, column
+\eqn{j} is the effect of process \eqn{j} at time \eqn{t - l} on
+process \eqn{i} at time \eqn{t}. A black outline marks each cell
+whose \code{prob_nonzero} exceeds \code{prob_threshold}. The colour scale is
+symmetric about zero. Several panels share one scale. Under
+\code{type = "diagonal"} they draw the persistence of each process as a
+point with its interval.
 }
 \description{
 The coefficient matrix \eqn{A_l} of lag \eqn{l} of a \code{VAR()} trend.

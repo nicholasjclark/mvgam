@@ -83,6 +83,10 @@
 #'     \item{`true_sigma_obs`}{The family's scale or dispersion, or
 #'       `NA` for a family without one.}
 #'   }
+#'   `summary()` returns the design and these true parameters as an
+#'   `mvgam_sim_summary` list, with the number of series, time points,
+#'   training and test rows and the names of the true smooths.
+#'   `print()` shows that summary.
 #'
 #' @author Nicholas J Clark
 #'
@@ -252,33 +256,9 @@ sim_mvgam <- function(type = 1L,
 }
 
 
-#' Summary for `sim_mvgam()` output
-#'
-#' The design of a simulated data set and its true generative
-#' parameters.
-#'
-#' @param object An `mvgam_sim` object returned by [sim_mvgam()].
+#' @param object An `mvgam_sim` object.
 #' @param ... Unused. Anything passed here is refused.
-#'
-#' @return A list with class `mvgam_sim_summary` containing:
-#'   \describe{
-#'     \item{`type`}{The catalog type used.}
-#'     \item{`family`}{Family name (string).}
-#'     \item{`trend`}{Trend type label (string or `"None"`).}
-#'     \item{`n_series`}{Number of series.}
-#'     \item{`n_timepoints`}{Total number of timepoints.}
-#'     \item{`n_train`}{Number of training rows.}
-#'     \item{`n_test`}{Number of test rows.}
-#'     \item{`true_betas`}{Named numeric vector of population
-#'       coefficients.}
-#'     \item{`n_smooths`}{Number of true smooth functions.}
-#'     \item{`smooth_names`}{Character vector of true smooth names.}
-#'     \item{`true_trend_sigma`}{Empirical SD of the latent trend
-#'       across all series x time cells.}
-#'     \item{`true_sigma_obs`}{Observation-family scale / dispersion
-#'       parameter (NA if family is fully discrete).}
-#'   }
-#'
+#' @rdname sim_mvgam
 #' @method summary mvgam_sim
 #' @export
 summary.mvgam_sim <- function(object, ...) {
@@ -311,15 +291,9 @@ summary.mvgam_sim <- function(object, ...) {
 }
 
 
-#' Print method for `mvgam_sim_summary`
-#'
-#' @param x A `mvgam_sim_summary` object.
-#' @param digits Integer; significant digits for printed numbers.
-#'   Default `3`.
-#' @param ... Unused.
-#'
-#' @return The `mvgam_sim_summary` object `x`, returned invisibly.
-#'
+#' @param x An `mvgam_sim` object or its summary.
+#' @param digits Integer number of significant digits. Defaults to 3.
+#' @rdname sim_mvgam
 #' @method print mvgam_sim_summary
 #' @export
 print.mvgam_sim_summary <- function(x, digits = 3L, ...) {
@@ -359,15 +333,7 @@ print.mvgam_sim_summary <- function(x, digits = 3L, ...) {
 }
 
 
-#' Print method for `mvgam_sim`
-#'
-#' Delegates to `summary(x)` so the default print is informative.
-#'
-#' @param x A `mvgam_sim` object.
-#' @param ... Passed to `print.mvgam_sim_summary()`.
-#'
-#' @return The `mvgam_sim` object `x`, returned invisibly.
-#'
+#' @rdname sim_mvgam
 #' @method print mvgam_sim
 #' @export
 print.mvgam_sim <- function(x, ...) {

@@ -297,17 +297,6 @@ mvgam_update_inheritance <- list(
   threads = list(
     getter = function(object) object$obs_model$threads$threads
   ),
-  # A `trend_map` written on the trend constructor travels inside
-  # `trend_call`. `mvgam()` refuses one given in both places. Only a
-  # fit that set it at the top level gets it back there.
-  trend_map = list(
-    getter = function(object) {
-      if (trend_call_names_arg(object$trend_call, "trend_map")) {
-        return(NULL)
-      }
-      object$trend_metadata$fixed_Z
-    }
-  ),
   # A refit of a quiet fit is quiet.
   silent = list(getter = function(object) object$silent),
   loadings_prior = list(
@@ -415,8 +404,9 @@ mvgam_sampler_inheritance <- function(object) {
 #' Visit every named argument of a stored trend call
 #'
 #' `all.vars()` and `all.names()` return the values an argument was
-#' given. Neither returns the argument's own name. This walks the call
-#' for the two functions below that need the names.
+#' given. Neither returns the argument's own name.
+#' `restore_trend_call_env()` walks the call to pair each name with its
+#' value.
 #'
 #' @param trend_call The `trend_call` slot, or NULL.
 #' @param visit Called as `visit(name, value)` for each named
@@ -437,22 +427,6 @@ walk_trend_call_args <- function(trend_call, visit) {
   }
   recurse(trend_call[[length(trend_call)]])
   invisible(NULL)
-}
-
-
-#' Does a stored trend call name a given constructor argument?
-#'
-#' @param trend_call The `trend_call` slot, or NULL.
-#' @param arg Argument name to look for.
-#' @return `TRUE` when the call names it anywhere.
-#' @noRd
-trend_call_names_arg <- function(trend_call, arg) {
-  checkmate::assert_string(arg)
-  found <- FALSE
-  walk_trend_call_args(trend_call, function(name, value) {
-    if (identical(name, arg)) found <<- TRUE
-  })
-  found
 }
 
 
@@ -559,8 +533,7 @@ mvgam_refit_prior_table <- function(args) {
     data = args$data,
     family = args$family %||% gaussian(),
     loadings_prior = args$loadings_prior,
-    data2 = args$data2,
-    trend_map = args$trend_map
+    data2 = args$data2
   )
 }
 
@@ -678,105 +651,6 @@ restore_trend_call_env <- function(trend_call, metadata) {
 }
 
 
-# Of the arguments `trend_arg_metadata` maps, those a refit must write
-# on the constructor. Binding them in scope is not enough. The slot
-# holding each one stays in `trend_arg_metadata`.
-#
-# A top-level `trend_map` sets the factor count as a constructor
-# argument does. `mvgam()` has no top-level `n_lv` to pass it back
-# through. `trend_map` itself travels at the top level, through
-# `mvgam_update_inheritance`.
-trend_args_stated_on_rebuild <- "n_lv"
-
-
-#' State a resolved trend argument the user's own expression omits
-#'
-#' A refit rebuilds the trend side by evaluating the expression the
-#' user wrote. A value the fit resolved elsewhere is absent from that
-#' expression. A factor count set by a top-level `trend_map` is held
-#' only by the fit. Rebuilt without it, the model changes with no
-#' error. `by = lv_axis()` then takes the series axis in place of the
-#' factor axis. A fit with two per-factor smooths would come back with
-#' one smooth per series.
-#'
-#' @param trend_call The `trend_call` slot, or NULL.
-#' @param metadata The `trend_metadata` slot, or NULL.
-#' @return `trend_call`, with each resolved argument stated on the
-#'   constructor that owns it.
-#' @noRd
-state_resolved_trend_args <- function(trend_call, metadata) {
-  if (!inherits(trend_call, "formula") || is.null(metadata)) {
-    return(trend_call)
-  }
-  stated <- list()
-  for (arg in trend_args_stated_on_rebuild) {
-    if (trend_call_names_arg(trend_call, arg)) next
-    value <- metadata[[trend_arg_metadata[[arg]]]]
-    if (!is.null(value)) stated[[arg]] <- value
-  }
-  if (length(stated) == 0L) return(trend_call)
-
-  state <- new.env(parent = emptyenv())
-  state$n <- 0L
-  rhs <- state_args_on_trend_constructor(
-    rlang::f_rhs(trend_call), stated, state
-  )
-  # No constructor to state them on. Rebuilding regardless would give
-  # back a different model in silence.
-  if (state$n == 0L) {
-    stop(insight::format_error(c(
-      "'update()' needs a trend constructor to rebuild this fit.",
-      x = paste0(
-        "The fit resolved ",
-        paste0("'", names(stated), "'", collapse = ", "),
-        " outside 'trend_formula'."
-      ),
-      x = "The fit's 'trend_formula' lacks a trend constructor.",
-      i = paste0(
-        "Pass 'trend_formula = ...' naming ",
-        paste0("'", names(stated), "'", collapse = ", "), "."
-      )
-    )), call. = FALSE)
-  }
-  rlang::new_formula(
-    lhs = rlang::f_lhs(trend_call), rhs = rhs,
-    env = environment(trend_call)
-  )
-}
-
-
-#' Add named arguments to every trend constructor in an expression
-#'
-#' The trend registry decides which calls are constructors. A newly
-#' registered trend needs no change here.
-#'
-#' @param expr Current expression node.
-#' @param values Named list of argument values to state.
-#' @param state Environment counting the constructors rewritten.
-#' @param depth Recursion depth guard.
-#' @return The rewritten expression. `state$n` is zero when the
-#'   expression held no trend constructor.
-#' @noRd
-state_args_on_trend_constructor <- function(expr, values, state,
-                                            depth = 0L) {
-  if (depth > 50L || !rlang::is_call(expr)) {
-    return(expr)
-  }
-  fn_name <- rlang::call_name(expr)
-  if (!is.null(fn_name) && fn_name %in% mvgam_trend_registry()) {
-    args <- rlang::call_args(expr)
-    args[names(values)] <- values
-    state$n <- state$n + 1L
-    return(rlang::call2(fn_name, !!!args))
-  }
-  parts <- as.list(expr)
-  rewritten <- lapply(parts[-1L], state_args_on_trend_constructor,
-                      values = values, state = state,
-                      depth = depth + 1L)
-  rlang::call2(parts[[1L]], !!!rewritten)
-}
-
-
 #' Arguments for refitting an `mvgam` fit
 #'
 #' The resolution order is the caller's `...`, then the matching slot
@@ -831,15 +705,6 @@ mvgam_update_call <- function(object, formula., newdata, dots) {
   resolved$trend_formula <- restore_trend_call_env(
     resolved$trend_formula, object$trend_metadata
   )
-  # A trend formula the caller supplied states its own structure. The
-  # fit's resolved values describe the model being replaced. Only the
-  # inherited call needs what the fit settled outside it.
-  if (!"trend_formula" %in% names(dots)) {
-    resolved$trend_formula <- state_resolved_trend_args(
-      resolved$trend_formula, object$trend_metadata
-    )
-  }
-
   # Pass through any remaining user dots (cores, threads, seed,
   # control, init, silent, ...) that are not already resolved.
   resolved <- c(resolved, dots[!names(dots) %in% names(resolved)])

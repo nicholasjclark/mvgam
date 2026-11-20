@@ -99,12 +99,15 @@ mvgam_match_response <- function(models) {
 #' be finite and non-negative with a positive total and one entry per
 #' model.
 #'
-#' @param weights Numeric vector of weights
+#' @param weights Numeric vector of weights, such as the result of
+#'   `loo_model_weights()`
 #' @param n_models Integer number of models
-#' @return Numeric vector of weights summing to one
+#' @return Named numeric vector of weights summing to one, without the
+#'   class `loo_model_weights()` gives its result
 #' @noRd
 mvgam_normalize_weights <- function(weights, n_models) {
   checkmate::assert_numeric(weights)
+  weights <- stats::setNames(as.numeric(weights), names(weights))
   checkmate::assert_integerish(n_models, lower = 1L, len = 1L)
   if (length(weights) != n_models) {
     stop(insight::format_error(c(
