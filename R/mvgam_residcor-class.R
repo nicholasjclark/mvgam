@@ -158,7 +158,7 @@ plot.mvgam_residcor <- function(
 #' @param type `"correlation"` or `"precision"`
 #' @param cluster Reorder by `cluster_cormat()`
 #' @param supported_only Blank every pair that is not supported
-#' @return Frame from `residcor_panel_data()`
+#' @return Frame from `support_panel()`
 #' @noRd
 residcor_panel <- function(x, type = "correlation", cluster = FALSE,
                            supported_only = FALSE) {
@@ -169,11 +169,10 @@ residcor_panel <- function(x, type = "correlation", cluster = FALSE,
     i = "Pass 'partial = TRUE' to 'residual_cor()' to compute them."
   )), call. = FALSE)
   prob <- x[[if (field == "cor") "prob_nonzero" else "prec_prob_nonzero"]]
-  supported <- prob > x[["prob_threshold"]]
   # The cluster order comes from every estimate, blanked or not
   idx <- if (cluster) cluster_cormat(estimate) else seq_len(nrow(estimate))
-  if (supported_only) estimate[!supported] <- NA_real_
-  residcor_panel_data(estimate[idx, idx], clear = supported[idx, idx])
+  support_panel(estimate, prob, x[["prob_threshold"]], supported_only,
+                rows = idx, cols = idx, lower_only = TRUE)
 }
 
 
@@ -186,9 +185,7 @@ residcor_panel <- function(x, type = "correlation", cluster = FALSE,
 #' @return A `ggplot` object
 #' @noRd
 residcor_heatmap <- function(panel, scale_name, rescale, ncol = NULL) {
-  # Every pair left blank leaves no entry to scale to
-  shown <- panel$value[!is.na(panel$value)]
-  lim <- if (rescale && length(shown)) max(abs(shown)) else 1
+  lim <- if (rescale) symmetric_limit(panel$value) else 1
   matrix_heatmap(
     panel,
     mvgam_diverging_scale(name = scale_name, limits = c(-lim, lim)),
@@ -203,9 +200,10 @@ residcor_heatmap <- function(panel, scale_name, rescale, ncol = NULL) {
 #' matrices returned by `residual_cor(mod, by_group = TRUE)` on a
 #' hierarchical trend fit. Each panel is drawn as by
 #' [plot.mvgam_residcor()], one per group, with fill showing the
-#' posterior point estimate and an outline on each supported pair. The facets share colour limits. Panels are then
-#' directly comparable. The `_global` reference matrix is included by
-#' default. Drop it with `include_global = FALSE`.
+#' posterior point estimate and an outline on each supported pair. The
+#' facets share colour limits. The panels are then directly comparable.
+#' The `_global` reference matrix is included by default.
+#' Drop it with `include_global = FALSE`.
 #'
 #' @param x An `mvgam_residcor_list` returned by
 #'   `residual_cor(mod, by_group = TRUE)`.

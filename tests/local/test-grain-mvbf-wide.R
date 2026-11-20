@@ -654,14 +654,19 @@ test_that("process noise is each response's own, drawn jointly", {
   noise <- lapply(stats::setNames(responses, responses), function(r) {
     as.numeric(on[[r]] - off[[r]])
   })
-  sigma <- colMeans(
-    sampler_draws[, paste0("sigma_trend[", seq_len(n_resp), "]")]
-  )
-  names(sigma) <- responses
-  # `mass` has the smallest innovation scale by a wide margin. Its
-  # noise must then be the quietest of the three.
-  expect_lt(sigma[["mass"]], 0.75 * sigma[["count"]])
-  expect_lt(stats::sd(noise$mass), 0.85 * stats::sd(noise$count))
+  # Each response's noise takes its own stationary scale,
+  # sigma / sqrt(1 - ar1^2), draw by draw. One draw shared by the three
+  # gave each the first response's scale.
+  for (k in seq_len(n_resp)) {
+    r <- responses[k]
+    sigma <- sampler_draws[ids, paste0("sigma_trend[", k, "]")]
+    ar1 <- sampler_draws[ids, paste0("ar1_trend[", k, "]")]
+    stationary_sd <- as.numeric(sigma / sqrt(1 - ar1^2))
+    noise_sd <- apply(on[[r]] - off[[r]], 1L, stats::sd)
+    expect_equal(mean(noise_sd), mean(stationary_sd), tolerance = 0.05,
+                 label = r)
+    expect_gt(stats::cor(noise_sd, stationary_sd), 0.6)
+  }
   # The noise is drawn jointly. No pair moves in lockstep.
   for (pair in list(c("count", "seen"), c("count", "mass"),
                     c("seen", "mass"))) {
@@ -908,6 +913,17 @@ test_that("lfo_cv scores a wide fit by elpd and CRPS", {
   # Both rules score one predictive. A surprising fold costs on both.
   expect_gt(stats::cor(lfo$elpds, -lfo$scores$crps, method = "spearman"),
             0)
+})
+
+
+test_that("species_effects takes each response as a species", {
+  ids <- 1:5
+  se <- species_effects(fit, variables = "x", draw_ids = ids)
+  dm <- posterior::as_draws_matrix(fit)[ids, ]
+  by_hand <- vapply(responses, function(r) {
+    as.numeric(dm[, paste0("b_", r, "_x")])
+  }, numeric(length(ids)))
+  expect_equal(se$draws$species[, , "x"], by_hand, tolerance = 1e-8)
 })
 
 

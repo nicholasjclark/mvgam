@@ -219,7 +219,7 @@ formula.mvgam <- function(x, ...) {
     stop(insight::format_error(c(
       "Formula not found in mvgam object.",
       i = "The object may be corrupted or from an incompatible version."
-    )))
+    )), call. = FALSE)
   }
 
   return(x$formula)

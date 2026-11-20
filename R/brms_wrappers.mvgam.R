@@ -315,7 +315,7 @@ bridge_sampler.mvgam <- function(samples, recompile = FALSE, ...) {
         paste(offenders, collapse = ", "), "."
       ),
       i = "Refit with 'normalize = TRUE'."
-    )))
+    )), call. = FALSE)
   }
   # bridgesampling evaluates the density through the fit's compiled
   # rstan model. A cmdstanr fit has none, nor does one loaded with
@@ -514,7 +514,7 @@ predictive_error.mvgam <- function(object, newdata = NULL,
     stop(insight::format_error(c(
       paste0("'newdata' lacks the response column '", resp_name, "'."),
       i = "Omit 'newdata' to use the training data."
-    )))
+    )), call. = FALSE)
   }
   pred_fun <- if (identical(method, "posterior_predict")) {
     posterior_predict
@@ -596,7 +596,7 @@ prediction_frame <- function(object, newdata = NULL) {
         "'newdata' requires at least one row."
       ), call. = FALSE)
     }
-    return(jsdgam_axis_columns(object, newdata))
+    return(jsdgam_prediction_columns(object, newdata))
   }
   out <- object$data
   if (is.null(out)) {

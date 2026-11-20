@@ -75,8 +75,9 @@ draw indices to use. NULL (default) uses all draws (subject to
 \item{coef_uncertainty}{Logical, \code{TRUE} by default. \code{FALSE} holds
 the coefficients of the observation and trend formulas at one
 posterior draw, the first that \code{ndraws} or \code{draw_ids} selects. That
-includes smooth, random-effect and Hilbert-space \code{gp(x, k)}
-coefficients. The forecast then leaves out their uncertainty.
+includes smooth, random-effect and \code{gp()} coefficients. An exact
+\code{gp()} term's draw at new values is held too. The forecast then
+leaves out their uncertainty.
 Turning off one source of uncertainty at a time shows how much each
 contributes to a forecast.}
 

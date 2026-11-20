@@ -406,8 +406,15 @@ smooth_truth <- function(sm, var, grid = seq(-2, 2, length.out = 100L)) {
 }
 
 
-# Type 1: y ~ s(x), RW trend
-#'@noRd
+#' Recipe 1 of `sim_mvgam()`: one smooth with a random walk trend
+#'
+#' Simulates `y ~ s(x)` with an `RW()` trend. By default the trend
+#' takes half the link-scale variance.
+#'
+#' @return List of the recipe's `default_trend`, `default_prop_trend`,
+#'   `trend_params` and `build_data`, in the form `sim_type_spec()`
+#'   describes
+#' @noRd
 spec_type_1 <- function() {
   list(
     default_trend = RW(),
@@ -427,8 +434,14 @@ spec_type_1 <- function() {
 }
 
 
-# Type 2: y ~ s(x) + s(z), AR(1) trend
-#'@noRd
+#' Recipe 2 of `sim_mvgam()`: two smooths with an AR(1) trend
+#'
+#' Simulates `y ~ s(x) + s(z)` with an `AR(p = 1)` trend.
+#'
+#' @return List of the recipe's `default_trend`, `default_prop_trend`,
+#'   `trend_params` and `build_data`, in the form `sim_type_spec()`
+#'   describes
+#' @noRd
 spec_type_2 <- function() {
   list(
     default_trend = AR(p = 1),
@@ -456,8 +469,15 @@ spec_type_2 <- function() {
 }
 
 
-# Type 3: y ~ s(x) + (1 | grp), AR(1) trend
-#'@noRd
+#' Recipe 3 of `sim_mvgam()`: a smooth and a random intercept
+#'
+#' Simulates `y ~ s(x) + (1 | grp)` with an `AR(p = 1)` trend. The
+#' recorded `true_betas` are the group-level intercepts.
+#'
+#' @return List of the recipe's `default_trend`, `default_prop_trend`,
+#'   `trend_params` and `build_data`, in the form `sim_type_spec()`
+#'   describes
+#' @noRd
 spec_type_3 <- function() {
   list(
     default_trend = AR(p = 1),
@@ -480,8 +500,14 @@ spec_type_3 <- function() {
 }
 
 
-# Type 4: y ~ gp(x), AR(1) trend
-#'@noRd
+#' Recipe 4 of `sim_mvgam()`: a Gaussian process with an AR(1) trend
+#'
+#' Simulates `y ~ gp(x)` with an `AR(p = 1)` trend.
+#'
+#' @return List of the recipe's `default_trend`, `default_prop_trend`,
+#'   `trend_params` and `build_data`, in the form `sim_type_spec()`
+#'   describes
+#' @noRd
 spec_type_4 <- function() {
   list(
     default_trend = AR(p = 1),
@@ -507,8 +533,15 @@ spec_type_4 <- function() {
 }
 
 
-# Type 5: y ~ x, trend_formula = ~ s(z), AR(1) trend
-#'@noRd
+#' Recipe 5 of `sim_mvgam()`: a smooth in the trend formula
+#'
+#' Simulates `y ~ x` with `trend_formula = ~ s(z)` and an `AR(p = 1)`
+#' trend. The slope of `x` is 1.
+#'
+#' @return List of the recipe's `default_trend`, `default_prop_trend`,
+#'   `trend_params` and `build_data`, in the form `sim_type_spec()`
+#'   describes
+#' @noRd
 spec_type_5 <- function() {
   list(
     default_trend = AR(p = 1),
@@ -533,8 +566,16 @@ spec_type_5 <- function() {
 }
 
 
-# Type 6: y ~ s(season, bs = "cc"), CAR trend on irregular gaps
-#'@noRd
+#' Recipe 6 of `sim_mvgam()`: a cyclic smooth with a CAR trend
+#'
+#' Simulates `y ~ s(season, bs = "cc")` with a `CAR()` trend on
+#' irregular gaps. Its `build_data()` also returns `time_long` and the
+#' `trend_time` gaps.
+#'
+#' @return List of the recipe's `default_trend`, `default_prop_trend`,
+#'   `trend_params` and `build_data`, in the form `sim_type_spec()`
+#'   describes
+#' @noRd
 spec_type_6 <- function() {
   list(
     default_trend = CAR(),
@@ -568,8 +609,15 @@ spec_type_6 <- function() {
 }
 
 
-# Type 7: y ~ s(x), sparse AR(p = c(1, 12)) trend
-#'@noRd
+#' Recipe 7 of `sim_mvgam()`: one smooth with a sparse AR trend
+#'
+#' Simulates `y ~ s(x)` with an `AR(p = c(1, 12))` trend, lags 1 and 12
+#' only.
+#'
+#' @return List of the recipe's `default_trend`, `default_prop_trend`,
+#'   `trend_params` and `build_data`, in the form `sim_type_spec()`
+#'   describes
+#' @noRd
 spec_type_7 <- function() {
   list(
     default_trend = AR(p = c(1L, 12L)),

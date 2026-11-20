@@ -180,6 +180,9 @@ render_data_section <- function(obj) {
 
 #' One Markdown bullet per covariate of the linear predictors
 #'
+#' A trait of `jsdgam(trait_slopes = )` is named as one. A column its
+#' expansion derived follows, described by `derived_column_text()`.
+#'
 #' @param obj An `mvgam` object
 #' @return Character vector of Markdown lines
 #' @noRd
@@ -191,12 +194,13 @@ describe_predictors <- function(obj) {
   # slope's among them. Trial counts, offsets and grouping factors are
   # left out.
   terms <- mvgam_term_list(obj)
-  used_vars <- c(terms$conditional, terms$slopes)
+  used_vars <- c(terms$conditional, terms$slopes, terms$traits)
   # The dimensions line counts the response, time and series columns
   vars <- axis_vars(obj)
   skip <- unique(c(resp_cols, vars$time_var, vars$series_var))
   predictors <- intersect(setdiff(names(data), skip), used_vars)
   if (length(predictors) == 0L) return(character(0L))
+  traits <- all.vars(obj$jsdgam_args$trait_slopes)
   out <- character(0L)
   for (nm in predictors) {
     col <- data[[nm]]
@@ -218,7 +222,16 @@ describe_predictors <- function(obj) {
     } else {
       paste0(class(col)[[1L]], " covariate")
     }
+    if (nm %in% traits) {
+      desc <- paste0(sub(" covariate$", "", desc),
+                     " trait, one value per species")
+    }
     out <- c(out, gloss(escape_math_text(nm), desc))
+  }
+  # A column `trait_slopes` derived is named by what it is built from
+  spec <- obj$trait_columns
+  for (nm in names(spec$derived)) {
+    out <- c(out, gloss(escape_math_text(nm), derived_column_text(spec, nm)))
   }
   out
 }
@@ -940,7 +953,7 @@ term_glossary <- function(obj) {
     defs <- c(defs, gloss(
       sym[["f"]], basis_label(spec$bs, spec$fname),
       " in $", paste(escape_math_text(spec$vars), collapse = "$, $"),
-      "$", by_clause(spec), ", basis size ",
+      "$", by_clause(spec, obj), ", basis size ",
       k_label, ", smoothing SD $", sym[["sd"]], "$"
     ))
   }
@@ -953,7 +966,7 @@ term_glossary <- function(obj) {
     }
     defs <- c(defs, gloss(
       sym[["f"]], "Gaussian process in $",
-      spec_subscript(spec), "$", by_clause(spec), " with ",
+      spec_subscript(spec), "$", by_clause(spec, obj), " with ",
       gp_kernel_names(spec$cov)[["label"]], " kernel, length scale $",
       sym[["rho"]], "$ and marginal SD $", sym[["sd"]], "$", k_text
     ))
@@ -2524,8 +2537,9 @@ fixed_term_specs <- function(obj, coefs) {
   if (!length(coefs)) return(list())
   data <- obj$data %||% data.frame()
   series_var <- axis_vars(obj)$series_var
+  expressions <- formula_expression_symbols(obj)
   pieces <- lapply(strsplit(coefs, ":", fixed = TRUE), function(p) {
-    lapply(p, coef_piece, data = data)
+    lapply(p, coef_piece, data = data, expressions = expressions)
   })
   # The levels each factor's coefficients name. The one level left out
   # is the reference.
@@ -2599,22 +2613,71 @@ fixed_term_specs <- function(obj, coefs) {
   })
 }
 
+#' The expressions of a model's formulas, by the names brms gives them
+#'
+#' brms names the column of `I(env^2)` `IenvE2`. Each call a formula
+#' holds outside its operators is an expression, collected from every
+#' formula of the model, sub-formulas included. Each is written as
+#' LaTeX with its variables upright, `(\\mathrm{env}^2)`. `I()` itself is
+#' dropped.
+#'
+#' @param obj An `mvgam` object or a view of one predictor
+#' @return Named character vector of LaTeX, named by the brms column
+#' @noRd
+formula_expression_symbols <- function(obj) {
+  formulas <- function(x) {
+    if (inherits(x, "formula")) return(list(x))
+    if (is.list(x)) return(unlist(lapply(x, formulas), recursive = FALSE))
+    list()
+  }
+  operators <- c("~", "+", "-", "*", ":", "/", "|", "||", "(", "%in%")
+  calls <- function(e) {
+    if (!is.call(e)) return(character(0L))
+    if (as.character(e[[1L]])[[1L]] %in% operators) {
+      return(unlist(lapply(as.list(e)[-1L], calls)))
+    }
+    deparse1(e)
+  }
+  parts <- unique(unlist(lapply(
+    formulas(list(obj$formula, obj$trend_formula)), function(f) calls(f)
+  )))
+  if (!length(parts)) return(character(0L))
+  latex <- vapply(parts, function(part) {
+    text <- sub("^I\\((.*)\\)$", "\\1", part)
+    vars <- all.vars(str2lang(part))
+    if (length(vars)) {
+      # One pass, which leaves the inserted LaTeX alone
+      at <- gregexpr(paste0("\\b(", paste(vars, collapse = "|"), ")\\b"),
+                     text, perl = TRUE)
+      regmatches(text, at) <- lapply(regmatches(text, at), math_upright)
+    }
+    paste0("(", text, ")")
+  }, character(1L))
+  stats::setNames(unname(latex), brms_rename(parts))
+}
+
+
 #' One part of a population effect's name
 #'
 #' A part naming a column of the data is a covariate. A part made of a
 #' factor's name and one of its levels, as brms joins them, is that
-#' level. The factor axis of a factor model's trend is `.trend` and the
-#' factor's number.
+#' level. A part naming an expression, `IenvE2` for `I(env^2)`, takes
+#' the expression's symbol. The factor axis of a factor model's trend is
+#' `.trend` and the factor's number.
 #'
 #' @param piece Character part of a coefficient name
 #' @param data The model's data frame
+#' @param expressions What `formula_expression_symbols()` gives
 #' @return List holding `kind` (`"var"`, `"level"` or `"axis"`) with
 #'   `var` and `level` where they apply
 #' @noRd
-coef_piece <- function(piece, data) {
+coef_piece <- function(piece, data, expressions = character(0L)) {
   axis <- paste0("^", gsub(".", "\\.", factor_axis_column, fixed = TRUE),
                  "[0-9]+$")
   if (grepl(axis, piece)) return(list(kind = "axis"))
+  if (piece %in% names(expressions)) {
+    return(list(kind = "var", var = expressions[[piece]]))
+  }
   if (!piece %in% names(data)) {
     is_factor <- vapply(data, function(x) is.factor(x) || is.character(x),
                         logical(1L))
@@ -2748,6 +2811,8 @@ compose_inline_terms <- function(specs, term_composer) {
 
 #' Smooth or Gaussian process terms, each a function of its variables
 #'
+#' A numeric `by` multiplies its term.
+#'
 #' @param kind `"smooth"` or `"gp"`
 #' @param specs List of term specs
 #' @param obj An `mvgam` object or a view of one predictor
@@ -2756,7 +2821,10 @@ compose_inline_terms <- function(specs, term_composer) {
 render_function_inline <- function(kind, specs, obj) {
   compose_inline_terms(specs, function(s) {
     args <- paste(indexed(obj, escape_math_text(s$vars)), collapse = ", ")
-    paste0(term_symbols(kind, s, obj)[["f"]], "(", args, ")")
+    scale <- if (has_numeric_by(s, obj)) {
+      paste0(indexed(obj, escape_math_text(s$by)), " \\, ")
+    }
+    paste0(scale, term_symbols(kind, s, obj)[["f"]], "(", args, ")")
   })
 }
 
@@ -2837,15 +2905,30 @@ by_subscript <- function(spec) {
   if (has_by(spec)) paste0(base, " \\mid ", by_symbol(spec)) else base
 }
 
-#' Glossary clause naming the `by` variable of a term
+#' Whether a term's `by` variable is a numeric column, which scales it
 #'
 #' @param spec A term spec holding `by`
+#' @param obj The `mvgam` object or view holding the data
+#' @return Logical scalar
+#' @noRd
+has_numeric_by <- function(spec, obj) {
+  has_by(spec) && is.numeric(obj$data[[spec$by]])
+}
+
+#' Glossary clause naming the `by` variable of a term
+#'
+#' A factor `by` gives one function per level. A numeric `by` scales
+#' one function.
+#'
+#' @param spec A term spec holding `by`
+#' @param obj The `mvgam` object or view holding the data
 #' @return Character phrase, empty without `by`
 #' @noRd
-by_clause <- function(spec) {
+by_clause <- function(spec, obj) {
   if (!has_by(spec)) return("")
   if (identical(spec$by, factor_axis_column)) return(", one per factor $k$")
-  paste0(", stratified by $", by_symbol(spec), "$")
+  paste0(if (has_numeric_by(spec, obj)) ", scaled by $" else
+           ", stratified by $", by_symbol(spec), "$")
 }
 
 #' Group-level terms of a linear predictor
@@ -3673,7 +3756,11 @@ render_latent_llt <- function(obj) {
         lhs = llt_slope(obj), op = "=",
         rhs = paste0(damping, llt_slope(obj, lag = 1L), " + ", zeta)
       ),
-      llt_slope_shock_row(obj, zeta)
+      llt_shock_row(
+        obj, zeta, vector_lhs = "\\boldsymbol{\\epsilon}^{(\\beta)}_t",
+        sd = llt_symbols(obj, trend_process_index(obj))[["sigma_slope_trend"]],
+        sd_vector = "\\boldsymbol{\\sigma}_\\beta"
+      )
     ),
     if (seasonal) llt_season_rows(obj, sym),
     innovation_rows(obj, is_vector = FALSE)
@@ -3717,27 +3804,39 @@ llt_season_rows <- function(obj, sym) {
          rhs = turn("first", "second", "+")),
     list(lhs = llt_season(obj, "second"), op = "=",
          rhs = turn("second", "first", "-")),
-    list(lhs = paste0(shock("first"), ", ", shock("second")),
-         op = "\\sim",
-         rhs = paste0("\\text{Normal}(0, ", sym[["sigma_season_trend"]],
-                      ")"))
+    llt_shock_row(
+      obj, paste0(shock("first"), ", ", shock("second")),
+      vector_lhs = paste0("\\boldsymbol{\\omega}_{j,t}, ",
+                          "\\boldsymbol{\\omega}^*_{j,t}"),
+      sd = sym[["sigma_season_trend"]],
+      sd_vector = "\\boldsymbol{\\sigma}_\\gamma"
+    )
   )
 }
 
-#' The law of the slope shocks: the level's correlation when it has one
+#' The law of an LLT state's shocks: the level's correlation when it
+#' has one
+#'
+#' The slope shocks and each harmonic's seasonal shocks take the
+#' correlation of the level shocks under `cor` or `gr`, with scales of
+#' their own.
+#'
+#' @param obj An `mvgam` object
+#' @param lhs The shock of one process
+#' @param vector_lhs The shocks of every process at one step
+#' @param sd The shock SD of one process
+#' @param sd_vector The vector of every process's shock SD
+#' @return One statement
 #' @noRd
-llt_slope_shock_row <- function(obj, zeta) {
-  sd <- llt_symbols(obj, trend_process_index(obj))[["sigma_slope_trend"]]
+llt_shock_row <- function(obj, lhs, vector_lhs, sd, sd_vector) {
   if (!trend_samples_cor(obj)) {
-    return(list(lhs = zeta, op = "\\sim",
+    return(list(lhs = lhs, op = "\\sim",
                 rhs = paste0("\\text{Normal}(0, ", sd, ")")))
   }
   omega <- group_matrix_symbol("Omega", trend_grouping_var(obj))
-  list(
-    lhs = "\\boldsymbol{\\epsilon}^{(\\beta)}_t", op = "\\sim",
-    rhs = paste0("\\text{MVNormal}(\\mathbf{0}, ",
-                 scaled_cor_text("\\boldsymbol{\\sigma}_\\beta", omega), ")")
-  )
+  list(lhs = vector_lhs, op = "\\sim",
+       rhs = paste0("\\text{MVNormal}(\\mathbf{0}, ",
+                    scaled_cor_text(sd_vector, omega), ")"))
 }
 
 #' The glossary entries for a local linear trend's slope and season
@@ -3775,7 +3874,10 @@ glossary_llt <- function(obj) {
     gloss("\\lambda_j", "frequency of harmonic $j$, ",
           "$2 \\pi j / s$ radians per time step for ", periods),
     gloss(sym[["sigma_season_trend"]], "SD of the seasonal ",
-          "shocks, shared by every harmonic"),
+          "shocks, shared by every harmonic",
+          if (trend_samples_cor(obj)) {
+            ", which take the correlation of the level shocks"
+          }),
     gloss(sym[["init_season_trend"]], "starting state pair, ",
           "estimated")
   )
@@ -4120,9 +4222,11 @@ prior_scope <- function(prior) {
 
 #' Copy each class's prior onto the coefficients that inherit it
 #'
-#' brms gives a class's prior on a row with no `coef` and no `group`.
-#' Each coefficient that inherits it has a row with no prior. A
-#' coefficient inherits from the class row of its own predictor.
+#' brms gives a class's prior on a row with no `coef` and no `group`,
+#' and a group's on a row with a `group` and no `coef`. Each
+#' coefficient that inherits one has a row with no prior. As in brms, a
+#' coefficient takes its group's row first, then the class row of its
+#' own predictor.
 #'
 #' @param prior A brms prior table
 #' @return `prior`, with each inherited prior filled in
@@ -4131,12 +4235,19 @@ backfill_umbrella_priors <- function(prior) {
   if (NROW(prior) == 0L) return(prior)
   text <- prior_field(prior, "prior")
   has_text <- !is.na(text) & nzchar(text) & text != "(flat)"
-  umbrella <- has_text & !nzchar(prior_field(prior, "coef")) &
-    !nzchar(prior_field(prior, "group"))
+  no_coef <- !nzchar(prior_field(prior, "coef"))
+  group <- prior_field(prior, "group")
   scope <- prior_scope(prior)
-  source <- match(scope, scope[umbrella])
-  fill <- !has_text & !is.na(source)
-  prior$prior[fill] <- text[umbrella][source[fill]]
+  group_scope <- paste(scope, group, sep = "\x1f")
+  for (umbrella in list(
+    list(rows = has_text & no_coef & nzchar(group), key = group_scope),
+    list(rows = has_text & no_coef & !nzchar(group), key = scope)
+  )) {
+    source <- match(umbrella$key, umbrella$key[umbrella$rows])
+    fill <- !has_text & !is.na(source)
+    prior$prior[fill] <- text[umbrella$rows][source[fill]]
+    has_text <- has_text | fill
+  }
   prior
 }
 

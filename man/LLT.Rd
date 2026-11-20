@@ -15,7 +15,8 @@ LLT(
   trend_map = NULL,
   df = Inf,
   season = NULL,
-  harmonics = NULL
+  harmonics = NULL,
+  centred = FALSE
 )
 }
 \arguments{
@@ -37,7 +38,15 @@ for an ungrouped trend and \code{TRUE} when \code{gr} names a
 grouping variable. \code{VAR()}, \code{ZMVN()} and grouped
 \code{AR()} and \code{RW()} trends always estimate correlations.
 They refuse \code{cor = FALSE}. \code{CAR()} defaults to
-\code{FALSE}.}
+\code{FALSE}.
+
+In a factor model with every loading sampled, the factors take
+independent shocks. The loadings carry the correlation among
+series, which \code{\link[=residual_cor]{residual_cor()}} reports. A correlation among the
+factors would trade off against the loadings. \code{AR()}, \code{RW()} and
+\code{LLT()} refuse \code{cor = TRUE} there. A \code{trend_map} that fixes the
+loadings keeps the factors apart. \code{cor = TRUE} then estimates
+their correlation.}
 
 \item{gr}{An optional \code{factor} in \code{data} that groups the series, such
 as region. Each level of \code{gr} takes its own correlation matrix among
@@ -144,6 +153,10 @@ fits no season.}
 trigonometric harmonics of each period, each below half its
 period. Fewer harmonics give a smoother seasonal shape. Defaults to
 the most each period allows, up to 10.}
+
+\item{centred}{Logical. Sample the latent states directly rather
+than their innovations? Default \code{FALSE}. The model and its
+posterior are the same. See \emph{Centred states} below.}
 }
 \value{
 An object of class \code{mvgam_trend}.
@@ -169,8 +182,9 @@ forecasts extend the current growth rate.
 The level shocks take the innovation structure of \code{RW()}: \code{cor}
 correlates them across series, \code{gr} and \code{subgr} pool their
 correlations hierarchically and \code{df} gives them a multivariate t.
-The slope shocks are Gaussian and take the level's correlation
-matrix with scales of their own.
+The slope and seasonal shocks are Gaussian and take the level's
+correlation matrix with scales of their own. \code{\link[=residual_cor]{residual_cor()}}
+reports that one matrix.
 
 The slope starts at a free value, \code{init_slope_trend}, damped or not,
 as in the damped trends of exponential smoothing. Damping serves a
@@ -216,7 +230,8 @@ Every factor keeps its level noise. The factors share one
 \code{sigma_slope_trend} and one \code{ar1_slope_trend}. A rotation of the
 factors then leaves the model unchanged. The QR rotation of \code{RW()}
 factors identifies the loadings. A \code{trend_map} that fixes loadings
-keeps one slope scale per factor.
+keeps one slope scale per factor. The factors' shocks are
+independent, as \code{cor} describes.
 
 \emph{Seasonality}:
 \code{season} adds a stochastic season \eqn{\gamma_t} to the level, the
@@ -248,9 +263,11 @@ sharing a harmonic, such as 6 and 12 with three or more harmonics,
 are refused. A period longer than the data overlaps the slope and
 draws a warning. The starting pairs \code{init_season_trend} are
 estimated under one prior for both states of every harmonic. That
-prior treats every phase at the first time point alike. Seasonal
-shocks are independent across series. In a factor model each factor
-has its own season, mapped to the series through the loadings.
+prior treats every phase at the first time point alike. Under \code{cor}
+or \code{gr} each harmonic's shocks are correlated across series, as the
+level shocks are. Series correlated in their shocks shift their
+seasons together. In a factor model each factor has its own season,
+mapped to the series through the loadings.
 
 \code{sigma_season_trend} takes a \code{gamma(2, .)} prior whose median puts
 the season's drift over the series at \eqn{s / 4}. A season that
@@ -345,6 +362,34 @@ plot(fc_s)
 
 # Draws of the seasonal shock scale
 head(as.data.frame(mod_s, variable = "sigma_season_trend"))
+
+# Two regions whose levels move together, with shocks correlated at
+# 0.7. Counts near 20 pin the states down, which the centred form
+# samples fastest
+set.seed(4)
+n_t <- 60
+z <- rnorm(n_t)
+shock <- 0.25 * cbind(z, 0.7 * z + sqrt(1 - 0.7^2) * rnorm(n_t))
+dat_r <- data.frame(
+  time = rep(1:n_t, 2),
+  series = factor(rep(c("north", "south"), each = n_t))
+)
+dat_r$y <- rpois(2 * n_t, exp(3 + c(apply(shock, 2, cumsum)) +
+                                0.5 * sin(2 * pi * dat_r$time / 12)))
+
+# `cor = TRUE` correlates the level, slope and seasonal shocks
+mod_r <- mvgam(
+  y ~ 1,
+  trend_formula = ~ LLT(season = 12, harmonics = 1, cor = TRUE,
+                        centred = TRUE),
+  data = dat_r,
+  family = poisson(),
+  chains = 2,
+  silent = 2
+)
+
+# The one correlation matrix the three kinds of shock share
+residual_cor(mod_r)
 }
 
 }

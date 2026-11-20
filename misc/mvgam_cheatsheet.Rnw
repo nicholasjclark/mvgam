@@ -148,7 +148,7 @@ Use \texttt{\color{Orchid} stancode(model)} to see the auto-generated \texttt{St
 {{\fontsize{11}{11} \selectfont \color{mygray} What effects has the model estimated?}}
 
 \medskip
-\texttt{\color{Orchid} summary(model)} and \texttt{\color{Orchid} coef(model)}: posterior summaries and diagnostics
+\texttt{\color{Orchid} summary(model)} and \texttt{\color{Orchid} fixef(model)}: posterior summaries and diagnostics
 
 \medskip
 \texttt{\color{Orchid} fitted(model)}, \texttt{\color{Orchid} logLik(model)} and \texttt{\color{Orchid} residuals(model)}: posterior expectations, pointwise Log-Likelihoods and randomized quantile residuals

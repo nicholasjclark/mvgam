@@ -10,6 +10,7 @@ posterior_transition_matrix(
   summary = TRUE,
   robust = FALSE,
   probs = c(0.025, 0.975),
+  prob_threshold = 0.95,
   lag = 1L
 )
 }
@@ -33,6 +34,10 @@ deviation (MAD).}
 \item{probs}{Numeric vector of probabilities for quantile computation.
 Default is \code{c(0.025, 0.975)} for 95\% credible intervals.}
 
+\item{prob_threshold}{The posterior probability of its sign a cell
+needs to count as supported, at least 0.5 and below 1. Defaults to
+0.95. \code{\link[=plot.mvgam_var_matrix]{plot.mvgam_var_matrix()}} outlines the supported cells.}
+
 \item{lag}{The lag of the matrix, at most the order \code{p} of the
 fitted \code{VAR(p)}.}
 }
@@ -40,9 +45,10 @@ fitted \code{VAR(p)}.}
 With \code{summary = TRUE}, an \code{mvgam_var_matrix}: a list of the
 matrices \code{A}, \code{A_se}, \code{A_lower}, \code{A_upper}, \code{A_ess},
 \code{prob_positive}, \code{prob_negative} and \code{prob_nonzero}, with
-\code{n_series}, \code{series_names}, \code{group_label}, \code{probs} and \code{lag}. It
-has \code{print()} and \code{plot()} methods. With \code{summary = FALSE}, the
-array of draws. Several panels give a list of either.
+\code{n_series}, \code{series_names}, \code{group_label}, \code{probs},
+\code{prob_threshold} and \code{lag}. It has \code{print()} and \code{plot()} methods.
+With \code{summary = FALSE}, the array of draws. Several panels give a
+list of either.
 }
 \description{
 The coefficient matrix \eqn{A_l} of lag \eqn{l} of a \code{VAR()} trend.

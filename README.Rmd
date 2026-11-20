@@ -60,9 +60,9 @@ Install the released version from `CRAN` with `install.packages("mvgam")`, or th
 <p class="github-only"><a href="https://www.youtube.com/watch?v=0zZopLlomsQ"><img src="https://img.youtube.com/vi/0zZopLlomsQ/hqdefault.jpg" width="100%" alt="Introductory seminar on Ecological forecasting with Dynamic Generalized Additive Models"/></a></p>
 
 ## Cheatsheet
-[![`mvgam` usage cheatsheet](https://github.com/nicholasjclark/mvgam/raw/master/misc/mvgam_cheatsheet.png)](https://github.com/nicholasjclark/mvgam/raw/master/misc/mvgam_cheatsheet.pdf)
+[![`mvgam` usage cheatsheet](https://nicholasjclark.github.io/mvgam/dev/cheatsheets/mvgam_cheatsheet.png)](https://nicholasjclark.github.io/mvgam/dev/cheatsheets/mvgam_cheatsheet.pdf)
 
-[![`jsdgam` cheatsheet for joint species distribution models](https://github.com/nicholasjclark/mvgam/raw/master/misc/jsdgam_cheatsheet.png)](https://github.com/nicholasjclark/mvgam/raw/master/misc/jsdgam_cheatsheet.pdf)
+[![`jsdgam` cheatsheet for joint species distribution models](https://nicholasjclark.github.io/mvgam/dev/cheatsheets/jsdgam_cheatsheet.png)](https://nicholasjclark.github.io/mvgam/dev/cheatsheets/jsdgam_cheatsheet.pdf)
 
 ## A state-space model of rodent captures
 The `portal_data` from [the Portal Project](https://portal.weecology.org/){target="_blank"} hold monthly counts of baited captures for four desert rodent species, with minimum temperature and a 12-month moving average of NDVI (see `?portal_data`). `mvgam_data()` checks that the data suit an observation family and plots each series:

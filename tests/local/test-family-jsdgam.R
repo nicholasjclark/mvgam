@@ -108,8 +108,23 @@ jsdm_sim <- function(spec) {
     family_pars = spec$sim_pars,
     seed        = spec$seed
   )
+  long_dat <- s$data_train
+  # A fourth-corner fit takes two traits per species: a linear `size`
+  # and a smoothed `mass`. Each site holds three covariates: a habitat
+  # factor and two numeric gradients.
+  if (isTRUE(spec$trait_slopes)) {
+    long_dat$size <- as.numeric(long_dat$series) / s$n_species
+    long_dat$mass <- cos(as.numeric(long_dat$series))
+    sites <- sort(unique(long_dat$time))
+    site_x <- withr::with_seed(spec$seed, {
+      cbind(stats::rnorm(length(sites)), stats::runif(length(sites), -2, 2))
+    })
+    long_dat$x2 <- site_x[match(long_dat$time, sites), 1L]
+    long_dat$x3 <- site_x[match(long_dat$time, sites), 2L]
+    long_dat$hab <- factor(c("a", "b")[long_dat$time %% 2L + 1L])
+  }
   list(
-    long_dat       = s$data_train,
+    long_dat       = long_dat,
     K              = s$n_species,
     N_lv           = s$n_lv,
     species_levels = levels(s$data_train$series),
@@ -132,8 +147,30 @@ sim_frame_key <- function(d) {
     series = as.character(d$series),
     levels = levels(d$series),
     env    = d$env,
-    time   = d$time
+    time   = d$time,
+    size   = d$size,
+    mass   = d$mass,
+    x2     = d$x2,
+    x3     = d$x3,
+    hab    = as.character(d$hab)
   )
+}
+
+
+# A prediction frame given the covariates beyond `env` a fit names: each
+# species' traits and one value of each site covariate
+with_site_covariates <- function(nd, d) {
+  if ("size" %in% names(d) && "series" %in% names(nd)) {
+    at <- match(nd$series, d$series)
+    nd$size <- d$size[at]
+    nd$mass <- d$mass[at]
+  }
+  if ("x2" %in% names(d)) {
+    nd$x2 <- 0
+    nd$x3 <- 0
+    nd$hab <- factor("a", levels = levels(d$hab))
+  }
+  nd
 }
 
 
@@ -152,6 +189,9 @@ sim_frame_key <- function(d) {
 SPECS <- list(
   nb = list(
     family = quote(brms::negbinomial()),
+    # The fourth-corner model: each species' intercept and `env` slope
+    # regress on its trait
+    trait_slopes = TRUE,
     n_species = 5L, n_sites = 60L, seed = 608L,
     sim_pars = list(size = 4),
     loadings_identified = TRUE, na_response = NA_integer_,
@@ -282,6 +322,9 @@ SPECS <- list(
 # top level.
 JSDM_FORMULA <- y ~ env * series
 JSDM_FACTOR_FORMULA <- ~ -1
+TRAIT_FORMULA <- y ~ env + hab + I(env^2) + s(x2, k = 4, by = hab) +
+  gp(x3, k = 5)
+TRAIT_SLOPES <- ~ size + s(mass, k = 3)
 
 # A cached fit belongs to the simulation whose frame it was built from.
 # Editing a simulator changes that frame, and the stored posterior then
@@ -291,7 +334,8 @@ fit_jsdm <- function(nm, spec, sim) {
     paste0("val_mvgam_jsdgam_mv_", nm, ".rds"),
     function() {
       jsdgam(
-        formula = JSDM_FORMULA,
+        formula = if (isTRUE(spec$trait_slopes)) TRAIT_FORMULA else JSDM_FORMULA,
+        trait_slopes = if (isTRUE(spec$trait_slopes)) TRAIT_SLOPES,
         factor_formula = JSDM_FACTOR_FORMULA,
         data = sim$long_dat,
         unit = time, species = series,
@@ -300,10 +344,26 @@ fit_jsdm <- function(nm, spec, sim) {
         chains = 2L,
         iter = 1000L, warmup = 500L,
         silent = 2,
-        backend = "cmdstanr"
+        backend = "cmdstanr",
+        seed = spec$seed
       )
     },
-    key = sim_frame_key(sim$long_dat)
+    # The model is part of the key. A formula edit then refits. The
+    # formulas enter as text, which leaves out their environments.
+    key = list(
+      data = sim_frame_key(sim$long_dat),
+      model = vapply(
+        if (isTRUE(spec$trait_slopes)) {
+          list(TRAIT_FORMULA, TRAIT_SLOPES)
+        } else {
+          list(JSDM_FORMULA)
+        },
+        deparse1, character(1L)
+      ),
+      factor_formula = deparse1(JSDM_FACTOR_FORMULA),
+      family = deparse1(spec$family),
+      seed = spec$seed
+    )
   )
 }
 
@@ -674,7 +734,9 @@ jsdgam_battery <- function(nm, spec, sim, fit) {
     )
     # check_newdata() runs the same check on a fitted model.
     expect_error(check_newdata(nd, fit), "y_unseen", fixed = TRUE)
-    expect_identical(names(check_newdata(d, fit)), names(d))
+    # The frame keeps its columns. A trait fit adds those it derived.
+    expect_identical(names(check_newdata(d, fit)),
+                     union(names(d), names(fit$trait_columns$derived)))
     # A refusal that does not name the offending level, or list the
     # ones that would have worked, leaves the user to find which of
     # their species the model has never seen.
@@ -707,6 +769,7 @@ jsdgam_battery <- function(nm, spec, sim, fit) {
       stringsAsFactors = FALSE
     )
     nd$env <- 0
+    nd <- with_site_covariates(nd, d)
     nd$y <- spec$na_response
     for (ty in spec$fc_types) {
       fc <- forecast(fit, newdata = nd, ndraws = 20L, type = ty)
@@ -1001,8 +1064,8 @@ jsdgam_battery <- function(nm, spec, sim, fit) {
     }
 
     ce <- conditional_effects(fit)
-    # The observation formula is `y ~ env * series`, so the covariate
-    # has to be offered. A default list that lost it draws a correct
+    # Every observation formula here holds `env`. The default list must
+    # offer it. A default list that lost it draws a correct
     # panel of the wrong thing.
     env_panels <- grep("env", names(ce), value = TRUE)
     expect_gt(length(env_panels), 0L)
@@ -1073,8 +1136,9 @@ jsdgam_battery <- function(nm, spec, sim, fit) {
     # reports it hands the user a number the package refuses to put
     # an r-hat on.
     expect_false(any(grepl("^L_Omega_trend", td$term)))
-    # Fixed effects drop their `b_` prefix, as broom.mixed names them
-    expect_true(all(td$term %in% c(v, sub("^b_", "", v))))
+    # Fixed effects take their `fixef()` names, as broom.mixed names
+    # them: `b_` and the smooth's `bs_` prefixes dropped
+    expect_true(all(td$term %in% c(v, mvgam:::fixef_name(v))))
 
     aug <- augment(fit)
     expect_identical(nrow(aug), n_obs)
@@ -1122,6 +1186,7 @@ jsdgam_battery <- function(nm, spec, sim, fit) {
         stringsAsFactors = FALSE
       )
       grid$time <- min(d$time)
+      grid <- with_site_covariates(grid, d)
       grid$y <- spec$na_response
       # mvgam parts company with brms and marginaleffects on what
       # `type` means, and does so deliberately: `"expected"` is the
@@ -1160,8 +1225,9 @@ jsdgam_battery <- function(nm, spec, sim, fit) {
         expect_true(halves(pr_r$estimate))
         expect_false(halves(pr_e$estimate))
       }
-      # `env * series` gives each species its own slope; a design
-      # that dropped the interaction returns one slope shared by all.
+      # Each species takes its own slope, through `env * series` or
+      # through its trait and deviation. A design that dropped either
+      # returns one slope shared by all.
       # A threshold near machine zero would pass on numerical noise,
       # so the claim is that the species differ by an amount
       # comparable to the slopes themselves.
@@ -1562,6 +1628,10 @@ test_that("each part's response-scale share is the fit's own: each jsdgam family
 
 test_that("community richness sums each species' chance of a count", {
   fit <- get("nb", envir = built)$fit
+  d <- get("nb", envir = built)$sim$long_dat
+  site <- function(env, time = 1) {
+    with_site_covariates(data.frame(env = env, time = time), d)
+  }
   ids <- 1:6
   shape <- as.vector(as_draws_matrix(fit)[ids, "shape"])
   # By hand at the fitted factors: one less the negative binomial zero
@@ -1583,13 +1653,13 @@ test_that("community richness sums each species' chance of a count", {
   }, numeric(1L))
   expect_equal(averaged$presence[2L, c(3L, 20L)], by_hand, tolerance = 0.03)
   # Communities share their latent nodes. Equal rows give equal draws.
-  gradient <- data.frame(env = c(-1, 1, 1), time = 1)
+  gradient <- site(c(-1, 1, 1))
   along <- community(fit, newdata = gradient, draw_ids = ids)
   expect_identical(along$richness[, 2L], along$richness[, 3L])
   # By hand: a pair's joint presence over its latent covariance, by
   # Gauss-Hermite quadrature on a 30 by 30 grid
   set.seed(2)
-  one <- community(fit, newdata = data.frame(env = 0.5, time = 1),
+  one <- community(fit, newdata = site(0.5),
                    draw_ids = ids, n_nodes = 4000L)
   lp <- posterior_linpred(fit, newdata = one$frame, draw_ids = ids)
   pair <- c(3L, 4L)
@@ -1607,10 +1677,14 @@ test_that("community richness sums each species' chance of a count", {
   # By hand at a typical site: Hill numbers and mean traits from the
   # relative expected counts
   species <- fitted_series_levels(fit)
-  traits <- data.frame(series = species, size = seq_along(species),
+  # `size` is the trait the fit regresses its slopes on
+  traits <- data.frame(series = species, size = seq_along(species) / 5,
                        guild = rep(c("a", "b"), length.out = length(species)))
-  typical <- community(fit, newdata = data.frame(env = 0.3, time = 1),
+  typical <- community(fit, newdata = site(0.3),
                        traits = traits, latent = "zero", draw_ids = ids)
+  auto <- community(fit, newdata = site(0.3),
+                    traits = "auto", latent = "zero", draw_ids = ids)
+  expect_identical(auto$diversity$size, typical$diversity$size)
   share <- posterior_epred(fit, newdata = typical$frame, draw_ids = ids)
   share <- share / rowSums(share)
   expect_equal(drop(typical$diversity$`Hill q = 1`),
@@ -1635,7 +1709,199 @@ test_that("community richness sums each species' chance of a count", {
     drop(typical$diversity$size)
   )
   # A fitted state exists at the fitted times alone
-  expect_error(community(fit, newdata = data.frame(env = 0, time = 999),
+  expect_error(community(fit, newdata = site(0, time = 999),
                          latent = "conditional", draw_ids = ids),
                "fitted at each time")
+})
+
+
+test_that("species_effects reports the fourth-corner slopes", {
+  fit <- get("nb", envir = built)$fit
+  d <- get("nb", envir = built)$sim$long_dat
+  ids <- 1:6
+  se <- species_effects(fit, variables = c("env", "hab"), draw_ids = ids)
+  species <- levels(d$series)
+  fd <- mvgam:::fitted_data(fit)
+  # By hand, through brms's own predictor on the observation model. The
+  # derived columns are built here from each frame's own variables.
+  expect_setequal(names(fit$trait_columns$derived),
+                  c("habb", "IenvE2", "haba_size", "habb_size",
+                    "hab_series"))
+  by_hand <- function(nd) {
+    nd$habb <- as.numeric(nd$hab == "b")
+    nd$IenvE2 <- nd$env^2
+    nd$haba_size <- (nd$hab == "a") * nd$size
+    nd$habb_size <- (nd$hab == "b") * nd$size
+    nd$hab_series <- factor(paste(nd$hab, nd$series, sep = "_"),
+                            levels = levels(fd$hab_series))
+    nd
+  }
+  # brms 2.23.0 drops `gp(x3)` from the rows `gp(x3, by = series)`
+  # covers (paul-buerkner/brms#1979). Its Stan code adds both.
+  testthat::local_mocked_bindings(predictor_gp = brms_predictor_gp_added,
+                                  .package = "brms")
+  obs <- as_brms(fit, "obs")
+  lp <- function(nd) {
+    brms::posterior_linpred(obs, newdata = by_hand(nd), draw_ids = ids)
+  }
+  # mvgam's predictor is brms's, its GP terms summed as Stan sums them
+  expect_lt(max(predictor_gap(fit, fd, ids = ids)), 1e-8)
+  per_species <- function(m) {
+    vapply(species, function(s) rowMeans(m[, fd$series == s]),
+           numeric(length(ids)))
+  }
+  shift <- function(nd, column, by) {
+    nd[[column]] <- nd[[column]] + by
+    nd
+  }
+  # Each species' env slope: marginaleffects' centred difference over
+  # its fitted rows
+  step <- 1e-4 * diff(range(fd$env))
+  env_slope <- function(nd) {
+    per_species((lp(shift(nd, "env", step / 2)) -
+                   lp(shift(nd, "env", -step / 2))) / step)
+  }
+  expect_equal(unname(se$draws$species[, , "env"]),
+               unname(env_slope(fd)), tolerance = 1e-8)
+  # Each fitted row at hab = b less at hab = a. Switching hab also
+  # switches the smooths of `s(x2, by = hab)`, their trait crossings and
+  # the species smooths of `hab_series`.
+  at_hab <- function(nd, level) {
+    nd$hab <- factor(level, levels = levels(fd$hab))
+    lp(nd)
+  }
+  hab_contrast <- function(nd) {
+    per_species(at_hab(nd, "b") - at_hab(nd, "a"))
+  }
+  expect_equal(unname(se$draws$species[, , "hab: b - a"]),
+               unname(hab_contrast(fd)), tolerance = 1e-8)
+  # The trait panel: the species' mean change in each response per unit
+  # of a trait, over the step species_effects() shifts the trait by
+  for (trait in c("size", "mass")) {
+    step_t <- 1e-3 * stats::sd(unique(fd[[trait]]))
+    moved <- shift(fd, trait, step_t)
+    expect_equal(
+      unname(se$draws$traits[, trait, "env"]),
+      unname(rowMeans(env_slope(moved) - env_slope(fd)) / step_t),
+      tolerance = 1e-5
+    )
+    expect_equal(
+      unname(se$draws$traits[, trait, "hab: b - a"]),
+      unname(rowMeans(hab_contrast(moved) - hab_contrast(fd)) / step_t),
+      tolerance = 1e-5
+    )
+  }
+  # The methods paragraph names the trait regression and, for `s(x2)`,
+  # the hierarchical smooths
+  expect_true(all(c("ovaskainen_hmsc_2017", "pedersen_hgam") %in%
+                    names(how_to_cite(fit)$bibtex)))
+  # The equations scale the level-b smooth by its derived column, which
+  # the predictors define. The species SDs take the group's own prior.
+  md <- paste(methods_md(fit), collapse = "\n")
+  expect_match(md, paste0("\\mathrm{habb\\_size}_{i,t} \\, ",
+                          "f_{\\mathrm{x2} \\mid \\mathrm{habb\\_size}}"),
+               fixed = TRUE)
+  expect_match(md, "$\\mathrm{habb\\_size}$: product of hab = b and size",
+               fixed = TRUE)
+  expect_match(md, "$\\mathrm{hab\\_series}$: factor crossing hab with series",
+               fixed = TRUE)
+  expect_match(md, paste0("\\sigma^{(\\beta_{\\mathrm{env}})}_",
+                          "{\\mathrm{series}} &\\sim \\text{StudentT}",
+                          "(3, 0, 2.5)"), fixed = TRUE)
+  expect_match(md, "\\beta_{(\\mathrm{env}^2)} (\\mathrm{env}^2)_{i,t}",
+               fixed = TRUE)
+  expect_match(md, "$\\mathrm{size}$: continuous trait, one value per species",
+               fixed = TRUE)
+  # A smooth scaled by a numeric column is drawn at three of its values,
+  # each labelled to three decimals
+  cs <- conditional_smooths(fit, ndraws = 5L)
+  by_b <- cs[[grep("by = habb_size", names(cs), fixed = TRUE)]]
+  expect_identical(
+    levels(by_b$cond__),
+    as.character(round(mean(fd$habb_size) +
+                         c(-1, 0, 1) * stats::sd(fd$habb_size), 3L))
+  )
+  # Each default panel draws one curve per species. The grid leaves the
+  # trait to each species' own value, which a grid holding its mean
+  # would replace for four of the five.
+  # The trait crossings of `s(x2, by = hab)` join its panel through
+  # their sources. A bare `x2` panel would hold hab at level a.
+  expect_identical(names(conditional_effects(fit)),
+                   c("env:series", "hab:series", "x2:series:hab",
+                     "x3:series"))
+  withr::local_options(marginaleffects_model_classes = "mvgam")
+  expect_false("size" %in% names(marginaleffects::datagrid(
+    model = fit, series = levels(d$series)
+  )))
+  # A trait is constant within each species, which leaves it no slope
+  expect_error(species_effects(fit, variables = "size"),
+               "'size' is a trait of 'trait_slopes'")
+  # A frame without the trait takes each species' own from the fit
+  rows <- d[d$time %in% 1:2, ]
+  expect_identical(
+    posterior_linpred(fit, newdata = rows[setdiff(names(rows), "size")],
+                      draw_ids = ids),
+    posterior_linpred(fit, newdata = rows, draw_ids = ids)
+  )
+  # `y ~ env * series` makes the series a term. The axis is refused.
+  expect_error(species_effects(get("mvn", envir = built)$fit,
+                               variables = "series"),
+               "Not a covariate: 'series'")
+})
+
+
+test_that("diri: species_effects centres each draw across the species", {
+  # The softmax ignores the shared slope `b_env`. Each species' slope
+  # less the mean over species is what the data inform.
+  fit <- get("diri", envir = built)$fit
+  ids <- 1:6
+  se <- species_effects(fit, variables = "env", draw_ids = ids)
+  dm <- as_draws_matrix(fit)[ids, ]
+  species <- levels(get("diri", envir = built)$sim$long_dat$series)
+  own <- vapply(species, function(k) {
+    term <- paste0("b_env:series", k)
+    as.numeric(dm[, "b_env"]) +
+      if (term %in% colnames(dm)) as.numeric(dm[, term]) else 0
+  }, numeric(length(ids)))
+  expect_equal(unname(se$draws$species[, , "env"]),
+               unname(own - rowMeans(own)), tolerance = 1e-8)
+})
+
+
+test_that("diri: variance shares and forecast spread centre each site", {
+  # The softmax ignores the shared slope `b_env`. Each species'
+  # predictor less the site's mean over species is what the data inform.
+  fit <- get("diri", envir = built)$fit
+  ids <- 1:6
+  frame <- mvgam:::fitted_data(fit)
+  dm <- as_draws_matrix(fit)[ids, ]
+  coef_of <- function(name) {
+    if (name %in% colnames(dm)) as.numeric(dm[, name]) else 0
+  }
+  centre <- function(m) t(apply(m, 1L, function(r) r - ave(r, frame$time)))
+  # By hand: each row's intercept and slope from the coefficients
+  env_part <- vapply(seq_len(nrow(frame)), function(j) {
+    k <- paste0("series", frame$series[j])
+    coef_of("b_Intercept") + coef_of(paste0("b_", k)) +
+      (coef_of("b_env") + coef_of(paste0("b_env:", k))) * frame$env[j]
+  }, numeric(length(ids)))
+  env_c <- centre(env_part)
+  # `incl_autocor` adds the fitted factors, the associations
+  assoc <- centre(posterior_linpred(fit, newdata = frame, draw_ids = ids,
+                                    incl_autocor = TRUE)) - env_c
+  rv <- function(m) apply(m, 1L, stats::var)
+  vp <- variance_partition(fit, draw_ids = ids)
+  expect_equal(unname(vp$community[, "environment"]),
+               rv(env_c) / (rv(env_c) + rv(assoc)), tolerance = 1e-8)
+
+  d <- get("diri", envir = built)$sim$long_dat
+  lev <- levels(d$series)
+  nd <- expand.grid(time = max(d$time) + 1:3,
+                    series = factor(lev, levels = lev))
+  nd$env <- c(-1, 0.5, 1)[nd$time - max(d$time)]
+  nd$y <- NA_real_
+  fu <- forecast_uncertainty(fit, newdata = nd, draw_ids = ids,
+                             n_replicates = 2L, n_boot = 2L)
+  expect_equal(as.vector(Reduce(`+`, fu$draws)), rep(0, 3L * length(ids)),
+               tolerance = 1e-8)
 })

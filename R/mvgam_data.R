@@ -123,7 +123,6 @@ mvgam_data <- function(data,
                        log_scale = FALSE) {
   checkmate::assert_string(y, null.ok = TRUE)
   checkmate::assert_flag(plot)
-  checkmate::assert_formula(trend_formula, null.ok = TRUE)
   checkmate::assert_list(data2, names = "named", null.ok = TRUE)
   as_frame <- function(x) {
     if (is.list(x) && !is.data.frame(x)) as.data.frame(x) else x
@@ -135,6 +134,7 @@ mvgam_data <- function(data,
   # The family and the trend are resolved as mvgam() resolves them, so
   # a model this check passes is one mvgam() accepts.
   obs_formula <- formula %||% stats::reformulate("1", response = y %||% "y")
+  validate_model_formulas(obs_formula, trend_formula)
   resolved <- resolve_observation_family(obs_formula, family)
   obs_formula <- resolved$formula
   family <- resolved$family

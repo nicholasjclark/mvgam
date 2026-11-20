@@ -1373,6 +1373,37 @@ enforce_factor_support_against_specs <- function(trend_specs) {
 }
 
 
+#' Refuse `cor = TRUE` on factors whose loadings are all sampled
+#'
+#' The series shocks of a factor model have covariance
+#' \eqn{Z \Omega Z'}. With every loading sampled, any \eqn{\Omega}
+#' passes into the loadings, as \eqn{(Z L)(Z L)'}. The factors then take
+#' independent shocks. A `trend_map` that fixes loadings pins the
+#' factors and keeps an estimated \eqn{\Omega}. `RW()`, `AR()` and
+#' `LLT()` record an explicit `cor = TRUE` as `cor_requested`. `VAR()`
+#' and `ZMVN()` always correlate their series.
+#'
+#' @param trend_specs Normalised trend specifications, one spec or a
+#'   per-response list.
+#' @return `invisible(TRUE)`.
+#' @noRd
+refuse_factor_cor <- function(trend_specs) {
+  checkmate::assert_list(trend_specs, null.ok = TRUE)
+  spec <- trend_spec_head(trend_specs)
+  if (!isTRUE(spec$cor_requested) || !samples_factor_loadings(spec)) {
+    return(invisible(TRUE))
+  }
+  stop(insight::format_error(c(
+    "'cor = TRUE' is not supported in a factor model.",
+    x = paste0("The loadings carry the correlation among series. A ",
+               "correlation among factors would trade off against them."),
+    i = paste0("Drop 'cor'. 'residual_cor()' reports the correlation ",
+               "the loadings imply."),
+    i = "A 'trend_map' that fixes the loadings can take 'cor = TRUE'."
+  )), call. = FALSE)
+}
+
+
 #' Apply the `n_lv` ceiling to the resolved series axis
 #'
 #' Called once, where `extract_and_validate_trend_components()` has
@@ -2066,71 +2097,6 @@ formula_rhs_function_names <- function(x) {
   character(0L)
 }
 
-#' Tell the user once per term that an exact GP term predicts in-sample
-#'
-#' `inform_once()` keeps the count and honours `silent >= 2`.
-#'
-#' @param gp_term Character deparse of the `gp()` call
-#' @return `NULL`, invisibly
-#' @noRd
-maybe_warn_exact_gp <- function(gp_term) {
-  checkmate::assert_string(gp_term)
-  example <- gsub("\\)$", ", k = 20)", gp_term)
-  inform_once(
-    c(
-      cli::format_inline(
-        "Exact GP term in {.field {gp_term}} (no {.field k} given)."
-      ),
-      i = "Prediction at 'newdata' requires the approximate form.",
-      i = cli::format_inline(
-        "Pass {.field k}, as in {.code {example}}, to use it."
-      )
-    ),
-    paste0("mvgam_exact_gp_", gp_term)
-  )
-}
-
-#' Inform once per term on exact GP terms
-#'
-#' Scans a formula for `gp()` terms that omit `k`. Exact GPs fit
-#' through brms with their full covariance kernel. mvgam's prediction
-#' code does not reconstruct their basis at newdata. The notice names
-#' that gap and the approximate form that avoids it.
-#'
-#' @param formula A formula, `brmsformula` or `mvbrmsformula`
-#' @return `NULL`, invisibly
-#' @noRd
-validate_exact_gp_usage <- function(formula) {
-  checkmate::assert(
-    checkmate::check_formula(formula),
-    checkmate::check_class(formula, "brmsformula"),
-    checkmate::check_class(formula, "mvbrmsformula"),
-    checkmate::check_null(formula),
-    .var.name = "formula"
-  )
-  if (is.null(formula)) return(invisible(NULL))
-
-  forms <- if (inherits(formula, "mvbrmsformula")) formula$forms else {
-    list(formula)
-  }
-  for (form in forms) {
-    main <- obs_arm_main_formula(form)
-    # `k` is taken from each `gp()` call as written. An unevaluated
-    # `k = kk` needs no object named `kk` to exist here.
-    for (gp_call in formula_calls(main[[length(main)]], "gp")) {
-      k <- gp_call_to_spec(gp_call)$k
-      if (is.na(k) || identical(k, "NA")) {
-        # One mvgam() call reaches this from the observation validator,
-        # the trend validator and `setup_brms_lightweight()`. The
-        # notice's id carries the term. It shows once per term per
-        # session.
-        maybe_warn_exact_gp(paste(deparse(gp_call), collapse = ""))
-      }
-    }
-  }
-  invisible(NULL)
-}
-
 #' Validate an observation formula for brms
 #'
 #' Refuses mvgam trend constructors and a `.` term in the observation
@@ -2157,26 +2123,27 @@ validate_obs_formula_brms <- function(formula) {
       "Trend constructors are not supported in the observation 'formula'.",
       x = paste0("Found: ", paste0("'", detected_trends, "()'",
                                    collapse = ", "), "."),
-      i = "Write the trend in 'trend_formula', as in 'trend_formula = ~ RW()'."
+      i = paste0("Write the trend in 'trend_formula', as in ",
+                 "'trend_formula = ~ ", detected_trends[1L], "()'.")
     )), call. = FALSE)
   }
 
-  # A `.` expands to every column of the frame. An mvgam frame also
-  # holds its time and series columns.
+  # brms models an `ar()` residual inside its likelihood or as latent
+  # residuals. mvgam's predictions, log-likelihoods and forecasts are
+  # built from the predictor and leave both out.
   forms <- if (inherits(formula, "mvbrmsformula")) formula$forms else {
     list(formula)
   }
-  has_dot <- vapply(forms, function(f) {
+  for (f in forms) {
     main <- obs_arm_main_formula(f)
-    "." %in% all.vars(main[[length(main)]])
-  }, logical(1L))
-  if (any(has_dot)) {
-    stop(insight::format_error(c(
-      "A '.' is not supported in the observation 'formula'.",
-      x = paste0("'.' enters every column of 'data' as a predictor, ",
-                 "the time and series columns among them."),
-      i = "List the covariates the model should use."
-    )), call. = FALSE)
+    rhs <- main[[length(main)]]
+    refuse_dot(rhs, "the observation 'formula'")
+    refuse_autocor_terms(
+      rhs, "the observation 'formula'",
+      "Predictions, forecasts and 'loo()' leave these terms out.",
+      paste0("Write the dynamics in 'trend_formula', as in ",
+             "'trend_formula = ~ AR(p = 1)'.")
+    )
   }
 
   # The Stan likelihood includes a `rate()` denominator and an `se()`
@@ -2192,6 +2159,12 @@ validate_obs_formula_brms <- function(formula) {
       stop(insight::format_error(c(
         paste0("'", aterm, "()' is not supported in the observation ",
                "'formula'."),
+        x = switch(
+          aterm,
+          rate = ,
+          se = "Predictions and log-likelihoods leave it out.",
+          index = "A trend orders rows by its time and series columns."
+        ),
         i = switch(
           aterm,
           rate = paste0("Write the exposure as an offset, as in ",
@@ -2201,8 +2174,6 @@ validate_obs_formula_brms <- function(formula) {
       )), call. = FALSE)
     }
   }
-
-  validate_exact_gp_usage(formula)
 
   # brms handles all other validation
   formula
@@ -2251,9 +2222,8 @@ refuse_trend_formula_offset <- function(terms_obj) {
 
 #' Validate a trend formula
 #'
-#' Refuses a response, an offset, brms autocorrelation and addition
-#' terms, `mi()`, `cs()`, more than one trend constructor and an exact
-#' `gp()`.
+#' Refuses a `.`, a response, an offset, brms autocorrelation and
+#' addition terms, `mi()`, `cs()` and more than one trend constructor.
 #' The checks walk the formula's calls. A variable such as `se_x` or
 #' `weights` is no call. None of the checks refuses it.
 #'
@@ -2263,23 +2233,20 @@ refuse_trend_formula_offset <- function(terms_obj) {
 validate_trend_formula <- function(formula) {
   if (is.null(formula)) return(NULL)
   checkmate::assert_class(formula, "formula")
+  rhs <- formula[[length(formula)]]
+  refuse_dot(rhs, "'trend_formula'")
   refuse_trend_formula_response(formula)
   refuse_trend_formula_offset(stats::terms(formula))
 
-  rhs <- formula[[length(formula)]]
   found <- function(calls) {
     paste0("Found: ", paste0("'", calls, "'", collapse = ", "), ".")
   }
 
-  autocor <- find_calls(rhs, brms_autocor_terms)
-  if (length(autocor) > 0L) {
-    stop(insight::format_error(c(
-      "brms autocorrelation terms are not supported in 'trend_formula'.",
-      x = found(autocor),
-      x = "Autocorrelation terms conflict with the trend dynamics.",
-      i = "Use a trend constructor, as in 'AR(p = 1)' for 'ar(p = 1)'."
-    )), call. = FALSE)
-  }
+  refuse_autocor_terms(
+    rhs, "'trend_formula'",
+    "Autocorrelation terms conflict with the trend dynamics.",
+    "Use a trend constructor, as in 'AR(p = 1)' for 'ar(p = 1)'."
+  )
 
   if (length(find_calls(rhs, "mi")) > 0L) {
     stop(insight::format_error(c(
@@ -2334,8 +2301,57 @@ validate_trend_formula <- function(formula) {
     )), call. = FALSE)
   }
 
-  validate_exact_gp_usage(formula)
   formula
+}
+
+#' Refuse a `.` in one formula
+#'
+#' A `.` expands to every column of the frame. An mvgam frame also holds
+#' its time and series columns.
+#'
+#' @param rhs The right-hand side to search
+#' @param where The formula's name, as the message gives it
+#' @return `NULL`, invisibly, when the formula holds none
+#' @noRd
+refuse_dot <- function(rhs, where) {
+  checkmate::assert_string(where)
+  if (!"." %in% all.vars(rhs)) {
+    return(invisible(NULL))
+  }
+  stop(insight::format_error(c(
+    paste0("A '.' is not supported in ", where, "."),
+    x = paste0("'.' enters every column of 'data' as a predictor, ",
+               "the time and series columns among them."),
+    i = "List the covariates the model should use."
+  )), call. = FALSE)
+}
+
+
+#' Refuse brms autocorrelation terms in one formula
+#'
+#' A latent trend carries the dynamics. Its constructors take the place
+#' of brms's `ar()`, `ma()` and the rest.
+#'
+#' @param rhs The right-hand side to search
+#' @param where The formula's name, as the message gives it
+#' @param reason Why the terms are refused there
+#' @param hint What to write instead
+#' @return `NULL`, invisibly, when the formula holds none
+#' @noRd
+refuse_autocor_terms <- function(rhs, where, reason, hint) {
+  checkmate::assert_string(where)
+  checkmate::assert_string(reason)
+  checkmate::assert_string(hint)
+  autocor <- find_calls(rhs, brms_autocor_terms)
+  if (!length(autocor)) {
+    return(invisible(NULL))
+  }
+  stop(insight::format_error(c(
+    paste0("brms autocorrelation terms are not supported in ", where, "."),
+    x = paste0("Found: ", paste0("'", autocor, "'", collapse = ", "), "."),
+    x = reason,
+    i = hint
+  )), call. = FALSE)
 }
 
 #' brms autocorrelation terms
@@ -2737,6 +2753,7 @@ prepare_trend_specs <- function(trend_specs, trend_map, loadings_prior,
   specs <- apply_trend_map_alias(trend_specs, trend_map)
   specs <- normalise_trend_map_on_specs(specs, data)
   enforce_factor_support_against_specs(specs)
+  refuse_factor_cor(specs)
   attach_loadings_prior_spec(specs, loadings_prior, data, data2)
 }
 
@@ -4917,11 +4934,13 @@ gp_call_to_spec <- function(call) {
       x = paste0("Got '", deparse1(call), "'.")
     )), call. = FALSE)
   }
+  cov <- args$named("cov", "exp_quad")
   list(
     vars = vars,
     k = args$named("k", NA_character_),
     by = args$named("by", NA_character_),
-    cov = args$named("cov", "exp_quad"),
+    # brms renames the Matern 1/2 kernel to the exponential one
+    cov = if (identical(cov, "matern12")) "exponential" else cov,
     coef = paste0("gp", paste(vars, collapse = ""))
   )
 }

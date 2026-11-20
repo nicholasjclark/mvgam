@@ -273,4 +273,45 @@ test_that("a new level takes its coefficients from one fitted level", {
 })
 
 
+test_that("coef adds each level's deviation to the population effect", {
+  fit <- fits$G
+  cf <- coef(fit, summary = FALSE)
+  dm <- posterior::as_draws_matrix(fit)
+  lev <- dimnames(cf$g1)[[2L]]
+  # By hand: `(1 + x | g1)` gives each level of g1 its own slope
+  expect_equal(unname(cf$g1[, , "x"]),
+               unname(vapply(lev, function(l) {
+                 as.numeric(dm[, "b_x"]) +
+                   as.numeric(dm[, paste0("r_g1[", l, ",x]")])
+               }, numeric(nrow(dm)))))
+  # `(1 | g2)` leaves every level of g2 the population slope
+  expect_equal(unname(cf$g2[, 1L, "x"]), as.numeric(dm[, "b_x"]))
+  # Each response keeps its own prefix. `y2` takes no group term, which
+  # leaves its population effect.
+  mv <- coef(fits$V, summary = FALSE)$mmg1g2
+  dv <- posterior::as_draws_matrix(fits$V)
+  expect_equal(unname(mv[, "m2", "y1_Intercept"]),
+               as.numeric(dv[, "b_y1_Intercept"]) +
+                 as.numeric(dv[, "r_mmg1g2__y1[m2,Intercept]"]))
+  expect_equal(unname(mv[, "m2", "y2_x"]), as.numeric(dv[, "b_y2_x"]))
+})
+
+
+test_that("species_effects averages a random slope over each series' rows", {
+  fit <- fits$G
+  se <- species_effects(fit, variables = "x", draw_ids = ids)
+  dm <- posterior::as_draws_matrix(fit)[ids, ]
+  # By hand: `(1 + x | g1)` adds each row's group slope to `b_x`
+  by_hand <- vapply(levels(dat$series), function(s) {
+    g <- dat$g1[dat$series == s]
+    as.numeric(dm[, "b_x"]) +
+      rowMeans(unclass(dm[, paste0("r_g1[", g, ",x]"), drop = FALSE]))
+  }, numeric(length(ids)))
+  expect_equal(unname(se$draws$species[, , "x"]), unname(by_hand),
+               tolerance = 1e-8)
+  expect_error(species_effects(fit), "Covariates: 'x'")
+  expect_error(species_effects(fit, variables = "g1"),
+               "'g1' groups a random effect")
+})
+
 cat("\nDone.\n")

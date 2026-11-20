@@ -1,125 +1,62 @@
-## Package Overview
+## mvgam
 
-mvgam is an R package for fitting, plotting and interpreting Bayesian Multivariate State-Space Models.
+An R package for Bayesian multivariate state-space models. brms builds the
+observation model's Stan code and data. mvgam adds trend and factor blocks
+(`R/stan_assembly.R`) and its own post-fit methods. `architecture/` holds the
+design decisions and `architecture/quick-reference.md` the current syntax.
+Work happens on `feature/brms-integration`. Use `gh` for GitHub.
 
-## Development Commands
+## Commands
 
-### Testing
-- Run the full suite on 4 cores: `TESTTHAT_PARALLEL=true TESTTHAT_CPUS=4 Rscript -e "devtools::test()"`
-- YOU MUST load all functions (`devtools::load_all()`) prior to testing or debugging. Use `Rscript -e "devtools::load_all();testthat::test_file(path/to/test)"` to run specific tests
-- You CANNOT use filter calls in `testthat::test_file()` for selective execution (use the `desc` argument for this instead)
-- No test errors or warnings are allowed. This is NON-NEGOTIABLE
-- Every printed warning must be traced to root cause and either fixed or explained. Do NOT silently move on after seeing one, and do NOT mute with blanket `suppressWarnings()`
-- **NEVER pipe test output into `tail`/`head`/`grep`/etc.** Redirect to a log file, then Read it. Never re-run a test just to see the summary — the first run already wrote it to disk.
-- **CI tests MUST NOT skip on missing fixtures.** Fixture-dependent tests go in `tests/local/`, period.
+- One test file: `Rscript -e "devtools::load_all(); testthat::test_file('path')"`.
+  Select tests with `desc`. `test_file()` takes no filter.
+- Full suite: `TESTTHAT_PARALLEL=true TESTTHAT_CPUS=4 Rscript -e "devtools::test()"`.
+- Documentation: `Rscript -e "devtools::document()"`.
+- Write test and build output to a log file and read the file. Never pipe it
+  into `tail`, `head` or `grep`, and never rerun a test to see its summary.
 
-### Building and Documentation
-- `Rscript -e "devtools::document()"` - Generate roxygen2 documentation
-- `R CMD INSTALL --preclean --no-multiarch` - Install package locally
-- No `devtools::document()` warnings or errors are allowed. This is NON-NEGOTIABLE. Every roxygen change must leave the documentation rebuild clean.
+## Non-negotiable
 
-### Documentation Memory
-- Use `context7` MCP server to find relevant, up-to-date documentation when working with 3rd party libraries, as needed
+- No test errors or warnings and no `document()` warnings. Trace every warning
+  to its cause. Never mute it with `suppressWarnings()`.
+- Tests never use `try()`, `tryCatch()` or `skip()`. `skip_on_cran()` may gate
+  a heavy sweep whose core cases still run on CRAN. The CI suite stays under
+  10 minutes.
+- CI tests never fit Stan models or depend on cached fixtures. Fits live in
+  `tests/local/`.
+- Never patch package code with wrappers, placeholders or `tryCatch()` to make
+  a test pass.
 
-## Architecture
+## Code
 
-### Package Structure
-- Standard R package structure with `DESCRIPTION`, `NAMESPACE`, `src/` and `man/` directories
-- R source code in `R/` directory
-- Rcpp source code in `src/` directory
-- Vignettes in `vignettes/` directory demonstrate key features
-- Tests in `tests/testthat/`
+- Tidyverse style, snake_case, 80-character lines, 2-space roxygen
+  continuation lines. Internal functions take `@noRd`. Export only what users
+  call.
+- Validate every argument with `checkmate::assert_*()`.
+- Errors use `insight::format_error()` and per-call warnings
+  `insight::format_warning()`. Once-per-session conditions use `warn_once()` and
+  `inform_once()` (`R/utils-conditions.R`), which are quiet under testthat. A
+  test of one sets `withr::local_envvar(TESTTHAT = "")`. `silent = 2` suppresses
+  messages. Warnings always show.
+- Comments, roxygen and messages describe current behaviour. Never mention
+  planning docs, task IDs, `tasks/` paths, refactor history ("legacy", "new"),
+  future work ("planned", "TODO"), process words ("DRY") or a convention's
+  author. Never use empty praise words ("robust", "comprehensive",
+  "efficient").
+- Never claim parity with brms before reading the brms source.
+- Write no new helper before reading every related surface for one that
+  already does the job. That reading also finds the duplicated logic and
+  tech debt the change should fold in. Extend or consolidate what exists.
 
-### Key Design Patterns
-**S3 Type System**: Uses S3 for structured objects to support method inheritance and specialization
+### Messages
 
-**Layered Architecture Pattern**:
-- Interface Layer: User-facing functions provide clean APIs
-- Model Specification Layer: Formula processing with special trend model constructors
-- Code Generation Layer: Translates R specifications into brms code to build initial Stan models and data, then extends these with custom trend and factor additions
-- Computational Backend Layer: Interfaces with Stan for sampling
-- Post-processing Layer: S3 methods for analysis, diagnostics, and visualization
+- The first element is the problem in one sentence. Parameter names take
+  single quotes: `'n_lv'`.
+- A multi-line message uses `c()` with named bullets: `x =` for details, `i =`
+  for the fix. Positional strings merge into one paragraph.
+- One plain sentence per bullet. A bullet must add a value, a reason or a
+  fix the main line lacks. Unsupported features say "X is not supported."
 
-**Bayesian Workflow Integration**:
-- Model Building: Formula specification, priors, trend model selection, observation family
-- Fitting: MCMC sampling with convergence monitoring
-- Checking: Posterior predictive checks, residual analysis, diagnostic plots
-- Inference: Parameter summaries, uncertainty quantification
-- Prediction: Forecasting with proper uncertainty propagation
-- Evaluation: Cross-validation, scoring rules, model comparison
-  
-## Continuous Integration
-- `.github/workflows/` - CI/CD with R CMD check, pkgdown building and valgrind memory check
-
-## Development Notes
-
-### Testing Strategy
-- After updating any logic, check whether existing unit tests need to be updated. If so, update them
-- When proposing new tests, first check existing test file names and add to the most appropriate existing file
-- DO NOT write wrapper functions to fix failing tests
-- DO NOT use `try()`, `tryCatch()` or `skip()` within tests
-- `skip_on_cran()` is the one exception: it gates a heavy sweep whose core cases still run on CRAN, which keeps the check under CRAN's 10-minute budget
-- DO NOT insert placeholder functions or use `try()` / `tryCatch()` within functions to address test errors or warnings
-
-### testthat Expectations Guidelines
-- testthat expectation functions (expect_true, expect_equal, etc.) do NOT have an `info` argument
-- Use descriptive variable names and clear assertions
-- NEVER use `info = "..."` in any expect_* function calls - add comments above the expectation instead
-
-### Documentation
-- Use roxygen2 tags for all functions
-- Vignettes demonstrate in-depth use cases
-- pkgdown site provides comprehensive documentation
-- README provides a high level overview of package goals and major functions
-- roxygen2 examples demonstrate simpler use cases
-
-### Code Style and Formatting
-- Apply tidyverse styling for all R and roxygen code
-- **Line Length**: Maximum 80 characters per line
-- **Roxygen Documentation**: Use 2-space indentation for continuation lines
-- When commenting complex logic, add above line `# Reason` comment explaining the why, not just the what
-- **Comment Style**: Use sentence case, avoid ALL CAPS in comments
-- **Comment Quality**: Keep comments professional and interpretable in isolation. **NEVER use meaningless descriptive words like "comprehensive", "unified", "enhanced", "robust", "simplified", "complete", "advanced", "improved", "optimized", "efficient", "powerful", "flexible", or "intelligent" in comments, function descriptions, or variable names**. These words provide no useful information. Describe WHAT the code does and WHY, not how good it supposedly is
-- **Function Names**: Use snake_case
-
-### Validation and Error Handling
-- All R functions must follow these validation patterns:
-
-#### Validation Patterns
-1. **Input Validation**: Use `checkmate::assert_*()` for all function parameters
-2. **Error Messages**: Use `insight::format_error()` for user-friendly error formatting
-3. **Warnings**: Use `insight::format_warning()` for a warning raised on every call
-4. **Session Warnings**: Use `warn_once(message, id)` (`R/utils-conditions.R`) for a warning raised once per session. Never hand-write `rlang::warn(.frequency = "once")` or read `Sys.getenv("TESTTHAT")` in package code
-5. **Session Messages**: Use `inform_once(message, id)` for an informational message shown once per session. Per-call messages use `rlang::inform()` inside `if (silent < 2)`
-6. **`silent`**: `silent = 2` suppresses messages, never warnings (as in `brms::brm()`). `mvgam()` and `jsdgam()` store it in `options(mvgam.silent)` for the call
-7. **Testing once-per-session conditions**: `warn_once()` and `inform_once()` are quiet under testthat. A test asserting one clears the variable with `withr::local_envvar(TESTTHAT = "")`
-
-See "User-Facing Conditions" in `architecture/architecture-decisions.md` for the reasons.
-
-#### Message Formatting Standards
-
-These rules are non-negotiable. New error and warning messages must follow
-them; existing non-conforming sites should be updated when touched.
-
-- Use single quotes around parameter names: `'parameter_name'`
-- Multi-line messages MUST use `c()` with named elements. Bare positional
-  string arguments to `insight::format_error()` are NOT accepted — they
-  concatenate into one paragraph and lose the bullet structure
-  `cli`/`insight` render for named elements:
-  - first element: the main error line (no name)
-  - `x = "..."` for error details (indented red cross)
-  - `i = "..."` for informational hints (indented blue info)
-- Include a suggested solution and the context that explains why the
-  constraint exists
-- Single-line messages may stay as a bare string argument; no need to
-  wrap them in `c()` just to satisfy the convention
-- One plain sentence per element. Never pad a line with a clause joined
-  by `;`, `, which`, `, and`, `, but` or `, so`: make it its own `x =`
-  or `i =` bullet, or delete it if it does not help the user act
-- Say what the user needs in the fewest words: "'future = TRUE' requires
-  the 'future' package." Never contort a sentence to dodge a lint word
-
-Correct (multi-line):
 ```r
 stop(insight::format_error(c(
   "Parameter 'ndraws' exceeds available draws.",
@@ -128,51 +65,46 @@ stop(insight::format_error(c(
 )))
 ```
 
-Wrong (multi-line, positional args — DO NOT USE):
-```r
-stop(insight::format_error(
-  "Parameter 'ndraws' exceeds available draws.",
-  paste0("Requested: ", ndraws, ", available: ", total, "."),
-  "Use a smaller value or set ndraws = NULL to use all draws."
-))
-```
+## Working rules
 
-Correct (single-line, bare string):
-```r
-stop(insight::format_error(
-  paste0("Series variable '", series_var, "' not found in data.")
-))
-```
+- Never scope a feature down by refusing reasonable cases. Build the general
+  solution.
+- Verify by exactness: recompute Stan's stored quantities from raw draws in R,
+  compare with brms or closed forms, read the output and open the plots. Run
+  no recovery or coverage studies unless asked. Ignore ESS, Rhat and divergence
+  noise in local fixtures and examples.
+- A task closes only when predictions, forecasts, summaries, plots and scores
+  work on several fixtures of different types.
+- Fit each probe once and cache it. A cache key holds the data, formulas,
+  family, seed and response. Use `run_model = FALSE` to check code alone. Run
+  every article chunk on cached fits before a knit.
+- Each new behaviour gets one biting assertion, in an existing test block.
+  Update existing fixtures before adding new ones. Prose-lint flags in test
+  files can be ignored.
+- Run the full suite once, as the final gate. No commit until the task's open
+  items are fixed.
+- Run long tasks in the background and wait for the completion notice without
+  polling. Parallel jobs are fine with combined cores, the reporting-pipeline
+  session's included, at 18 or fewer.
+- Do the work in this session. Spawn no subagents unless asked.
+- `tasks/` roadmaps are not logs. Delete an item once it is verified.
 
-### Export Guidelines
-- Only export functions that users directly need
-- Keep validation and utility functions internal (`@noRd`)
+## Documentation
 
-## Git Workflow
+- NEWS holds one line per change against the released 1.x.
+- Fitting examples stay in `\dontrun{}`. A few fast models may run unguarded.
+- `forecast()` propagates the fitted state. `posterior_predict()` marginalises
+  over the trend. Docs keep the two apart.
+- Examples put covariates in `trend_formula` and pass `type = "expected"` to
+  marginaleffects.
 
-### Branch Management
-- Use descriptive feature branch names: `feature/brms-integration`
-- Create branches from master before starting major work
-- Keep feature branches focused on specific functionality
-- Push branches to remote for backup and collaboration
-- Use `gh` client for all Github interactions
+## Commits
 
-### Commit Message Standards
-- Follow this pattern for all commits:
 ```
 Brief description of changes (50 chars max)
 
-- Detailed explanation of what was changed
-- Why the change was necessary  
-- Any important implementation notes
+- What changed
+- Why it was necessary
 ```
-- Do not mention Claude as a co-author or include links to Claude Code in messages
 
-### Pre-commit Workflow
-1. Check git status to understand current changes
-2. Stage appropriate files with clear understanding of what's being committed
-3. Write commit messages explaining changes
-
-### AI Behavior Rules
-- **Never assume missing context. Ask questions if uncertain**
-- **Never hallucinate libraries or functions** – only use known, verified R packages
+Never mention Claude as a co-author or link to Claude Code.

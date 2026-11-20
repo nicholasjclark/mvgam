@@ -560,6 +560,12 @@ test_that("the parts and the expectation follow the predictor", {
 test_that("the site grouping reports the varying monotonic slope", {
   expect_identical(dimnames(ranef(fits$A)$site)[[3L]],
                    c("Intercept", "modose"))
+  # A site's monotonic slope adds its deviation to the special-term
+  # coefficient `bsp_modose`
+  dm <- posterior::as_draws_matrix(fits$A)
+  expect_equal(unname(coef(fits$A, summary = FALSE)$site[, "st2", "modose"]),
+               as.numeric(dm[, "bsp_modose"]) +
+                 as.numeric(dm[, "r_site[st2,modose]"]))
 })
 
 

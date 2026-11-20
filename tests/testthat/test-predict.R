@@ -20,20 +20,80 @@ test_that("a monotonic variable keeps the coding brms gives it", {
   )
 })
 
-test_that("the exp_quad density matches brms's Stan function", {
-  # brms's anisotropic `spd_gp_exp_quad()`: sdgp^2 * sqrt(2 pi)^D *
-  # prod(l) * exp(-0.5 * sum(l^2 * x^2)), one row per draw.
-  slambda <- array(c(1, 2, 3, 4), dim = c(2, 2))
-  sdgp <- c(0.5, 0.8)
-  lscale <- matrix(c(1.0, 1.5, 2.0, 2.5), nrow = 2, ncol = 2)
-
-  result <- gp_spectral_density(slambda, sdgp, lscale, "exp_quad")
-  expected <- outer(seq_len(2), seq_len(2), Vectorize(function(d, m) {
-    sdgp[d]^2 * sqrt(2 * pi)^2 * prod(lscale[d, ]) *
-      exp(-0.5 * sum(lscale[d, ]^2 * slambda[m, ]^2))
-  }))
-  expect_equal(result, expected)
+test_that("each GP kernel's density and covariance are brms's own", {
+  # brms's R functions are the oracle, for an isotropic and an
+  # anisotropic length scale. Two draws, two dimensions.
+  slambda <- array(c(0.5, 1, 1.5, 0.2, 0.4, 0.9), dim = c(3, 2))
+  sdgp <- c(0.5, 2)
+  iso <- matrix(c(1, 3), nrow = 2)
+  aniso <- matrix(c(1, 3, 0.5, 2), nrow = 2)
+  X <- matrix(c(-1, 0, 0.4, 2, 1, -0.5), nrow = 3)
+  X_new <- matrix(c(0.1, 1.7, -2, 0.3), nrow = 2)
+  cov_gp <- utils::getFromNamespace("cov_gp", "brms")
+  for (kernel in GP_KERNELS) {
+    spd <- utils::getFromNamespace(paste0("spd_gp_", kernel), "brms")
+    for (lscale in list(iso, aniso)) {
+      expect_equal(gp_spectral_density(slambda, sdgp, lscale, kernel),
+                   spd(slambda, sdgp, lscale))
+      expect_identical(
+        gp_covariance(X, X_new, sdgp[2], lscale[2, ], kernel),
+        cov_gp(X, X_new, sdgp = sdgp[2], lscale = lscale[2, ], cov = kernel)
+      )
+    }
+  }
 })
+
+
+test_that("the Stan data tells exact gp() terms from approximate ones", {
+  dat <- data.frame(y = rnorm(6), x = 1:6, z = c(2, 5, 1, 4, 3, 6))
+  forms <- function(f) gp_forms(brms::make_standata(f, dat))
+  expect_identical(forms(y ~ gp(x) + gp(z, k = 4)),
+                   c(approximate = TRUE, exact = TRUE))
+  expect_identical(forms(y ~ gp(x, k = 4)),
+                   c(approximate = TRUE, exact = FALSE))
+  expect_identical(forms(y ~ gp(x, cov = "matern12")),
+                   c(approximate = FALSE, exact = TRUE))
+  # A prediction's Stan data copies the fitted values into `_old`
+  fit <- brms::brm(y ~ gp(x, k = 4), dat, empty = TRUE)
+  expect_identical(
+    gp_forms(brms::standata(fit, newdata = dat, internal = TRUE)),
+    c(approximate = TRUE, exact = FALSE)
+  )
+})
+
+
+test_that("an exact GP is brms's at fitted and at new values", {
+  # brms's `.predictor_gp_old()` gives the process at the fitted values.
+  # Its `.predictor_gp_new()` draws it at new values, from the same
+  # random stream.
+  X <- matrix(c(-1, 0, 0.4, 2, 1, -0.5), nrow = 3)
+  X_new <- matrix(c(0.1, 1.7, -2, 0.3), nrow = 2)
+  zgp <- matrix(c(0.3, -1.2, 0.8, 1.1, 0.2, -0.4), nrow = 2)
+  sdgp <- c(0.5, 2)
+  lscale <- matrix(c(1, 3, 0.5, 2), nrow = 2)
+  old <- utils::getFromNamespace(".predictor_gp_old", "brms")
+  new <- utils::getFromNamespace(".predictor_gp_new", "brms")
+  for (kernel in GP_KERNELS) {
+    by_brms <- t(vapply(1:2, function(s) {
+      old(X, sdgp[s], lscale[s, ], zgp[s, ], kernel, nug = 1e-12)
+    }, numeric(3L)))
+    expect_equal(exact_gp_pred(X, X, zgp, sdgp, lscale, kernel), by_brms)
+    mine <- withr::with_seed(1L, {
+      exact_gp_pred(X, X_new, zgp, sdgp, lscale, kernel)
+    })
+    theirs <- withr::with_seed(1L, t(vapply(1:2, function(s) {
+      new(X_new, by_brms[s, ], X, sdgp[s], lscale[s, ], kernel, nug = 1e-8)
+    }, numeric(2L))))
+    expect_equal(mine, theirs)
+  }
+  # A new row at a fitted value takes the fitted process, where brms adds
+  # noise of SD 1e-4
+  mixed <- exact_gp_pred(X, rbind(X[2, ], X_new), zgp, sdgp, lscale,
+                         "exp_quad")
+  expect_identical(mixed[, 1L], exact_gp_pred(X, X, zgp, sdgp, lscale,
+                                              "exp_quad")[, 2L])
+})
+
 
 test_that("each draw's spectral density is its own", {
   # An isotropic kernel's density at a draw depends on that draw's
@@ -42,7 +102,7 @@ test_that("each draw's spectral density is its own", {
   slambda <- array(c(0.5, 1, 1.5), dim = c(3, 1))
   sdgp <- c(0.5, 2)
   lscale <- matrix(c(1, 3), nrow = 2)
-  for (kernel in c("exp_quad", "matern32", "matern52")) {
+  for (kernel in GP_KERNELS) {
     both <- gp_spectral_density(slambda, sdgp, lscale, kernel)
     alone <- rbind(
       gp_spectral_density(slambda, sdgp[1], lscale[1, , drop = FALSE],
@@ -52,26 +112,6 @@ test_that("each draw's spectral density is its own", {
     )
     expect_equal(both, alone)
   }
-})
-
-test_that("the Matern densities match brms's Stan functions", {
-  # In one dimension brms's `spd_gp_matern32()` is sdgp^2 * 2 *
-  # sqrt(pi) * gamma(2) * 3^1.5 / (0.5 * sqrt(pi)) * l *
-  # (3 + l^2 * x^2)^-2. Its `spd_gp_matern52()` is sdgp^2 * 2 *
-  # sqrt(pi) * gamma(3) * 5^2.5 / (0.75 * sqrt(pi)) * l *
-  # (5 + l^2 * x^2)^-3.
-  x <- c(0.5, 1, 1.5)
-  sdgp <- 2
-  l <- 3
-  slambda <- array(x, dim = c(3, 1))
-  expect_equal(
-    as.vector(gp_spectral_density(slambda, sdgp, matrix(l), "matern32")),
-    sdgp^2 * 4 * 3^1.5 * l * (3 + l^2 * x^2)^-2
-  )
-  expect_equal(
-    as.vector(gp_spectral_density(slambda, sdgp, matrix(l), "matern52")),
-    sdgp^2 * 4 * 5^2.5 / 0.75 * l * (5 + l^2 * x^2)^-3
-  )
 })
 
 # ==============================================================================

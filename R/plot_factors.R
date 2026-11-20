@@ -61,7 +61,7 @@ plot_factors <- function(
   ggplot2::ggplot() +
     layers +
     ggplot2::labs(x = "Time", y = "Posterior factor") +
-    ggplot2::facet_wrap(~series) +
+    mvgam_facet_series(scales = "fixed") +
     mvgam_theme()
 }
 
@@ -138,7 +138,7 @@ plot_latent_state <- function(object, probs = c(0.5, 0.8, 0.95),
     layers +
     ggplot2::labs(x = "Time",
                   y = closure_unit_labels(object$family)$label) +
-    ggplot2::facet_wrap(~ series) +
+    mvgam_facet_series(scales = "fixed") +
     mvgam_theme()
 }
 

@@ -4,7 +4,7 @@
 \alias{plot.mvgam_var_matrix}
 \title{Plot a VAR transition matrix}
 \usage{
-\method{plot}{mvgam_var_matrix}(x, cluster = FALSE, ...)
+\method{plot}{mvgam_var_matrix}(x, cluster = FALSE, supported_only = FALSE, ...)
 }
 \arguments{
 \item{x}{An \code{mvgam_var_matrix} object returned by
@@ -12,6 +12,9 @@
 
 \item{cluster}{Logical. \code{TRUE} orders the processes by a Robinson
 clustering of \code{1 - A}, which suits a matrix close to symmetric.}
+
+\item{supported_only}{Logical. \code{TRUE} leaves blank every cell whose
+\code{prob_nonzero} is at most \code{prob_threshold}. Defaults to \code{FALSE}.}
 
 \item{...}{Unused. Anything passed here is refused.}
 }
@@ -22,7 +25,8 @@ A \link[ggplot2:ggplot]{ggplot2::ggplot} object.
 Draws the posterior estimate of the matrix as a heatmap. Row
 \eqn{i}, column \eqn{j} is the effect of process \eqn{j} at time
 \eqn{t - l} on process \eqn{i} at time \eqn{t}. A black outline
-marks each cell whose interval excludes zero. The colour scale is
+marks each cell whose \code{prob_nonzero} exceeds the \code{prob_threshold}
+given to \code{\link[=posterior_transition_matrix]{posterior_transition_matrix()}}. The colour scale is
 symmetric about zero and spans the largest absolute cell.
 }
 \seealso{

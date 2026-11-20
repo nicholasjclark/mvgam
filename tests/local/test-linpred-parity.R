@@ -25,10 +25,11 @@
 # term, an offset, a smooth and a correlated random effect between
 # them; a non-linear model with a smooth and a random effect in one
 # parameter; a hurdle model whose `hu` has a random effect; a model
-# whose mean has three smooths, one split by a factor, beside a smooth
-# in `sigma`; a latent trend whose own formula has a smooth, a slope
-# and a random effect; and a latent trend with an intercept alone. Two
-# ordinal fits further down carry category-specific terms.
+# whose mean has three smooths (one split by a factor) plus an exact GP
+# and whose `sigma` has a smooth; a latent trend whose own formula has a
+# smooth, a slope, a random effect and an exact GP; and a latent trend
+# with an intercept alone. Two ordinal fits further down carry
+# category-specific terms.
 #
 # Run with:
 #   testthat::test_file("tests/local/test-linpred-parity.R")
@@ -40,7 +41,8 @@ suppressMessages({
 
 
 # brms advises at fit time that cumulative `cs()` terms are
-# experimental. The fixtures fit them on purpose.
+# experimental. The fixtures fit them on purpose. The model is part of
+# the key. A formula edit then refits.
 fit_cached <- function(name, formula, family = gaussian(), ...) {
   cached_fit(paste0("val_linpred_", name, ".rds"), function() {
     without_brms_fit_advisories(
@@ -48,7 +50,11 @@ fit_cached <- function(name, formula, family = gaussian(), ...) {
             iter = 600L, warmup = 300L, silent = 2,
             backend = "cmdstanr", seed = 1L, ...)
     )
-  }, key = parity_data)
+  }, key = list(
+    data = parity_data,
+    model = utils::capture.output(print(formula), print(family),
+                                  print(list(...)))
+  ))
 }
 
 parity_data <- local({
@@ -108,12 +114,13 @@ fits <- list(
   ),
   smooths = fit_cached(
     "smooths",
-    bf(ys ~ s(x, k = 5) + s(z, by = gs, k = 5) + t2(x, z, k = c(4, 4)),
+    bf(ys ~ s(x, k = 5) + s(z, by = gs, k = 5) + t2(x, z, k = c(4, 4)) +
+         gp(z, cov = "matern12"),
        sigma ~ s(z, k = 5))
   ),
   trend = fit_cached(
     "trend", bf(y ~ s(x, k = 5)),
-    trend_formula = ~ s(z, k = 5) + x + (1 | g) + AR()
+    trend_formula = ~ s(z, k = 5) + x + (1 | g) + gp(o) + AR()
   ),
   trend_intercept = fit_cached(
     "trend_intercept", bf(y ~ x), trend_formula = ~ 1 + AR()
@@ -204,7 +211,8 @@ test_that("the trend's predictor and its smooth are brms's own", {
       side_draws(full, side_parameters(fit, "trend"), "trend"),
       fit$trend_model, newdata = frame
     ))
-    theirs <- brms::posterior_linpred(b, newdata = frame, draw_ids = ids,
+    # brms returns an exact GP's fitted values only without `newdata`
+    theirs <- brms::posterior_linpred(b, draw_ids = ids,
                                       incl_autocor = FALSE)
     expect_lt(max(abs(unname(mine) - unname(theirs))), 1e-8)
     parts <- extract_component_parts(fit, fit$data, component = "trend",
@@ -227,6 +235,49 @@ test_that("the trend's predictor and its smooth are brms's own", {
       unname(brms::posterior_smooths(b, hits[[1L]]$term, newdata = frame,
                                      draw_ids = ids))
   )), 1e-8)
+})
+
+
+test_that("an exact GP draws brms's process at new values", {
+  # At values the fit never saw, brms draws the process conditioned on
+  # its fitted values. One random stream gives both the same draw. brms
+  # inverts the kernel's factor and mvgam solves against it. On a kernel
+  # near singularity the two agree to about 1e-6.
+  fit <- fits$smooths
+  moved <- fit$data[1:8, ]
+  moved$z <- moved$z + 0.37
+  mine <- withr::with_seed(3L, {
+    posterior_linpred(fit, newdata = moved, draw_ids = ids,
+                      incl_autocor = FALSE)
+  })
+  theirs <- withr::with_seed(3L, {
+    brms::posterior_linpred(as_brms(fit), newdata = moved, draw_ids = ids)
+  })
+  expect_lt(max(abs(unname(mine) - unname(theirs))), 1e-5)
+
+  fit <- fits$trend
+  frame <- fit$trend_model$data[1:8, ]
+  frame$o <- frame$o + 0.37
+  full <- subset_draws_rows(posterior::as_draws_matrix(fit$fit),
+                            draw_ids = ids)
+  mine <- withr::with_seed(3L, extract_linpred_from_prep(
+    prepare_linpred_data(side_draws(full, side_parameters(fit, "trend"),
+                                    "trend"),
+                         fit$trend_model, newdata = frame)
+  ))
+  theirs <- withr::with_seed(3L, {
+    brms::posterior_linpred(as_brms(fit, "trend"), newdata = frame,
+                            draw_ids = ids, incl_autocor = FALSE)
+  })
+  expect_lt(max(abs(unname(mine) - unname(theirs))), 1e-5)
+
+  # The methods paragraph cites each form the fit holds
+  refs <- names(how_to_cite(fits$uni)$bibtex)
+  expect_true("riutort_gp" %in% refs)
+  expect_false("rasmussen_gp" %in% refs)
+  refs <- names(how_to_cite(fits$trend)$bibtex)
+  expect_true("rasmussen_gp" %in% refs)
+  expect_false("riutort_gp" %in% refs)
 })
 
 

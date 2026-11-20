@@ -163,11 +163,19 @@ hindcast.mvgam <- function(object,
 }
 
 
-# Build an mvgam_latent_state object from a fitted closure-unit
-# model. `posterior_latent_N()` gives the per-draw latent state. The
-# closure-unit arrays give the (`series`, `time`) label of each draw
-# column.
-#'@noRd
+#' The hindcast of a closure-unit model's latent state
+#'
+#' Builds an `mvgam_latent_state` object from a fitted closure-unit
+#' model. `posterior_latent_N()` gives the per-draw latent state. The
+#' closure-unit arrays give the (`series`, `time`) label of each draw
+#' column.
+#'
+#' @param object Fitted `mvgam` object with a closure-unit family
+#' @param ndraws Integer number of draws to take, or `NULL` for all
+#' @param draw_ids Integer indices of the draws to take, or `NULL`
+#' @return An `mvgam_latent_state` object holding a draws by units
+#'   matrix and one (`series`, `time`) row per unit
+#' @noRd
 hindcast_latent_state <- function(object, ndraws = NULL,
                                   draw_ids = NULL) {
   total_draws <- posterior::ndraws(object)

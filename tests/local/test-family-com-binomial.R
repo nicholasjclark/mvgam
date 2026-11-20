@@ -488,6 +488,18 @@ test_that("predict refuses variance and names what it does offer", {
 })
 
 
+test_that("coef shifts the mean's terms by site and leaves nu's", {
+  # `(1 | site)` is a term of the mean. `nu ~ z` takes no site term.
+  dm <- posterior::as_draws_matrix(fit)
+  site <- coef(fit, summary = FALSE)$site
+  expect_equal(unname(site[, "st3", "Intercept"]),
+               as.numeric(dm[, "b_Intercept"]) +
+                 as.numeric(dm[, "r_site[st3,Intercept]"]))
+  expect_equal(unname(site[, "st3", "nu_Intercept"]),
+               as.numeric(dm[, "b_nu_Intercept"]))
+})
+
+
 test_that("each part's response-scale share is the fit's own: com_binomial", {
   expect_epred_parts(fit)
 })

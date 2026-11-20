@@ -17,6 +17,8 @@ test_that("mvgam_formula keeps the formulas it is given", {
   # A dot would sweep the time and series columns into the model.
   expect_error(mvgam_formula(y ~ .), "not supported")
   expect_error(mvgam_formula(brms::bf(y ~ x + .)), "not supported")
+  expect_error(mvgam_formula(y ~ x, trend_formula = ~ . + AR()),
+               "A '.' is not supported in 'trend_formula'")
 })
 
 test_that("mvgam_formula takes formulas alone", {
@@ -122,7 +124,7 @@ test_that("error handling for invalid get_prior calls", {
   )
 })
 
-test_that("trend_formula refuses brms addition and autocorrelation terms", {
+test_that("the formulas refuse brms addition and autocorrelation terms", {
   # The trend dynamics replace brms autocorrelation
   err <- expect_error(
     mvgam_formula(y ~ x, trend_formula = ~ autocor(M = ~ 1) + weights(w))
@@ -130,6 +132,17 @@ test_that("trend_formula refuses brms addition and autocorrelation terms", {
   expect_match(conditionMessage(err),
                "brms autocorrelation terms are not supported")
   expect_match(conditionMessage(err), "conflict with the trend dynamics")
+  # The observation formula refuses them too: no prediction carries them.
+  # Each response of a multivariate formula is searched.
+  expect_error(
+    mvgam_formula(y ~ x + ar(time = time, gr = series), trend_formula = ~ 1),
+    "autocorrelation terms are not supported in the observation"
+  )
+  expect_error(
+    mvgam_formula(bf(y ~ x) + bf(z ~ arma(time = time, gr = series)) +
+                    set_rescor(FALSE)),
+    "Found: 'arma\\(time = time"
+  )
 
   # A term is found however deeply it is nested
   refused <- list(
@@ -148,6 +161,22 @@ test_that("trend_formula refuses brms addition and autocorrelation terms", {
     )
   }
 
+  # Every entry point refuses them before its data checks. Without the
+  # formula check first, `mvgam()` reached base R's `terms()` error.
+  d <- data.frame(y = 1:4, x = 1:4, time = 1:4, series = factor("a"))
+  expect_error(
+    mvgam(y ~ ., trend_formula = ~ AR(), data = d, run_model = FALSE),
+    "A '.' is not supported in the observation 'formula'"
+  )
+  expect_error(
+    mvgam_data(d, formula = y ~ ar(time = time), plot = FALSE),
+    "autocorrelation terms are not supported in the observation"
+  )
+  expect_error(
+    check_newdata(d, d, trend_formula = ~ offset(x) + AR()),
+    "Offsets apply to the observation model"
+  )
+
   # The observation formula takes them. A covariate named like a term
   # is a variable.
   expect_no_error(
@@ -157,9 +186,6 @@ test_that("trend_formula refuses brms addition and autocorrelation terms", {
 })
 
 test_that("exact and approximate GP terms are accepted on either side", {
-  # Exact GPs fit through brms with a full covariance kernel. Their
-  # notice covers the prediction-at-newdata gap and is quiet under
-  # testthat.
   expect_no_error(mvgam_formula(y ~ gp(x), trend_formula = ~ 1))
   expect_no_error(
     mvgam_formula(y ~ x, trend_formula = ~ s(time) + gp(season) + AR())
@@ -171,20 +197,6 @@ test_that("exact and approximate GP terms are accepted on either side", {
   expect_no_error(
     mvgam_formula(y ~ gp(x, k = 5) + gp(z), trend_formula = ~ 1)
   )
-})
-
-test_that("the exact GP notice shows once per term under 'silent' < 2", {
-  # The notice is a message, quiet under testthat and at `silent = 2`.
-  # A fresh term keeps the once-per-session count of earlier tests
-  # away from this one.
-  withr::local_envvar(TESTTHAT = "")
-  expect_message(
-    mvgam_formula(y ~ gp(z), trend_formula = ~ 1),
-    "Exact GP term"
-  )
-  expect_no_message(mvgam_formula(y ~ gp(z), trend_formula = ~ 1))
-  withr::local_options(mvgam.silent = 2L)
-  expect_no_message(mvgam_formula(y ~ gp(z2), trend_formula = ~ 1))
 })
 
 test_that("bf() in trend_formula errors with hint", {

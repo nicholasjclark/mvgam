@@ -49,6 +49,12 @@
 #'   `binomial()` for presence-absence data. Counts take a count family
 #'   such as `poisson()` or `negbinomial()`.
 #'
+#'   The factors and a family's dispersion parameter, such as `shape`,
+#'   `phi` or `sigma`, explain the same residual variation. Where the
+#'   factors explain it, the dispersion posterior runs toward its limit
+#'   and the sampler can diverge there. An informative dispersion prior
+#'   or a family without dispersion, such as `poisson()`, settles it.
+#'
 #'   For one family per species, write `formula` with one [brms::bf()]
 #'   per species, each naming its family, as in
 #'   `bf(count ~ env, family = poisson()) +
@@ -81,7 +87,9 @@
 #'   counts the factors the data support.
 #' @param priors Optional `brmsprior` of priors to set, from
 #'   [brms::prior()]. `prior`, the brms spelling, is accepted in `...`.
-#'   [get_prior.mvgam_formula()] lists the classes a model takes.
+#'   `get_prior()` of a model built with `run_model = FALSE` lists every
+#'   class and coefficient with its default, the `trait_slopes` terms
+#'   among them. See *Trait-mediated responses* for their scales.
 #' @param traits Optional species traits for a structured loadings
 #'   prior: a `data.frame` or matrix with one row per species, or the
 #'   name of an element of `data2`. Rows are matched to
@@ -90,18 +98,15 @@
 #'   standardised. They become `loadings_prior$features`. Supplying an
 #'   explicit `loadings_prior` as well is refused.
 #' @param trait_slopes Optional one-sided formula of traits, such as
-#'   `~ trait1 + trait2`, for trait-mediated responses to the
-#'   environment (the fourth-corner model of \pkg{Hmsc}). Each
-#'   population-level term of `formula` becomes a non-linear parameter
-#'   regressed on the traits, plus a species-level deviation. The
-#'   deviations of intercept and slope correlate under an LKJ prior
-#'   (`(1 | sp | species)`). The traits must be columns of `data`,
-#'   constant within species. A smooth of a trait goes in
-#'   `trait_slopes`, as `~ s(trait1)`. A smooth in `formula` is
-#'   refused, because brms's top-level non-linear formula takes none.
-#'   The defaults are `std_normal()` on each trait coefficient and
-#'   `student_t(3, 0, 2.5)` on the species SD. `priors` overrides
-#'   them.
+#'   `~ trait1 + trait2`, for species responses that depend on their
+#'   traits (the fourth-corner model of \pkg{Hmsc}). The traits must be
+#'   columns of `data`, constant within species, as \pkg{brms} takes
+#'   every variable of a formula. A prediction frame that omits a trait
+#'   takes each species' value from the fit. The grids of
+#'   [conditional_effects()] and \pkg{marginaleffects} omit the traits,
+#'   which draws each species at its own. Each term of `formula`
+#'   takes a shared effect, an effect of each trait and a species
+#'   deviation. See *Trait-mediated responses*.
 #' @param phylo Optional phylogeny: an `ape::phylo` tree, whose
 #'   cophenetic distances are taken, or a numeric distance matrix
 #'   with row and column names matching `levels(data[[species]])`.
@@ -122,11 +127,69 @@
 #'   describe the factors. `update(fit, n_lv = 3)` refits it through
 #'   `jsdgam()` with the arguments given changed.
 #'
+#' @section Trait-mediated responses:
+#' `trait_slopes = ~ size` adds terms to `formula`. Each term takes a
+#' shared effect, an effect of each trait and a species deviation:
+#' \describe{
+#'   \item{Intercept}{`size`, with the species deviation `1` in
+#'     `(1 + ... | sp | series)`}
+#'   \item{A term with design columns}{a numeric or factor covariate, an
+#'     interaction, `I()`, `poly()`, `mo()`, `me()` or `mi()`: the term
+#'     `env:size` and the deviation `env` in `(1 + env | sp | series)`.
+#'     The `|sp|` tag correlates the deviations under one LKJ prior.}
+#'   \item{A smooth, `s()` or `t2()`}{`s(x, by = size)` scales the
+#'     smooth by the trait. `s(x, by = series, m = 1)` gives each species
+#'     a smooth penalised towards a flat line.}
+#'   \item{A Gaussian process, `gp()`}{`gp(x, by = size)` and
+#'     `gp(x, by = series)`, one approximate process per species}
+#'   \item{A group-level term}{entered as written, as is a smooth with
+#'     `bs = "re"` or `bs = "fs"`}
+#' }
+#' A smooth trait, `~ s(size)`, gives the intercept `s(size)`. Each
+#' design column of a covariate scales the trait's smooth: `env` takes
+#' `s(size, by = env)` and a factor `hab` takes `s(size, by = habb)`. A
+#' smooth of `x` takes the surface `t2(x, size)`. A smooth with its own
+#' `by`, such as `s(x, by = hab)`, crosses the trait level by level.
+#' Its species deviations keep the `by`. `mo()`, `me()` and `mi()`
+#' terms cross linear traits alone.
+#'
+#' A smooth or `gp()` takes one column of `data` as its `by`. A factor
+#' level, a `poly()` column or a `by` scaled per species enters through
+#' a derived column. Its name follows [fixef.mvgam()], such as `habb`,
+#' `polyx21` or `env_size`. Each prediction frame recomputes these
+#' columns from the variables they come from. A frame that changes
+#' `env` then changes `env_size`.
+#'
+#' A crossing of a centred smooth passes through zero at the mean of its
+#' covariates (mgcv's `pc`). The shared term then carries the effect at
+#' the means. mgcv leaves a smooth with a numeric `by` uncentred. Its
+#' crossing keeps the constant, the trait's effect on that column's
+#' slope. A `t2()` surface takes first-order margins. Their penalties
+#' separate it from the main smooths. A margin of one covariate is a thin
+#' plate spline, or keeps a cyclic basis. An `s()` of several covariates
+#' gives one isotropic Duchon spline margin.
+#'
+#' The coefficients take their brms names, such as `b_env:size`. Each
+#' population-level coefficient takes `normal(0, r / s)` by default. `s`
+#' is the SD of its design column. `r` is 1, or the SD of the response
+#' under an identity link, which keeps the coefficients in its units.
+#' Every covariate then has one prior scale on the link, whatever its
+#' units or the basis `poly()` gives it, as rstanarm's autoscaled priors
+#' do. `student_t(3, 0, 2.5 r)` is the default on the SDs of the
+#' correlated species deviations. The smooth and `gp()` deviations take
+#' the brms defaults. `priors` overrides any of them. A prior on class
+#' `b` without a `coef` replaces every coefficient's default. A term of
+#' `formula` naming the species is refused: each species already takes
+#' its own response. For some of these terms alone, write them in
+#' `formula` directly, as in
+#' `y ~ env + size + env:size + (1 + env | series)`.
+#'
 #' @seealso [sim_jsdgam()] simulates data this function fits.
 #'   [sim_closure_unit_data()] simulates the `occ()` and `nmix()`
 #'   case. [residual_cor()], [ordinate()], [shared_variation()],
 #'   [active_factors()] and [compare_loadings()] interpret the fitted
-#'   factors. [community()] gives richness, diversity and
+#'   factors. [species_effects()] gives each species' response to the
+#'   covariates. [community()] gives richness, diversity and
 #'   co-occurrence. [lv_axis()] gives each factor its own covariate
 #'   effect. [how_to_cite()] drafts a methods paragraph for the fit and
 #'   [methods_md()] writes its equations.
@@ -194,6 +257,9 @@
 #' # The effect of `env` on the chance of a detection, occupancy times
 #' # detection
 #' conditional_effects(mod)
+#'
+#' # Each species' response to env, outlined where its sign is clear
+#' plot(species_effects(mod, variables = "env"))
 #'
 #' # The residual correlations among species the factors imply
 #' plot(residual_cor(mod))
@@ -277,7 +343,7 @@ jsdgam <- function(formula,
       i = paste0(
         "The '", species_chr, "' column has ", n_species, " level(s)."
       )
-    )))
+    )), call. = FALSE)
   }
   # Checked here as well as in `mvgam()`, where the error would name
   # series. This one names species.
@@ -295,13 +361,8 @@ jsdgam <- function(formula,
   # grid can then name them, as `insight::find_predictors()` reports.
   # On a multivariate formula `mvgam()` builds the series from the
   # responses.
-  data_train <- copy_axis_column(data, unit_chr, "time", "unit")
-  if (!is_mv_formula) {
-    data_train <- copy_axis_column(data_train, species_chr, "series",
-                                   "species")
-    data_train$series <- factor(data_train$series,
-                                levels = species_levels)
-  }
+  data_train <- jsdgam_fit_frame(data, unit_chr, species_chr,
+                                 species_levels, is_mv_formula)
 
   # An all-NA `n_species` by `n_lv` map samples every loading. Its
   # column count sets `n_lv` in `normalise_trend_map()`.
@@ -352,12 +413,12 @@ jsdgam <- function(formula,
     warn_simplex_obs_formula_lacks_species(formula, species_chr)
   }
 
-  # `trait_slopes` rewrites `formula` as a brms non-linear formula.
-  # Each population-level slope becomes a parameter regressed on the
-  # traits, with species deviations of intercept and slopes correlated
-  # under an LKJ prior. The new parameters take default priors. A user
-  # prior with the same class, coef and nlpar replaces one.
+  # `trait_slopes` adds to `formula` each term's response to the traits
+  # and a species deviation of each term. The coefficients and the
+  # species SDs take default priors. A user prior on the same class and
+  # coefficient replaces one.
   trait_slopes_priors <- NULL
+  trait_columns <- NULL
   if (is_mv_formula && !is.null(trait_slopes)) {
     stop(insight::format_error(c(
       "'trait_slopes' is not supported with a multivariate 'formula'.",
@@ -370,7 +431,7 @@ jsdgam <- function(formula,
         "column."
       ),
       i = "Pass a single-response 'formula' with a 'species' column."
-    )))
+    )), call. = FALSE)
   }
   if (!is.null(trait_slopes)) {
     validate_trait_slopes(
@@ -379,14 +440,22 @@ jsdgam <- function(formula,
       data         = data_train,
       species_chr  = "series"
     )
-    # The default priors come from the formula as given, one per
-    # population-level term. The right-hand side of the rewritten
-    # formula holds the parameter names themselves.
-    trait_slopes_priors <- default_trait_slopes_priors(formula)
-    formula <- build_trait_slopes_formula(
-      obs_formula  = formula,
-      trait_slopes = trait_slopes,
-      species_var  = "series"
+    expansion <- build_trait_slopes_formula(
+      obs_formula   = formula,
+      trait_slopes  = trait_slopes,
+      data          = data_train,
+      species_var   = "series",
+      species_names = c("series", species_chr)
+    )
+    formula <- expansion$formula
+    trait_columns <- expansion$columns
+    data_train <- derive_trait_columns(trait_columns, data_train)
+    trait_slopes_priors <- default_trait_slopes_priors(
+      "series", trait_slopes_column_sds(formula, data_train), user_prior,
+      trait_slopes_response_scale(
+        formula, resolve_observation_family(formula, family)$family,
+        data_train
+      )
     )
   }
 
@@ -442,16 +511,24 @@ jsdgam <- function(formula,
   }
   # `newdata` and `knots` are forwarded when given. `mvgam()` applies
   # its own defaults otherwise.
-  if (!missing(newdata)) forward_args$newdata <- newdata
-  if (!missing(knots)) forward_args$knots <- knots
-  # Default priors on the trait-slope nlpars go first. A user row with
-  # the same class, coef and nlpar follows and replaces the default.
-  combined_prior <- if (!is.null(trait_slopes_priors)) {
-    if (!is.null(user_prior)) {
-      c(trait_slopes_priors, user_prior)
-    } else {
-      trait_slopes_priors
+  # `newdata` takes the columns `data` was given above. A trait it
+  # omits comes from the species' training rows.
+  if (!missing(newdata) && !is.null(newdata)) {
+    newdata <- jsdgam_fit_frame(newdata, unit_chr, species_chr,
+                                species_levels, is_mv_formula)
+    if (!is.null(trait_slopes)) {
+      newdata <- derive_trait_columns(trait_columns, fill_traits(
+        newdata, all.vars(trait_slopes),
+        data_train[!duplicated(data_train$series), , drop = FALSE],
+        "series"
+      ))
     }
+    forward_args$newdata <- newdata
+  }
+  if (!missing(knots)) forward_args$knots <- knots
+  # A user row replaces the trait_slopes default it matches
+  combined_prior <- if (!is.null(trait_slopes_priors)) {
+    merge_user_priors(trait_slopes_priors, user_prior)
   } else {
     user_prior
   }
@@ -466,11 +543,17 @@ jsdgam <- function(formula,
   forward_args <- c(forward_args, dots)
 
   fit <- do.call(mvgam, forward_args)
+  # `mvgam()` takes every row of `prior` as the user's
+  if (!is.null(trait_slopes_priors)) {
+    fit$prior <- label_trait_slopes_defaults(fit$prior, combined_prior)
+  }
 
   # The arguments record the unit and species columns the user
   # named. Messages and prediction frames name those columns in
   # place of the `time` and `series` copies mvgam fits on.
   fit$jsdgam_args <- refit_args
+  # The columns `trait_slopes` derived, rebuilt in every prediction frame
+  fit$trait_columns <- trait_columns
   # `mvgam()` recorded the `do.call()` of its resolved arguments. The
   # fit reports the `jsdgam()` call, with the symbols the user wrote.
   fit$call <- call
@@ -498,6 +581,50 @@ column_name_arg <- function(expr, arg) {
     ), call. = FALSE)
   }
   out
+}
+
+
+#' Give a frame the `time` and `series` columns `jsdgam()` fits on
+#'
+#' @param data Data frame
+#' @param unit_chr,species_chr The user's unit and species columns
+#' @param species_levels The species, in their fitted order
+#' @param is_mv_formula Whether `formula` takes one response per
+#'   species, which leaves the series to `mvgam()`
+#' @return `data` with the two copies
+#' @noRd
+jsdgam_fit_frame <- function(data, unit_chr, species_chr, species_levels,
+                             is_mv_formula) {
+  out <- copy_axis_column(data, unit_chr, "time", "unit")
+  if (is_mv_formula) {
+    return(out)
+  }
+  out <- copy_axis_column(out, species_chr, "series", "species")
+  out$series <- factor(out$series, levels = species_levels)
+  out
+}
+
+
+#' A frame of a `jsdgam()` fit, as the user gave it
+#'
+#' `jsdgam()` adds the `time` and `series` copies of the unit and
+#' species columns and the columns `trait_slopes` derived. A refit
+#' passes the frame without them. `jsdgam()` then adds them again
+#' under the same names.
+#'
+#' @param object A fitted `mvgam` object `jsdgam()` built
+#' @param frame The fit's data or test data, or `NULL`
+#' @return `frame` without the added columns, or `NULL`
+#' @noRd
+jsdgam_user_frame <- function(object, frame) {
+  if (is.null(frame)) {
+    return(NULL)
+  }
+  args <- object$jsdgam_args
+  columns <- c(time = args$unit, series = args$species)
+  added <- c(names(columns)[columns != names(columns)],
+             names(object$trait_columns$derived))
+  frame[setdiff(names(frame), added)]
 }
 
 
@@ -607,6 +734,25 @@ series_column_label <- function(object) {
 }
 
 
+#' Give a frame the columns a `jsdgam()` fit predicts from
+#'
+#' The `time` and `series` copies of the unit and species columns come
+#' from `copy_jsdgam_axis_columns()`. The traits of a `trait_slopes` fit
+#' come from `fill_species_traits()`. `derive_trait_columns()` computes
+#' the columns its expansion derived.
+#'
+#' @param object A fitted `mvgam` object
+#' @param data Frame to predict for
+#' @return `data`. A fit `jsdgam()` did not build returns it unchanged.
+#' @noRd
+jsdgam_prediction_columns <- function(object, data) {
+  derive_trait_columns(
+    object$trait_columns,
+    fill_species_traits(object, copy_jsdgam_axis_columns(object, data))
+  )
+}
+
+
 #' Give a frame the `time` and `series` columns a `jsdgam()` fit uses
 #'
 #' `jsdgam()` fits on `time` and `series` columns that repeat the
@@ -624,7 +770,7 @@ series_column_label <- function(object) {
 #' @param data Frame to predict for
 #' @return `data`. A fit `jsdgam()` did not build returns it unchanged.
 #' @noRd
-jsdgam_axis_columns <- function(object, data) {
+copy_jsdgam_axis_columns <- function(object, data) {
   named <- jsdgam_axis_names(object)
   if (is.null(named) || !is.data.frame(data)) {
     return(data)
@@ -667,6 +813,50 @@ jsdgam_axis_columns <- function(object, data) {
 }
 
 
+#' Give a frame the traits of a `trait_slopes` fit
+#'
+#' A species' traits are constant. The training rows hold them. A frame
+#' naming the species takes each trait it omits from those rows.
+#' A trait the frame gives is kept, which predicts for a species under
+#' other traits.
+#'
+#' @param object A fitted `mvgam` object
+#' @param data Frame to predict for
+#' @return `data` with every trait of `trait_slopes`
+#' @noRd
+fill_species_traits <- function(object, data) {
+  traits <- all.vars(object$jsdgam_args$trait_slopes)
+  series_var <- axis_vars(object)$series_var
+  if (!length(setdiff(traits, names(data))) || !is.data.frame(data)) {
+    return(data)
+  }
+  fill_traits(data, traits,
+              species_rows(object, fitted_data(object), series_var),
+              series_var)
+}
+
+
+#' Give a frame each trait it omits, from one row per species
+#'
+#' @param data Frame to fill
+#' @param traits The trait columns
+#' @param table Frame with one row per species, holding `traits`
+#' @param series_var The species column of both frames
+#' @return `data` with every trait. A frame without `series_var` is
+#'   returned unchanged.
+#' @noRd
+fill_traits <- function(data, traits, table, series_var) {
+  missing <- setdiff(traits, names(data))
+  if (!length(missing) || !series_var %in% names(data)) {
+    return(data)
+  }
+  at <- match(as.character(data[[series_var]]),
+              as.character(table[[series_var]]))
+  data[missing] <- table[at, missing, drop = FALSE]
+  data
+}
+
+
 #' The `loadings_prior` that `traits` and `phylo` describe
 #'
 #' `traits` becomes `features` and `phylo` becomes `distances$phylo`.
@@ -688,7 +878,7 @@ build_jsdgam_loadings_prior <- function(traits,
         "supplied."
       ),
       x = "The aliases build their own 'loadings_prior'."
-    )))
+    )), call. = FALSE)
   }
   if (!is.null(loadings_prior)) return(loadings_prior)
   if (!has_alias) return(NULL)
@@ -739,7 +929,7 @@ jsdgam_phylo_to_dist <- function(phylo, species_levels) {
     if (!is.numeric(d)) {
       stop(insight::format_error(
         "'phylo' matrix must be numeric."
-      ))
+      ), call. = FALSE)
     }
   } else {
     stop(insight::format_error(c(
@@ -748,7 +938,7 @@ jsdgam_phylo_to_dist <- function(phylo, species_levels) {
         "numeric distance matrix."
       ),
       x = paste0("Got: '", class(phylo)[1L], "'.")
-    )))
+    )), call. = FALSE)
   }
   if (is.null(rownames(d)) || is.null(colnames(d))) {
     stop(insight::format_error(c(
@@ -761,7 +951,7 @@ jsdgam_phylo_to_dist <- function(phylo, species_levels) {
         "an 'ape::phylo' object whose tip labels match the ",
         "species levels."
       )
-    )))
+    )), call. = FALSE)
   }
   missing_sp <- setdiff(species_levels, rownames(d))
   if (length(missing_sp) > 0L) {
@@ -774,7 +964,7 @@ jsdgam_phylo_to_dist <- function(phylo, species_levels) {
       i = paste0(
         "Every species level must appear as a tip label / row name."
       )
-    )))
+    )), call. = FALSE)
   }
   d[species_levels, species_levels, drop = FALSE]
 }

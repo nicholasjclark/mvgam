@@ -110,7 +110,7 @@ Structured priors on the loadings. Options include:
 \item\texttt{\color{Orchid} phylo}: an \texttt{ape::phylo} tree or a distance matrix. Close relatives load alike
 \item\texttt{\color{Orchid} loadings\_prior = 'mgp'}: shrinks later factors to zero, so \texttt{\color{Orchid} n\_lv} becomes a ceiling
 \end{itemize}
-\texttt{\color{Orchid} trait\_slopes = \textasciitilde{} body\_size} makes species responses to the environment depend on their traits, the fourth-corner model. The traits are columns of \texttt{\color{Orchid} data}
+\texttt{\color{Orchid} trait\_slopes = \textasciitilde{} body\_size} makes species responses to the environment depend on their traits, the fourth-corner model. Every term of \texttt{\color{Orchid} formula} takes part, smooths and factors among them. The traits are columns of \texttt{\color{Orchid} data}
 
 \medskip
 \textbf{\color{BrickRed} Prior to modelling}, it is useful to:
@@ -181,7 +181,7 @@ Structured priors on the loadings. Options include:
 
 \texttt{\color{Orchid} shared\_variation(mod)}: the covariance the factors imply, with the variance each species shares on the diagonal. \texttt{\color{Orchid} compare\_loadings(mod1, mod2)} aligns the loadings of two fits
 
-\smallskip
+\medskip
 {{\fontsize{11}{11} \selectfont \color{mygray} How many factors?}}
 
 \medskip
@@ -214,6 +214,9 @@ Structured priors on the loadings. Options include:
 {{\fontsize{11}{11} \selectfont \color{mygray} How does each species respond?}}
 
 \medskip
+\texttt{\color{Orchid} species\_effects(mod, variables = 'env')}: each species' slope on \texttt{env}. Its \texttt{\color{Orchid} plot()} outlines a slope whose sign has posterior probability above 0.95. A \texttt{\color{Orchid} trait\_slopes} fit adds the trait effects
+
+\medskip
 \texttt{\color{Orchid} conditional\_effects(mod, effects = 'env:series')} plots the expected count of each species along \texttt{env}
 
 \begin{knitrout}
@@ -226,7 +229,7 @@ Structured priors on the loadings. Options include:
 
 \end{knitrout}
 
-\smallskip
+\medskip
 {{\fontsize{11}{11} \selectfont \color{mygray} Does the model predict well?}}
 
 \medskip
@@ -261,14 +264,14 @@ A constrained ordination moves each factor with \texttt{env}. Each species then 
 \medskip
 \texttt{\color{Orchid} posterior\_epred(mod, newdata = new\_sites)} predicts every species at unsurveyed sites from their covariates
 
-\smallskip
+\medskip
 {{\fontsize{11}{11} \selectfont \color{mygray} How do I report the model?}}
 
 \medskip
 \texttt{\color{Orchid} how\_to\_cite(mod)} drafts a methods paragraph with its references. \texttt{\color{Orchid} methods\_md(mod)} writes the model's equations and priors
 
 \medskip
-The \href{https://nicholasjclark.github.io/mvgam/dev/articles/jsdgam.html}{JSDM article} fits ant counts with traits, constrained ordination and factor shrinkage. The \href{https://github.com/nicholasjclark/mvgam/raw/master/misc/mvgam_cheatsheet.pdf}{mvgam cheatsheet} covers time-series models
+The \href{https://nicholasjclark.github.io/mvgam/dev/articles/jsdgam.html}{JSDM article} fits ant counts with traits, constrained ordination and factor shrinkage. The \href{https://nicholasjclark.github.io/mvgam/dev/cheatsheets/mvgam_cheatsheet.pdf}{mvgam cheatsheet} covers time-series models
 
 \end{block}
 \end{column}

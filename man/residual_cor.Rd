@@ -109,8 +109,9 @@ states, including any moving-average term. With one lag it is
 trend holds it at every time of an irregular grid. A draw whose
 autoregression is explosive has no stationary covariance and keeps
 its innovation covariance. A warning gives the count once per session.
-\code{ZMVN()} keeps no memory between times and \code{RW()} has no stationary
-distribution. Both report their innovation covariance. A hierarchical
+\code{ZMVN()} keeps no memory between times and \code{RW()} and \code{LLT()} have no
+stationary distribution. Each reports its innovation covariance. The
+level, slope and seasonal shocks of \code{LLT()} share its correlation. A hierarchical
 \code{AR()} converts each group's scales to stationary scales in the same
 way, before its global and group correlations are mixed.
 
@@ -162,6 +163,8 @@ Regression Analysis of Multivariate Abundance Data in R.
 \seealso{
 \code{\link[=plot.mvgam_residcor]{plot.mvgam_residcor()}} draws the matrix as a heatmap.
 \code{\link[=community]{community()}} gives the same associations as excess co-occurrence.
+\code{\link[=species_effects]{species_effects()}} gives the responses to the covariates these
+correlations are net of.
 \code{\link[=summary.mvgam_residcor]{summary.mvgam_residcor()}} lists the pairs. \code{\link[=ordinate]{ordinate()}} draws the
 loadings as a biplot. The example of \link{trend_constructors} takes
 the correlations of a \code{CAR(cor = TRUE)} trend. The

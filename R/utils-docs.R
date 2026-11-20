@@ -1,3 +1,9 @@
+# The package website. The 2.0 site builds into /dev/ and the CRAN 1.x
+# site holds the root. The address moves to the root when 2.0 reaches
+# CRAN, when the site's development mode switches to release.
+MVGAM_SITE_URL <- "https://nicholasjclark.github.io/mvgam/dev/"
+
+
 #' A link to an article on the package website
 #'
 #' Roxygen calls this in inline R code, as
@@ -15,20 +21,16 @@ mvgam_article <- function(name, text) {
     "hierarchical_var", "idm", "jsdgam", "mvbf", "nmix", "var"
   ))
   checkmate::assert_string(text, min.chars = 1L)
-  # The 2.0 site builds into /dev/ and the CRAN 1.x site holds the root.
-  # The address moves to the root when 2.0 reaches CRAN, with the
-  # site's development mode.
-  paste0("[", text,
-         "](https://nicholasjclark.github.io/mvgam/dev/articles/",
-         name, ".html)")
+  paste0("[", text, "](", MVGAM_SITE_URL, "articles/", name, ".html)")
 }
 
 
 #' A link to a cheatsheet PDF
 #'
 #' Roxygen calls this in inline R code, as
-#' `` `r mvgam_cheatsheet("mvgam", "the cheatsheet")` ``. The address
-#' of the PDFs is written here once.
+#' `` `r mvgam_cheatsheet("mvgam", "the cheatsheet")` ``. The website
+#' serves its own copies of the PDFs in `misc/`, which the pkgdown
+#' workflow places in the site's `cheatsheets/` folder.
 #'
 #' @param name The cheatsheet, `"mvgam"` or `"jsdgam"`
 #' @param text The link text
@@ -37,7 +39,6 @@ mvgam_article <- function(name, text) {
 mvgam_cheatsheet <- function(name, text) {
   checkmate::assert_choice(name, c("mvgam", "jsdgam"))
   checkmate::assert_string(text, min.chars = 1L)
-  paste0("[", text,
-         "](https://github.com/nicholasjclark/mvgam/raw/master/misc/",
-         name, "_cheatsheet.pdf)")
+  paste0("[", text, "](", MVGAM_SITE_URL, "cheatsheets/", name,
+         "_cheatsheet.pdf)")
 }

@@ -122,9 +122,10 @@ each scenario's own \code{mvgam_forecast_uncertainty} object.
 }
 \description{
 Shows where a forecast's uncertainty comes from and how each source
-grows with the horizon. The variance of the forecast at each horizon splits among the
-model's terms, its random effects, the latent dynamics, process error
-and, on the response scale, observation noise.
+grows with the horizon. The variance of the forecast at each horizon
+splits among the model's terms, its random effects, the latent
+dynamics, process error and, on the response scale, observation
+noise.
 }
 \details{
 With \eqn{\theta} the parameters and \eqn{y_h} the forecast at horizon
@@ -168,6 +169,11 @@ contribution is the source's Shapley value in the forecast's variance.
 Terms that overlap, such as \code{s(x)} with \code{t2(x, z)}, can take large
 contributions of opposite sign. The sum over a kind stays stable, which
 is why the overview and the default plot work by kind.
+
+A \code{\link[=diri]{diri()}}, \code{\link[=multi]{multi()}} or \code{\link[=categ]{categ()}} fit gives each species' share
+through a softmax, which ignores a shift every species at a site
+shares. Its link scale is centred across the species at each site,
+the centred log-ratio scale.
 
 On the link scale the contributions are exact. On the other scales a
 term's values are the expected value less the expected value without

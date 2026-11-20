@@ -75,6 +75,12 @@ formula, \code{p ~ ...}, on that formula's own link scale. It joins
 }
 A source a model lacks or that never varies is left out.
 
+A \code{\link[=diri]{diri()}}, \code{\link[=multi]{multi()}} or \code{\link[=categ]{categ()}} fit gives each species' share
+through a softmax, which ignores a shift every species at a site
+shares. Each source is centred across the species at each site, the
+centred log-ratio scale. A covariate with one slope for every species
+then moves no share and is left out.
+
 Under a non-linear link, \code{scale = "expected"} holds the other sources
 at their fitted values. Its sources then interact, as a covariate's
 effect on a count grows with the level.

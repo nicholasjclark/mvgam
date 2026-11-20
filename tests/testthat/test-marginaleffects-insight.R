@@ -331,7 +331,7 @@ test_that("conditional_effects refuses `...` that sets its own arguments", {
     expect_error(
       do.call(conditional_effects, c(list(stub, effects = "x"),
                                       setNames(list("hijack"), kw))),
-      paste0("Cannot pass '", kw, "'")
+      paste0("sets '", kw, "' itself")
     )
   }
 })

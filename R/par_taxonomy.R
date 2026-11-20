@@ -157,7 +157,7 @@ by_par_stem <- function(pars, classify) {
 #' | `latent` | `Xme_*`, `Ymi_*`, `Yl_*` | the prediction routes |
 #' | `family` | `sigma`, `shape`, `nu`, ... | `obs_params` |
 #' | `dynamics` | trend-side leftovers | `trend_params` |
-#' | `bookkeeping` | `lprior`, `lp__` | nothing; no summary claims them |
+#' | `bookkeeping` | `lprior`, `log_jacobian_trend`, `lp__` | nothing; no summary claims them |
 #' | `internal` | Stan working arrays | nothing; hidden everywhere |
 #'
 #' With any two of these merged, a caller that takes one of them
@@ -268,10 +268,16 @@ mvgam_par_order <- function(pars) {
 }
 
 
-# The classes brms orders a fitted object by, as the kinds this
-# taxonomy names. Stan's own accumulators come last, as they do in
-# brms. A name of no named kind sorts just before them.
-#'@noRd
+#' The order of parameter kinds in a fitted object
+#'
+#' The classes brms orders a fitted object by, as the kinds this
+#' taxonomy names. `mvgam_par_order()` ranks each name by its kind's
+#' position here. Stan's own accumulators come last, as they do in
+#' brms. A name of no named kind sorts just before them.
+#'
+#' @format Character vector of the kinds `mvgam_par_kind()` returns,
+#'   in reporting order
+#' @noRd
 MVGAM_PAR_KIND_ORDER <- c(
   "beta", "basis", "ranef_sd", "smooth_sd", "gp", "family", "intercept",
   "simplex", "ranef_coef", "smooth_coef", "gp_coef", "latent", "measurement",
@@ -280,58 +286,68 @@ MVGAM_PAR_KIND_ORDER <- c(
 )
 
 
-# The brms classes that share a kind, in the order
-# `brms:::reorder_pars()` gives them. The unpenalised smooth
-# coefficients precede the special-term ones, which precede the
-# category-specific ones. The group-level standard
-# deviations precede their correlations. A Gaussian process's marginal
-# deviation precedes its length-scale. A response's imputed values
-# precede its latent values, which precede the noise-free covariates.
-#'@noRd
+#' The order of brms classes that share a kind
+#'
+#' The brms classes that share a kind, in the order
+#' `brms:::reorder_pars()` gives them. `mvgam_par_order()` matches each
+#' name's class prefix here to rank names within a kind. The
+#' unpenalised smooth coefficients precede the special-term ones. Those
+#' precede the category-specific ones. The group-level standard
+#' deviations precede their correlations. A Gaussian process's marginal
+#' deviation precedes its length-scale. A response's imputed values
+#' precede its latent values. Those precede the noise-free covariates.
+#'
+#' @format Character vector of brms class prefixes, in reporting order
+#' @noRd
 MVGAM_PAR_CLASS_ORDER <- c("bs", "bsp", "bcs", "sd", "cor", "sdgp",
                            "lscale", "Ymi", "Yl", "Xme")
 
 
-# The name patterns, written once. A trend-side name matches the
-# same pattern as its observation-side counterpart. The side tells the
-# two apart.
-#
-# The first alternation of the internal pattern lists Stan working
-# arrays. They are the intermediates of the VAR stationarity
-# transformation, the moving-average innovations an `AR(ma = TRUE)` or
-# `RW(ma = TRUE)` forms from the scaled ones and the Cholesky factors a
-# correlated trend samples. Stan saves every variable declared at the
-# top level of transformed parameters. These reach the posterior of
-# any VAR, VARMA or ARMA fit without naming a quantity a reader
-# interprets. A Cholesky factor carries a unit diagonal and a
-# structurally zero upper triangle. Both print as a row with no
-# posterior width. `A_trend` is the unconstrained matrix the
-# stationarity transform turns into `Phi_trend`. `Z_cols` holds the
-# sum-to-zero columns `Z` is assembled from. Multiplicative gamma
-# process shrinkage samples `Z_raw`, the loadings before their column
-# scales. A structured loadings
-# prior builds its correlation `Phi_loadings` and that matrix's
-# Cholesky factor from the length-scales `summary()` reports. It builds
-# its column scales `Psi_diag` from the increments `varrho_inv`.
-# `residual_cor()` and `shared_variation()` take all of them from
-# `fit_parameter_draws()`. That conversion keeps the Stan names this
-# classification hides. A local linear trend samples its slope and
-# season scales as `sigma_slope_raw_trend` and
-# `sigma_season_raw_trend`, in units of the default priors' scales. It
-# reports `sigma_slope_trend` and `sigma_season_trend`.
-# `scaled_innovations_trend` is
-# the innovation a forecast seed needs. It is classified a state.
-#
-# The second alternation is brms's own group-level workspace, as
-# `brms:::exclude_pars_re()` lists it. brms computes the scaled
-# effects from the standardised deviates `z_<id>`, the correlation
-# Cholesky `L_<id>` and the correlation matrix `Cor_<id>`. It always
-# drops `Cor_<id>`. It drops `z_<id>` and `L_<id>` unless the user asks
-# for them with `save_pars(all = TRUE)`. mvgam writes its own Stan and
-# hides all three here. The trend side spells the same names with
-# `_trend` after the id. The lower-case `cor_<id>` vector is a
-# different parameter, which is aliased and kept.
-#'@noRd
+#' Name pattern of the Stan working arrays a reader never sees
+#'
+#' The name patterns below are written once. A trend-side name matches
+#' the same pattern as its observation-side counterpart. The side tells
+#' the two apart. `mvgam_par_kind()` gives names this pattern matches
+#' the kind `internal`.
+#'
+#' The first alternation lists Stan working arrays. They are the
+#' intermediates of the VAR stationarity transformation, the
+#' moving-average innovations an `AR(ma = TRUE)` or `RW(ma = TRUE)`
+#' forms from the scaled ones and the Cholesky factors a correlated
+#' trend samples. Stan saves every variable declared at the top level
+#' of transformed parameters. These reach the posterior of any VAR,
+#' VARMA or ARMA fit without naming a quantity a reader interprets. A
+#' Cholesky factor carries a unit diagonal and a structurally zero
+#' upper triangle. Both print as a row with no posterior width.
+#' `A_trend` is the unconstrained matrix the stationarity transform
+#' turns into `Phi_trend`. `Z_cols` holds the sum-to-zero columns `Z`
+#' is assembled from. Multiplicative gamma process shrinkage samples
+#' `Z_raw`, the loadings before their column scales. A structured
+#' loadings prior builds its correlation `Phi_loadings` and that
+#' matrix's Cholesky factor from the length-scales `summary()`
+#' reports. It builds its column scales `Psi_diag` from the increments
+#' `varrho_inv`. `residual_cor()` and `shared_variation()` take all of
+#' them from `fit_parameter_draws()`. That conversion keeps the Stan
+#' names this classification hides. A local linear trend samples its
+#' slope and season scales as `sigma_slope_raw_trend` and
+#' `sigma_season_raw_trend`, in units of the default priors' scales.
+#' It reports `sigma_slope_trend` and `sigma_season_trend`.
+#' `scaled_innovations_trend` is the innovation a forecast seed needs.
+#' It is classified a state.
+#'
+#' The second alternation is brms's own group-level workspace, as
+#' `brms:::exclude_pars_re()` lists it. brms computes the scaled
+#' effects from the standardised deviates `z_<id>`, the correlation
+#' Cholesky `L_<id>` and the correlation matrix `Cor_<id>`. It always
+#' drops `Cor_<id>`. It drops `z_<id>` and `L_<id>` unless the user
+#' asks for them with `save_pars(all = TRUE)`. mvgam writes its own
+#' Stan and hides all three here. The trend side spells the same names
+#' with `_trend` after the id. The lower-case `cor_<id>` vector is a
+#' different parameter. It is aliased and kept. The third alternation
+#' matches the measurement-error workspace `zme_<id>` and `Lme_<id>`.
+#'
+#' @format Character string holding a regular expression
+#' @noRd
 MVGAM_PAR_INTERNAL_PATTERN <- paste0(
   "^(ma_innovations_trend|A_trend|A_group_trend|D_trend|D_group_trend|",
   "L_Omega_trend|L_Sigma_trend|L_Omega_global_trend|",
@@ -342,41 +358,72 @@ MVGAM_PAR_INTERNAL_PATTERN <- paste0(
   "|^(zme|Lme)_[0-9]+(_trend)?\\["
 )
 
-# The hyperparameters of the measurement-error terms. Each latent
-# covariate has a population mean and SD. A group of them has a
-# correlation matrix.
-#'@noRd
+#' Name pattern of the measurement-error hyperparameters
+#'
+#' The hyperparameters of the measurement-error terms. Each latent
+#' covariate has a population mean and SD. A group of them has a
+#' correlation matrix. `mvgam_par_kind()` gives these names the kind
+#' `measurement`.
+#'
+#' @format Character string holding a regular expression
+#' @noRd
 MVGAM_PAR_MEASUREMENT_PATTERN <- "^(meanme|sdme|Corme)_"
 
-# The values a special term takes at each fitted row: the noise-free
-# covariate of `me()`, the imputed values of a `mi()` response and the
-# latent response of one observed with noise.
-#'@noRd
+#' Name pattern of the latent values of special terms
+#'
+#' The values a special term takes at each fitted row: the noise-free
+#' covariate of `me()`, the imputed values of a `mi()` response and the
+#' latent response of one observed with noise. `mvgam_par_kind()` gives
+#' these names the kind `latent`.
+#'
+#' @format Character string holding a regular expression
+#' @noRd
 MVGAM_PAR_LATENT_PATTERN <- "^(Xme|Ymi|Yl)_"
 
-# The trend's latent states and the variates they are built from.
-# Their sampling statements are the trend equation and its
-# non-centred reparameterisation. A user sets no prior on them. No
-# summary block reports them. `init_trend` is the vector of states
-# before the first observed time. `init_innovations_trend` is the
-# vector of standard variates an ARMA start scales to its stationary
-# law. `season_state_trend` holds a local linear trend's last
-# seasonal state pairs, the start of a forecast.
-#'@noRd
+#' Base names of the trend's latent states
+#'
+#' The trend's latent states and the variates they are built from.
+#' Their sampling statements are the trend equation and its
+#' non-centred reparameterisation. A user sets no prior on them. No
+#' summary block reports them. `init_trend` is the vector of states
+#' before the first observed time. `init_innovations_trend` is the
+#' vector of standard variates an ARMA start scales to its stationary
+#' law. `season_state_trend` holds a local linear trend's last
+#' seasonal state pairs, the start of a forecast. A centred trend
+#' samples `innovations_start_trend` and `lv_dev_trend`, the start
+#' rows' innovations and each later state's distance from the first.
+#'
+#' @format Character vector of Stan variable names without indices
+#' @noRd
 MVGAM_STATE_PARAMS <- c(
   "trend", "lv_trend", "lv_trend_tilde", "innovations_trend",
   "scaled_innovations_trend", "init_trend", "init_innovations_trend",
   "mu_trend", "slope_trend", "slope_trend_tilde",
   "innovations_slope_trend", "season_trend", "season_trend_tilde",
-  "season_state_trend", "innovations_season_trend"
+  "season_state_trend", "innovations_season_trend",
+  "innovations_start_trend", "lv_dev_trend"
 )
 
-# The season of each period of a local linear trend with several, in
-# both bases. Their number follows the trend's periods.
-#'@noRd
+#' Name pattern of each period's season in a local linear trend
+#'
+#' The season of each period of a local linear trend with several, in
+#' both bases. Their number follows the trend's periods. The pattern
+#' omits `^` and the index bracket. `MVGAM_PAR_STATE_PATTERN` adds them
+#' to match indexed draws. `is_state_param()` adds `^` and `$` to match
+#' base names.
+#'
+#' @format Character string holding a regular expression
+#' @noRd
 MVGAM_PERIOD_SEASON_PATTERN <- "season_[0-9]+_trend(_tilde)?"
 
-#'@noRd
+#' Name pattern of the trend's latent state draws
+#'
+#' Matches an indexed draw of any name in `MVGAM_STATE_PARAMS` or any
+#' period's season. `mvgam_par_kind()` gives these names the kind
+#' `state`.
+#'
+#' @format Character string holding a regular expression
+#' @noRd
 MVGAM_PAR_STATE_PATTERN <- paste0(
   "^(", paste(c(MVGAM_STATE_PARAMS, MVGAM_PERIOD_SEASON_PATTERN),
               collapse = "|"), ")\\["
@@ -396,107 +443,191 @@ is_state_param <- function(nm) {
     grepl(paste0("^", MVGAM_PERIOD_SEASON_PATTERN, "$"), nm)
 }
 
-# The per-cell matrix arrays a correlated or hierarchical trend
-# derives. A high-dimensional fit has hundreds of their cells.
-# `summary()` prints them only with `matrices = TRUE`. The Cholesky
-# factors they are built from carry the kind `internal` and never
-# reach a printed summary.
-#'@noRd
+#' Name pattern of the trend's derived matrix cells
+#'
+#' The per-cell matrix arrays a correlated or hierarchical trend
+#' derives. A high-dimensional fit has hundreds of their cells.
+#' `summary()` prints them only with `matrices = TRUE`. The Cholesky
+#' factors they are built from carry the kind `internal`. Those factors
+#' never reach a printed summary.
+#'
+#' @format Character string holding a regular expression
+#' @noRd
 MVGAM_PAR_MATRIX_PATTERN <- paste0(
   "^(Phi_group_trend|Sigma_group_trend|Phi_trend|Sigma_trend|",
   "Omega_trend|Theta_trend)\\["
 )
 
-# The symmetric matrices among them: the innovation covariances and a
-# VAR's stationary covariance. A cell above the diagonal repeats the
-# cell below it. The default view lists the diagonal and the lower
-# triangle, the half `residual_cor()` draws.
-#'@noRd
+#' Name pattern of the symmetric matrices among the trend's matrices
+#'
+#' The symmetric matrices among those `MVGAM_PAR_MATRIX_PATTERN`
+#' matches: the innovation covariances and a VAR's stationary
+#' covariance. A cell above the diagonal repeats the cell below it. The
+#' default view lists the diagonal and the lower triangle, the half
+#' `residual_cor()` draws.
+#'
+#' @format Character string holding a regular expression
+#' @noRd
 MVGAM_PAR_SYMMETRIC_PATTERN <- "^(Sigma_group_trend|Sigma_trend|Omega_trend)\\["
 
-# The class prefix `b<type>_` of each type of coefficient
-# `brms::fixef()` reports, as `brms:::fixef_pars()` writes it.
-#'@noRd
+#' Class prefix of the population-level coefficients
+#'
+#' The class prefix `b<type>_` of each type of coefficient
+#' `brms::fixef()` reports, as `brms:::fixef_pars()` writes it.
+#'
+#' @format Character string holding a regular expression
+#' @noRd
 MVGAM_PAR_FIXEF_PREFIX <- "^b(s|cs|sp|mo|me|mi|m)?_"
 
-# The name `brms::fixef()` gives a population-level coefficient: its
-# class prefix dropped.
-#'@noRd
+#' Coefficient names as brms::fixef() reports them
+#'
+#' The name `brms::fixef()` gives a population-level coefficient: its
+#' class prefix dropped. `fixef()`, `vcov()` and `tidy()` label their
+#' coefficients with it.
+#'
+#' @param pars Character vector of parameter names
+#' @return Character vector the length of `pars`, each name without
+#'   the prefix `MVGAM_PAR_FIXEF_PREFIX` matches
+#' @noRd
 fixef_name <- function(pars) {
   sub(MVGAM_PAR_FIXEF_PREFIX, "", pars)
 }
 
-# `b[k]` is the positional form the population block takes before
-# `mvgam_user_pars()` renames it.
-#'@noRd
+#' Name pattern of the population-level coefficients
+#'
+#' Matches `b_` names and `b[k]`, the positional form the population
+#' block takes before `mvgam_user_pars()` renames it.
+#' `mvgam_par_kind()` gives these names the kind `beta`.
+#'
+#' @format Character string holding a regular expression
+#' @noRd
 MVGAM_PAR_BETA_PATTERN <- "^(b_|b\\[)"
 
-# `bs`, `bsp` and `bcs` are the unpenalised smooth coefficients, the
-# special-term coefficients and the category-specific coefficients,
-# which brms reports with the population block.
-#'@noRd
+#' Name pattern of the coefficients brms reports with the population
+#' block
+#'
+#' `bs`, `bsp` and `bcs` are the unpenalised smooth coefficients, the
+#' special-term coefficients and the category-specific coefficients.
+#' brms reports all three with the population block. `mvgam_par_kind()`
+#' gives these names the kind `basis`.
+#'
+#' @format Character string holding a regular expression
+#' @noRd
 MVGAM_PAR_BASIS_PATTERN <- "^(bs_|bs\\[|bsp_|bsp\\[|bcs_|bcs\\[)"
 
-# The simplex of each monotonic effect, which brms reports in a block
-# of its own.
-#'@noRd
+#' Name pattern of the monotonic-effect simplexes
+#'
+#' The simplex of each monotonic effect. brms reports these in a block
+#' of their own. `mvgam_par_kind()` gives them the kind `simplex`.
+#'
+#' @format Character string holding a regular expression
+#' @noRd
 MVGAM_PAR_SIMPLEX_PATTERN <- "^simo_"
 
-# brms centres the design matrix and writes the intercept as a scalar
-# of its own, outside `b`.
-#'@noRd
+#' Name pattern of the centred intercept
+#'
+#' brms centres the design matrix and writes the intercept as a scalar
+#' of its own, outside `b`. `mvgam_par_kind()` gives it the kind
+#' `intercept`.
+#'
+#' @format Character string holding a regular expression
+#' @noRd
 MVGAM_PAR_INTERCEPT_PATTERN <- "^Intercept"
 
-# The smoothing penalty standard deviations. `?mvgam_draws`
-# documents the `smooth_params` keyword as exactly these, which is
-# narrower than the set the parameter buckets group together.
-#'@noRd
+#' Name pattern of the smoothing penalty standard deviations
+#'
+#' `?mvgam_draws` documents the `smooth_params` keyword as exactly
+#' these. The parameter buckets group a wider set with them.
+#'
+#' @format Character string holding a regular expression
+#' @noRd
 MVGAM_PAR_SMOOTH_SD_PATTERN <- "^sds_"
 
-# The basis coefficients the penalty applies to, raw and
-# standardised.
-#'@noRd
+#' Name pattern of the penalised smooth coefficients
+#'
+#' The basis coefficients the penalty applies to, raw and
+#' standardised.
+#'
+#' @format Character string holding a regular expression
+#' @noRd
 MVGAM_PAR_SMOOTH_COEF_PATTERN <- "^(s_|zs_)"
 
-# Gaussian-process marginal deviations and length-scales. The second
-# pattern matches the standardised basis coefficients they scale. The
-# parameter buckets group these with the smooths. `summary()` reports
-# them apart.
-#'@noRd
+#' Name pattern of the Gaussian-process hyperparameters
+#'
+#' Gaussian-process marginal deviations and length-scales. The
+#' parameter buckets group these with the smooths. `summary()` reports
+#' them apart.
+#'
+#' @format Character string holding a regular expression
+#' @noRd
 MVGAM_PAR_GP_PATTERN <- "^(sdgp_|lscale_)"
-#'@noRd
+#' Name pattern of the Gaussian-process basis coefficients
+#'
+#' The standardised basis coefficients the hyperparameters of
+#' `MVGAM_PAR_GP_PATTERN` scale. The parameter buckets group these with
+#' the smooths. `summary()` reports them apart.
+#'
+#' @format Character string holding a regular expression
+#' @noRd
 MVGAM_PAR_GP_COEF_PATTERN <- "^zgp_"
 
-# The group-level block as brms spells it after renaming. The first
-# pattern matches the standard deviations and the correlation vector.
-# The second matches the scaled effects they govern. The workspace
-# those are built from carries a bare `L_` or `z_` prefix. The
-# internal pattern above claims it. Matching either prefix here would
-# take the trend's own innovation Cholesky (`L_Omega_trend`) for a
-# group-level effect.
-#'@noRd
+#' Name pattern of the group-level standard deviations and
+#' correlations
+#'
+#' The group-level block as brms spells it after renaming. This
+#' pattern matches the standard deviations and the correlation vector.
+#' The workspace the group-level effects are built from carries a bare
+#' `L_` or `z_` prefix. `MVGAM_PAR_INTERNAL_PATTERN` claims it.
+#' Matching either prefix here would take the trend's own innovation
+#' Cholesky (`L_Omega_trend`) for a group-level effect.
+#'
+#' @format Character string holding a regular expression
+#' @noRd
 MVGAM_PAR_RANEF_SD_PATTERN <- "^(sd_|cor_)"
-#'@noRd
+#' Name pattern of the scaled group-level effects
+#'
+#' Matches the scaled effects that the standard deviations and
+#' correlations of `MVGAM_PAR_RANEF_SD_PATTERN` govern, as brms spells
+#' them after renaming.
+#'
+#' @format Character string holding a regular expression
+#' @noRd
 MVGAM_PAR_RANEF_COEF_PATTERN <- "^r_"
 
-# What Stan accumulates for itself: the prior contribution the
-# program sums into `lprior` and the log posterior density it reports
-# as `lp__`. brms keeps both in the posterior and claims neither in a
-# summary table, which is what this kind states.
-#'@noRd
-MVGAM_PAR_BOOKKEEPING_PATTERN <- "^(lprior|lp__)$"
+#' Name pattern of Stan's own accumulators
+#'
+#' What Stan accumulates for itself: the prior contribution the
+#' program sums into `lprior` and the log posterior density it reports
+#' as `lp__`. A centred trend adds `log_jacobian_trend`, the log
+#' Jacobian of its states' map to the standard innovations. brms keeps
+#' the first two in the posterior. No summary table claims any of them.
+#' The kind `bookkeeping` records exactly that.
+#'
+#' @format Character string holding a regular expression
+#' @noRd
+MVGAM_PAR_BOOKKEEPING_PATTERN <- "^(lprior|log_jacobian_trend|lp__)$"
 
-# brms reports the prior contribution before the log posterior
-#'@noRd
-MVGAM_PAR_BOOKKEEPING_ORDER <- c("lprior", "lp__")
+#' The order of Stan's own accumulators
+#'
+#' brms reports the prior contribution before the log posterior.
+#' `mvgam_par_order()` ranks the names by their position here.
+#'
+#' @format Character vector of the accumulator names
+#' @noRd
+MVGAM_PAR_BOOKKEEPING_ORDER <- c("lprior", "log_jacobian_trend", "lp__")
 
-# The distributional parameters each family declares, which
-# `get_family_dpars()` gives to the prediction paths. The custom
-# families' names follow the same convention: `mphi`, `mtheta` and
-# `mtail` are the Tweedie and beta-negative-binomial dispersion,
-# power and tail, `p` the closure-unit detection probability and
-# `Psi` the scale of `mvn()` and `mvt()`.
-#'@noRd
+#' The distributional parameters of each family
+#'
+#' The distributional parameters each family declares.
+#' `get_family_dpars()` gives them to the prediction paths. The custom
+#' families' names follow the same convention. `mphi` and `mtheta` are
+#' the Tweedie dispersion and power. `mtail` is the
+#' beta-negative-binomial tail. `p` is the closure-unit detection
+#' probability. `Psi` is the scale of `mvn()` and `mvt()`.
+#'
+#' @format Named list with one element per family name, each a
+#'   character vector of parameter names, empty for a family with none
+#' @noRd
 MVGAM_FAMILY_DPARS <- list(
   gaussian = "sigma", student = c("sigma", "nu"),
   skew_normal = c("sigma", "alpha"), lognormal = "sigma",
@@ -525,26 +656,35 @@ MVGAM_FAMILY_DPARS <- list(
   mvt = c("Psi", "nu")
 )
 
-# The family parameters as the posterior names them. These are the
-# parameters of `MVGAM_FAMILY_DPARS` and the discrimination `disc`
-# brms saves for the ordinal families. A response of a model with
-# several takes its key after an underscore, as `sigma_y2`. A mixture
-# gives each component's parameters the component's number, as
-# `sigma1` and `theta2`. The mixing proportions are a family parameter
-# only in that spelling. A bare `theta` is the simplex the program is
-# identified by. `theta_features` is the trend's own loading-prior
-# length-scale.
-#'@noRd
+#' Name pattern of the family parameters
+#'
+#' The family parameters as the posterior names them. These are the
+#' parameters of `MVGAM_FAMILY_DPARS` and the discrimination `disc`
+#' brms saves for the ordinal families. A response of a model with
+#' several takes its key after an underscore, as `sigma_y2`. A mixture
+#' gives each component's parameters the component's number, as
+#' `sigma1` and `theta2`. The mixing proportions are a family parameter
+#' only in that spelling. A bare `theta` is the simplex the program is
+#' identified by. `theta_features` is the trend's own loading-prior
+#' length-scale. `mvgam_par_kind()` gives an observation-side match the
+#' kind `family`.
+#'
+#' @format Character string holding a regular expression
+#' @noRd
 MVGAM_PAR_FAMILY_PATTERN <- paste0(
   "^(", paste(unique(c(unlist(MVGAM_FAMILY_DPARS), "disc")),
               collapse = "|"),
   ")[0-9]*(_|\\[|$)|^theta[0-9]+(\\[|$)"
 )
 
-# The structured loadings prior's hyperparameters `summary()` reports:
-# the feature and distance length-scales and the column scales of the
-# multiplicative gamma process. They carry no side suffix and are
-# classified before the side is consulted.
-#'@noRd
+#' Name pattern of the structured loadings prior's hyperparameters
+#'
+#' The structured loadings prior's hyperparameters `summary()` reports:
+#' the feature and distance length-scales and the column scales of the
+#' multiplicative gamma process. They carry no side suffix.
+#' `mvgam_par_kind()` classifies them before it consults the side.
+#'
+#' @format Character string holding a regular expression
+#' @noRd
 MVGAM_PAR_LOADINGS_PRIOR_PATTERN <-
   "^theta_features(\\[|_)|^theta_dist_|^Psi_diag\\["

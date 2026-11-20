@@ -153,6 +153,21 @@ row_var <- function(m) {
 }
 
 
+#' Centre each row of a matrix within groups of its columns
+#'
+#' @param m Numeric matrix, one row per draw.
+#' @param group Integer group of each column.
+#' @return Matrix of the dimensions of `m`, each group of columns with
+#'   mean zero in every row.
+#' @noRd
+centre_within_groups <- function(m, group) {
+  means <- t(rowsum(t(m), group, reorder = FALSE)) /
+    rep(as.vector(table(factor(group, levels = unique(group)))),
+        each = nrow(m))
+  m - means[, match(group, unique(group)), drop = FALSE]
+}
+
+
 #' Covariance of two matrices' columns over their rows
 #'
 #' @param a,b Numeric matrices of one shape. `NULL` for `b` gives each

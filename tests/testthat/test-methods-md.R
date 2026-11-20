@@ -156,6 +156,14 @@ test_that("a seasonal LLT writes the level plus each harmonic's turn", {
   ))
   expect_match(out, "for $j = 1, \\dots, 2$ of period 12", fixed = TRUE)
   expect_true("delivera_trig" %in% names(how_to_cite(mod)$bibtex))
+  # Correlated series take the level's correlation in each harmonic
+  cor <- methods_md(make_methods_md_prefit(
+    y ~ 1, trend_formula = ~ LLT(season = 12, harmonics = 2, cor = TRUE)
+  ))
+  expect_match(cor, paste0(
+    "\\boldsymbol{\\omega}_{j,t}, \\boldsymbol{\\omega}^*_{j,t} &\\sim ",
+    "\\text{MVNormal}(\\mathbf{0}, "
+  ), fixed = TRUE)
 })
 
 test_that("Smooth term renders f_{x}(x) inline + basis decomposition", {
@@ -1286,4 +1294,30 @@ test_that("me() arguments count as R matches them", {
       list(var = "x", sdvar = "s", gr = NA_character_)
     )
   }
+})
+
+
+test_that("a coefficient takes its group's prior before its class's", {
+  prior <- data.frame(
+    prior = c("student_t(3, 0, 3.4)", "student_t(3, 0, 2.5)", "", ""),
+    class = "sd", coef = c("", "", "env", "env"),
+    group = c("", "series", "series", "site"),
+    resp = "", dpar = "", nlpar = ""
+  )
+  expect_identical(
+    mvgam:::backfill_umbrella_priors(prior)$prior,
+    c("student_t(3, 0, 3.4)", "student_t(3, 0, 2.5)",
+      "student_t(3, 0, 2.5)", "student_t(3, 0, 3.4)")
+  )
+})
+
+
+test_that("an expression's coefficient takes the expression's symbol", {
+  # brms names the column of `I(env^2)` `IenvE2`
+  expect_identical(
+    mvgam:::formula_expression_symbols(
+      list(formula = y ~ env + I(env^2) + log(x_1 + 1) + env:x2)
+    ),
+    c(IenvE2 = "(\\mathrm{env}^2)", logx_1P1 = "(log(\\mathrm{x\\_1} + 1))")
+  )
 })

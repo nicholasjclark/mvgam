@@ -10,7 +10,7 @@
 #' @param sdgp Vector `[ndraws]` of marginal SDs
 #' @param lscale Matrix `[ndraws, 1]` of an isotropic GP's length scale,
 #'   or `[ndraws, D]` of an anisotropic GP's
-#' @param kernel `"exp_quad"`, `"matern32"` or `"matern52"`
+#' @param kernel One of `GP_KERNELS`
 #' @return Matrix `[ndraws, N]` of the GP's contribution
 #' @noRd
 approx_gp_pred <- function(Xgp, slambda, zgp, sdgp, lscale, kernel) {
@@ -27,16 +27,143 @@ approx_gp_pred <- function(Xgp, slambda, zgp, sdgp, lscale, kernel) {
 }
 
 
+#' The `gp()` kernels brms fits, exact or approximate
+#'
+#' brms renames `cov = "matern12"` to `"exponential"`.
+#' @noRd
+GP_KERNELS <- c("exp_quad", "matern32", "matern52", "exponential")
+
+
+#' Whether a model's `gp()` terms are exact or approximate
+#'
+#' An approximate term's Stan data holds its basis `Xgp` and the square
+#' roots of its basis eigenvalues, `slambda`. An exact term's holds its
+#' covariate values in `Xgp` and no `slambda`. brms copies the fitted
+#' values of either into `Xgp<stem>_old` for a prediction.
+#'
+#' @param sdata Stan data of a model, as brms or mvgam builds it
+#' @return Logical vector named `approximate` and `exact`
+#' @noRd
+gp_forms <- function(sdata) {
+  xgp <- grep("^Xgp_(?!prior)(?!.*_old$)", names(sdata), value = TRUE,
+              perl = TRUE)
+  exact <- !sub("^Xgp", "slambda", xgp) %in% names(sdata)
+  c(approximate = any(!exact), exact = any(exact))
+}
+
+
+#' An exact Gaussian process at the prediction rows
+#'
+#' brms's Stan code writes the process at the fitted covariate values as
+#' `cholesky_decompose(K) * zgp`, `K` the kernel's covariance plus 1e-12
+#' on its diagonal. Rows at those values take it. Rows at other values
+#' take one draw from the process conditioned on it, with 1e-8 on the
+#' diagonal, as brms draws them. brms also draws a row at a fitted
+#' value, which adds the 1e-8 noise to that row's fitted value.
+#'
+#' @param X Matrix `[n, D]` of the fitted covariate values
+#' @param X_new Matrix `[m, D]` of the prediction rows' values
+#' @param zgp Matrix `[ndraws, n]` of standard normal coefficients
+#' @inheritParams approx_gp_pred
+#' @return Matrix `[ndraws, m]` of the GP's contribution
+#' @noRd
+exact_gp_pred <- function(X, X_new, zgp, sdgp, lscale, kernel) {
+  checkmate::assert_matrix(X, any.missing = FALSE)
+  checkmate::assert_matrix(X_new, any.missing = FALSE, ncols = ncol(X))
+  checkmate::assert_matrix(zgp, any.missing = FALSE, ncols = nrow(X))
+  checkmate::assert_matrix(lscale, any.missing = FALSE, nrows = nrow(zgp))
+  if (length(sdgp) != nrow(zgp)) {
+    stop_shape_fault("The GP scale 'sdgp'", length(sdgp), nrow(zgp))
+  }
+  # A row matches a fitted value when every bit of its covariates does
+  row_key <- function(M) {
+    apply(M, 1L, function(r) paste(sprintf("%a", r), collapse = ","))
+  }
+  at <- match(row_key(X_new), row_key(X))
+  old <- which(!is.na(at))
+  new <- which(is.na(at))
+  with_nugget <- function(K, nug) {
+    diag(K) <- diag(K) + nug
+    K
+  }
+  out <- matrix(0, nrow(zgp), nrow(X_new))
+  for (s in seq_len(nrow(zgp))) {
+    cov <- function(a, b) gp_covariance(a, b, sdgp[s], lscale[s, ], kernel)
+    K <- cov(X, X)
+    # `chol()` gives the upper factor `R`, `K = R'R`. The process is
+    # `R' zgp`. `backsolve(transpose = TRUE)` solves against `R'`.
+    f <- drop(crossprod(chol(with_nugget(K, 1e-12)), zgp[s, ]))
+    out[s, old] <- f[at[old]]
+    if (!length(new)) {
+      next
+    }
+    X_draw <- X_new[new, , drop = FALSE]
+    R <- chol(with_nugget(K, 1e-8))
+    V <- backsolve(R, cov(X, X_draw), transpose = TRUE)
+    mu <- drop(crossprod(V, backsolve(R, f, transpose = TRUE)))
+    Sigma <- with_nugget(cov(X_draw, X_draw) - crossprod(V), 1e-8)
+    out[s, new] <- mu + drop(stats::rnorm(length(new)) %*% chol(Sigma))
+  }
+  out
+}
+
+
+#' A GP kernel's covariance between two sets of covariate values
+#'
+#' The kernels brms writes as `gp_exp_quad_cov()` and its siblings. One
+#' length scale serves every dimension of an isotropic GP, through the
+#' Euclidean distance. An anisotropic GP multiplies one kernel per
+#' dimension, the marginal SD entering once.
+#'
+#' @param a,b Matrices `[n_a, D]` and `[n_b, D]` of covariate values
+#' @param sdgp The marginal SD
+#' @param lscale One length scale, or one per dimension
+#' @param kernel As `exact_gp_pred()` takes it
+#' @return Matrix `[n_a, n_b]`
+#' @noRd
+gp_covariance <- function(a, b, sdgp, lscale, kernel) {
+  checkmate::assert_choice(kernel, GP_KERNELS)
+  # The arithmetic follows brms's `cov_gp_*()` step for step. A kernel
+  # near singularity carries any rounding difference into its Cholesky
+  # factor.
+  # `exp_quad` takes the squared distance alone. Its root is taken for
+  # the other kernels.
+  kernel_of <- function(sq_dist, sd, l) {
+    if (kernel == "exp_quad") {
+      return(sd^2 * exp(-sq_dist / (2 * l^2)))
+    }
+    dist <- sqrt(sq_dist)
+    switch(
+      kernel,
+      matern32 = sd^2 * (1 + sqrt(3) * dist / l) * exp(-sqrt(3) * dist / l),
+      matern52 = sd^2 * (1 + sqrt(5) * dist / l + 5 * sq_dist / (3 * l^2)) *
+        exp(-sqrt(5) * dist / l),
+      exponential = sd^2 * exp(-dist / l)
+    )
+  }
+  sq_dist <- function(cols) {
+    Reduce(`+`, lapply(cols, function(d) outer(a[, d], b[, d], "-")^2))
+  }
+  if (length(lscale) == 1L) {
+    return(kernel_of(sq_dist(seq_len(ncol(a))), sdgp, lscale))
+  }
+  Reduce(`*`, lapply(seq_len(ncol(a)), function(d) {
+    kernel_of(sq_dist(d), if (d == 1L) sdgp else 1, lscale[[d]])
+  }))
+}
+
+
 #' The spectral density of a GP kernel at each basis function
 #'
 #' The densities brms writes in Stan as `spd_gp_exp_quad()`,
-#' `spd_gp_matern32()` and `spd_gp_matern52()`. With `D` dimensions,
-#' length scales `l` and `q = sum(l^2 * slambda^2)`, each is
-#' `sdgp^2 * prod(l)` times
+#' `spd_gp_exponential()`, `spd_gp_matern32()` and `spd_gp_matern52()`.
+#' With `D` dimensions, length scales `l` and `q = sum(l^2 * slambda^2)`,
+#' each is `sdgp^2 * prod(l)` times
 #' - `sqrt(2 pi)^D * exp(-q / 2)` for `exp_quad`,
 #' - `2^D pi^(D/2) gamma((D + n) / 2) n^(n/2) / gamma(n / 2) *
 #'   (n + q)^(-(D + n) / 2)` for a Matern kernel of smoothness `n / 2`,
-#'   with `n = 3` for `matern32` and `n = 5` for `matern52`.
+#'   with `n = 1` for `exponential`, `n = 3` for `matern32` and `n = 5`
+#'   for `matern52`.
 #'
 #' brms counts the columns of `lscale` to tell the forms apart. An
 #' isotropic GP's one length scale serves every dimension.
@@ -48,7 +175,7 @@ gp_spectral_density <- function(slambda, sdgp, lscale, kernel) {
   checkmate::assert_array(slambda, min.d = 2, max.d = 3, any.missing = FALSE)
   checkmate::assert_numeric(sdgp, any.missing = FALSE, min.len = 1)
   checkmate::assert_matrix(lscale, any.missing = FALSE)
-  checkmate::assert_choice(kernel, c("exp_quad", "matern32", "matern52"))
+  checkmate::assert_choice(kernel, GP_KERNELS)
   slambda <- matrix(slambda, nrow = dim(slambda)[1L])
   d <- ncol(slambda)
   if (nrow(lscale) != length(sdgp)) {
@@ -69,6 +196,7 @@ gp_spectral_density <- function(slambda, sdgp, lscale, kernel) {
   kernel_part <- switch(
     kernel,
     exp_quad = sqrt(2 * pi)^d * exp(-q / 2),
+    exponential = matern(1),
     matern32 = matern(3),
     matern52 = matern(5)
   )

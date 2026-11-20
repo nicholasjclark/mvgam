@@ -215,7 +215,7 @@ plot.mvgam_latent_state <- function(x, series = NULL, ...) {
   }
   x_lab <- if (x$has_time) "Time" else "Closure-unit index"
   p +
-    ggplot2::facet_wrap(~ series, scales = "free_y") +
+    mvgam_facet_series() +
     ggplot2::labs(x = x_lab, y = x$state_label) +
     mvgam_theme()
 }

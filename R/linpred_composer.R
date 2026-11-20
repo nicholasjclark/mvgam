@@ -1063,11 +1063,13 @@ gp_kernels <- function(gp_form) {
 }
 
 
-#' One approximate Gaussian process term
+#' One Gaussian process term
 #'
-#' The term uses its basis `Xgp`, its eigenvalues `slambda`, its
-#' marginal standard deviation `sdgp`, its length scales `lscale` and
-#' its basis coefficients `zgp`, all under `<sfx>_<i>`. A term with a
+#' An approximate term uses its basis `Xgp`, its eigenvalues `slambda`,
+#' its marginal standard deviation `sdgp`, its length scales `lscale` and
+#' its basis coefficients `zgp`, all under `<sfx>_<i>`. An exact term
+#' holds the frame's covariate values in `Xgp`, the fitted ones in
+#' `Xgp<sfx>_<i>_old` and its standard normal latent values in `zgp`. A term with a
 #' factor `by` holds one of each per level, suffixed by the level. `Igp`
 #' places that level's rows. `Jgp` maps rows onto the unique covariate
 #' values the basis was computed from. `Cgp` scales a term by a
@@ -1114,15 +1116,23 @@ gp_level_pred <- function(draws, sdata, stem, level, data_stem, kernel) {
   lscale_cols <- colnames(draws)[startsWith(
     colnames(draws), paste0("lscale", stem, "[", level, ",")
   )]
-  out <- approx_gp_pred(
-    Xgp = Xgp,
-    slambda = sdata_entry(sdata, paste0("slambda", data_stem)),
-    zgp = draw_columns(draws, paste0("zgp", data_stem, "[",
-                                     seq_len(ncol(Xgp)), "]")),
-    sdgp = draw_columns(draws, paste0("sdgp", stem, "[", level, "]"))[, 1L],
-    lscale = draw_columns(draws, lscale_cols),
-    kernel = kernel
-  )
+  sdgp <- draw_columns(draws, paste0("sdgp", stem, "[", level, "]"))[, 1L]
+  lscale <- draw_columns(draws, lscale_cols)
+  zgp <- function(n) {
+    draw_columns(draws, paste0("zgp", data_stem, "[", seq_len(n), "]"))
+  }
+  # An approximate term holds its basis and eigenvalues. An exact term,
+  # `gp()` without `k`, holds its latent values at the fitted covariates.
+  # brms's Stan data for a frame holds those covariates as `Xgp<stem>_old`.
+  slambda <- sdata[[paste0("slambda", data_stem)]]
+  out <- if (is.null(slambda)) {
+    X <- as.matrix(sdata_entry(sdata, paste0("Xgp", data_stem, "_old")))
+    exact_gp_pred(X = X, X_new = as.matrix(Xgp), zgp = zgp(nrow(X)),
+                  sdgp = sdgp, lscale = lscale, kernel = kernel)
+  } else {
+    approx_gp_pred(Xgp = Xgp, slambda = slambda, zgp = zgp(ncol(Xgp)),
+                   sdgp = sdgp, lscale = lscale, kernel = kernel)
+  }
   Jgp <- sdata[[paste0("Jgp", data_stem)]]
   if (!is.null(Jgp)) {
     out <- out[, as.integer(Jgp), drop = FALSE]

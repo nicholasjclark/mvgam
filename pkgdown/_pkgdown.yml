@@ -2,7 +2,7 @@ url: https://nicholasjclark.github.io/mvgam/
 
 # The 2.0 site builds into /dev/ and the CRAN 1.x site stays at the
 # root. Switch to `mode: release` when 2.0 reaches CRAN, along with the
-# article address in `mvgam_article()` (R/utils-docs.R).
+# site address `MVGAM_SITE_URL` (R/utils-docs.R).
 development:
   mode: devel
 
@@ -23,9 +23,9 @@ navbar:
       text: Cheatsheets
       menu:
       - text: mvgam
-        href: https://github.com/nicholasjclark/mvgam/raw/master/misc/mvgam_cheatsheet.pdf
+        href: cheatsheets/mvgam_cheatsheet.pdf
       - text: Joint species distribution models
-        href: https://github.com/nicholasjclark/mvgam/raw/master/misc/jsdgam_cheatsheet.pdf
+        href: cheatsheets/jsdgam_cheatsheet.pdf
 
 articles:
 - title: Getting started
@@ -289,8 +289,9 @@ reference:
 
 - title: Latent factors and joint species distribution models
   desc: >
-    Ordinations, loading comparisons, factor activity and the
-    residual correlations a factor model implies.
+    Ordinations, loading comparisons, factor activity, each species'
+    responses to covariates and the residual correlations a factor
+    model implies.
   contents:
   - ordinate
   - active_factors
@@ -298,6 +299,7 @@ reference:
   - compare_loadings
   - shared_variation
   - plot.mvgam_shared_variation
+  - species_effects
   - residual_cor
   - variance_partition
   - community

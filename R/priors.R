@@ -1475,6 +1475,48 @@ get_trend_parameter_prior <- function(prior = NULL, param_name,
 # `mvgam_formula()` pairs an observation formula with a trend formula
 # for `get_prior()`, `stancode()` and `standata()`.
 
+#' Refuse the formula terms a model cannot take
+#'
+#' `mvgam_formula()` and `mvgam()` call this before any other check, which
+#' gives every entry point the same refusals.
+#'
+#' @param formula The observation formula
+#' @param trend_formula The trend formula, or `NULL`
+#' @return `NULL`, invisibly
+#' @noRd
+validate_model_formulas <- function(formula, trend_formula) {
+  checkmate::assert(
+    checkmate::check_formula(formula),
+    checkmate::check_class(formula, "brmsformula"),
+    checkmate::check_class(formula, "mvbrmsformula"),
+    .var.name = "formula"
+  )
+  validate_obs_formula_brms(formula)
+  if (is.null(trend_formula)) {
+    return(invisible(NULL))
+  }
+  # A `bf()` trend formula carries distributional or non-linear
+  # sub-formulas, which the latent state cannot take
+  if (inherits(trend_formula, c("brmsformula", "bform"))) {
+    subs <- names(trend_formula$pforms)
+    stop(insight::format_error(c(
+      "'trend_formula' must be a one-sided formula such as '~ x + AR()'.",
+      x = if (length(subs)) {
+        paste0("Found 'bf()' sub-formulas for: ",
+               paste0("'", subs, "'", collapse = ", "), ".")
+      } else {
+        "Found a 'bf()' formula."
+      },
+      i = paste0("Write distributional and non-linear formulas with ",
+                 "'bf()' in the observation 'formula'.")
+    )), call. = FALSE)
+  }
+  checkmate::assert_formula(trend_formula, .var.name = "trend_formula")
+  validate_trend_formula(trend_formula)
+  invisible(NULL)
+}
+
+
 #' Pair an observation formula with a trend formula
 #'
 #' @description
@@ -1490,21 +1532,39 @@ get_trend_parameter_prior <- function(prior = NULL, param_name,
 #'   trend, the model brms itself would fit.
 #'
 #' @details
-#' A trend formula holds one trend constructor ([trend_constructors]).
-#' It can also hold covariates of the trend, smooths such as `s()` and
-#' `t2()`, random effects such as `(1 | group)` and Gaussian processes
-#' through `gp()`.
-#'
-#' Some terms describe how the response was observed. They belong in
-#' the observation formula. A trend formula refuses them:
+#' The observation formula takes the brms syntax, with distributional
+#' and non-linear sub-formulas through `bf()`. It refuses:
 #' \itemize{
-#'   \item addition terms such as `weights()`, `cens()`, `trunc()`,
-#'     `trials()` and `thres()`
-#'   \item `offset()`
-#'   \item `mi()`, which brms imputes as a response of the model
+#'   \item a trend constructor such as `AR()`. It belongs in
+#'     `trend_formula`.
+#'   \item `.`, which would enter the time and series columns as
+#'     predictors
+#'   \item `rate()` and `se()`. Predictions leave them out. Write an
+#'     exposure as `offset(log(area))`.
+#'   \item `subset()` and `index()`. A response leaves rows out by
+#'     holding `NA` there.
 #'   \item the brms autocorrelation terms `ar()`, `ma()`, `arma()`,
-#'     `cosy()`, `unstr()` and `autocor()`. The trend constructor
-#'     models dependence over time in their place.
+#'     `cosy()`, `unstr()` and `autocor()`. Predictions, forecasts and
+#'     `loo()` leave them out. The trend constructor models dependence
+#'     over time.
+#' }
+#'
+#' A trend formula holds one trend constructor ([trend_constructors])
+#' and covariates of the latent state: smooths such as `s()` and
+#' `t2()`, random effects such as `(1 | group)` and Gaussian processes
+#' through `gp()`. [lv_axis()] in a term varies its effect by latent
+#' factor, or by series in a model without factors. It refuses:
+#' \itemize{
+#'   \item a response, a second trend constructor and `bf()`
+#'     sub-formulas
+#'   \item the series column. `lv_axis()` takes its place.
+#'   \item a response of the observation formula as a covariate
+#'   \item `offset()` and addition terms such as `weights()`,
+#'     `cens()`, `trunc()`, `trials()` and `thres()`. They describe how
+#'     the response was observed.
+#'   \item `mi()`, which brms imputes as a response
+#'   \item `cs()`, which shifts an ordinal response's thresholds
+#'   \item the brms autocorrelation terms
 #' }
 #'
 #' @section Multivariate models:
@@ -1542,40 +1602,7 @@ get_trend_parameter_prior <- function(prior = NULL, param_name,
 #' @family model fitting
 #' @export
 mvgam_formula <- function(formula, trend_formula = NULL) {
-  checkmate::assert(
-    checkmate::check_formula(formula),
-    checkmate::check_class(formula, "brmsformula"),
-    checkmate::check_class(formula, "mvbrmsformula"),
-    .var.name = "formula"
-  )
-
-  # Validate observation formula for GP usage and trend constructors
-  validate_obs_formula_brms(formula)
-
-  # Validate trend_formula if provided
-  if (!is.null(trend_formula)) {
-    # A `bf()` trend formula carries distributional or non-linear
-    # sub-formulas, which the latent state cannot take. Named here
-    # before the generic "Must be a formula" assertion runs.
-    if (inherits(trend_formula, c("brmsformula", "bform"))) {
-      subs <- names(trend_formula$pforms)
-      stop(insight::format_error(c(
-        "'trend_formula' must be a one-sided formula such as '~ x + AR()'.",
-        x = if (length(subs)) {
-          paste0("Found 'bf()' sub-formulas for: ",
-                 paste0("'", subs, "'", collapse = ", "), ".")
-        } else {
-          "Found a 'bf()' formula."
-        },
-        i = paste0("Write distributional and non-linear formulas with ",
-                   "'bf()' in the observation 'formula'.")
-      )), call. = FALSE)
-    }
-
-    checkmate::assert_formula(trend_formula, .var.name = "trend_formula")
-
-    validate_trend_formula(trend_formula)
-  }
+  validate_model_formulas(formula, trend_formula)
 
   # Formula type, stored as an attribute
   if (inherits(formula, "mvbrmsformula")) {

@@ -31,6 +31,12 @@
 #' }
 #' A source a model lacks or that never varies is left out.
 #'
+#' A [diri()], [multi()] or [categ()] fit gives each species' share
+#' through a softmax, which ignores a shift every species at a site
+#' shares. Each source is centred across the species at each site, the
+#' centred log-ratio scale. A covariate with one slope for every species
+#' then moves no share and is left out.
+#'
 #' Under a non-linear link, `scale = "expected"` holds the other sources
 #' at their fitted values. Its sources then interact, as a covariate's
 #' effect on a count grows with the level.
@@ -149,6 +155,13 @@ predictor_sources <- function(object, frame, draw_ids, resp, scale) {
     lapply(latent, function(group_parts) Reduce(`+`, group_parts)),
     list(detection = detection)
   ))
+  # A softmax ignores a shift shared by a unit's rows, which the data
+  # leave to the prior. Each source is centred within each unit. The
+  # expected values are unchanged.
+  if (is_simplex_response_family(model_families(object, resp))) {
+    row_unit <- closure_unit_arrays_for(object, frame)$row_unit
+    sources <- lapply(sources, centre_within_groups, group = row_unit)
+  }
   whole <- Reduce(`+`, sources)
   # A source fixed over the rows moves nothing, on any scale
   sources <- Filter(function(values) any(row_var(values) > 0), sources)

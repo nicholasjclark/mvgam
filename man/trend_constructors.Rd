@@ -17,7 +17,8 @@ RW(
   subgr = NA,
   n_lv = NULL,
   trend_map = NULL,
-  df = Inf
+  df = Inf,
+  centred = FALSE
 )
 
 AR(
@@ -31,7 +32,8 @@ AR(
   n_lv = NULL,
   trend_map = NULL,
   coef_sharing = c("none", "shared", "hierarchical"),
-  df = Inf
+  df = Inf,
+  centred = FALSE
 )
 
 CAR(
@@ -40,7 +42,8 @@ CAR(
   cor = FALSE,
   n_lv = NULL,
   trend_map = NULL,
-  df = Inf
+  df = Inf,
+  centred = FALSE
 )
 
 VAR(
@@ -74,7 +77,15 @@ for an ungrouped trend and \code{TRUE} when \code{gr} names a
 grouping variable. \code{VAR()}, \code{ZMVN()} and grouped
 \code{AR()} and \code{RW()} trends always estimate correlations.
 They refuse \code{cor = FALSE}. \code{CAR()} defaults to
-\code{FALSE}.}
+\code{FALSE}.
+
+In a factor model with every loading sampled, the factors take
+independent shocks. The loadings carry the correlation among
+series, which \code{\link[=residual_cor]{residual_cor()}} reports. A correlation among the
+factors would trade off against the loadings. \code{AR()}, \code{RW()} and
+\code{LLT()} refuse \code{cor = TRUE} there. A \code{trend_map} that fixes the
+loadings keeps the factors apart. \code{cor = TRUE} then estimates
+their correlation.}
 
 \item{gr}{An optional \code{factor} in \code{data} that groups the series, such
 as region. Each level of \code{gr} takes its own correlation matrix among
@@ -173,6 +184,10 @@ close to the prior.
 \code{VAR()} samples its states directly and \code{PW()} has no
 innovations. Neither takes \code{df}.}
 
+\item{centred}{Logical. Sample the latent states directly rather
+than their innovations? Default \code{FALSE}. The model and its
+posterior are the same. See \emph{Centred states} below.}
+
 \item{p}{The autoregressive lags. The accepted form depends on the
 trend type:
 \itemize{
@@ -236,6 +251,18 @@ constructor express richer dynamics:
 weekly and monthly lags
 \item For cross-series dynamics: \code{VAR(p = 2)}
 }
+
+\strong{Centred states}: by default the sampler draws standard
+innovations and builds the states from them. This suits data that
+say little about each state, such as small counts, presence-absence
+or short series. When the data pin the states down, as large counts
+do, every innovation constrains every later state. The sampler then
+takes long trajectories and can hit the maximum tree depth.
+\code{centred = TRUE} samples each state as its distance from the first
+and recovers the innovations from them. On large counts it ran two
+to five times faster per effective draw. On small counts it ran ten
+to a hundred times slower. \code{ZMVN()} factors with sampled loadings
+draw their states directly either way. \code{VAR()} always does.
 
 \strong{Stationarity of \code{AR(p)}}: a consecutive lag set with
 \code{p >= 2} is sampled as partial autocorrelations,
@@ -438,6 +465,21 @@ plot(mod, type = "residuals", series = 2)
 # Each series is forecast at its own future times
 plot(forecast(mod, newdata = keep_some(simdat$data_test)),
      series = 2)
+
+# Counts near 150 pin each latent state down. Sampled centred, this
+# random walk ran about five times faster per effective draw
+n_t <- 60
+big <- data.frame(time = 1:n_t, series = factor("s1"),
+                  y = rpois(n_t, exp(5 + cumsum(rnorm(n_t, 0, 0.1)))))
+mod_big <- mvgam(
+  y ~ 1,
+  trend_formula = ~ RW(centred = TRUE),
+  data          = big,
+  family        = poisson(),
+  chains        = 2,
+  silent        = 2
+)
+summary(mod_big)
 
 # Next: hindcast() returns the fitted latent trends. The articles
 # under 'See Also' fit VAR, hierarchical and factor trends

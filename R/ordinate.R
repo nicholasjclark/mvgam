@@ -40,11 +40,12 @@
 #'   A fit with up to 10 series then has every arrow labelled. `"all"`
 #'   labels every arrow and `"none"` labels none.
 #' @param traits `NULL`, `"auto"`, or a data frame or matrix of series
-#'   traits. `"auto"` takes the traits a `jsdgam(traits = ...)` fit
-#'   stores. Each numeric trait is regressed on the plotted loadings.
-#'   Its arrow points the way the trait increases. Rows match the
-#'   series by `rownames(traits)` when those name every series and by
-#'   position otherwise. Drawn only with `biplot = TRUE`.
+#'   traits. `"auto"` takes the traits the fit was built with, those of
+#'   `jsdgam(traits = )` or else of `jsdgam(trait_slopes = )`. Each
+#'   numeric trait is regressed on the plotted loadings. Its arrow
+#'   points the way the trait increases. Rows match the series by a
+#'   `series` column, else by `rownames(traits)` when those name every
+#'   series, else by position. Drawn only with `biplot = TRUE`.
 #' @param trait_arrow_scale Positive number. The longest trait arrow is
 #'   `trait_arrow_scale` times the longest loading arrow.
 #' @param ... Unused. Anything passed here is refused.
@@ -308,11 +309,11 @@ ordinate_build_plot <- function(comp, which_lvs, biplot, label_sites,
       mapping = ggplot2::aes(label = site_names),
       type = "text",
       alpha = 0.75, size = 3, max.overlaps = 20,
-      colour = "grey40", segment.color = NA
+      colour = mvgam_neutral("rule"), segment.color = NA
     )
   }
   p <- p + ggplot2::geom_point(
-    data = site_dat, pch = 21, fill = "grey20", colour = "white"
+    data = site_dat, pch = 21, fill = mvgam_neutral("ink"), colour = "white"
   )
   if (biplot) {
     p <- p +
@@ -419,9 +420,17 @@ resolve_auto_traits <- function(traits, object) {
     )), call. = FALSE)
   }
   # `jsdgam(traits = ...)` stores the traits as the `features` of the
-  # loadings prior. The warning describes the returned plot and is
-  # raised on every call.
+  # loadings prior. A `trait_slopes` fit holds its traits as columns of
+  # the data, one value per species. The warning describes the
+  # returned plot and is raised on every call.
   found <- first_trend_spec(object)$loadings_prior$features
+  slopes <- object$jsdgam_args$trait_slopes
+  if (is.null(found) && !is.null(slopes)) {
+    series_var <- axis_vars(object)$series_var
+    found <- species_rows(object, fitted_data(object),
+                          series_var)[c(series_var, all.vars(slopes))]
+    found[[series_var]] <- as.character(found[[series_var]])
+  }
   if (is.null(found)) {
     insight::format_warning(c(
       "Argument 'traits = \"auto\"' requires a fit built with traits.",

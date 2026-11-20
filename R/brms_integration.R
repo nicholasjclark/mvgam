@@ -184,12 +184,6 @@ setup_brms_lightweight <- function(formula, data, family = gaussian(),
     }
   }
 
-  # The trend submodel's formula is the trend formula with its
-  # constructor removed. The observation rules do not apply to it.
-  if (!is_trend_setup) {
-    validate_obs_formula_brms(formula)
-  }
-
   # An observation formula with no coefficient (`y ~ 0`) is given a
   # pinned zero column, as `inject_obs_zero_placeholder()` explains.
   # Only applied to the obs side; the trend side goes through mvgam's
@@ -786,9 +780,9 @@ stancode_declarations <- function(sc) {
 #' parameter it holds.
 #'
 #' The latent states are excluded. `innovations_trend` carries a
-#' `std_normal()` because the trend is written non-centred. That
-#' statement is a reparameterisation. The trend equation governs the
-#' state paths.
+#' `std_normal()` because every trend writes its states through
+#' standard innovations, sampled or recovered. That statement is a
+#' reparameterisation. The trend equation governs the state paths.
 #'
 #' @param sc Character scalar holding the assembled Stan model.
 #' @return A list of single-row `brmsprior` objects, possibly empty.
@@ -1103,8 +1097,6 @@ parse_multivariate_trends <- function(formula, trend_formula = NULL) {
       base_formula = NULL
     ))
   }
-
-  validate_trend_formula(trend_formula)
 
   # Check if main formula is multivariate
   is_mv_main <- is_multivariate_formula(formula)

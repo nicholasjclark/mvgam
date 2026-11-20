@@ -83,7 +83,7 @@ compute_family_variance <- function(mu, family, sigma = NULL,
   if (is.null(family$family)) {
     stop(insight::format_error(
       "'family' object is missing the 'family' component."
-    ))
+    ), call. = FALSE)
   }
   family_name <- resolve_family_name(family)
 
@@ -111,7 +111,7 @@ compute_family_variance <- function(mu, family, sigma = NULL,
       if (is.null(trials)) {
         stop(insight::format_error(
           "Family 'binomial' requires 'trials' for variance computation."
-        ))
+        ), call. = FALSE)
       }
       checkmate::assert_numeric(trials, lower = 0)
       if (any(trials == 0)) {
@@ -169,7 +169,7 @@ compute_family_variance <- function(mu, family, sigma = NULL,
         "For unsupported families, draw with type = \"response\" and ",
         "compute the variance empirically."
       )
-    )))
+    )), call. = FALSE)
   )
 }
 

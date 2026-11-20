@@ -205,7 +205,7 @@ pivot_detection_array <- function(y,
       x = paste0("Arguments sharing a name: ",
                  paste(clash, collapse = ", "), "."),
       i = "Give each of them a different column name."
-    )))
+    )), call. = FALSE)
   }
 
   # Coerce `y` to a canonical 4D `[N, J, T, K]` array. Single-species
@@ -358,7 +358,7 @@ resolve_y_layout <- function(y, species) {
     if (length(y) == 0L) {
       stop(insight::format_error(
         "'y' is an empty list of species matrices."
-      ))
+      ), call. = FALSE)
     }
     nm <- names(y)
     if (is.null(nm) || any(!nzchar(nm))) {
@@ -368,7 +368,7 @@ resolve_y_layout <- function(y, species) {
           "The `unmarked::unmarkedFrameOccuMulti` convention uses ",
           "list names as species labels."
         )
-      )))
+      )), call. = FALSE)
     }
     J_first <- nrow(y[[1L]])
     K_first <- ncol(y[[1L]])
@@ -394,7 +394,7 @@ resolve_y_layout <- function(y, species) {
         "Accepted: '[J, K]' matrix, '[N, J, K]' array, ",
         "'[N, J, T, K]' array or named list of '[J, K]' matrices."
       )
-    )))
+    )), call. = FALSE)
   }
 
   N <- dim(y_arr)[1L]
@@ -428,7 +428,7 @@ normalise_obs_covs <- function(obs_covs, J, T_, K, multi_season) {
           "Multi-season data must pass 'obs_covs' as a named list ",
           "of '[J, T, K]' arrays."
         )
-      )))
+      )), call. = FALSE)
     }
     expected_rows <- J * K
     checkmate::assert_data_frame(obs_covs, nrows = expected_rows)
@@ -492,7 +492,7 @@ assert_no_reserved_cols <- function(nms, reserved, arg_name) {
         "Rename or pass non-default '*_col' arguments to ",
         "`pivot_detection_array()`."
       )
-    )))
+    )), call. = FALSE)
   }
   invisible(TRUE)
 }
@@ -576,7 +576,7 @@ pivot_species_matrix <- function(Y,
               collapse = ", "),
         "."
       )
-    )))
+    )), call. = FALSE)
   }
   species <- colnames(Y) %||% paste0("sp", seq_len(N))
 
@@ -588,7 +588,7 @@ pivot_species_matrix <- function(Y,
         "'site_covs' must not contain the reserved output columns.",
         i = paste0("Rename overlaps with: '", series_name,
                    "', '", site_id_name, "', '", values_to, "'.")
-      )))
+      )), call. = FALSE)
     }
   }
   if (!is.null(traits)) {
@@ -599,7 +599,7 @@ pivot_species_matrix <- function(Y,
         "'traits' must not contain the reserved output columns.",
         i = paste0("Rename overlaps with: '", series_name,
                    "', '", site_id_name, "', '", values_to, "'.")
-      )))
+      )), call. = FALSE)
     }
   }
 

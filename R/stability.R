@@ -128,15 +128,23 @@ stability <- function(object, ...) {
   UseMethod("stability", object)
 }
 
-# Discrete Lyapunov solver by doubling (Kitagawa 1977; Anderson
-# 1979). Solves X = B X B' + Sigma for X when B has spectral radius
-# below 1, which the stationarity prior of Heaps (2023) guarantees.
-# Doubling sums the series `sum_{k>=0} B^k Sigma (B')^k`. After `k`
-# steps the partial sum covers `2^k` terms and the multiplier is
-# `B^{2^k}`, which decays like `rho(B)^{2^k}`. Each solve costs
-# O(K^3 log(1/tol)). The Kronecker form `solve(I - B %x% B)` costs
-# O(K^6).
-#'@noRd
+#' Solve the discrete Lyapunov equation by doubling
+#'
+#' Solves `X = B X B' + Sigma` for `X` when `B` has spectral radius
+#' below 1 (Kitagawa 1977; Anderson 1979). The stationarity prior of
+#' Heaps (2023) guarantees that radius. Doubling sums the series
+#' `sum_{k>=0} B^k Sigma (B')^k`. After `k` steps the partial sum
+#' covers `2^k` terms and the multiplier is `B^{2^k}`, which decays
+#' like `rho(B)^{2^k}`. Each solve costs O(K^3 log(1/tol)). The
+#' Kronecker form `solve(I - B %x% B)` costs O(K^6).
+#'
+#' @param B Numeric K x K transition matrix
+#' @param Sigma Numeric K x K innovation covariance matrix
+#' @param tol Numeric; doubling stops once every entry of the
+#'   multiplier falls below it in absolute value
+#' @param max_iter Integer maximum number of doubling steps
+#' @return Numeric K x K stationary covariance matrix `X`
+#' @noRd
 solve_dlyap <- function(B, Sigma, tol = 1e-12, max_iter = 100L) {
   X <- Sigma
   A <- B
@@ -472,9 +480,7 @@ stability_intervals <- function(dat, keep) {
   }
   bounds <- grep("^Q", colnames(dat), value = TRUE)
   ggplot2::ggplot(dat, ggplot2::aes(x = .data$Estimate, y = .data$row)) +
-    ggplot2::geom_vline(data = stability_threshold(keep),
-                        ggplot2::aes(xintercept = .data$x),
-                        linetype = "dashed", colour = "grey30") +
+    reference_line(data = stability_threshold(keep)) +
     ggplot2::geom_pointrange(
       ggplot2::aes(xmin = .data[[bounds[1L]]], xmax = .data[[bounds[2L]]]),
       colour = mvgam_colour("mid_highlight")
@@ -543,9 +549,7 @@ stability_histogram <- function(counts) {
       fill = mvgam_colour("mid_highlight"),
       colour = "white"
     ) +
-    ggplot2::geom_vline(data = stability_threshold(names(counts)),
-                        ggplot2::aes(xintercept = .data$x),
-                        linetype = "dashed", colour = "grey30") +
+    reference_line(data = stability_threshold(names(counts))) +
     ggplot2::facet_wrap(
       ~ metric, scales = "free", nrow = 1L,
       labeller = ggplot2::as_labeller(stability_metric_labels(names(counts)))

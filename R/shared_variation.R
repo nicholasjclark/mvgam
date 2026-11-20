@@ -127,7 +127,7 @@ shared_variation.mvgam <- function(object,
   )
   stats <- summarise_unconstrained_array(
     delta_draws, robust = robust, probs = probs,
-    series_names = series_names
+    dim_names = list(series_names, series_names)
   )
   structure(
     list(
@@ -210,14 +210,14 @@ plot.mvgam_shared_variation <- function(x,
   type <- match.arg(type)
   rlang::check_dots_empty()
   mat <- switch(type, point = x$delta, uncertainty = x$delta_se)
-  rng <- max(abs(range(mat, na.rm = TRUE, finite = TRUE)))
+  rng <- symmetric_limit(mat)
   fill_scale <- if (type == "point") {
     mvgam_diverging_scale(name = "Posterior\nDelta", limits = c(-rng, rng))
   } else {
     ggplot2::scale_fill_gradient(
       name = "Posterior\nspread",
-      low = "grey95", high = mvgam_palette("red")[5L],
-      limits = c(0, rng), na.value = "grey30"
+      low = mvgam_neutral("paper"), high = mvgam_colour("dark", "red"),
+      limits = c(0, rng), na.value = mvgam_neutral("ink")
     )
   }
   matrix_heatmap(

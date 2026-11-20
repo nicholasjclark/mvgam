@@ -72,7 +72,7 @@ test_that("a trend with no design declares no mu_trend", {
 test_that("parameters are ordered by class, bookkeeping last", {
   pars <- c("lp__", "trend[1,1]", "sigma", "lprior", "b_x", "b_Intercept",
             "sd_g__Intercept", "Intercept", "sds_1", "r_g[a,Intercept]",
-            "ar1_trend[1]")
+            "ar1_trend[1]", "log_jacobian_trend")
   ordered <- pars[mvgam_par_order(pars)]
   # An intercept opens its own class, and Stan's accumulators close
   # the list
@@ -80,7 +80,7 @@ test_that("parameters are ordered by class, bookkeeping last", {
     ordered,
     c("b_Intercept", "b_x", "sd_g__Intercept", "sds_1", "sigma",
       "Intercept", "r_g[a,Intercept]", "ar1_trend[1]", "trend[1,1]",
-      "lprior", "lp__")
+      "lprior", "log_jacobian_trend", "lp__")
   )
 })
 
@@ -137,6 +137,7 @@ test_that("one taxonomy answers for every consumer of a name", {
     "innovations_trend[1,1]", "scaled_innovations_trend[1,1]",
     "init_trend[1,1]", "init_innovations_trend[1]",
     "ma_innovations_trend[1,1]", "z_1[1,1]",
+    "innovations_start_trend[1,1]", "lv_dev_trend[1,1]",
     "L_Omega_trend[1,1]", "A_trend[1,1,1]",
     "Phi_trend[1,1,1]", "Sigma_trend[1,1]",
     "lscale_1[1]", "zs_1_1[1]", "Z[1,1]", "Z_tilde[1,1]"
@@ -151,7 +152,8 @@ test_that("one taxonomy answers for every consumer of a name", {
     pars[kind == "state"],
     c("trend[1,1]", "lv_trend[1,1]", "mu_trend[1]",
       "innovations_trend[1,1]", "scaled_innovations_trend[1,1]",
-      "init_trend[1,1]", "init_innovations_trend[1]")
+      "init_trend[1,1]", "init_innovations_trend[1]",
+      "innovations_start_trend[1,1]", "lv_dev_trend[1,1]")
   )
   # Stan saves every variable declared at the top level of
   # transformed parameters. The working arrays among them carry no

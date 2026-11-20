@@ -75,14 +75,20 @@ me_measurement_vars <- function(term) {
 }
 
 
-# The variables one parsed formula contributes, by the part of the
-# model they belong to. brms has already separated them: `fe` holds
-# the parametric terms, `sm` the smooths, `gp` the Gaussian
-# processes, `sp` the special terms such as `mo()`, `offset` the
-# offset and `re` a row per group-level term. Every slot is collected.
-# A covariate that reaches the linear predictor only through a smooth
-# or a Gaussian process then stays in the list.
-#'@noRd
+#' The variables one parsed formula contributes, by model part
+#'
+#' brms has already separated them: `fe` holds the parametric terms,
+#' `sm` the smooths, `gp` the Gaussian processes, `sp` the special
+#' terms such as `mo()`, `offset` the offset and `re` a row per
+#' group-level term. Every slot is collected. A covariate that reaches
+#' the linear predictor only through a smooth or a Gaussian process
+#' then stays in the list.
+#'
+#' @param bt A `brmsterms` object for one response, as
+#'   `brms_terms()` returns it or one element of its `terms`
+#' @return Named list of character vectors: `conditional`, `random`,
+#'   `slopes`, `aterms`, `offset`, `labels` and `all`
+#' @noRd
 mvgam_brmsterms_parts <- function(bt) {
   # A non-linear formula keeps its sub-formulas under `nlpars`. Their
   # covariates appear in no `dpars` entry, whose predictor lists
@@ -161,22 +167,36 @@ mvgam_brmsterms_parts <- function(bt) {
 }
 
 
-# Parses of one side of a model, keyed by `side_terms_key()`. A
-# prediction checks its frame against the terms of both formulas once
-# per component. Each check would parse them again.
-#'@noRd
+#' Session cache of parsed model sides
+#'
+#' Parses of one side of a model, keyed by `side_terms_key()`. A
+#' prediction checks its frame against the terms of both formulas once
+#' per component. Without the cache each check would parse them again.
+#'
+#' @format Environment mapping each key to the list
+#'   `mvgam_side_terms()` returns
+#' @noRd
 .side_terms_cache <- new.env(parent = emptyenv())
 
 
-# One side of the model, parsed once per session.
-#
-# The stored `brmsformula` holds no family. `brmsterms()` then
-# defaults to gaussian and refuses `trials()` as unsupported for it.
-# The fit's own family is attached before parsing. A multivariate
-# formula keeps no top-level `dpars`. Each response has its own parse
-# under `$terms`. The function returns one response's parts when
-# `resp` names it, or the union over responses.
-#'@noRd
+#' One side of the model, parsed once per session
+#'
+#' The stored `brmsformula` holds no family. `brmsterms()` then
+#' defaults to gaussian and refuses `trials()` as unsupported for it.
+#' The fit's own family is attached before parsing. A multivariate
+#' formula keeps no top-level `dpars`. Each response has its own parse
+#' under `$terms`. The function returns one response's parts when
+#' `resp` names it, or the union over responses.
+#'
+#' @param f The observation or trend formula: a `formula`,
+#'   `brmsformula` or `mvbrmsformula`, or `NULL` for an absent side
+#' @param family The fit's `brmsfamily`, or `NULL` to parse without one
+#' @param resp Character name of one response of a multivariate
+#'   formula, or `NULL` for all of them
+#' @return Named list of character vectors: `conditional`, `random`,
+#'   `slopes`, `aterms`, `offset`, `labels` and `all`, each empty when
+#'   `f` is `NULL`
+#' @noRd
 mvgam_side_terms <- function(f, family = NULL, resp = NULL) {
   checkmate::assert_string(resp, null.ok = TRUE)
   if (is.null(f)) {
@@ -293,8 +313,8 @@ parse_side_terms <- function(f, family, resp) {
 #'   observation terms replace those of every response. The trend terms
 #'   are shared by all responses.
 #' @return A list of character vectors: `response`, `conditional`,
-#'   `random`, `aterms`, `offset`, `index` and `groupings`, each
-#'   filtered to columns the model's data carries
+#'   `random`, `aterms`, `offset`, `index`, `traits` and `groupings`,
+#'   each filtered to columns the model's data carries
 #' @noRd
 mvgam_term_list <- function(x, resp = NULL) {
   obs <- mvgam_side_terms(x$formula, x$family, resp = resp)
@@ -319,6 +339,15 @@ mvgam_term_list <- function(x, resp = NULL) {
   # addressable in a grid. The formula makes it a term. Only the axis
   # columns no formula mentions are grid-only.
   conditional <- keep(c(obs$conditional, trend$conditional))
+  # A trait of `jsdgam(trait_slopes = )` is constant within each
+  # species. A prediction grid would hold it at one value for every
+  # species. It is listed apart. Each frame then takes the species' own
+  # value from `fill_species_traits()`.
+  traits <- keep(all.vars(x$jsdgam_args$trait_slopes))
+  # A column the expansion derived is rebuilt from its sources in every
+  # frame. A grid varies the sources.
+  sources <- derived_column_sources(x$trait_columns)
+  conditional <- setdiff(conditional, c(traits, names(sources)))
 
   # The same terms, grouped as they are drawn. `conditional_effects()`
   # plots one panel per grouping. An interaction is one entry over two
@@ -334,7 +363,15 @@ mvgam_term_list <- function(x, resp = NULL) {
   # second draws a slope per series, as a smooth per series is drawn.
   series_var <- axis_vars(x)$series_var
   groupings <- lapply(groupings, function(g) {
-    g <- keep(g)
+    # A derived column is drawn through its sources. The crossing
+    # `s(x2, by = habb_size)` then joins the panel of `s(x2, by = hab)`.
+    g <- unique(unlist(lapply(g, function(v) sources[[v]] %||% v)))
+    g <- setdiff(keep(g), traits)
+    # Under `trait_slopes` every covariate takes a species deviation.
+    # Each panel draws one curve per species, at its own traits.
+    if (length(traits) && length(g) && !series_var %in% g) {
+      g <- c(g, series_var)
+    }
     if (length(g) > 1L && series_var %in% g) {
       rest <- setdiff(g, series_var)
       g <- c(rest[1L], series_var, rest[-1L])
@@ -354,6 +391,7 @@ mvgam_term_list <- function(x, resp = NULL) {
     aterms = setdiff(keep(c(obs$aterms, trend$aterms)), conditional),
     offset = keep(c(obs$offset, trend$offset)),
     index = setdiff(index, conditional),
+    traits = traits,
     groupings = groupings
   )
 }
@@ -482,7 +520,7 @@ get_data.mvgam <- function(x, effects = "all", component = "all",
     stop(insight::format_error(c(
       "No data found in mvgam object.",
       i = "Refit the model and ensure the data is stored on the object."
-    )))
+    )), call. = FALSE)
   }
   x$data
 }
@@ -513,7 +551,7 @@ model.frame.mvgam <- function(formula, trend_effects = FALSE, ...) {
     stop(insight::format_error(c(
       "No data found in mvgam object.",
       i = "Refit the model and ensure the data is stored on the object."
-    )))
+    )), call. = FALSE)
   }
   vars <- if (trend_effects) {
     mvgam_side_terms(formula$trend_formula)$all
@@ -528,15 +566,19 @@ model.frame.mvgam <- function(formula, trend_effects = FALSE, ...) {
 }
 
 
-# Families mvgam classifies for `insight::model_info()`, keyed on the
-# name `resolve_family_name()` reports.
-#
-# Reason: every family mvgam defines itself has the literal
-# `family$family == "custom"`. Classifying by that field left all ten
-# of them unclassified. marginaleffects and the easystats packages use
-# `model_info()` to decide how to treat a fit. A blank classification
-# changes their behaviour without a message.
-#'@noRd
+#' Families mvgam classifies for insight::model_info()
+#'
+#' The classes are keyed on the name `resolve_family_name()` reports.
+#' Every family mvgam defines itself has the literal
+#' `family$family == "custom"`. Classifying by that field left all ten
+#' of them unclassified. marginaleffects and the easystats packages use
+#' `model_info()` to decide how to treat a fit. A blank classification
+#' changes their behaviour without a message.
+#'
+#' @return Named list with one element per response class (`binomial`,
+#'   `count`, `continuous`, `categorical`, `proportion`, `multinomial`
+#'   and `simplex`), each a character vector of family names
+#' @noRd
 mvgam_model_info_families <- function() {
   list(
     binomial = c(

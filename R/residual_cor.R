@@ -69,8 +69,9 @@
 #' trend holds it at every time of an irregular grid. A draw whose
 #' autoregression is explosive has no stationary covariance and keeps
 #' its innovation covariance. A warning gives the count once per session.
-#' `ZMVN()` keeps no memory between times and `RW()` has no stationary
-#' distribution. Both report their innovation covariance. A hierarchical
+#' `ZMVN()` keeps no memory between times and `RW()` and `LLT()` have no
+#' stationary distribution. Each reports its innovation covariance. The
+#' level, slope and seasonal shocks of `LLT()` share its correlation. A hierarchical
 #' `AR()` converts each group's scales to stationary scales in the same
 #' way, before its global and group correlations are mixed.
 #'
@@ -95,6 +96,8 @@
 #'
 #' @seealso [plot.mvgam_residcor()] draws the matrix as a heatmap.
 #'   [community()] gives the same associations as excess co-occurrence.
+#'   [species_effects()] gives the responses to the covariates these
+#'   correlations are net of.
 #'   [summary.mvgam_residcor()] lists the pairs. [ordinate()] draws the
 #'   loadings as a biplot. The example of [trend_constructors] takes
 #'   the correlations of a `CAR(cor = TRUE)` trend. The
@@ -154,13 +157,7 @@ residual_cor.mvgam <- function(object,
   checkmate::assert_flag(robust)
   checkmate::assert_numeric(probs, len = 2L, lower = 0, upper = 1,
                             any.missing = FALSE, unique = TRUE)
-  checkmate::assert_number(prob_threshold, lower = 0.5)
-  if (prob_threshold >= 1) {
-    stop(insight::format_error(c(
-      "'prob_threshold' must be below 1.",
-      i = "A sign probability exceeds it only when it is below 1."
-    )), call. = FALSE)
-  }
+  assert_prob_threshold(prob_threshold)
   validate_draw_selectors(ndraws, draw_ids)
   rlang::check_dots_empty()
   probs <- sort(probs)
@@ -653,8 +650,9 @@ finalise_residcor <- function(cov_draws, series_names, partial,
 
   cor_stats <- summarise_correlation_array(cor_draws, robust, probs,
                                             prob_threshold, series_names)
-  cov_stats <- summarise_unconstrained_array(cov_draws, robust, probs,
-                                              series_names)
+  cov_stats <- summarise_unconstrained_array(
+    cov_draws, robust, probs, list(series_names, series_names)
+  )
 
   out <- list(
     cor = cor_stats$point,
@@ -727,27 +725,68 @@ partial_cor_from_cor <- function(R) {
 #' recovers `r` to print precision. The diagonal is 1 in every draw
 #' and is set exactly, with zero SE.
 #'
-#' @inheritParams summarise_unconstrained_array
-#' @param prob_threshold The sign probability an entry of `sig` needs
-#' @return The list of `summarise_unconstrained_array()` plus the
-#'   matrices of `sign_probabilities()` and `sig`, the point
-#'   estimates with entries at or below `prob_threshold` set to 0
+#' @inheritParams summarise_signed_array
+#' @param series_names Labels for both dimensions
+#' @return What `summarise_signed_array()` gives
 #' @noRd
 summarise_correlation_array <- function(arr, robust, probs, prob_threshold,
                                         series_names) {
   eps <- 1e-7
-  z <- atanh(pmin(pmax(arr, -1 + eps), 1 - eps))
-  stats <- summarise_unconstrained_array(z, robust, probs, series_names,
-                                         back = tanh)
+  stats <- summarise_signed_array(
+    arr, robust, probs, prob_threshold, list(series_names, series_names),
+    transform = function(r) atanh(pmin(pmax(r, -1 + eps), 1 - eps)),
+    back = tanh
+  )
   diag(stats$point) <- 1
   diag(stats$se) <- 0
   diag(stats$lower) <- 1
   diag(stats$upper) <- 1
   diag(stats$ess) <- NA_real_
-  signs <- sign_probabilities(arr, series_names)
-  diag(signs$prob_positive) <- 1
-  diag(signs$prob_negative) <- 0
-  diag(signs$prob_nonzero) <- 1
+  diag(stats$prob_positive) <- 1
+  diag(stats$prob_negative) <- 0
+  diag(stats$prob_nonzero) <- 1
+  diag(stats$sig) <- 1
+  stats
+}
+
+
+#' Refuse a sign probability no estimate could exceed or always exceeds
+#'
+#' A sign probability lies between 0.5 and 1.
+#'
+#' @param prob_threshold The caller's threshold
+#' @return `prob_threshold`, invisibly
+#' @noRd
+assert_prob_threshold <- function(prob_threshold) {
+  checkmate::assert_number(prob_threshold, lower = 0.5)
+  if (prob_threshold >= 1) {
+    stop(insight::format_error(c(
+      "'prob_threshold' must be below 1.",
+      i = "A sign probability exceeds it only when it is below 1."
+    )), call. = FALSE)
+  }
+  invisible(prob_threshold)
+}
+
+
+#' Per-element summary of an array of matrix draws, with their signs
+#'
+#' `sig` keeps the point estimates whose `prob_nonzero` exceeds
+#' `prob_threshold`. Its other entries are zero.
+#'
+#' @inheritParams summarise_unconstrained_array
+#' @param prob_threshold The sign probability an entry of `sig` needs
+#' @param transform Function taking `arr` to the scale it is summarised
+#'   on
+#' @return The list of `summarise_unconstrained_array()`, the matrices
+#'   of `sign_probabilities()` and `sig`
+#' @noRd
+summarise_signed_array <- function(arr, robust, probs, prob_threshold,
+                                   dim_names, transform = identity,
+                                   back = identity) {
+  stats <- summarise_unconstrained_array(transform(arr), robust, probs,
+                                         dim_names, back = back)
+  signs <- sign_probabilities(arr, dim_names)
   stats$sig <- stats$point
   stats$sig[signs$prob_nonzero <= prob_threshold] <- 0
   c(stats, signs)
@@ -756,20 +795,20 @@ summarise_correlation_array <- function(arr, robust, probs, prob_threshold,
 
 #' The posterior mass above and below zero of every matrix entry
 #'
-#' @param arr `[ndraws, p, p]` array of draws
-#' @param series_names Labels for both dimensions
+#' @param arr `[ndraws, rows, columns]` array of draws
+#' @param dim_names List of the row and column labels
 #' @return List of `prob_positive`, `prob_negative` and `prob_nonzero`,
-#'   the larger of the two, each a labelled `p` by `p` matrix
+#'   the larger of the two, each a labelled matrix
 #' @noRd
-sign_probabilities <- function(arr, series_names) {
+sign_probabilities <- function(arr, dim_names) {
   checkmate::assert_array(arr, d = 3L)
   prob_pos <- apply(arr > 0, c(2L, 3L), mean)
   prob_neg <- apply(arr < 0, c(2L, 3L), mean)
-  name_series_matrices(list(
+  name_matrices(list(
     prob_positive = prob_pos,
     prob_negative = prob_neg,
     prob_nonzero = pmax(prob_pos, prob_neg)
-  ), series_names)
+  ), dim_names)
 }
 
 
@@ -779,45 +818,47 @@ sign_probabilities <- function(arr, series_names) {
 #' draws.
 #'
 #' @inheritParams mvgam_post_summary
-#' @param arr `[ndraws, p, p]` array of draws
+#' @param arr `[ndraws, rows, columns]` array of draws
 #' @param probs Length-2 interval probabilities
-#' @param series_names Labels for both dimensions
+#' @param dim_names List of the row and column labels
 #' @param back Function mapping the scale of `arr` to the reported
 #'   scale. It is applied to the point estimate, spread and bounds.
 #'   The ESS is that of `arr`
-#' @return List of labelled `p` by `p` matrices `point`, `se`,
-#'   `lower`, `upper` and `ess`. A constant cell has `NA` ESS
+#' @return List of labelled matrices `point`, `se`, `lower`, `upper`
+#'   and `ess`. A constant cell has `NA` ESS
 #' @noRd
-summarise_unconstrained_array <- function(arr, robust, probs,
-                                          series_names, back = identity) {
-  p <- dim(arr)[2L]
-  # Column `(j - 1) * p + i` holds cell `[i, j]`, the order `matrix()`
-  # fills a `p` by `p` matrix in.
+summarise_unconstrained_array <- function(arr, robust, probs, dim_names,
+                                          back = identity) {
+  checkmate::assert_array(arr, d = 3L)
+  shape <- dim(arr)[2:3]
+  # Column `(j - 1) * rows + i` holds cell `[i, j]`, the order
+  # `matrix()` fills a matrix in
   cells <- matrix(arr, nrow = dim(arr)[1L])
   stats <- mvgam_post_summary(cells, robust = robust, probs = probs)
-  as_cells <- function(x) back(matrix(x, p, p))
+  as_cells <- function(x) back(matrix(x, shape[1L], shape[2L]))
   ess <- without_ess_cap_notice(apply(cells, 2L, function(x) {
     if (stats::sd(x) > 0) posterior::ess_basic(x) else NA_real_
   }))
-  name_series_matrices(list(
+  name_matrices(list(
     point = as_cells(stats[, 1L]),
     se = as_cells(stats[, 2L]),
     lower = as_cells(stats[, 3L]),
     upper = as_cells(stats[, 4L]),
-    ess = matrix(ess, p, p)
-  ), series_names)
+    ess = matrix(ess, shape[1L], shape[2L])
+  ), dim_names)
 }
 
 
-#' Label the rows and columns of series-by-series matrices
+#' Label the rows and columns of matrices
 #'
-#' @param mats Named list of square matrices
-#' @param series_names Labels for both dimensions
+#' @param mats Named list of matrices
+#' @param dim_names List of the row and column labels
 #' @return `mats`, each with dimnames set
 #' @noRd
-name_series_matrices <- function(mats, series_names) {
+name_matrices <- function(mats, dim_names) {
+  checkmate::assert_list(dim_names, len = 2L)
   lapply(mats, function(m) {
-    dimnames(m) <- list(series_names, series_names)
+    dimnames(m) <- dim_names
     m
   })
 }

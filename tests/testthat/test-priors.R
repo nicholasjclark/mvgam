@@ -242,7 +242,7 @@ test_that("multivariate models handle priors correctly", {
   test_data_mv <- create_test_data(n = 20, n_series = 3)
   mf_factor <- mvgam_formula(
     y ~ x,
-    trend_formula = ~ AR(p = 1, cor = TRUE, n_lv = 2)  # n_lv < n_series
+    trend_formula = ~ AR(p = 1, n_lv = 2)  # n_lv < n_series
   )
   priors_factor <- get_prior(
     mf_factor, data = test_data_mv, family = gaussian()
@@ -256,7 +256,7 @@ test_that("multivariate models handle priors correctly", {
   edge_cases <- list(
     factor_smooth = list(
       formula = y ~ s(x),
-      trend = ~ AR(p = 1, cor = TRUE, n_lv = 1)
+      trend = ~ AR(p = 1, n_lv = 1)
     ),
     factor_random = list(
       formula = y ~ x + (1|series),

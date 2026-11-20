@@ -1962,47 +1962,52 @@ complete_simplex_grid <- function(object, newdata,
 }
 
 
-# Fill missing closure-unit identifier columns on an incoming
-# newdata so synthetic prediction grids (e.g. those built by
-# `marginaleffects::datagrid()`, which drops every column the
-# model formula does not reference) round-trip through the per-
-# unit prediction pipeline.
-#
-# The natural interpretation of a per-row marginaleffects grid on
-# a closure-unit fit is "each row is one hypothetical single-
-# visit closure unit". To get that, we stamp:
-#   * `series` to the first training level (held constant so the
-#     state intercept stays interpretable across the grid).
-#   * `time` to `seq_len(nrow(newdata))` so each row has a
-#     distinct unit identifier; `build_closure_unit_arrays()`
-#     then treats the rows as `N_grid` independent units of
-#     1 visit each. Per-row state-level covariate variation
-#     produces per-row state predictions as intended.
-#   * `visit` to `1L`.
-#   * the response column to `0L`. A synthetic unit has no observation
-#     attached. The value `0L` also satisfies the integer and binary
-#     checks in `validate_closure_unit_data()`. The response is never
-#     consumed by `posterior_epred()` or `posterior_predict()` for these
-#     families.
-#
-# `cap` and the response are filled on any frame that omits them,
-# grid or not. The pipeline uses both whatever the frame's shape. `cap`
-# takes the family's `mvgam_default_cap` attribute or, failing that, the
-# first training row's value.
-#
-# The unit structure is left alone (`newdata` returned with those
-# fills alone) when:
-#   * the family has no closure unit, or
-#   * `newdata` is NULL, or
-#   * the fit has no `data` slot to source defaults from, or
-#   * the frame already carries intact units, which
-#     `closure_units_are_intact()` decides.
-#
-# Used by `get_predict.mvgam` so every marginaleffects entry
-# point (`predictions`, `slopes`, `comparisons`, `plot_predictions`,
-# `conditional_effects`) works on closure-unit fits out of the
-# box.
-#'@noRd
+#' Fill the closure-unit identifier columns of a prediction frame
+#'
+#' A synthetic prediction grid lacks the identifiers the per-unit
+#' prediction pipeline needs. `marginaleffects::datagrid()` builds such
+#' grids: it drops every column the model formula does not reference.
+#' Filling the columns lets the grid pass through that pipeline.
+#'
+#' The function treats each row of a marginaleffects grid on a
+#' closure-unit fit as one hypothetical single-visit closure unit. On
+#' the grid path it sets these columns:
+#' - `series` to the series of the first training row. One value
+#'   across the grid keeps the state intercept interpretable.
+#' - `time` to `seq_len(nrow(newdata))`, which gives each row a
+#'   distinct unit identifier. `build_closure_unit_arrays()` then
+#'   treats the rows as `N_grid` independent units of one visit each.
+#'   Per-row variation in a state-level covariate gives per-row state
+#'   predictions.
+#' - `visit` to `1L`.
+#' - the response column to `0L`. A synthetic unit has no observation
+#'   attached. The value `0L` also satisfies the integer and binary
+#'   checks in `validate_closure_unit_data()`. `posterior_epred()` and
+#'   `posterior_predict()` never use the response for these families.
+#'
+#' `cap` and the response are filled on any frame that omits them,
+#' grid or not. The pipeline uses both whatever the frame's shape.
+#' `cap` takes the family's `mvgam_default_cap` attribute or, failing
+#' that, the first training row's value.
+#'
+#' A frame that already carries intact units keeps its unit structure.
+#' It returns with those two fills alone. `closure_units_are_intact()`
+#' decides whether the units are intact. `newdata` returns unchanged
+#' when the family has no closure unit, when `newdata` is `NULL` or
+#' when the fit has no `data` slot to source defaults from.
+#'
+#' `get_predict.mvgam()` calls it. Every marginaleffects entry point
+#' (`predictions`, `slopes`, `comparisons`, `plot_predictions`,
+#' `conditional_effects`) then works on closure-unit fits.
+#'
+#' @param object Fitted `mvgam` object
+#' @param newdata Data frame of prediction rows, or `NULL`
+#' @param is_grid Logical; `TRUE` when `newdata` is a synthetic grid
+#'   whose unit structure must be built. Defaults to whether its
+#'   closure units are broken.
+#' @return `newdata` with the closure-unit columns filled, or
+#'   unchanged when no fill applies
+#' @noRd
 complete_closure_unit_newdata <- function(object, newdata,
                                           is_grid = !closure_units_are_intact(
                                             object, newdata
@@ -2290,7 +2295,7 @@ build_closure_unit_arrays <- function(data,
           "Closure-unit families need at least one observed visit ",
           "in at least one unit."
         )
-      )))
+      )), call. = FALSE)
     }
     rows_by_unit <- rows_by_unit[visited]
     unit_levels  <- unit_levels[visited]
@@ -2423,7 +2428,7 @@ build_closure_unit_arrays <- function(data,
           "Missing values in '", cap_var,
           "' are not allowed for closure-unit families."
         )
-      ))
+      ), call. = FALSE)
     }
     # The cap bounds a unit's latent state. It is a property of the unit,
     # and it is recorded on every one of its rows. The cap is taken over
@@ -2455,7 +2460,7 @@ build_closure_unit_arrays <- function(data,
             "Drop the '", cap_var, "' column to use the data-driven ",
             "default."
           )
-        )))
+        )), call. = FALSE)
       }
     }
   } else if (!is.null(default_cap_buffer)) {
@@ -2760,10 +2765,10 @@ occ <- function(multi_season = FALSE) {
 #' Every closure-unit lpmf wrapper builds the unit index `g_seq`,
 #' picks a grainsize and returns the `reduce_sum()` call. The wrapper
 #' builds `g_seq` locally, which keeps the index out of the data that
-#' brms passes to the likelihood. The grainsize targets about eight
-#' chunks. Without threading that costs eight serial dispatches per
-#' leapfrog step, against `N_unit` at a grainsize of one. With up to
-#' eight threads TBB maps the chunks across cores.
+#' brms passes to the likelihood. A program compiled without threads
+#' makes one call over every unit. The grainsize then goes unused. With
+#' threads, TBB splits the units into chunks of at least the
+#' grainsize. `N_unit %/% 8` gives about eight chunks.
 #'
 #' @param partial_sum Name of the Stan partial-sum function.
 #' @param args Character vector of the indented argument lines that
@@ -3213,6 +3218,11 @@ make_multi_response_stanvars <- function(arrays, family, prior = NULL) {
 #' subtraction. `posterior_epred()` gives the expected shares, which
 #' sum to one within each unit.
 #'
+#' [species_effects()], [variance_partition()] and
+#' `forecast_uncertainty(scale = "link")` report the predictor centred
+#' across each unit's components, the centred log-ratio scale. A shift
+#' shared by every component then drops out.
+#'
 #' @return A family object to pass to [jsdgam()] or [mvgam()].
 #'
 #' @references
@@ -3260,6 +3270,9 @@ make_multi_response_stanvars <- function(arrays, family, prior = NULL) {
 #' # and `env` act on every species alike. The softmax cancels them. Their
 #' # posteriors repeat the prior.
 #' summary(fit)
+#'
+#' # Each species' response to env relative to the average species
+#' species_effects(fit, variables = "env")
 #'
 #' # The expected shares move along the gradient
 #' conditional_effects(fit, effects = "env:series")
@@ -4686,7 +4699,7 @@ posterior_epred_com_binomial <- function(prep) {
     stop(insight::format_error(c(
       "Family 'com_binomial' requires the 'trials' data entry.",
       i = "Pass a per-row trials vector to posterior_epred()."
-    )))
+    )), call. = FALSE)
   }
   trials <- data2draws(prep$data$trials, dim_mu(prep))
   ey_flat <- cmb_mean_vec(as.numeric(mu), as.numeric(nu),
@@ -4725,7 +4738,7 @@ dispatch_closure_unit_method <- function(family, method_kind) {
   if (!uses_closure_unit_layout(family)) {
     stop(insight::format_error(
       "dispatch_closure_unit_method() requires a closure-unit family."
-    ))
+    ), call. = FALSE)
   }
   family_name <- resolve_family_name(family)
   if (is_closure_unit_family(family)) {
@@ -4925,7 +4938,7 @@ extract_closure_unit_components <- function(object, newdata = NULL,
     stop(insight::format_error(c(
       "extract_closure_unit_components() requires a closure-unit fit.",
       i = "Use family = nmix() or family = occ()."
-    )))
+    )), call. = FALSE)
   }
   newdata <- closure_unit_frame(object, newdata)
   # Cap edits and a non-binary response in `newdata` are refused here.
@@ -5067,7 +5080,7 @@ visit_to_unit_lookup <- function(arrays, n_visit) {
       "Closure-unit row map does not cover the prediction frame.",
       x = paste0("The map covers ", length(out), " rows."),
       x = paste0("The prediction frame has ", n_visit, " visits.")
-    )))
+    )), call. = FALSE)
   }
   out
 }
@@ -5992,7 +6005,7 @@ extract_simplex_response_components <- function(object,
   if (!is_simplex_response_family(object$family)) {
     stop(insight::format_error(
       "extract_simplex_response_components() requires a simplex-response fit."
-    ))
+    ), call. = FALSE)
   }
   newdata <- closure_unit_frame(object, newdata)
   arrays <- closure_unit_arrays_for(object, newdata)
@@ -6322,7 +6335,7 @@ log_lik_categ <- function(linpred, link, y, family_pars, trials) {
           "Site ", g, " has ", sum(y_unit),
           " ones across K = ", Kg, " species rows."
         )
-      )))
+      )), call. = FALSE)
     }
     log(family_pars$prob_row[, idx[cat_code]])
   })

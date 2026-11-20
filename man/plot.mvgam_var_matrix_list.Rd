@@ -4,7 +4,13 @@
 \alias{plot.mvgam_var_matrix_list}
 \title{Plot the VAR transition matrices of several panels}
 \usage{
-\method{plot}{mvgam_var_matrix_list}(x, type = c("heatmap", "diagonal"), ncol = NULL, ...)
+\method{plot}{mvgam_var_matrix_list}(
+  x,
+  type = c("heatmap", "diagonal"),
+  ncol = NULL,
+  supported_only = FALSE,
+  ...
+)
 }
 \arguments{
 \item{x}{An \code{mvgam_var_matrix_list} returned by
@@ -14,6 +20,9 @@
 
 \item{ncol}{The number of facet columns of the heatmaps, or \code{NULL}
 for \code{ceiling(sqrt(length(x)))}.}
+
+\item{supported_only}{Logical. \code{TRUE} leaves blank every cell whose
+\code{prob_nonzero} is at most \code{prob_threshold}. Defaults to \code{FALSE}.}
 
 \item{...}{Unused. Anything passed here is refused.}
 }

@@ -99,13 +99,14 @@ get_predict.mvgam <- function(model,
                               process_error = FALSE) {
   checkmate::assert_class(model, "mvgam")
   checkmate::assert_data_frame(newdata, min.rows = 1L)
-  # conditional_effects() sets the response and the trend setting on
-  # its copy of the model. marginaleffects would warn on both as
-  # arguments.
+  # conditional_effects() and species_effects() set the response, the
+  # trend setting and the draws as an attribute of their copy of the
+  # model. marginaleffects would warn on each as an argument.
   preset <- attr(model, "mvgam_predict_args", exact = TRUE)
   if (!is.null(preset)) {
     resp <- resp %||% preset$resp
     process_error <- preset$process_error
+    draw_ids <- draw_ids %||% preset$draw_ids
   }
   checkmate::assert_logical(process_error, len = 1L)
   # `marginaleffects::datagrid()` drops every column the formula does
@@ -115,7 +116,7 @@ get_predict.mvgam <- function(model,
   # runs once, on the frame as it arrived. The completion writes the
   # columns the test inspects.
   is_grid <- !closure_units_are_intact(model, newdata)
-  newdata <- jsdgam_axis_columns(model, newdata)
+  newdata <- jsdgam_prediction_columns(model, newdata)
   newdata <- complete_closure_unit_newdata(model, newdata, is_grid)
   # A composition belongs to a whole site. Its grid is completed to
   # whole sites and predicted. The rows asked for are then taken back.

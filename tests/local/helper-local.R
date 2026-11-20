@@ -97,6 +97,37 @@ as_brms <- function(fit, side = "obs") {
 }
 
 
+# brms's GP predictor with each level of a factor `by` added to its
+# rows, as brms's Stan code adds it. brms 2.23.0 assigns the level in
+# place, which drops a GP term written before it from those rows
+# (paul-buerkner/brms#1979). A test comparing a fit holding such a
+# pair against brms mocks `brms:::predictor_gp()` with this function.
+#
+# @param prep The predictor's prepared draws and data
+# @param i Unused. brms passes `NULL` for a GP term.
+# @return `[ndraws, nobs]` matrix, the sum of every GP term
+brms_predictor_gp_added <- function(prep, i) {
+  if (!length(prep[["gp"]])) {
+    return(0)
+  }
+  one_term <- utils::getFromNamespace(".predictor_gp", "brms")
+  eta <- matrix(0, nrow = prep$ndraws, ncol = prep$nobs)
+  for (gp in prep[["gp"]]) {
+    if (!isTRUE(attr(gp, "byfac"))) {
+      eta <- eta + one_term(gp)
+      next
+    }
+    for (level in gp) {
+      rows <- level[["Igp"]]
+      if (length(rows)) {
+        eta[, rows] <- eta[, rows] + one_term(level)
+      }
+    }
+  }
+  eta
+}
+
+
 # The largest gap between each observation predictor mvgam composes and
 # brms's own from the same draws. Each predictor's parts also sum to it.
 # brms uses a fit's latent values only when given no `newdata`. mvgam

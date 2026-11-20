@@ -1139,16 +1139,20 @@ gr_lv_true <- local({
   }
   cbind(one_region(), one_region())
 })
+# A covariate every series shares. The frame names its series by
+# `region` and `sp` alone, with no series column.
 gr_dat <- expand.grid(time = 1:80, sp = c("a", "b"), region = c("r1", "r2"))
-gr_dat$y <- rpois(nrow(gr_dat), exp(1 + as.vector(gr_lv_true)))
+gr_dat$x <- rnorm(nrow(gr_dat))
+gr_dat$y <- rpois(nrow(gr_dat),
+                  exp(1 + 0.4 * gr_dat$x + as.vector(gr_lv_true)))
 gr_fit <- cached_fit(
   "val_mvgam_var_grouped.rds",
   function() {
-    mvgam(y ~ 1, trend_formula = ~ VAR(p = 2, gr = region, subgr = sp),
+    mvgam(y ~ x, trend_formula = ~ VAR(p = 2, gr = region, subgr = sp),
           data = gr_dat, family = poisson(), chains = 2L, iter = 1000L,
           warmup = 500L, silent = 2, backend = "cmdstanr")
   },
-  key = gr_lv_true
+  key = list(lv = gr_lv_true, x = gr_dat$x)
 )
 
 test_that("a grouped VAR(2) is stationary, block by block", {
@@ -1206,7 +1210,7 @@ test_that("a forecast community takes each draw's propagated state", {
   # By hand: one replicate is the forecast. Presence is one less the
   # Poisson zero of its predictor.
   set.seed(1)
-  one <- community(gr_fit, newdata = data.frame(time = 81:83),
+  one <- community(gr_fit, newdata = data.frame(time = 81:83, x = 0),
                    latent = "forecast", draw_ids = ids, n_nodes = 1L)
   set.seed(1)
   fc <- forecast(gr_fit, newdata = one$frame, type = "link", draw_ids = ids)
@@ -1225,9 +1229,22 @@ test_that("a forecast community takes each draw's propagated state", {
               n_nodes = 1L)$presence,
     one$presence
   )
-  expect_error(community(gr_fit, newdata = data.frame(time = 80:81),
+  expect_error(community(gr_fit, newdata = data.frame(time = 80:81, x = 0),
                          latent = "forecast", draw_ids = ids),
                "at or before")
+})
+
+
+test_that("species_effects places each row on its grouped series", {
+  # Every series shares `b_x`. The frame names no series column.
+  ids <- 1:5
+  se <- species_effects(gr_fit, variables = "x", draw_ids = ids)
+  b_x <- as.numeric(posterior::as_draws_matrix(gr_fit)[ids, "b_x"])
+  levels <- fitted_series_levels(gr_fit)
+  expect_equal(se$draws$species[, , "x"],
+               matrix(b_x, length(ids), length(levels),
+                      dimnames = list(NULL, levels)),
+               tolerance = 1e-8)
 })
 
 

@@ -38,7 +38,7 @@ mvgam_split_models <- function(x, ..., model_names = NULL,
     stop(insight::format_error(c(
       "All non-model arguments must be named.",
       i = "Pass mvgam fits by position."
-    )))
+    )), call. = FALSE)
   }
   models <- c(list(x), dots[is_model_dot])
   # `substitute(x)` names the caller's own argument, `object` in
@@ -113,17 +113,17 @@ mvgam_normalize_weights <- function(weights, n_models) {
         "Got ", length(weights), " weights for ",
         n_models, " models."
       )
-    )))
+    )), call. = FALSE)
   }
   if (any(weights < 0) || any(!is.finite(weights))) {
     stop(insight::format_error(
       "Numeric 'weights' must be finite and non-negative."
-    ))
+    ), call. = FALSE)
   }
   if (sum(weights) == 0) {
     stop(insight::format_error(
       "Numeric 'weights' must have a positive total."
-    ))
+    ), call. = FALSE)
   }
   weights / sum(weights)
 }
@@ -162,7 +162,7 @@ mvgam_validate_weights <- function(weights, models,
         "Use 'stacking', 'pseudobma', 'pseudobma+', 'loo', ",
         "'waic' or a numeric vector."
       )
-    )))
+    )), call. = FALSE)
   }
   valid <- c("stacking", "pseudobma", "pseudobma+",
              "loo", "waic")

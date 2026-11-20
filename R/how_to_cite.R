@@ -49,11 +49,16 @@ how_to_cite <- function(object, ...) {
 }
 
 
-# The references `how_to_cite()` can return. Each entry holds the
-# citation as BibTeX and as text in the "(Author Year)" form of the
-# methods text. The detection table of `how_to_cite()` names
-# entries by key.
-#'@noRd
+#' The references how_to_cite() can return
+#'
+#' Each entry holds the citation as BibTeX and as text in the
+#' "(Author Year)" form of the methods text. The detection table of
+#' `how_to_cite()` names entries by key. Roxygen blocks elsewhere
+#' insert an entry's text through inline R code.
+#'
+#' @return Named list with one element per reference key, each a list
+#'   of character scalars `text` and `bibtex`
+#' @noRd
 reference_db <- function() {
   list(
     clark_dgam = list(
@@ -291,6 +296,18 @@ reference_db <- function() {
         sep = "\n"
       )
     ),
+    rasmussen_gp = list(
+      text = "Rasmussen CE and Williams CKI (2006). Gaussian Processes for Machine Learning. MIT Press.",
+      bibtex = paste(
+        "@book{rasmussen2006gp,",
+        "  title = {{G}aussian Processes for Machine Learning},",
+        "  author = {Rasmussen, Carl Edward and Williams, Christopher K. I.},",
+        "  publisher = {MIT Press},",
+        "  year = {2006}",
+        "}",
+        sep = "\n"
+      )
+    ),
     taylor_pw = list(
       text = "Taylor S and Letham B (2018). Forecasting at scale. The American Statistician, 72(1), 37-45. https://doi.org/10.1080/00031305.2017.1380080",
       bibtex = paste(
@@ -387,6 +404,21 @@ reference_db <- function() {
         sep = "\n"
       )
     ),
+    pedersen_hgam = list(
+      text = "Pedersen EJ, Miller DL, Simpson GL and Ross N (2019). Hierarchical generalized additive models in ecology: an introduction with mgcv. PeerJ, 7, e6876. https://doi.org/10.7717/peerj.6876",
+      bibtex = paste(
+        "@article{pedersen2019hgam,",
+        "  title = {Hierarchical generalized additive models in ecology: an introduction with mgcv},",
+        "  author = {Pedersen, Eric J. and Miller, David L. and Simpson, Gavin L. and Ross, Noam},",
+        "  journal = {PeerJ},",
+        "  volume = {7},",
+        "  pages = {e6876},",
+        "  year = {2019},",
+        "  doi = {10.7717/peerj.6876}",
+        "}",
+        sep = "\n"
+      )
+    ),
     tikhonov_hmsc_2020 = list(
       text = "Tikhonov G, Opedal OH, Abrego N, Lehikoinen A, de Jonge MMJ, Oksanen J and Ovaskainen O (2020). Joint species distribution modelling with the R-package Hmsc. Methods in Ecology and Evolution, 11(3), 442-447. https://doi.org/10.1111/2041-210X.13345",
       bibtex = paste(
@@ -479,6 +511,22 @@ reference_db <- function() {
         "  pages = {2499--2523},",
         "  year = {2020},",
         "  doi = {10.1080/00949655.2020.1783262}",
+        "}",
+        sep = "\n"
+      )
+    ),
+    papaspiliopoulos_centring = list(
+      text = "Papaspiliopoulos O, Roberts GO and Skold M (2007). A general framework for the parametrization of hierarchical models. Statistical Science, 22(1), 59-73. https://doi.org/10.1214/088342307000000014",
+      bibtex = paste(
+        "@article{papaspiliopoulos2007parametrization,",
+        "  title = {A general framework for the parametrization of hierarchical models},",
+        "  author = {Papaspiliopoulos, Omiros and Roberts, Gareth O. and Sk{\\\"o}ld, Martin},",
+        "  journal = {Statistical Science},",
+        "  volume = {22},",
+        "  number = {1},",
+        "  pages = {59--73},",
+        "  year = {2007},",
+        "  doi = {10.1214/088342307000000014}",
         "}",
         sep = "\n"
       )
@@ -751,30 +799,19 @@ uses_jsdgam <- function(object) {
 }
 
 
-# Does the observation or trend formula hold a `gp()` term? brms
-# parses these terms from the formula and the fit stores no separate
-# record of them.
-#'@noRd
-uses_gp_smooth <- function(object) {
-  has_gp <- function(f) {
-    if (is.null(f)) return(FALSE)
-    txt <- if (inherits(f, "brmsformula")) {
-      paste(format(f$formula), collapse = " ")
-    } else {
-      paste(format(f), collapse = " ")
-    }
-    grepl("\\bgp\\(", txt)
-  }
-  has_gp(object$formula) || has_gp(object$trend_formula)
-}
-
-
-# Threading detection: returns TRUE iff the compiled stancode
-# contains a `reduce_sum(...)` call -- either the brms-emitted
-# `partial_log_lik_lpmf` for native families, or one of the
-# mvgam-emitted `partial_sum_*_lpmf` wrappers for closure-unit
-# families. Either path means within-chain parallelism was on.
-#'@noRd
+#' Whether the fit's Stan program threads within chains
+#'
+#' Returns `TRUE` when the compiled Stan code contains a `reduce_sum()`
+#' call. brms emits one through `partial_log_lik_lpmf` for native
+#' families. mvgam emits one through its `partial_sum_*_lpmf` wrappers
+#' for closure-unit families. Either path means within-chain
+#' parallelism was on. When this returns `TRUE`, `how_to_cite()` cites
+#' the threading interface of brms and `extract_sampling_info()`
+#' reports a thread count.
+#'
+#' @param object Fitted `mvgam` object
+#' @return Logical scalar, `FALSE` when the fit stores no Stan code
+#' @noRd
 uses_threading <- function(object) {
   sc <- object$stancode
   if (is.null(sc)) return(FALSE)
@@ -782,20 +819,19 @@ uses_threading <- function(object) {
 }
 
 
-# The sampling settings of a fit, taken from the `stan_args` slot of
-# the stanfit that mvgam builds from rstan and cmdstanr output alike.
-# Returns NULL for a fit drawn by any algorithm other than NUTS, or
-# when the slot is empty.
-#
-# `how_to_cite()` uses chains, warmup and iter. The Implementation
-# block of `methods_md()` also uses threads, adapt_delta,
-# max_treedepth and init. A field is NA where the user accepted the
-# brms or Stan default. Callers print only the fields that are set.
-# An initial-value specification is echoed into a reproduction call
-# only when it is a single keyword. Numeric, list and function starts
-# are not printable. The file path Stan records for them is not
-# printable either.
-#'@noRd
+#' The initial-value specification, when a reproduction call can print it
+#'
+#' An initial-value specification is echoed into a reproduction call
+#' only when it is a single keyword. Numeric, list and function starts
+#' are not printable. The file path Stan records for them is not
+#' printable either. The keyword `"random"`, Stan's default, and an
+#' empty string also return `NA`.
+#'
+#' @param init The `init` argument of a fit, or the value Stan recorded
+#'   for it
+#' @return Character scalar keyword, or `NA_character_` when `init` is
+#'   not printable
+#' @noRd
 printable_init <- function(init) {
   if (is.null(init) || length(init) != 1L || !is.character(init)) {
     return(NA_character_)
@@ -806,7 +842,21 @@ printable_init <- function(init) {
   init
 }
 
-#'@noRd
+#' The sampling settings of a fit
+#'
+#' Takes the settings from the `stan_args` slot of the stanfit that
+#' mvgam builds from rstan and cmdstanr output alike. `how_to_cite()`
+#' uses chains, warmup and iter. The Implementation block of
+#' `methods_md()` also uses threads, adapt_delta, max_treedepth and
+#' init. A field is `NA` where the user accepted the brms or Stan
+#' default. Callers print only the fields that are set.
+#'
+#' @param object Fitted `mvgam` object
+#' @return Named list of `chains`, `warmup`, `iter`, `threads`,
+#'   `adapt_delta`, `max_treedepth` and `init`, each a scalar. `NULL`
+#'   for a fit drawn by any algorithm other than NUTS, or when the slot
+#'   is empty.
+#' @noRd
 extract_sampling_info <- function(object) {
   if (!identical(object$algorithm %||% "sampling", "sampling")) {
     return(NULL)
@@ -945,6 +995,12 @@ how_to_cite.mvgam <- function(object, ...) {
   identification <- fit_factor_identification(object)
   fixed_Z <- object$trend_metadata$fixed_Z
   loadings_text <- loadings_prior_text(object)
+  trait_slopes <- object$jsdgam_args$trait_slopes
+  trait_slopes_smooth <- !is.null(trait_slopes) && any(
+    formula_term_kinds(
+      obs_arm_main_formula(object$jsdgam_args$formula)
+    )$kinds %in% c("smooth", "gp")
+  )
   rules <- list(
     list(
       detect = grepl("^VAR", trend_model),
@@ -963,9 +1019,14 @@ how_to_cite.mvgam <- function(object, ...) {
       refs = "heaps_var"
     ),
     list(
-      detect = uses_gp_smooth(object),
+      detect = gp_forms(object$standata)[["approximate"]],
       text = " Gaussian Process functional effects were estimated using the low-rank Hilbert-space approximation of Riutort-Mayol et al. (2023).",
       refs = "riutort_gp"
+    ),
+    list(
+      detect = gp_forms(object$standata)[["exact"]],
+      text = " Exact Gaussian Process functional effects were estimated through their full covariance kernels (Rasmussen and Williams 2006).",
+      refs = "rasmussen_gp"
     ),
     list(
       detect = identical(trend_model, "LLT"),
@@ -1027,6 +1088,24 @@ how_to_cite.mvgam <- function(object, ...) {
       )
     ),
     list(
+      detect = !is.null(trait_slopes),
+      text = paste0(
+        " Each species' intercept and covariate effects were regressed",
+        " on its traits, with correlated species-level deviations, the",
+        " fourth-corner model of Ovaskainen et al. (2017)."
+      ),
+      refs = "ovaskainen_hmsc_2017"
+    ),
+    list(
+      detect = !is.null(trait_slopes) && trait_slopes_smooth,
+      text = paste0(
+        " Each smooth effect took a shared curve, a curve scaled by each",
+        " trait and a curve per species penalised towards a flat line",
+        " (Pedersen et al. 2019)."
+      ),
+      refs = "pedersen_hgam"
+    ),
+    list(
       detect = !is.null(detect_factor_n_lv(object)) && nzchar(loadings_text),
       text = loadings_text,
       refs = "heaps_jermyn"
@@ -1046,6 +1125,16 @@ how_to_cite.mvgam <- function(object, ...) {
         " series of Dunn and Smyth (2005)."
       ),
       refs = c("jorgensen_tweedie", "dunn_smyth_tweedie")
+    ),
+    list(
+      detect = isTRUE(object$trend_metadata$centred),
+      text = paste0(
+        " The latent states were sampled in centred form, each as its",
+        " distance from the first state, with the innovations recovered",
+        " from them (Papaspiliopoulos et al. 2007). The parameterisation",
+        " leaves the model unchanged."
+      ),
+      refs = "papaspiliopoulos_centring"
     ),
     list(
       detect = uses_heavy_tailed_trend(object),

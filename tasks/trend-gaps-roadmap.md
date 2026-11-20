@@ -6,9 +6,6 @@ wrong in one respect.
 
 ## 1. Seasonal forecasting
 
-- **1e. Correlated seasonal shocks under `cor`.** They take the level's
-  correlation matrix with their own scales, as the slope shocks do.
-  `residual_cor()` reports which series shift seasons together.
 - **1f. Dummy seasonal form.** `s - 1` states tied to calendar
   positions, behind an argument whose default stays trigonometric.
 - **1g. Real-data check.** Forecasts against `s(month, bs = "cc") +
@@ -23,19 +20,11 @@ Reference points: gllvm `coefplot()`, and Hmsc `plotBeta()` and
 `plotGamma()` sign-support heatmaps, `computeAssociations()` support
 levels and `evaluateModelFit()` per species.
 
-- **4c. Sign-support heatmaps.** Species by
-  covariate effects, and trait by environment effects for
-  `trait_slopes` fits.
 - **4f. Associations net of detection.** For `occ()` and `nmix()` fits,
   latent-state associations set against naive co-occurrence, showing
   what detection error alone would have suggested.
 
 ## 2. Sparse level shifts
-
-**2a. Heavy-tail example.** One vignette example of `RW(df = NA)` or
-`AR(df = NA)`, which give multivariate t innovations. The t shares
-its scale across series at each time, and a jump in one series loosens
-the others at that time. The example should say so.
 
 **2b. Horseshoe step process. Parked.** It is one more law in
 `innovation_vector_prior()`, with a local scale per time and series and
@@ -50,21 +39,9 @@ One `lv_trend` matrix and one block of dynamics parameters hold the
 state, and `validate_trend_formula()` refuses a second constructor
 (architecture decisions, section 2). A sum of constructors needs
 parallel state, parameter and extraction paths in every post-fit
-method.
-
-The request was `PW() + AR(1)`: deterministic growth with persistent
-deviations. The local linear trend gives a stochastic slope with level
-noise, the same model class. One check is worth making: whether `PW()`
-with an observation-side brms `ar()` term already fits, and if it does,
-document it.
-
-## 5. Centred parameterisation
-
-Every trend is written non-centred. Counts informative enough to pin
-each state gave `RW()` maximum treedepth on 24% of transitions. The
-`noncentred` argument was removed on purpose. Two routes: an automatic
-rule, or a restored switch. Prototype a centred `RW()` on the referral
-data, and choose with the result in hand.
+method. The local linear trend covers the requested `PW() + AR(1)`
+model class. An observation-side brms `ar()` is refused: no prediction,
+forecast or log-likelihood carried it.
 
 ## 6. Calendar effects
 
@@ -75,10 +52,9 @@ dependency and stay out.
 
 ## Order
 
-1. 4c, 1e, 4f
+1. 4f
 2. Dummy seasonal form 1f
 3. Real-data seasonal check 1g, then 1h
-4. Centred prototype and decision (5)
-5. Calendar helpers (6), heavy-tail example (2a)
+4. Calendar helpers (6)
 
 Parked: horseshoe steps (2b). Not planned: combining trends (3).

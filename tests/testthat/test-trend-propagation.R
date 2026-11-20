@@ -211,8 +211,34 @@ test_that("an LLT forecast turns each seasonal pair by its frequency", {
   attr(out, "components") <- NULL
   expect_equal(out, ref)
 
+  # Correlated level shocks correlate each harmonic's seasonal shocks
+  # across the series, with the season's own scales
+  R <- matrix(c(1, 0.6, 0.6, 1), 2L)
+  params$Sigma <- R * tcrossprod(c(0.3, 0.2))
+  set.seed(5)
+  out <- propagate_trend(spec, params, h = 4L, n_series = 2L,
+                         last_state = state)
+  set.seed(5)
+  invisible(rmvn(4L, c(0, 0), params$Sigma))
+  invisible(rmvn(4L, c(0, 0), R * tcrossprod(c(0.1, 0.05))))
+  g <- season0[1:2, ]
+  g_star <- season0[3:4, ]
+  shock <- function() {
+    matrix(rnorm(4L), 2L) %*% chol(R) * rep(c(0.02, 0.04), each = 2L)
+  }
+  for (t in 1:4) {
+    w <- shock()
+    w_star <- shock()
+    g_last <- g
+    g <- cos(lam) * g_last + sin(lam) * g_star + w
+    g_star <- cos(lam) * g_star - sin(lam) * g_last + w_star
+    seasons[t, ] <- colSums(g)
+  }
+  expect_equal(attr(out, "components")$season, seasons)
+
   # Without shocks the season repeats every period and sums to zero
   # over one
+  params$Sigma <- NULL
   params$sigma_season <- c(0, 0)
   fixed <- attr(propagate_trend(spec, params, h = 24L, n_series = 2L,
                                 last_state = state), "components")$season

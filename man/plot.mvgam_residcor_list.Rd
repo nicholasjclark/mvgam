@@ -42,9 +42,10 @@ Faceted heatmap panel across the per-group correlation
 matrices returned by \code{residual_cor(mod, by_group = TRUE)} on a
 hierarchical trend fit. Each panel is drawn as by
 \code{\link[=plot.mvgam_residcor]{plot.mvgam_residcor()}}, one per group, with fill showing the
-posterior point estimate and an outline on each supported pair. The facets share colour limits. Panels are then
-directly comparable. The \verb{_global} reference matrix is included by
-default. Drop it with \code{include_global = FALSE}.
+posterior point estimate and an outline on each supported pair. The
+facets share colour limits. The panels are then directly comparable.
+The \verb{_global} reference matrix is included by default.
+Drop it with \code{include_global = FALSE}.
 }
 \seealso{
 \code{\link[=residual_cor]{residual_cor()}}, \code{\link[=plot.mvgam_residcor]{plot.mvgam_residcor()}},

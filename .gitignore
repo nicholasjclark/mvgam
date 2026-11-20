@@ -28,6 +28,10 @@ doc/
 **/cache/*.rdb
 **/cache/*.rdx
 **/cache/*.RData
+# knitr records a cache's packages in `<prefix>__packages`
+**/cache/*__packages
+# The pkgdown workflow copies the cheatsheets in from misc/
+pkgdown/assets/cheatsheets/
 tests/local/fixtures/lfo_cv/
 # session-only scratchpad of rendered figures
 scratchpad_figs/

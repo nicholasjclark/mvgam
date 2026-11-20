@@ -7,25 +7,22 @@
 mvgam_multiple(formula, trend_formula = NULL, data_list, combine = TRUE, ...)
 }
 \arguments{
-\item{formula}{Main observation model formula (supports brms syntax).
-Smooth specials \code{s()}, \code{t2()}, \code{gp()}, varying intercepts and
-slopes, multi-membership \code{mm()}, monotonic \code{mo()}, measurement-error
-\code{me()}, imputed \code{mi()}, distributional \code{dpar} sub-formulas and
-\code{offset()} are all available. A response leaves rows out by holding
-\code{NA} there. \code{subset()} and \code{index()} are not supported. \code{gp()}
-accepts both the approximate Hilbert-space form
-(\code{gp(x, k = 20)}) and the exact full-covariance form
-(\code{gp(x)}, no \code{k}). Prediction at \code{newdata} requires the
-approximate form. An exact \code{gp()} term fits and scores
-in-sample. \code{mvgam()} says so once per session.}
+\item{formula}{The observation model formula, in brms syntax:
+smooths \code{s()} and \code{t2()}, \code{gp()}, varying intercepts and slopes,
+\code{mm()}, \code{mo()}, \code{me()}, \code{mi()}, distributional and non-linear
+sub-formulas and \code{offset()}. A response leaves rows out by holding
+\code{NA} there. \code{\link[=mvgam_formula]{mvgam_formula()}} lists the terms each formula refuses.
+\code{gp()} takes the approximate Hilbert-space form (\code{gp(x, k = 20)})
+or the exact form (\code{gp(x)}, no \code{k}), under any brms kernel. An
+exact term predicts at new covariate values by conditioning on its
+fitted values, as brms does. Its cost grows with the cube of the
+number of unique values.}
 
 \item{trend_formula}{A one-sided formula for the latent process:
 a trend constructor such as \code{AR()} with any predictors of the
 latent state. Write \code{\link[=lv_axis]{lv_axis()}} in a term to vary its effect by
 latent factor, or by series in a model without factors, as in
-\code{~ x:lv_axis() + AR()}. The series column itself is not
-supported in a term of this formula. Forecasting requires the
-approximate form of any \code{gp()} term here.}
+\code{~ x:lv_axis() + AR()}.}
 
 \item{data_list}{A list of at least two imputed data frames, or a
 \code{mids} object from \pkg{mice}.}

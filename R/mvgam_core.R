@@ -29,7 +29,11 @@ mvgam_removed_args <- c(
     "a dynamic factor model is requested with 'n_lv' on the trend ",
     "constructor, as in 'trend_formula = ~ AR(p = 1, n_lv = 3)'"
   ),
-  noncentred = "the trend parameterisation is chosen by mvgam",
+  noncentred = paste0(
+    "the states are non-centred by default. 'centred' on the trend ",
+    "constructor samples them centred, as in ",
+    "'trend_formula = ~ RW(centred = TRUE)'"
+  ),
   prior_simulation = "use 'sample_prior = \"only\"'",
   return_model_data = "use 'standata()' on the fitted model",
   save_all_pars = paste0(
@@ -260,24 +264,21 @@ mvgam_imputation_forwarded <- c(
 #' `r mvgam_article("mvgam_overview", "overview article")` walks through
 #' a full analysis.
 #'
-#' @param formula Main observation model formula (supports brms syntax).
-#'   Smooth specials `s()`, `t2()`, `gp()`, varying intercepts and
-#'   slopes, multi-membership `mm()`, monotonic `mo()`, measurement-error
-#'   `me()`, imputed `mi()`, distributional `dpar` sub-formulas and
-#'   `offset()` are all available. A response leaves rows out by holding
-#'   `NA` there. `subset()` and `index()` are not supported. `gp()`
-#'   accepts both the approximate Hilbert-space form
-#'   (`gp(x, k = 20)`) and the exact full-covariance form
-#'   (`gp(x)`, no `k`). Prediction at `newdata` requires the
-#'   approximate form. An exact `gp()` term fits and scores
-#'   in-sample. `mvgam()` says so once per session.
+#' @param formula The observation model formula, in brms syntax:
+#'   smooths `s()` and `t2()`, `gp()`, varying intercepts and slopes,
+#'   `mm()`, `mo()`, `me()`, `mi()`, distributional and non-linear
+#'   sub-formulas and `offset()`. A response leaves rows out by holding
+#'   `NA` there. [mvgam_formula()] lists the terms each formula refuses.
+#'   `gp()` takes the approximate Hilbert-space form (`gp(x, k = 20)`)
+#'   or the exact form (`gp(x)`, no `k`), under any brms kernel. An
+#'   exact term predicts at new covariate values by conditioning on its
+#'   fitted values, as brms does. Its cost grows with the cube of the
+#'   number of unique values.
 #' @param trend_formula A one-sided formula for the latent process:
 #'   a trend constructor such as `AR()` with any predictors of the
 #'   latent state. Write [lv_axis()] in a term to vary its effect by
 #'   latent factor, or by series in a model without factors, as in
-#'   `~ x:lv_axis() + AR()`. The series column itself is not
-#'   supported in a term of this formula. Forecasting requires the
-#'   approximate form of any `gp()` term here.
+#'   `~ x:lv_axis() + AR()`.
 #' @param data Data frame in long format, one row per series and time.
 #'   A model with a trend needs a numeric `time` column and a factor
 #'   `series` column, or the columns a trend constructor names through
@@ -705,6 +706,7 @@ mvgam_from_data <- function(formula, trend_formula, data, newdata,
                             family, threads, save_pars, run_model,
                             user_call, ...) {
   checkmate::assert_class(user_call, "call")
+  validate_model_formulas(formula, trend_formula)
 
   if (inherits(data, "mids")) {
     data <- lapply(seq_len(data$m), function(i) mice::complete(data, i))
@@ -895,6 +897,9 @@ check_newdata <- function(newdata, data, trend_formula = NULL) {
       series_label = series_column_label(data)
     )
     return(invisible(newdata))
+  }
+  if (!is.null(trend_formula)) {
+    validate_trend_formula(trend_formula)
   }
   axis <- trend_formula_axis_columns(trend_formula)
   series_var <- axis$series_var

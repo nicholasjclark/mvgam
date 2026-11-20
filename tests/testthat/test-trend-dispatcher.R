@@ -183,6 +183,28 @@ test_that("Factor validation error messages are consistent", {
 
   # Check they have specific reasons
   expect_error(PW(n_lv = 1), "changepoint")
+
+  # Sampled loadings absorb any correlation among the factors, which the
+  # program pins at the identity. An explicit request is refused, as a
+  # jsdgam() factor request is. Fixed loadings keep it.
+  d <- data.frame(time = rep(1:12, 3), series = factor(rep(1:3, each = 12)),
+                  y = rnorm(36))
+  for (tf in list(~ LLT(n_lv = 2, cor = TRUE), ~ RW(n_lv = 2, cor = TRUE))) {
+    expect_error(stancode(mvgam_formula(y ~ 1, tf), data = d),
+                 "'cor = TRUE' is not supported in a factor model")
+  }
+  expect_error(
+    jsdgam(y ~ 1, factor_formula = ~ AR(cor = TRUE), data = d,
+           unit = time, species = series, n_lv = 2, family = gaussian(),
+           run_model = FALSE),
+    "'cor = TRUE' is not supported in a factor model"
+  )
+  tm <- data.frame(series = factor(1:3), trend = c(1, 1, 2))
+  expect_match(
+    stancode(mvgam_formula(y ~ 1, ~ RW(cor = TRUE, trend_map = tm)),
+             data = d),
+    "target += lkj_corr_cholesky_lpdf(L_Omega_trend", fixed = TRUE
+  )
 })
 
 # Test trend registry functionality
@@ -399,7 +421,7 @@ test_that("formula parsing handles edge cases correctly", {
 
   # Test that offset terms are properly rejected in trend formulas
   expect_error(
-    mvgam:::parse_trend_formula(~ I(x^2) + RW() + offset(z)),
+    mvgam_formula(y ~ 1, trend_formula = ~ I(x^2) + RW() + offset(z)),
     "Offsets apply to the observation model"
   )
 
@@ -420,7 +442,7 @@ test_that("formula parsing error handling works comprehensively", {
 
   # Test formula with response variable
   expect_error(
-    mvgam:::parse_trend_formula(y ~ RW()),
+    mvgam_formula(y ~ 1, trend_formula = y ~ RW()),
     "takes predictors only"
   )
 
@@ -532,6 +554,9 @@ test_that("print method handles all configurations", {
     "  Type: AR({1, 12})", "  Correlated innovations",
     "  Dynamic factors: 2", "  AR coefficients: hierarchical"
   ) %in% output))
+  # The sampling form prints when it departs from the default
+  expect_true("  Centred states" %in% capture.output(print(LLT(centred = TRUE))))
+  expect_false("  Centred states" %in% capture.output(print(LLT())))
 })
 
 # Test complex real-world scenarios
@@ -627,7 +652,7 @@ test_that("time parameter integrates correctly with formula parsing", {
 
   # Test that offset rejection works with various formulas
   expect_error(
-    mvgam:::parse_trend_formula(~ s(temp) + CAR() + offset(effort)),
+    mvgam_formula(y ~ 1, trend_formula = ~ s(temp) + CAR() + offset(effort)),
     "Offsets apply to the observation model"
   )
 })

@@ -188,15 +188,13 @@ test_that("as_draws_matrix / df / array / list / rvars all dispatch", {
 
 # ---- bayesplot-ecosystem wrappers ------------------------------------
 
-test_that("coef and fixef summarise the population coefficients", {
+test_that("fixef summarises the population coefficients", {
   stub <- make_mvgam_stub()
   betas <- unclass(posterior::as_draws_matrix(stub$fit))[
     , c("b_Intercept", "b_x")
   ]
-  expect_equal(coef(stub), colMeans(betas))
-  draws <- coef(stub, summary = FALSE)
-  expect_identical(colnames(draws), colnames(betas))
-  expect_equal(as.vector(draws), as.vector(betas))
+  # `coef()` combines group-level effects, as brms's does
+  expect_error(coef(stub), "'fixef\\(\\)' gives the population-level")
   fe <- fixef(stub)
   expect_identical(dimnames(fe), list(c("Intercept", "x"),
                    c("Estimate", "Est.Error", "Q2.5", "Q97.5")))
@@ -214,7 +212,7 @@ test_that("fixef.mvgam refuses a 'pars' entry the model does not have", {
 })
 
 test_that("trend_effects reports the trend formula's coefficients", {
-  # `fixef()`, `coef()` and `vcov()` reach the trend formula's terms
+  # `fixef()` and `vcov()` reach the trend formula's terms
   stub <- make_mvgam_stub(c("b_Intercept", "b_x", "b_x_trend", "lp__"))
   expect_error(fixef(stub, trend_effects = TRUE), "'trend_formula'")
   stub$trend_formula <- ~ x
@@ -224,7 +222,6 @@ test_that("trend_effects reports the trend formula's coefficients", {
   fe <- fixef(stub, trend_effects = TRUE)
   expect_identical(rownames(fe), "x_trend")
   expect_equal(unname(fe[, "Estimate"]), mean(draws))
-  expect_equal(unname(coef(stub, trend_effects = TRUE)), mean(draws))
   expect_equal(vcov(stub, trend_effects = TRUE),
                matrix(var(draws), 1, 1,
                       dimnames = list("x_trend", "x_trend")))
@@ -705,3 +702,17 @@ test_that("compiled_model() requires the backend the fit recorded", {
   expect_error(mvgam:::compiled_model(stub), "x\\$backend")
 })
 
+
+
+test_that("a level's threshold takes its family's sign", {
+  fixed <- matrix(c(1, 2), 1L)
+  deviation <- matrix(c(0.5, -0.5), 1L)
+  level <- function(name, family) {
+    mvgam:::level_coefficient(fixed, deviation, name, family)
+  }
+  # brms sets cumulative thresholds against the predictor as
+  # `thres - eta`, acat's as `eta - thres`
+  expect_equal(level("Intercept[1]", brms::cumulative()), fixed - deviation)
+  expect_equal(level("Intercept[1]", brms::acat()), deviation - fixed)
+  expect_equal(level("x", brms::cumulative()), fixed + deviation)
+})

@@ -155,7 +155,8 @@ has_factor_coefficients <- function(trend_spec) {
 factor_indexed_pars <- list(
   signed = c("Z", "Z_raw", "lv_trend", "innovations_trend",
              "scaled_innovations_trend", "ma_innovations_trend",
-             "init_innovations_trend"),
+             "init_innovations_trend", "innovations_start_trend",
+             "lv_dev_trend"),
   signed_first = "Z_cols",
   unsigned = "^((ar[0-9]+(_pacf)?|theta[0-9]+|sigma)_trend|Psi_diag)$",
   recomputed = "varrho_inv"

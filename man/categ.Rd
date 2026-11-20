@@ -56,6 +56,11 @@ and \code{NA} on the others. \code{loo()} then counts each unit once.
 \code{posterior_linpred()} gives \code{mu} per row before the reference
 subtraction. \code{posterior_epred()} gives the expected shares, which
 sum to one within each unit.
+
+\code{\link[=species_effects]{species_effects()}}, \code{\link[=variance_partition]{variance_partition()}} and
+\code{forecast_uncertainty(scale = "link")} report the predictor centred
+across each unit's components, the centred log-ratio scale. A shift
+shared by every component then drops out.
 }
 
 \examples{

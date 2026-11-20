@@ -55,7 +55,7 @@ plot_mvgam_series <- function(
   resolve_resp(object, resp)
   time_var <- axis_vars(object)$time_var
   series_levels <- fitted_series_levels(object)
-  test <- jsdgam_axis_columns(object, newdata %||% object$test_data)
+  test <- jsdgam_prediction_columns(object, newdata %||% object$test_data)
   if (!is.null(test) && !is.null(object$trend_metadata)) {
     validate_prediction_factor_levels(
       test, object$trend_metadata,
@@ -160,7 +160,7 @@ series_obs_plot <- function(dat, labels, series_levels, series = NULL,
       stop(insight::format_error(c(
         paste0("Response '", response, "' is an unordered factor."),
         i = "The series plots need an ordered response."
-      )))
+      )), call. = FALSE)
     }
     ordinal_levels <- levels(dat$y)
     dat$y <- as.integer(dat$y)
@@ -180,7 +180,7 @@ series_obs_plot <- function(dat, labels, series_levels, series = NULL,
     stop(insight::format_error(c(
       "No observations found for the requested series.",
       x = paste0("Series: '", s_name, "'.")
-    )))
+    )), call. = FALSE)
   }
   # The ACF panel takes its values in row order. A frame may hold a
   # series out of time order.
@@ -220,7 +220,7 @@ resolve_series_index <- function(series, series_levels) {
       "'series' selects one series on this plot.",
       x = paste0("Got ", length(idx), " of ", n_series, " series."),
       i = "Use 'all' to draw every series."
-    )))
+    )), call. = FALSE)
   }
   idx
 }
@@ -258,7 +258,7 @@ series_long_df <- function(df, response, series, time_var, label) {
       x = paste0("Expected: '", response, "'."),
       i = paste0("Got columns: ",
                  paste0("'", names(df), "'", collapse = ", "), ".")
-    )))
+    )), call. = FALSE)
   }
   data.frame(
     time = df[[time_var]],
@@ -291,7 +291,6 @@ series_time_plot <- function(dat, ylab, lines, facet = TRUE) {
   checkmate::assert_string(ylab)
   checkmate::assert_flag(lines)
   checkmate::assert_flag(facet)
-  palette <- mvgam_palette()
   cut_t <- if (any(dat$data == "validate")) {
     min(dat$time[dat$data == "validate"], na.rm = TRUE)
   } else {
@@ -307,7 +306,7 @@ series_time_plot <- function(dat, ylab, lines, facet = TRUE) {
   ) +
     geom_obs +
     ggplot2::scale_colour_manual(
-      values = c(train = palette[5L], validate = "black"),
+      values = c(train = mvgam_colour("dark"), validate = "black"),
       guide = "none"
     ) +
     mvgam_cut_layer(cut_t) +
@@ -366,13 +365,7 @@ series_acf_panel <- function(y) {
   )
   ci <- stats::qnorm(0.975) / sqrt(acf_y$n.used)
   ggplot2::ggplot(df, ggplot2::aes(x = lag, y = 0, yend = acf)) +
-    ggplot2::geom_hline(
-      yintercept = c(-1, 1) * ci, linetype = "dashed"
-    ) +
-    ggplot2::geom_hline(
-      yintercept = 0,
-      colour = mvgam_colour("dark"), linewidth = 0.25
-    ) +
+    acf_reference_layers(ci) +
     ggplot2::geom_segment(
       colour = mvgam_colour("dark"), linewidth = 1
     ) +

@@ -285,13 +285,17 @@ var_process_labels <- function(object, K) {
 #' @param summary Logical. `TRUE` returns the summary of each cell.
 #'   `FALSE` returns the draws as a `[ndraws, K, K]` array, with the
 #'   processes naming its second and third dimensions.
+#' @param prob_threshold The posterior probability of its sign a cell
+#'   needs to count as supported, at least 0.5 and below 1. Defaults to
+#'   0.95. [plot.mvgam_var_matrix()] outlines the supported cells.
 #'
 #' @return With `summary = TRUE`, an `mvgam_var_matrix`: a list of the
 #'   matrices `A`, `A_se`, `A_lower`, `A_upper`, `A_ess`,
 #'   `prob_positive`, `prob_negative` and `prob_nonzero`, with
-#'   `n_series`, `series_names`, `group_label`, `probs` and `lag`. It
-#'   has `print()` and `plot()` methods. With `summary = FALSE`, the
-#'   array of draws. Several panels give a list of either.
+#'   `n_series`, `series_names`, `group_label`, `probs`,
+#'   `prob_threshold` and `lag`. It has `print()` and `plot()` methods.
+#'   With `summary = FALSE`, the array of draws. Several panels give a
+#'   list of either.
 #'
 #' @examples
 #' \dontrun{
@@ -331,10 +335,12 @@ posterior_transition_matrix <- function(object, groups = NULL,
                                          summary = TRUE,
                                          robust = FALSE,
                                          probs = c(0.025, 0.975),
+                                         prob_threshold = 0.95,
                                          lag = 1L) {
   probs <- assert_var_surface_args(NULL, NULL, summary, probs,
                                    future = FALSE)
   checkmate::assert_flag(robust)
+  assert_prob_threshold(prob_threshold)
   require_fitted_model(object, "posterior_transition_matrix")
   assert_var_trend(object, surface = "posterior_transition_matrix()")
   checkmate::assert_int(lag, lower = 1L)
@@ -351,10 +357,11 @@ posterior_transition_matrix <- function(object, groups = NULL,
     if (!summary) return(arr)
     finalise_transition_matrix(
       arr,
-      group_label = attr(arr, "group_label"),
-      robust      = robust,
-      probs       = probs,
-      lag         = lag
+      group_label    = attr(arr, "group_label"),
+      robust         = robust,
+      probs          = probs,
+      prob_threshold = prob_threshold,
+      lag            = lag
     )
   }
 
@@ -472,13 +479,14 @@ extract_transition_matrix_draws <- function(object, group, lag) {
 #' @param arr `[ndraws, K, K]` array of transition matrix draws
 #' @return An `mvgam_var_matrix`
 #' @noRd
-finalise_transition_matrix <- function(arr, group_label,
-                                        robust, probs, lag = 1L) {
+finalise_transition_matrix <- function(arr, group_label, robust, probs,
+                                       prob_threshold, lag = 1L) {
   series_names <- dimnames(arr)[[2L]]
+  dim_names <- list(series_names, series_names)
   stats <- summarise_unconstrained_array(
-    arr, robust = robust, probs = probs, series_names = series_names
+    arr, robust = robust, probs = probs, dim_names = dim_names
   )
-  signs <- sign_probabilities(arr, series_names)
+  signs <- sign_probabilities(arr, dim_names)
   structure(
     list(
       A             = stats$point,
@@ -493,6 +501,7 @@ finalise_transition_matrix <- function(arr, group_label,
       series_names  = series_names,
       group_label   = group_label,
       probs         = probs,
+      prob_threshold = prob_threshold,
       lag           = lag
     ),
     class = "mvgam_var_matrix"
@@ -539,12 +548,15 @@ print.mvgam_var_matrix <- function(x, digits = 2L, ...) {
 #' Draws the posterior estimate of the matrix as a heatmap. Row
 #' \eqn{i}, column \eqn{j} is the effect of process \eqn{j} at time
 #' \eqn{t - l} on process \eqn{i} at time \eqn{t}. A black outline
-#' marks each cell whose interval excludes zero. The colour scale is
+#' marks each cell whose `prob_nonzero` exceeds the `prob_threshold`
+#' given to [posterior_transition_matrix()]. The colour scale is
 #' symmetric about zero and spans the largest absolute cell.
 #'
 #' @inheritParams print.mvgam_var_matrix
 #' @param cluster Logical. `TRUE` orders the processes by a Robinson
 #'   clustering of `1 - A`, which suits a matrix close to symmetric.
+#' @param supported_only Logical. `TRUE` leaves blank every cell whose
+#'   `prob_nonzero` is at most `prob_threshold`. Defaults to `FALSE`.
 #' @param ... Unused. Anything passed here is refused.
 #'
 #' @return A [ggplot2::ggplot] object.
@@ -555,23 +567,26 @@ print.mvgam_var_matrix <- function(x, digits = 2L, ...) {
 #' @author Nicholas J Clark
 #' @method plot mvgam_var_matrix
 #' @export
-plot.mvgam_var_matrix <- function(x, cluster = FALSE, ...) {
+plot.mvgam_var_matrix <- function(x, cluster = FALSE,
+                                  supported_only = FALSE, ...) {
   checkmate::assert_flag(cluster)
+  checkmate::assert_flag(supported_only)
   rlang::check_dots_empty()
   idx <- if (cluster) cluster_cormat(x$A) else seq_len(x$n_series)
-  var_matrix_heatmap(var_matrix_panel(x, idx), x$lag)
+  var_matrix_heatmap(var_matrix_panel(x, idx, supported_only), x$lag)
 }
 
-#' One transition matrix in long format, with its clear cells
+#' One transition matrix in long format, with its supported cells
 #'
 #' @param x An `mvgam_var_matrix`
 #' @param idx Order of the processes
-#' @return Frame of `Var1`, `Var2`, `value` and `clear`
+#' @param supported_only Leave every unsupported cell blank
+#' @return Frame from `support_panel()`
 #' @noRd
-var_matrix_panel <- function(x, idx = seq_len(x$n_series)) {
-  clear <- interval_excludes_zero(x$A_lower, x$A_upper)
-  matrix_panel(x$A[idx, idx, drop = FALSE],
-               clear = clear[idx, idx, drop = FALSE])
+var_matrix_panel <- function(x, idx = seq_len(x$n_series),
+                             supported_only = FALSE) {
+  support_panel(x$A, x$prob_nonzero, x$prob_threshold, supported_only,
+                rows = idx, cols = idx)
 }
 
 #' Heatmap of transition matrices, rows responding to columns
@@ -586,7 +601,7 @@ var_matrix_panel <- function(x, idx = seq_len(x$n_series)) {
 #' @return A `ggplot` object
 #' @noRd
 var_matrix_heatmap <- function(panel, lag, ncol = NULL) {
-  rng <- max(abs(range(panel$value, na.rm = TRUE, finite = TRUE)))
+  rng <- symmetric_limit(panel$value)
   matrix_heatmap(
     panel,
     mvgam_diverging_scale(name = "Lagged\neffect", limits = c(-rng, rng)),
@@ -638,6 +653,7 @@ print.mvgam_var_matrix_list <- function(x, ...) {
 #' @param type `"heatmap"` (default) or `"diagonal"`.
 #' @param ncol The number of facet columns of the heatmaps, or `NULL`
 #'   for `ceiling(sqrt(length(x)))`.
+#' @inheritParams plot.mvgam_var_matrix
 #' @param ... Unused. Anything passed here is refused.
 #'
 #' @return A [ggplot2::ggplot] object.
@@ -650,19 +666,23 @@ print.mvgam_var_matrix_list <- function(x, ...) {
 #' @export
 plot.mvgam_var_matrix_list <- function(x, type = c("heatmap",
                                                      "diagonal"),
-                                        ncol = NULL, ...) {
+                                        ncol = NULL, supported_only = FALSE,
+                                        ...) {
   type <- match.arg(type)
+  checkmate::assert_flag(supported_only)
   rlang::check_dots_empty()
-  if (type == "heatmap") return(plot_var_matrix_list_heatmap(x, ncol))
+  if (type == "heatmap") {
+    return(plot_var_matrix_list_heatmap(x, ncol, supported_only))
+  }
   plot_var_matrix_list_diagonal(x)
 }
 
 #' Faceted heatmap of per-group transition matrices. The facets share
 #' fill limits. Cell magnitudes then compare across groups.
 #' @noRd
-plot_var_matrix_list_heatmap <- function(x, ncol) {
+plot_var_matrix_list_heatmap <- function(x, ncol, supported_only) {
   panel <- do.call(rbind, lapply(names(x), function(g) {
-    df <- var_matrix_panel(x[[g]])
+    df <- var_matrix_panel(x[[g]], supported_only = supported_only)
     df$group <- g
     df
   }))

@@ -25,21 +25,39 @@ pair, with the data and family, to show the priors, the Stan program
 and the data a fit would use. Nothing is compiled or sampled.
 }
 \details{
-A trend formula holds one trend constructor (\link{trend_constructors}).
-It can also hold covariates of the trend, smooths such as \code{s()} and
-\code{t2()}, random effects such as \code{(1 | group)} and Gaussian processes
-through \code{gp()}.
-
-Some terms describe how the response was observed. They belong in
-the observation formula. A trend formula refuses them:
+The observation formula takes the brms syntax, with distributional
+and non-linear sub-formulas through \code{bf()}. It refuses:
 \itemize{
-\item addition terms such as \code{weights()}, \code{cens()}, \code{trunc()},
-\code{trials()} and \code{thres()}
-\item \code{offset()}
-\item \code{mi()}, which brms imputes as a response of the model
+\item a trend constructor such as \code{AR()}. It belongs in
+\code{trend_formula}.
+\item \code{.}, which would enter the time and series columns as
+predictors
+\item \code{rate()} and \code{se()}. Predictions leave them out. Write an
+exposure as \code{offset(log(area))}.
+\item \code{subset()} and \code{index()}. A response leaves rows out by
+holding \code{NA} there.
 \item the brms autocorrelation terms \code{ar()}, \code{ma()}, \code{arma()},
-\code{cosy()}, \code{unstr()} and \code{autocor()}. The trend constructor
-models dependence over time in their place.
+\code{cosy()}, \code{unstr()} and \code{autocor()}. Predictions, forecasts and
+\code{loo()} leave them out. The trend constructor models dependence
+over time.
+}
+
+A trend formula holds one trend constructor (\link{trend_constructors})
+and covariates of the latent state: smooths such as \code{s()} and
+\code{t2()}, random effects such as \code{(1 | group)} and Gaussian processes
+through \code{gp()}. \code{\link[=lv_axis]{lv_axis()}} in a term varies its effect by latent
+factor, or by series in a model without factors. It refuses:
+\itemize{
+\item a response, a second trend constructor and \code{bf()}
+sub-formulas
+\item the series column. \code{lv_axis()} takes its place.
+\item a response of the observation formula as a covariate
+\item \code{offset()} and addition terms such as \code{weights()},
+\code{cens()}, \code{trunc()}, \code{trials()} and \code{thres()}. They describe how
+the response was observed.
+\item \code{mi()}, which brms imputes as a response
+\item \code{cs()}, which shifts an ordinal response's thresholds
+\item the brms autocorrelation terms
 }
 }
 \section{Multivariate models}{

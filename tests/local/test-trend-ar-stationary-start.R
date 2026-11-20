@@ -376,15 +376,17 @@ test_that("the one-step forecast continues the fitted state", {
       at <- function(par, t) {
         as.numeric(fx$dm[, sprintf("%s[%d,%d]", par, t, s)])
       }
-      coef <- function(par) as.numeric(fx$dm[, sprintf("%s[%d]", par, s)])
+      par_draws <- function(par) {
+        as.numeric(fx$dm[, sprintf("%s[%d]", par, s)])
+      }
       cond <- 0
       for (l in seq_len(sh$p)) {
         cond <- cond +
-          coef(paste0("ar", l, "_trend")) * at("lv_trend", last_time + 1L - l)
+          par_draws(paste0("ar", l, "_trend")) * at("lv_trend", last_time + 1L - l)
       }
       if (sh$ma) {
         cond <- cond +
-          coef("theta1_trend") * at("scaled_innovations_trend", last_time)
+          par_draws("theta1_trend") * at("scaled_innovations_trend", last_time)
       }
       nm_s <- series_levels[s]
       expect_identical(as.integer(fc$test_times[[nm_s]]),

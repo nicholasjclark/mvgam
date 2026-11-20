@@ -1170,8 +1170,8 @@ mvgam_trend_registry <- function() {
 #'
 #' A term is a trend term when its outermost call is a registered
 #' trend constructor. A formula with none takes the default `ZMVN()`.
-#' `validate_trend_formula()` refuses more than one constructor before
-#' `parse_multivariate_trends()` calls this.
+#' The entry points refuse a malformed trend formula through
+#' `validate_model_formulas()` before any caller reaches this.
 #'
 #' @param trend_formula A one-sided formula
 #' @return A list with three elements: `trend_model` (the evaluated
@@ -1182,11 +1182,7 @@ parse_trend_formula <- function(trend_formula) {
   checkmate::assert_class(trend_formula, "formula")
   ensure_registry_initialized()
 
-  # `terms()` refuses what it cannot expand, such as a `.` with no
-  # data. Its message names the problem.
   tf_terms <- stats::terms(trend_formula, keep.order = TRUE)
-  refuse_trend_formula_response(trend_formula)
-  refuse_trend_formula_offset(tf_terms)
 
   labels <- attr(tf_terms, "term.labels")
   is_trend <- vapply(labels, is_trend_constructor_call, logical(1L),
@@ -1272,6 +1268,9 @@ print.mvgam_trend <- function(x, ...) {
   )
   if (isTRUE(x$cor)) {
     lines <- c(lines, "Correlated innovations")
+  }
+  if (isTRUE(x$centred)) {
+    lines <- c(lines, "Centred states")
   }
   if (!is.null(x$df) && !identical(x$df, Inf)) {
     df <- if (is.na(x$df)) "estimated" else x$df
@@ -1398,6 +1397,18 @@ print.mvgam_trend <- function(x, ...) {
 #'   They refuse \code{cor = FALSE}. \code{CAR()} defaults to
 #'   \code{FALSE}.
 #'
+#'   In a factor model with every loading sampled, the factors take
+#'   independent shocks. The loadings carry the correlation among
+#'   series, which [residual_cor()] reports. A correlation among the
+#'   factors would trade off against the loadings. `AR()`, `RW()` and
+#'   `LLT()` refuse `cor = TRUE` there. A `trend_map` that fixes the
+#'   loadings keeps the factors apart. `cor = TRUE` then estimates
+#'   their correlation.
+#'
+#' @param centred Logical. Sample the latent states directly rather
+#'   than their innovations? Default `FALSE`. The model and its
+#'   posterior are the same. See *Centred states* below.
+#'
 #' @param p The autoregressive lags. The accepted form depends on the
 #'   trend type:
 #'   * For `AR()` models: a positive integer or a positive integer
@@ -1431,6 +1442,18 @@ print.mvgam_trend <- function(x, ...) {
 #'     weekly and monthly lags
 #'   \item For cross-series dynamics: `VAR(p = 2)`
 #' }
+#'
+#' **Centred states**: by default the sampler draws standard
+#' innovations and builds the states from them. This suits data that
+#' say little about each state, such as small counts, presence-absence
+#' or short series. When the data pin the states down, as large counts
+#' do, every innovation constrains every later state. The sampler then
+#' takes long trajectories and can hit the maximum tree depth.
+#' `centred = TRUE` samples each state as its distance from the first
+#' and recovers the innovations from them. On large counts it ran two
+#' to five times faster per effective draw. On small counts it ran ten
+#' to a hundred times slower. `ZMVN()` factors with sampled loadings
+#' draw their states directly either way. `VAR()` always does.
 #'
 #' **Stationarity of `AR(p)`**: a consecutive lag set with
 #' \code{p >= 2} is sampled as partial autocorrelations,
@@ -1726,6 +1749,21 @@ print.mvgam_trend <- function(x, ...) {
 #' plot(forecast(mod, newdata = keep_some(simdat$data_test)),
 #'      series = 2)
 #'
+#' # Counts near 150 pin each latent state down. Sampled centred, this
+#' # random walk ran about five times faster per effective draw
+#' n_t <- 60
+#' big <- data.frame(time = 1:n_t, series = factor("s1"),
+#'                   y = rpois(n_t, exp(5 + cumsum(rnorm(n_t, 0, 0.1)))))
+#' mod_big <- mvgam(
+#'   y ~ 1,
+#'   trend_formula = ~ RW(centred = TRUE),
+#'   data          = big,
+#'   family        = poisson(),
+#'   chains        = 2,
+#'   silent        = 2
+#' )
+#' summary(mod_big)
+#'
 #' # Next: hindcast() returns the fitted latent trends. The articles
 #' # under 'See Also' fit VAR, hierarchical and factor trends
 #' }
@@ -1741,7 +1779,8 @@ RW <- function(
     subgr = NA,
     n_lv = NULL,
     trend_map = NULL,
-    df = Inf) {
+    df = Inf,
+    centred = FALSE) {
 
   assert_trend_map_input(trend_map)
 
@@ -1754,8 +1793,10 @@ RW <- function(
     .subgr = substitute(subgr),
     ma = ma,
     cor = cor,
+    cor_requested = isTRUE(cor),
     n_lv = n_lv,
-    trend_map = trend_map
+    trend_map = trend_map,
+    centred = centred
   )
 }
 
@@ -1764,7 +1805,7 @@ RW <- function(
 AR <- function(time = NA, series = NA, p = 1, ma = FALSE, cor = NULL,
               gr = NA, subgr = NA, n_lv = NULL, trend_map = NULL,
               coef_sharing = c("none", "shared", "hierarchical"),
-              df = Inf) {
+              df = Inf, centred = FALSE) {
   if (length(p) == 1) {
     checkmate::assert_int(p, lower = 1)
   } else {
@@ -1786,16 +1827,18 @@ AR <- function(time = NA, series = NA, p = 1, ma = FALSE, cor = NULL,
     p = p,
     ma = ma,
     cor = cor,
+    cor_requested = isTRUE(cor),
     n_lv = n_lv,
     trend_map = trend_map,
-    coef_sharing = coef_sharing
+    coef_sharing = coef_sharing,
+    centred = centred
   )
 }
 
 #' @rdname trend_constructors
 #' @export
 CAR <- function(time = NA, series = NA, cor = FALSE, n_lv = NULL,
-               trend_map = NULL, df = Inf) {
+               trend_map = NULL, df = Inf, centred = FALSE) {
   # A continuous-time process evolves per series and has no factor
   # form. The two arguments exist here to refuse a factor request
   # with the reason the registry records, matching the refusal the
@@ -1810,7 +1853,8 @@ CAR <- function(time = NA, series = NA, cor = FALSE, n_lv = NULL,
     .series = substitute(series),
     p = 1,        # CAR is always first-order
     ma = FALSE,   # CAR takes no moving-average term
-    cor = cor
+    cor = cor,
+    centred = centred
   )
 }
 
@@ -1888,8 +1932,9 @@ VAR <- function(time = NA, series = NA, p = 1, ma = FALSE, cor = TRUE,
 #' The level shocks take the innovation structure of `RW()`: `cor`
 #' correlates them across series, `gr` and `subgr` pool their
 #' correlations hierarchically and `df` gives them a multivariate t.
-#' The slope shocks are Gaussian and take the level's correlation
-#' matrix with scales of their own.
+#' The slope and seasonal shocks are Gaussian and take the level's
+#' correlation matrix with scales of their own. [residual_cor()]
+#' reports that one matrix.
 #'
 #' The slope starts at a free value, `init_slope_trend`, damped or not,
 #' as in the damped trends of exponential smoothing. Damping serves a
@@ -1935,7 +1980,8 @@ VAR <- function(time = NA, series = NA, p = 1, ma = FALSE, cor = TRUE,
 #' `sigma_slope_trend` and one `ar1_slope_trend`. A rotation of the
 #' factors then leaves the model unchanged. The QR rotation of `RW()`
 #' factors identifies the loadings. A `trend_map` that fixes loadings
-#' keeps one slope scale per factor.
+#' keeps one slope scale per factor. The factors' shocks are
+#' independent, as `cor` describes.
 #'
 #' *Seasonality*:
 #' `season` adds a stochastic season \eqn{\gamma_t} to the level, the
@@ -1967,9 +2013,11 @@ VAR <- function(time = NA, series = NA, p = 1, ma = FALSE, cor = TRUE,
 #' are refused. A period longer than the data overlaps the slope and
 #' draws a warning. The starting pairs `init_season_trend` are
 #' estimated under one prior for both states of every harmonic. That
-#' prior treats every phase at the first time point alike. Seasonal
-#' shocks are independent across series. In a factor model each factor
-#' has its own season, mapped to the series through the loadings.
+#' prior treats every phase at the first time point alike. Under `cor`
+#' or `gr` each harmonic's shocks are correlated across series, as the
+#' level shocks are. Series correlated in their shocks shift their
+#' seasons together. In a factor model each factor has its own season,
+#' mapped to the series through the loadings.
 #'
 #' `sigma_season_trend` takes a `gamma(2, .)` prior whose median puts
 #' the season's drift over the series at \eqn{s / 4}. A season that
@@ -2084,13 +2132,42 @@ VAR <- function(time = NA, series = NA, p = 1, ma = FALSE, cor = TRUE,
 #'
 #' # Draws of the seasonal shock scale
 #' head(as.data.frame(mod_s, variable = "sigma_season_trend"))
+#'
+#' # Two regions whose levels move together, with shocks correlated at
+#' # 0.7. Counts near 20 pin the states down, which the centred form
+#' # samples fastest
+#' set.seed(4)
+#' n_t <- 60
+#' z <- rnorm(n_t)
+#' shock <- 0.25 * cbind(z, 0.7 * z + sqrt(1 - 0.7^2) * rnorm(n_t))
+#' dat_r <- data.frame(
+#'   time = rep(1:n_t, 2),
+#'   series = factor(rep(c("north", "south"), each = n_t))
+#' )
+#' dat_r$y <- rpois(2 * n_t, exp(3 + c(apply(shock, 2, cumsum)) +
+#'                                 0.5 * sin(2 * pi * dat_r$time / 12)))
+#'
+#' # `cor = TRUE` correlates the level, slope and seasonal shocks
+#' mod_r <- mvgam(
+#'   y ~ 1,
+#'   trend_formula = ~ LLT(season = 12, harmonics = 1, cor = TRUE,
+#'                         centred = TRUE),
+#'   data = dat_r,
+#'   family = poisson(),
+#'   chains = 2,
+#'   silent = 2
+#' )
+#'
+#' # The one correlation matrix the three kinds of shock share
+#' residual_cor(mod_r)
 #' }
 #'
 #' @family trend models
 #' @export
 LLT <- function(time = NA, series = NA, damped = FALSE, cor = NULL,
                 gr = NA, subgr = NA, n_lv = NULL, trend_map = NULL,
-                df = Inf, season = NULL, harmonics = NULL) {
+                df = Inf, season = NULL, harmonics = NULL,
+                centred = FALSE) {
   checkmate::assert_flag(damped)
   assert_trend_map_input(trend_map)
   seasonal <- resolve_llt_season(season, harmonics)
@@ -2106,8 +2183,10 @@ LLT <- function(time = NA, series = NA, damped = FALSE, cor = NULL,
     season = seasonal$season,
     harmonics = seasonal$harmonics,
     cor = cor,
+    cor_requested = isTRUE(cor),
     n_lv = n_lv,
-    trend_map = trend_map
+    trend_map = trend_map,
+    centred = centred
   )
 }
 
@@ -2331,7 +2410,7 @@ PW <- function(time = NA, series = NA, cap = NA, n_changepoints = 10,
 #' @export
 ZMVN <- function(time = NA, series = NA, gr = NA, subgr = NA,
                  n_lv = NULL, cor = TRUE, trend_map = NULL,
-                 df = Inf) {
+                 df = Inf, centred = FALSE) {
   # `cor` is accepted for symmetry with `AR()` and `VAR()`. ZMVN is a
   # multivariate normal whose purpose is the correlation among series.
   checkmate::assert_flag(cor)
@@ -2354,7 +2433,8 @@ ZMVN <- function(time = NA, series = NA, gr = NA, subgr = NA,
     n_lv = n_lv,
     ma = FALSE,
     cor = TRUE,
-    trend_map = trend_map
+    trend_map = trend_map,
+    centred = centred
   )
 }
 
@@ -2381,7 +2461,8 @@ get_mvgam_trend_defaults <- function() {
 
     # Universal behavior defaults
     ma = FALSE,
-    cor = FALSE
+    cor = FALSE,
+    centred = FALSE
   )
 }
 
@@ -2495,6 +2576,8 @@ create_mvgam_trend <- function(trend_type, ...,
                         .var.name = "n_lv")
   checkmate::assert_flag(trend_obj$ma, null.ok = TRUE, .var.name = "ma")
   checkmate::assert_flag(trend_obj$cor, null.ok = TRUE, .var.name = "cor")
+  checkmate::assert_flag(trend_obj$centred, null.ok = TRUE,
+                         .var.name = "centred")
 
   # A grouping estimates correlations among the `subgr` units within
   # each level of `gr`. The generated Stan program declares the group
@@ -2513,7 +2596,7 @@ create_mvgam_trend <- function(trend_type, ...,
           "Drop 'cor = FALSE' to keep the grouping, or drop 'gr' and ",
           "'subgr' for independent per-series innovations."
         )
-      )))
+      )), call. = FALSE)
     }
     trend_obj$cor <- TRUE
   } else if (is.null(trend_obj$cor)) {
@@ -2552,7 +2635,7 @@ assert_trend_df <- function(df) {
       x = paste0("Got an object of class '", class(df)[1], "' of length ",
                  length(df), "."),
       i = usage
-    )))
+    )), call. = FALSE)
   }
   if (is.na(df)) {
     return(NA_real_)
@@ -2564,7 +2647,7 @@ assert_trend_df <- function(df) {
         "Argument 'df' must be positive.",
         x = "Got '-Inf'.",
         i = usage
-      )))
+      )), call. = FALSE)
     }
     return(Inf)
   }

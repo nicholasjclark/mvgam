@@ -119,7 +119,7 @@ posterior_average.mvgam <- function(x, ..., variable = NULL,
           paste0("'", inv_vars, "'", collapse = ", "), "."
         ),
         i = "Use 'missing' to supply defaults for absent parameters."
-      )))
+      )), call. = FALSE)
     }
   } else {
     if (is.null(variable)) {
@@ -134,7 +134,7 @@ posterior_average.mvgam <- function(x, ..., variable = NULL,
           "Unknown: ",
           paste0("'", inv_vars, "'", collapse = ", "), "."
         )
-      )))
+      )), call. = FALSE)
     }
     if (is.list(missing)) {
       all_miss <- unique(unlist(lapply(models, function(m) {
@@ -148,7 +148,7 @@ posterior_average.mvgam <- function(x, ..., variable = NULL,
             "No default for: ",
             paste0("'", no_default, "'", collapse = ", "), "."
           )
-        )))
+        )), call. = FALSE)
       }
       missing_resolved <- lapply(missing, as.numeric)
     } else {
@@ -235,12 +235,12 @@ pp_average.mvgam <- function(x, ..., weights = "stacking",
         "Cannot pass: ",
         paste0("'", reserved, "'", collapse = ", "), "."
       )
-    )))
+    )), call. = FALSE)
   }
   if (!mvgam_match_response(models)) {
     stop(insight::format_error(
       "Can only average models that predict the same response."
-    ))
+    ), call. = FALSE)
   }
   shares <- averaging_draws(models, weights, ndraws, control)
   ndraws_per <- shares$ndraws

@@ -311,10 +311,10 @@ dia_word <- more_fewer(A$A["Diatoms", "Cryptomonas"])
 
 The diagonal describes persistence. Each taxon's deviation carries a
 coefficient between `r fe_a_diag[1]` and `r fe_a_diag[2]` into the
-next month. The heatmap outlines each cell whose
-95% interval excludes zero:
+next month. The heatmap outlines each cell whose sign has a posterior
+probability above 0.95:
 
-```{r plot-A, fig.width = 6, fig.asp = 0.8, fig.cap = "Posterior mean of the transition matrix. Rows are the taxa at month t and columns the taxa at month t - 1. Outlined cells have 95% credible intervals that exclude zero."}
+```{r plot-A, fig.width = 6, fig.asp = 0.8, fig.cap = "Posterior mean of the transition matrix. Rows are the taxa at month t and columns the taxa at month t - 1. Outlined cells have a posterior probability of their sign above 0.95."}
 plot(A)
 ```
 
@@ -367,7 +367,7 @@ The default, `covariance = "stationary"`, correlates the deviations
 themselves. Each deviation accumulates the shocks of many months,
 passed through $A$:
 
-```{r rc-stat, fig.width = 6, fig.asp = 0.8, fig.cap = "Posterior mean correlations among the deviations of the five taxa. Outlined pairs have 95% credible intervals that exclude zero."}
+```{r rc-stat, fig.width = 6, fig.asp = 0.8, fig.cap = "Posterior mean correlations among the deviations of the five taxa. Outlined pairs have a posterior probability of their sign above 0.95."}
 rc <- residual_cor(fit)
 plot(rc)
 ```

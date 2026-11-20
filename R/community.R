@@ -25,8 +25,9 @@
 #'   a biomass. Under [nmix()] it applies to the latent abundance.
 #' @param traits Species traits for community-weighted means: a data
 #'   frame with one row per species, matched as [jsdgam()] matches its
-#'   `traits`, or `"auto"` for the traits the fit was built with. `NULL`
-#'   (the default) computes none.
+#'   `traits`, or `"auto"` for the traits the fit was built with, those
+#'   of `traits` or else of `trait_slopes`. `NULL` (the default)
+#'   computes none.
 #' @param latent How the latent state enters. `"marginal"` (the default)
 #'   averages over it. `"conditional"` takes the state the model fitted,
 #'   for communities in the training data. `"forecast"` propagates the
@@ -37,6 +38,10 @@
 #' @param ndraws,draw_ids The posterior draws to use, as
 #'   [hindcast.mvgam()] takes them. `NULL` for both uses every draw.
 #' @param resp The response to report, needed on a model with several.
+#' @param prob_threshold The posterior probability of its sign a pair's
+#'   excess co-occurrence needs to count as supported, at least 0.5 and
+#'   below 1. Defaults to 0.95. It sets the `sig` column of the
+#'   co-occurrence table and the pairs `plot()` outlines.
 #'
 #' @details
 #' *Richness*. Each draw sums the species' probabilities of presence,
@@ -108,6 +113,7 @@
 #'   per element.
 #'
 #' @seealso [residual_cor()] for the associations between species,
+#'   [species_effects()] for each species' response to the covariates,
 #'   [variance_partition()] for what moves each species
 #'
 #' @inherit jsdgam examples
@@ -127,13 +133,14 @@ community.mvgam <- function(object, newdata = NULL, ..., threshold = NULL,
                             latent = c("marginal", "conditional", "forecast",
                                        "zero"),
                             n_nodes = 100L, ndraws = NULL, draw_ids = NULL,
-                            resp = NULL) {
+                            resp = NULL, prob_threshold = 0.95) {
   checkmate::assert_class(object, "mvgam")
   rlang::check_dots_empty()
   checkmate::assert_data_frame(newdata, min.rows = 1L, null.ok = TRUE)
   checkmate::assert_number(threshold, finite = TRUE, null.ok = TRUE)
   latent <- match.arg(latent)
   checkmate::assert_count(n_nodes, positive = TRUE)
+  assert_prob_threshold(prob_threshold)
   validate_draw_selectors(ndraws, draw_ids)
   require_fitted_model(object, "community")
   require_series_axis(object, "community")
@@ -219,6 +226,7 @@ community.mvgam <- function(object, newdata = NULL, ..., threshold = NULL,
       species = species,
       latent = latent,
       threshold = threshold,
+      prob_threshold = prob_threshold,
       draw_ids = draw_ids
     ),
     class = "mvgam_community"
@@ -252,7 +260,7 @@ community_layout <- function(object, newdata, long) {
     names(training)
   )
   if (is.null(newdata)) {
-    long <- jsdgam_axis_columns(object, long)
+    long <- jsdgam_prediction_columns(object, long)
     keys <- setdiff(
       intersect(c(unlist(vars), fit_closure_unit_keys(object)), names(long)),
       series_cols
@@ -266,15 +274,15 @@ community_layout <- function(object, newdata, long) {
     communities <- frame[match(levels(community), community), keys,
                          drop = FALSE]
   } else {
-    species <- training[!duplicated(training[series_cols]), series_cols,
-                        drop = FALSE]
-    species <- species[order(axis_row_series(object, species,
-                                              required = TRUE)), ,
-                       drop = FALSE]
+    species <- species_rows(object, training, series_cols)
+    # A species-level column, such as a trait, comes from the species
+    # unless the frame of communities holds it
+    fill <- setdiff(names(species),
+                    setdiff(names(newdata), series_cols))
     rows <- rep(seq_len(nrow(newdata)), each = nrow(species))
     frame <- newdata[rows, , drop = FALSE]
-    frame[series_cols] <- species[rep(seq_len(nrow(species)),
-                                      nrow(newdata)), , drop = FALSE]
+    frame[fill] <- species[rep(seq_len(nrow(species)), nrow(newdata)),
+                           fill, drop = FALSE]
     community <- factor(rows)
     communities <- newdata[setdiff(names(newdata), series_cols)]
   }
@@ -330,6 +338,34 @@ community_forecast <- function(object, frame, draw_ids, n_replicates, resp) {
       if (length(latent)) at_rows(Reduce(`+`, latent))
     })
   )
+}
+
+
+#' One row per species, with every column that is constant within each
+#'
+#' A trait of a `trait_slopes` fit is such a column. The response and
+#' the axis columns other than the species' own are left out.
+#'
+#' @param object A fitted `mvgam` object
+#' @param data The rows, each placed on a fitted series
+#' @param series_cols The columns naming the series
+#' @return Data frame of `series_cols` and the species-level columns,
+#'   in the order of the fitted series
+#' @noRd
+species_rows <- function(object, data, series_cols) {
+  by_series <- split(seq_len(nrow(data)),
+                     axis_row_series(object, data, required = TRUE))
+  candidates <- setdiff(names(data), c(series_cols, unlist(axis_vars(object)),
+                                       unname(response_columns(object))))
+  constant <- Filter(function(col) {
+    all(vapply(by_series, function(rows) {
+      length(unique(data[[col]][rows])) <= 1L
+    }, logical(1L)))
+  }, candidates)
+  first <- vapply(by_series, `[`, integer(1L), 1L)
+  out <- data[first, c(series_cols, constant), drop = FALSE]
+  rownames(out) <- NULL
+  out
 }
 
 
@@ -517,8 +553,8 @@ pairwise_presence <- function(presence, cell) {
 #'
 #' A trend with a stationary covariance gives `n_nodes` states per draw,
 #' each that draw's covariance root times one shared vector of standard
-#' normal variates. The vectors come in antithetic pairs. A `RW()` or `LLT()` trend gives the states the draw
-#' fitted at each training time.
+#' normal variates. The vectors come in antithetic pairs. A `RW()` or
+#' `LLT()` trend gives the states the draw fitted at each training time.
 #'
 #' @param object A fitted `mvgam` object
 #' @param draw_ids Indices of the draws
@@ -609,22 +645,27 @@ summary.mvgam_community <- function(object, probs = c(0.025, 0.975), ...) {
 }
 
 
-#' Each pair of species' excess co-occurrence, median and interval
+#' Each pair of species' excess co-occurrence, with its support
 #'
 #' @param x An `mvgam_community` object
 #' @param probs Interval probabilities
 #' @return Data frame of the species and the one it is paired `with`,
-#'   one row per entry of the matrix in column order, with the median
-#'   and interval columns
+#'   one row per entry of the matrix in column order, with the median,
+#'   interval and sign probability columns of `sign_probabilities()`
+#'   and `sig`, whether `prob_nonzero` exceeds `prob_threshold`
 #' @noRd
 cooccurrence_table <- function(x, probs) {
-  cbind(
+  signs <- sign_probabilities(x$cooccurrence, list(x$species, x$species))
+  out <- cbind(
     stats::setNames(expand.grid(x$species, x$species,
                                 stringsAsFactors = FALSE),
                     c(x$species_column, "with")),
     median_interval_cols(matrix(x$cooccurrence, dim(x$cooccurrence)[1L]),
-                         probs, "")
+                         probs, ""),
+    lapply(signs, as.vector)
   )
+  out$sig <- out$prob_nonzero > x$prob_threshold
+  out
 }
 
 
@@ -685,18 +726,22 @@ print.mvgam_community <- function(x, digits = 2L, ...) {
 #' @param x An `mvgam_community` object from [community()].
 #' @param type `"richness"` (the default) draws richness along a column
 #'   of the communities. `"diversity"` draws each diversity measure.
-#'   `"cooccurrence"` draws each pair's excess co-occurrence, outlining
-#'   a pair whose 95% interval excludes zero.
+#'   `"cooccurrence"` draws each pair's median excess co-occurrence,
+#'   outlining a pair whose `prob_nonzero` exceeds `prob_threshold`.
 #' @param along The column of the communities to draw along. `NULL`
 #'   takes the first numeric column that varies.
+#' @param supported_only Logical, for `type = "cooccurrence"`. `TRUE`
+#'   leaves blank every pair whose `prob_nonzero` is at most
+#'   `prob_threshold`. Defaults to `FALSE`.
 #' @rdname community
 #' @method plot mvgam_community
 #' @export
 plot.mvgam_community <- function(x,
                                  type = c("richness", "diversity",
                                           "cooccurrence"),
-                                 along = NULL, ...) {
+                                 along = NULL, supported_only = FALSE, ...) {
   type <- match.arg(type)
+  checkmate::assert_flag(supported_only)
   rlang::check_dots_empty()
   set_color_scheme_local()
   if (type == "cooccurrence") {
@@ -705,10 +750,9 @@ plot.mvgam_community <- function(x,
       matrix(pairs[[col]], length(x$species),
              dimnames = list(x$species, x$species))
     }
-    panel <- residcor_panel_data(
-      as_matrix("Q50"),
-      clear = interval_excludes_zero(as_matrix("Q2.5"), as_matrix("Q97.5"))
-    )
+    panel <- support_panel(as_matrix("Q50"), as_matrix("prob_nonzero"),
+                           x$prob_threshold, supported_only,
+                           lower_only = TRUE)
     return(residcor_heatmap(panel, "Excess\nco-occurrence", rescale = TRUE))
   }
   varying <- names(Filter(function(col) {

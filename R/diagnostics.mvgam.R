@@ -1,10 +1,12 @@
 #' Posterior summaries and sampler diagnostics of mvgam models
 #'
 #' The \pkg{brms} and \pkg{bayesplot} accessors for a fitted model.
-#' `fixef()`, `coef()` and `vcov()` summarise the population-level
-#' coefficients of the observation formula, or of the trend formula
-#' with `trend_effects = TRUE`. `posterior_summary()` summarises any
-#' parameters. `rhat()` and `neff_ratio()` report convergence.
+#' `fixef()` and `vcov()` summarise the population-level coefficients
+#' of the observation formula, or of the trend formula with
+#' `trend_effects = TRUE`. `coef()` gives each level of each grouping
+#' factor its coefficients: the population effect plus that level's
+#' deviation, as [brms::coef.brmsfit()] does. `posterior_summary()`
+#' summarises any parameters. `rhat()` and `neff_ratio()` report convergence.
 #' `nuts_params()` and `log_posterior()` return the sampler's own
 #' quantities.
 #' `bayes_R2()` is the Bayesian R^2 of Gelman et al. (2019).
@@ -25,7 +27,7 @@
 #'   \pkg{brms} name of the argument. There `pars` is its deprecated
 #'   alias.
 #' @param summary Logical. `TRUE` (the default) returns a summary.
-#'   `FALSE` returns the draws. `coef()` summarises to posterior means.
+#'   `FALSE` returns the draws.
 #' @param robust Logical. `TRUE` summarises by the median and the median
 #'   absolute deviation. Defaults to `FALSE`, the mean and the standard
 #'   deviation.
@@ -40,8 +42,8 @@
 #'   probability that a row observed as 1 is predicted above a row
 #'   observed as 0. A series observed at one value alone takes `NA` for
 #'   both. Defaults to `FALSE`.
-#' @param trend_effects Logical. `coef()`, `fixef()` and `vcov()`
-#'   report the coefficients of the observation formula by default.
+#' @param trend_effects Logical. `fixef()` and `vcov()` report the
+#'   coefficients of the observation formula by default.
 #'   `TRUE` reports those of the `trend_formula` instead. Their names
 #'   end in `_trend`.
 #' @param ... Further arguments. `nuts_params()` and `log_posterior()`
@@ -53,8 +55,14 @@
 #'   or the draws with `summary = FALSE`. Under `by_series = TRUE`
 #'   `bayes_R2()` returns a data frame with one row per series and
 #'   measure, or draws in columns named `<measure>[<series>]`, such as
-#'   `AUC[sp1]`. `coef()` returns the posterior
-#'   means. `vcov()` returns the covariance matrix of the coefficients.
+#'   `AUC[sp1]`. `coef()` returns a named list with one array per
+#'   grouping factor: levels, statistics and coefficients, or draws,
+#'   levels and coefficients with `summary = FALSE`. A fit without
+#'   group-level effects in its observation formula is refused. A
+#'   level's coefficient omits the terms of other covariates that
+#'   change it, such as `env:size` under [jsdgam()]'s `trait_slopes`.
+#'   [species_effects()] gives each species' full response.
+#'   `vcov()` returns the covariance matrix of the coefficients.
 #'   `rhat()` and `neff_ratio()` return a named vector with one value
 #'   per parameter. `nuts_params()` and `log_posterior()` return the
 #'   long data frames of \pkg{bayesplot}. The counting methods return
@@ -241,19 +249,74 @@ cat_titled_table <- function(title, tab, digits, notes, max_rows = Inf) {
 #' @rdname mvgam_diagnostics
 #' @method coef mvgam
 #' @export
-coef.mvgam <- function(object, summary = TRUE, trend_effects = FALSE,
-                       ...) {
+coef.mvgam <- function(object, summary = TRUE, robust = FALSE,
+                       probs = c(0.025, 0.975), ...) {
   checkmate::assert_class(object, "mvgam")
   checkmate::assert_flag(summary)
+  checkmate::assert_flag(robust)
+  checkmate::assert_numeric(probs, lower = 0, upper = 1, len = 2L,
+                            sorted = TRUE)
   rlang::check_dots_empty()
-  draws_mat <- population_draws(object, trend_effects)
-  if (ncol(draws_mat) == 0L) {
-    return(if (isTRUE(summary)) numeric() else matrix(0, 0, 0))
+  meta <- mvgam_ranef_metadata(object)
+  if (is.null(meta)) {
+    stop(insight::format_error(c(
+      "'coef()' needs group-level effects in the observation formula.",
+      i = "'fixef()' gives the population-level effects."
+    )), call. = FALSE)
   }
-  if (isTRUE(summary)) {
-    return(colMeans(draws_mat))
+  fixef_draws <- fixef.mvgam(object, summary = FALSE)
+  ranef_draws <- ranef.mvgam(object, summary = FALSE)
+  reframe <- meta$reframe
+  groups <- unique(reframe$group)
+  out <- lapply(stats::setNames(groups, groups), function(g) {
+    levels <- meta$group_levels[[g]]
+    rows <- reframe[reframe$group == g, , drop = FALSE]
+    names <- union(colnames(fixef_draws), rows$coef_alias)
+    # Each level starts from the population effect, zero where none
+    arr <- array(0, c(nrow(fixef_draws), length(levels), length(names)),
+                 dimnames = list(NULL, levels, names))
+    for (nm in intersect(names, colnames(fixef_draws))) {
+      arr[, , nm] <- fixef_draws[, nm]
+    }
+    for (i in seq_len(nrow(rows))) {
+      nm <- rows$coef_alias[i]
+      arr[, , nm] <- level_coefficient(
+        arr[, , nm], ranef_draws[[rows$alias_key[i]]][, , rows$coef[i]],
+        nm, model_families(object, if (nzchar(rows$resp[i])) rows$resp[i])
+      )
+    }
+    if (summary) {
+      return(brms::posterior_summary(arr, probs = probs, robust = robust))
+    }
+    arr
+  })
+  out
+}
+
+
+#' One level's coefficient from the population effect and its deviation
+#'
+#' A coefficient adds the two. An ordinal threshold, `Intercept[k]`,
+#' follows the sign its family sets it against the predictor with, as
+#' `brms::coef.brmsfit()` does.
+#'
+#' @param fixed `[draws, levels]` population effect
+#' @param deviation `[draws, levels]` deviation of each level
+#' @param name The coefficient's name
+#' @param family The family of its predictor
+#' @return `[draws, levels]` coefficient
+#' @noRd
+level_coefficient <- function(fixed, deviation, name, family) {
+  if (!grepl("(^|_)Intercept\\[[[:digit:]]+\\]$", name)) {
+    return(fixed + deviation)
   }
-  draws_mat
+  if ("thres_minus_eta" %in% family$specials) {
+    return(fixed - deviation)
+  }
+  if ("eta_minus_thres" %in% family$specials) {
+    return(deviation - fixed)
+  }
+  fixed + deviation
 }
 
 

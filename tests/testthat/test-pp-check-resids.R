@@ -79,3 +79,16 @@ test_that("resid_series_rows takes one series in time order", {
   expect_true(mvgam:::resid_series_rows(fit, d)$irregular)
   expect_error(mvgam:::resid_series_rows(fit, d, "all"), "one series")
 })
+
+
+test_that("a residual panel keeps its statistic as title under a series", {
+  acf <- mvgam:::build_resid_lag_panel(.make_resid_draws(ndraws = 20L),
+                                       lag_type = "acf")
+  labelled <- mvgam:::label_resid_series(
+    acf, list(label = "sp_2", n_series = 2L)
+  )
+  # The series name replaced "ACF", which left the lag panels of the
+  # stacked figure unnamed
+  expect_identical(labelled$labels$title, "ACF")
+  expect_identical(labelled$labels$subtitle, "Residuals for sp_2")
+})

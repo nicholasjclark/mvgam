@@ -192,7 +192,7 @@ fitted.mvgam <- function(object,
       stop(insight::format_error(c(
         "'unit_level = TRUE' is not supported on multi-response fits.",
         i = "Pass `resp = '<name>'` to scope to one response first."
-      )))
+      )), call. = FALSE)
     } else {
       nd <- prediction_frame(object, newdata)
       draws <- aggregate_closure_unit_visits(object, nd, draws)$yrep_unit

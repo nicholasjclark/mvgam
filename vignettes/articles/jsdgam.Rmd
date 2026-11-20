@@ -44,7 +44,7 @@ Australia (Gibb et al.
 extensions in turn: environmental effects that act through the
 factors, a loadings prior informed by species traits and a prior
 under which the data decide how many factors are active. The
-[JSDM cheatsheet](https://github.com/nicholasjclark/mvgam/raw/master/misc/jsdgam_cheatsheet.pdf)
+[JSDM cheatsheet](https://nicholasjclark.github.io/mvgam/dev/cheatsheets/jsdgam_cheatsheet.pdf)
 summarises the functions on one page.
 
 ## The data
@@ -157,45 +157,31 @@ fixef(mod_env, trend_effects = TRUE)
 
 `fixef()` reports the slopes in the same rotated basis as the
 identified loadings `Z_tilde`. A species' response is the product of
-its loadings and these slopes. `posterior_linpred()` returns it as the
-change in each species' linear predictor between two sites that
-differ only in canopy cover:
+its loadings and these slopes. `species_effects()` returns each
+species' response to each covariate, draw by draw, on the log scale of
+expected counts. A black outline marks a response whose sign has a
+posterior probability above 0.95:
 
-```{r canopy-responses}
-newdata <- expand.grid(species = levels(ant_data$species),
-                       Canopy.cover = c(0, 1))
-newdata$site <- 1
-newdata$Bare.ground <- 0
-newdata$Shrub.cover <- 0
-lp <- posterior_linpred(mod_env, newdata = newdata)
-canopy <- lp[, newdata$Canopy.cover == 1] - lp[, newdata$Canopy.cover == 0]
-canopy_q <- data.frame(
-  species = levels(ant_data$species),
-  t(apply(canopy, 2, quantile, c(0.025, 0.5, 0.975)))
-)
-names(canopy_q)[2:4] <- c("lo", "med", "hi")
-canopy_q$species <- reorder(canopy_q$species, canopy_q$med)
-```
-
-```{r canopy-plot, fig.asp = 1.1, fig.cap = "Posterior median and 95% credible interval of each species' response to one standard deviation of canopy cover, on the log scale of expected counts."}
-ggplot(canopy_q, aes(med, species)) +
-  geom_vline(xintercept = 0, colour = "grey60") +
-  geom_pointrange(aes(xmin = lo, xmax = hi), colour = "#8F2727",
-                  size = 0.25) +
-  labs(x = "Response to canopy cover", y = NULL)
+```{r species-effects, fig.asp = 1.4, fig.cap = "Posterior mean response of each species to one standard deviation of each covariate, on the log scale of expected counts. Outlined cells have a posterior probability of their sign above 0.95."}
+se <- species_effects(mod_env, variables = c("Bare.ground", "Canopy.cover",
+                                             "Shrub.cover"))
+plot(se)
 ```
 
 ```{r canopy-numbers, include = FALSE}
-clear <- canopy_q$lo > 0 | canopy_q$hi < 0
-top <- as.character(canopy_q$species[which.max(canopy_q$med)])
-bottom <- as.character(canopy_q$species[which.min(canopy_q$med)])
-fe_med <- sprintf("%.2f", range(canopy_q$med))
+canopy_fx <- subset(summary(se), effect == "Canopy.cover")
+n_up <- sum(canopy_fx$sig & canopy_fx$Estimate > 0)
+n_down <- sum(canopy_fx$sig & canopy_fx$Estimate < 0)
+top <- canopy_fx$species[which.max(canopy_fx$Estimate)]
+bottom <- canopy_fx$species[which.min(canopy_fx$Estimate)]
+fe_range <- sprintf("%.2f", range(canopy_fx$Estimate))
 ```
 
-The intervals of `r sum(clear)` of the 41 species exclude zero. The
-median responses run from `r fe_med[1]` for
-`r gsub("\\.+", " ", bottom)` to `r fe_med[2]` for
-`r gsub("\\.+", " ", top)`.
+Under denser canopy `r n_up` of the 41 species become more abundant and
+`r n_down` less abundant, each with a posterior probability above 0.95.
+The mean responses run from `r fe_range[1]` for `r bottom` to
+`r fe_range[2]` for `r top`. `summary(se)` lists every species'
+estimate and interval.
 
 ## Trait-informed loadings
 
@@ -279,20 +265,20 @@ it by `r fe_diff` (SE `r fe_se`) in expected log predictive density.
 between every pair of species. `plot(cluster = TRUE)` orders the
 species to bring blocks of co-occurring species onto the diagonal:
 
-```{r resid-cor, fig.asp = 1, out.width = "95%", fig.cap = "Posterior median residual correlations from the trait-informed model. Outlined cells have 95% intervals excluding zero."}
+```{r resid-cor, fig.asp = 1, out.width = "95%", fig.cap = "Posterior mean residual correlations from the trait-informed model. Outlined cells have a posterior probability of their sign above 0.95."}
 rcor <- residual_cor(mod_traits)
 plot(rcor, cluster = TRUE)
 ```
 
 ```{r cor-numbers, include = FALSE}
-pairs <- upper.tri(rcor$cor)
-clear_pos <- sum(rcor$cor_lower[pairs] > 0)
-clear_neg <- sum(rcor$cor_upper[pairs] < 0)
+pairs <- summary(rcor)
+clear_pos <- sum(pairs$sig & pairs$Estimate > 0)
+clear_neg <- sum(pairs$sig & pairs$Estimate < 0)
 ```
 
-Of the `r sum(pairs)` species pairs, `r clear_pos` correlate
-positively and `r clear_neg` negatively with intervals that exclude
-zero. A residual correlation may reflect a shared
+Of the `r nrow(pairs)` species pairs, `r clear_pos` correlate
+positively and `r clear_neg` negatively, each with a posterior
+probability of its sign above 0.95. A residual correlation may reflect a shared
 response to an unmeasured driver or an interaction between species.
 The model alone cannot tell the two apart.
 

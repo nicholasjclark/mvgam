@@ -22,7 +22,7 @@
 #   E: 4 series in 2 regions, poisson, damped slope, level and slope
 #      shocks correlated within each region (0.7 and -0.4)
 #   F: 2 series, poisson, a twelve-month season of two harmonics whose
-#      shape drifts
+#      shape drifts, every shock correlated at 0.6
 #   G: 3 series on 2 factors, poisson, a seven-step season of one
 #      harmonic and a twelve-step season of two
 #
@@ -147,18 +147,20 @@ fit_e <- cached_fit(
 )
 
 # The trigonometric season: harmonic j of period s turns its state pair
-# by 2 pi j / s at each step and adds shocks of scale `sigma`
-sim_season <- function(n_t, K, s, n_harm, sigma, amp) {
+# by 2 pi j / s at each step and adds shocks of scale `sigma`. Each
+# harmonic's shocks across the series take the correlation `R`.
+sim_season <- function(n_t, K, s, n_harm, sigma, amp, R = diag(K)) {
   freq <- 2 * pi * seq_len(n_harm) / s
+  U <- chol(R)
+  shock <- function() sigma * matrix(rnorm(n_harm * K), n_harm, K) %*% U
   g <- matrix(rnorm(n_harm * K, 0, amp), n_harm, K)
   g_star <- matrix(rnorm(n_harm * K, 0, amp), n_harm, K)
   season <- matrix(0, n_t, K)
   season[1L, ] <- colSums(g)
   for (t in 2:n_t) {
     g_last <- g
-    g <- cos(freq) * g_last + sin(freq) * g_star + rnorm(n_harm * K, 0, sigma)
-    g_star <- cos(freq) * g_star - sin(freq) * g_last +
-      rnorm(n_harm * K, 0, sigma)
+    g <- cos(freq) * g_last + sin(freq) * g_star + shock()
+    g_star <- cos(freq) * g_star - sin(freq) * g_last + shock()
     season[t, ] <- colSums(g)
   }
   season
@@ -166,23 +168,39 @@ sim_season <- function(n_t, K, s, n_harm, sigma, amp) {
 
 # Nine years of monthly counts on two series, a drifting level and a
 # twelve-month season of two harmonics whose shape moves slowly. The
-# last year holds the truth the forecast is checked against.
+# level, slope and seasonal shocks share one correlation. Counts near
+# 55 identify it. Counts near 7 left its sign to the prior. The last
+# year holds the truth the forecast is checked against.
 set.seed(61L)
+R_f <- matrix(c(1, 0.6, 0.6, 1), 2L)
 truth_f <- list(
-  level = sim_llt(108L, 2L, 0.04, 0.003, 1, slope0 = c(0.01, -0.01))$level,
-  season = sim_season(108L, 2L, 12, 2L, 0.02, 0.4)
+  level = sim_llt(108L, 2L, 0.04, 0.003, 1, R = R_f,
+                  slope0 = c(0.01, -0.01))$level,
+  season = sim_season(108L, 2L, 12, 2L, 0.02, 0.4, R = R_f)
 )
 dat_f <- long_frame(truth_f$level + truth_f$season, c("s1", "s2"))
-dat_f$y <- rpois(nrow(dat_f), exp(2 + dat_f$eta))
+dat_f$y <- rpois(nrow(dat_f), exp(4 + dat_f$eta))
 train_f <- dat_f[dat_f$time <= 96L, ]
 fit_f <- cached_fit(
   "val_mvgam_llt_season.rds",
   function() {
-    mvgam(y ~ 1, trend_formula = ~ LLT(season = 12, harmonics = 2),
+    mvgam(y ~ 1, trend_formula = ~ LLT(season = 12, harmonics = 2,
+                                       cor = TRUE),
           data = train_f, family = poisson(), chains = 2L, iter = 1000L,
-          warmup = 500L, silent = 2, backend = "cmdstanr")
+          warmup = 500L, silent = 2, backend = "cmdstanr", seed = 61L)
   },
-  key = truth_f
+  key = list(truth_f, y = dat_f$y)
+)
+# The same model sampled centred
+fit_f_centred <- cached_fit(
+  "val_mvgam_llt_season_centred.rds",
+  function() {
+    mvgam(y ~ 1, trend_formula = ~ LLT(season = 12, harmonics = 2,
+                                       cor = TRUE, centred = TRUE),
+          data = train_f, family = poisson(), chains = 2L, iter = 1000L,
+          warmup = 500L, silent = 2, backend = "cmdstanr", seed = 61L)
+  },
+  key = list(truth_f, y = dat_f$y, centred = TRUE)
 )
 
 # Two periods on two factors. Each period's season is stored as its own
@@ -612,12 +630,14 @@ test_that("a component plots on its own axis and needs the trend scale", {
 
 test_that("the seasonal states follow the rotation of each harmonic", {
   # The program sums rotated shocks in closed form. The reference steps
-  # each pair one turn at a time.
+  # each pair one turn at a time. Each harmonic's shocks across the
+  # series take the level's correlation factor.
   dm <- as_draws_matrix(fit_f$fit)
   lam <- 2 * pi * (1:2) / 12
   worst <- 0
   for (r in round(seq(1, nrow(dm), length.out = 6))) {
     sig <- as.numeric(dm[r, sprintf("sigma_season_trend[%d]", 1:2)])
+    scale <- t(diag(sig) %*% block(dm, r, "L_Omega_trend", 2L, 2L))
     init <- block(dm, r, "init_season_trend", 4L, 2L)
     shocks <- block(dm, r, "innovations_season_trend", 95L, 8L)
     g <- init[1:2, ]
@@ -625,8 +645,8 @@ test_that("the seasonal states follow the rotation of each harmonic", {
     season <- matrix(0, 96L, 2L)
     season[1L, ] <- colSums(g)
     for (t in 2:96) {
-      w <- matrix(shocks[t - 1L, 1:4], 2L) * rep(sig, each = 2L)
-      w_star <- matrix(shocks[t - 1L, 5:8], 2L) * rep(sig, each = 2L)
+      w <- matrix(shocks[t - 1L, 1:4], 2L) %*% scale
+      w_star <- matrix(shocks[t - 1L, 5:8], 2L) %*% scale
       g_last <- g
       g <- cos(lam) * g_last + sin(lam) * g_star + w
       g_star <- cos(lam) * g_star - sin(lam) * g_last + w_star
@@ -666,11 +686,13 @@ test_that("the level and the season partition the seasonal trend", {
 test_that("the season's forecast turns its last pairs forward", {
   # Lead h turns each pair by h lambda_j. Each step adds shocks of
   # variance sigma^2 to both states. A rotation keeps that variance.
-  # The season's variance at lead h is then K h sigma^2.
+  # The season's variance at lead h is then K h sigma^2. The two
+  # series' seasons covary through the level's correlation.
   dm <- as_draws_matrix(fit_f$fit)
   lam <- 2 * pi * (1:2) / 12
   fc <- forecast(fit_f, newdata = future_frame(train_f, 12L), type = "trend",
                  component = "season", draw_ids = seq_len(nrow(dm)))
+  z <- list()
   for (k in 1:2) {
     pairs <- function(row) {
       sapply(1:2, function(j) {
@@ -682,11 +704,25 @@ test_that("the season's forecast turns its last pairs forward", {
     sig <- as.numeric(dm[, sprintf("sigma_season_trend[%d]", k)])
     for (h in c(1L, 5L, 12L)) {
       mu <- g %*% cos(h * lam) + g_star %*% sin(h * lam)
-      z <- (fc$forecasts[[k]][, h] - mu) / sqrt(2 * h * sig^2)
-      expect_lt(abs(mean(z)), 5 / sqrt(length(z)))
-      expect_lt(abs(stats::sd(z) - 1), 0.08)
+      z[[paste(k, h)]] <- (fc$forecasts[[k]][, h] - mu) / sqrt(2 * h * sig^2)
+      expect_lt(abs(mean(z[[paste(k, h)]])), 5 / sqrt(nrow(dm)))
+      expect_lt(abs(stats::sd(z[[paste(k, h)]]) - 1), 0.08)
     }
   }
+  # A two-by-two correlation's off-diagonal is its factor's [2, 1] entry
+  rho <- as.numeric(dm[, "L_Omega_trend[2,1]"])
+  for (h in c(1L, 12L)) {
+    expect_lt(abs(mean(z[[paste(1, h)]] * z[[paste(2, h)]]) - mean(rho)),
+              5 / sqrt(nrow(dm)))
+  }
+  # residual_cor() reports that correlation, which covers the simulated
+  # 0.6
+  rc <- residual_cor(fit_f, summary = FALSE)
+  # Stan writes draws to six significant figures. Rescaling L L' by its
+  # diagonal moves the correlation by about 1e-8.
+  expect_equal(as.numeric(rc$cor_draws[, 1L, 2L]), rho, tolerance = 1e-6)
+  q <- stats::quantile(rho, c(0.025, 0.975))
+  expect_true(q[[1L]] < 0.6 && 0.6 < q[[2L]])
   p <- plot(fit_f, type = "trend", component = "season")
   expect_identical(p$labels$y, "Latent season")
   expect_true("delivera_trig" %in% names(how_to_cite(fit_f)$bibtex))
@@ -916,6 +952,39 @@ test_that("variance_partition() reports an effect on the expected value", {
 test_that("each part's response-scale share is the fit's own: poisson LLT", {
   expect_epred_parts(fit_b, exp)
   expect_epred_parts(fit_g, exp)
+})
+
+test_that("the centred form gives the posterior and the recursion", {
+  # Sampling the level centred changes how the sampler moves. The model
+  # stays the same. The two fits agree within Monte Carlo error on every
+  # scale, the shock correlation and the intercept.
+  pars <- c(sprintf("sigma_trend[%d]", 1:2),
+            sprintf("sigma_slope_trend[%d]", 1:2),
+            sprintf("sigma_season_trend[%d]", 1:2),
+            "L_Omega_trend[2,1]", "Intercept")
+  summ <- function(fit) {
+    posterior::summarise_draws(as_draws_matrix(fit$fit)[, pars],
+                               "mean", "sd", "ess_bulk")
+  }
+  a <- summ(fit_f)
+  b <- summ(fit_f_centred)
+  mc_se <- sqrt(a$sd^2 / a$ess_bulk + b$sd^2 / b$ess_bulk)
+  expect_true(all(abs(a$mean - b$mean) < 4 * mc_se),
+              label = paste(pars, collapse = ", "))
+
+  # The level, the state less the season, steps by the last slope and
+  # the recovered shock
+  dm <- as_draws_matrix(fit_f_centred$fit)
+  worst <- 0
+  for (r in round(seq(1, nrow(dm), length.out = 6))) {
+    level <- block(dm, r, "lv_trend", 96L, 2L) -
+      block(dm, r, "season_trend", 96L, 2L)
+    slope <- block(dm, r, "slope_trend", 96L, 2L)
+    shock <- block(dm, r, "scaled_innovations_trend", 96L, 2L)
+    stepped <- level[-96L, ] + slope[-96L, ] + shock[-1L, ]
+    worst <- max(worst, abs(level[-1L, ] - stepped))
+  }
+  expect_lt(worst, 1e-6)
 })
 
 cat("\nDone.\n")

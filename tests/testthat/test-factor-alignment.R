@@ -148,8 +148,10 @@ test_that("every per-factor parameter of an AR factor model is relabelled", {
   }
   names_found <- unique(c(
     declared(~ AR(p = 2, n_lv = 2)),
-    declared(~ AR(p = 1, ma = TRUE, n_lv = 2, cor = TRUE)),
-    declared(~ AR(p = 1, n_lv = 2), loadings_prior = "mgp")
+    declared(~ AR(p = 1, ma = TRUE, n_lv = 2)),
+    declared(~ AR(p = 1, n_lv = 2), loadings_prior = "mgp"),
+    # Centred, the start innovations and the distances move with lv_trend
+    declared(~ AR(p = 2, ma = TRUE, n_lv = 2, centred = TRUE))
   ))
   moved <- names_found %in% factor_indexed_pars$signed |
     grepl(factor_indexed_pars$unsigned, names_found)

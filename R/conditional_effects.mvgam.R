@@ -194,7 +194,7 @@ conditional_effects.mvgam <- function(x,
         "Use {.fn marginaleffects::plot_predictions} directly to ",
         "build the higher-order plot."
       ))
-    )))
+    )), call. = FALSE)
   }
 
   if (length(cond_labs) == 0L) {
@@ -210,7 +210,7 @@ conditional_effects.mvgam <- function(x,
     stop(insight::format_error(c(
       "Cannot facet by series when an effect already has three variables.",
       i = "Drop one effect or omit 'series'."
-    )))
+    )), call. = FALSE)
   }
 
   # Reject collisions between named arguments mvgam controls and any
@@ -224,13 +224,10 @@ conditional_effects.mvgam <- function(x,
   clash <- intersect(dot_names, reserved)
   if (length(clash) > 0L) {
     stop(insight::format_error(c(
-      paste0(
-        "Cannot pass ",
-        paste(shQuote(clash), collapse = ", "),
-        " through `...`."
-      ),
-      i = "conditional_effects() sets these itself."
-    )))
+      paste0("conditional_effects() sets ",
+             paste0("'", clash, "'", collapse = ", "), " itself."),
+      i = "Remove them from the call."
+    )), call. = FALSE)
   }
 
   # The collision check above covers the names mvgam sets itself. The
@@ -585,12 +582,12 @@ resolve_series_arg <- function(series, x) {
       "'series' selects among the series a model records.",
       x = "The fit records an empty series axis.",
       i = "Drop the 'series' argument for a fit with one time series."
-    )))
+    )), call. = FALSE)
   }
   if (length(series) != 1L) {
     stop(insight::format_error(
       "'series' must be NULL, 'all', a series name or a 1-based index."
-    ))
+    ), call. = FALSE)
   }
   if (identical(series, "all")) {
     return(list(kind = "all", level = NA_character_))
@@ -600,20 +597,42 @@ resolve_series_arg <- function(series, x) {
 }
 
 
-# Draw a `plot_predictions()` panel as the other mvgam effect plots
-# are drawn. marginaleffects colours a second conditioning variable's
-# levels on one panel. Where that variable is the series, each series
-# is a panel of its own with its own y scale, since series counts can
-# differ by an order of magnitude. Any other second variable keeps its
-# colours, taken from the active scheme.
-#'@noRd
+#' Draw a `plot_predictions()` panel as the other mvgam effect plots
+#' are drawn
+#'
+#' marginaleffects colours a second conditioning variable's levels on
+#' one panel and facets by a third. Where the second is the series, each
+#' series is a panel of its own with its own y scale, since series
+#' counts can differ by an order of magnitude. A third variable then
+#' takes the colours. Any other second variable keeps its colours,
+#' taken from the active scheme.
+#'
+#' @param p The `plot_predictions()` panel
+#' @param condition The conditioning variables, in order
+#' @param series_var The series column
+#' @return The styled panel
+#' @noRd
 style_effect_panel <- function(p, condition, series_var) {
   set_color_scheme_local()
   group_var <- if (length(condition) >= 2L) condition[[2L]] else NULL
   by_series <- identical(group_var, series_var)
+  colour_var <- if (by_series && length(condition) >= 3L) {
+    condition[[3L]]
+  } else if (!by_series) {
+    group_var
+  }
   for (layer in p$layers) {
     if (by_series) {
+      # Each aesthetic marginaleffects mapped to the series moves to the
+      # third variable. A ribbon keeps its fill alone.
+      mapped <- intersect(c("colour", "fill"), names(layer$mapping))
       layer$mapping[c("colour", "fill")] <- NULL
+      if (!is.null(colour_var) && length(mapped)) {
+        layer$mapping[mapped] <- ggplot2::aes(
+          colour = factor(.data[[colour_var]]),
+          fill = factor(.data[[colour_var]])
+        )[mapped]
+      }
     }
     # An occasion with a missing response has no point to draw.
     if (inherits(layer$geom, "GeomPoint")) {
@@ -635,15 +654,13 @@ style_effect_panel <- function(p, condition, series_var) {
   if (by_series) {
     # marginaleffects labels the colour and fill it mapped. The facet
     # strips name the series instead. A label without a mapping draws
-    # a notice.
+    # a notice. The series facets replace marginaleffects' facets.
     p$labels[c("colour", "fill")] <- NULL
-    return(p + ggplot2::facet_wrap(ggplot2::vars(.data[[series_var]]),
-                                   scales = "free_y") +
-             mvgam_theme())
+    p <- p + mvgam_facet_series(var = series_var)
   }
-  if (!is.null(group_var)) {
+  if (!is.null(colour_var)) {
     p <- p + mvgam_model_colour_scale(
-      length(unique(p$data[[group_var]])), name = group_var,
+      length(unique(p$data[[colour_var]])), name = colour_var,
       aesthetics = c("colour", "fill"), labels = round_legend_labels
     )
   }

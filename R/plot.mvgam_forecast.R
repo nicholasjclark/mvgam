@@ -162,9 +162,18 @@ plot.mvgam_forecast <- function(
 }
 
 
-# Resolve the user-facing series argument to an integer vector
-# of indices into series_levels.
-#'@noRd
+#' Resolve a user-facing series argument to indices
+#'
+#' Every plot and summary that takes a `series` argument resolves it
+#' here. An index out of range or an unknown name stops with an error
+#' that lists the fit's series.
+#'
+#' @param series `NULL` or `"all"` for every series, an integer vector
+#'   of indices or a character vector of series names
+#' @param series_levels Character vector of the fit's series, in axis
+#'   order
+#' @return Integer vector of indices into `series_levels`
+#' @noRd
 resolve_series <- function(series, series_levels) {
   if (is.null(series) ||
         (length(series) == 1L &&
@@ -208,13 +217,28 @@ resolve_series <- function(series, series_levels) {
 }
 
 
-# Assemble per-series ribbon / median / observation layers.
-# Returns a flat list of layer objects suitable for `+`.
-#'@noRd
+#' Assemble the ribbon, median and observation layers of each series
+#'
+#' A hindcast draws one grey ribbon at the widest interval with its
+#' median. A forecast draws nested ribbons with their median. With a
+#' hindcast drawn, the forecast starts from its last occasion and joins
+#' it. Observations are drawn only on the scales they share with the
+#' ribbon.
+#'
+#' @param x A `mvgam_forecast` object
+#' @param plotted Character vector of the series to draw, in panel
+#'   order
+#' @param probs Numeric vector of interval probabilities, in decreasing
+#'   order
+#' @param hindcast Logical; draw the hindcasts
+#' @param forecast Logical; draw the forecasts
+#' @param newdata_obs Logical; draw the test observations
+#' @return Flat list of ggplot2 layers, ready to add with `+`
+#' @noRd
 build_forecast_layers <- function(
   x, plotted, probs, hindcast, forecast, newdata_obs
 ) {
-  hindcast_fill <- "grey70"
+  hindcast_fill <- mvgam_neutral("faint")
   outer_prob <- max(probs)
   layers <- list()
 
@@ -237,7 +261,7 @@ build_forecast_layers <- function(
       layers <- c(
         layers,
         list(mvgam_median_layer(
-          hc_mat, hc_times, colour = "grey25", group = panel
+          hc_mat, hc_times, colour = mvgam_neutral("ink"), group = panel
         ))
       )
     }

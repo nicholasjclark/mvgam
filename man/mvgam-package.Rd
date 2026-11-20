@@ -12,8 +12,8 @@ Fit Bayesian Dynamic Generalized Additive Models to multivariate observations. U
 \seealso{
 \code{\link[=mvgam]{mvgam()}} fits a state-space model and \code{\link[=jsdgam]{jsdgam()}} a joint
 species distribution model. The
-\href{https://github.com/nicholasjclark/mvgam/raw/master/misc/mvgam_cheatsheet.pdf}{mvgam cheatsheet} and the
-\href{https://github.com/nicholasjclark/mvgam/raw/master/misc/jsdgam_cheatsheet.pdf}{JSDM cheatsheet} summarise the
+\href{https://nicholasjclark.github.io/mvgam/dev/cheatsheets/mvgam_cheatsheet.pdf}{mvgam cheatsheet} and the
+\href{https://nicholasjclark.github.io/mvgam/dev/cheatsheets/jsdgam_cheatsheet.pdf}{JSDM cheatsheet} summarise the
 main functions on one page each.
 }
 \author{

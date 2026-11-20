@@ -296,7 +296,7 @@ in the same order.
 
 `by_group = TRUE` returns the correlation of each economy's shocks:
 
-```{r rc-groups, fig.width = 8, fig.asp = 0.8, fig.cap = "Posterior mean correlations of the shocks in each economy. Outlined pairs have 95% credible intervals that exclude zero."}
+```{r rc-groups, fig.width = 8, fig.asp = 0.8, fig.cap = "Posterior mean correlations of the shocks in each economy. Outlined pairs have a posterior probability of their sign above 0.95."}
 rc_groups <- residual_cor(fit, covariance = "innovation", by_group = TRUE)
 plot(rc_groups, include_global = FALSE)
 ```

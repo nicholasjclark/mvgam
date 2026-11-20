@@ -4,7 +4,8 @@ mvgam now uses 'brms' to build its models. The observation model takes the full 
 
 ## Breaking changes
 * Trend constructors now go inside `trend_formula`, e.g. `trend_formula = ~ AR(p = 1)`. The `trend_model` argument has been removed
-* `n_lv` moved onto the trend constructors. Removed arguments: `use_lv`, `noncentred`, `prior_simulation`, `return_model_data`, `save_all_pars`, `parallel`
+* `n_lv` moved onto the trend constructors. Removed arguments: `use_lv`, `prior_simulation`, `return_model_data`, `save_all_pars`, `parallel`
+* The trend constructors take `centred` in place of `noncentred`. Latent states are sampled non-centred by default
 * Data for a model with a trend need a factor series column, even for one series
 * Renamed families: `nb()` is now `negbinomial()`, `student_t()` is now `student()`, `betar()` is now `Beta()`
 * Default family is now `gaussian()` in `mvgam()` and `sim_mvgam()`. `jsdgam()` defaults to `binomial()`
@@ -16,6 +17,7 @@ mvgam now uses 'brms' to build its models. The observation model takes the full 
 * Posterior summaries by default from `irf()`, `fevd()`, `stability()`. Pass `summary = FALSE` for draws
 * Removed functions, with their replacements: `get_mvgam_priors()` (`get_prior()`), the `plot_mvgam_*()` functions (`plot()`), `compare_mvgams()` (`loo_compare()`), `eval_mvgam()` (`lfo_cv()`), `roll_eval_mvgam()` (`lfo_cv()`), `lv_correlations()` (`residual_cor()`), `add_residuals()` (`augment()`), `code()` (`stancode()`), `ppc()` (`pp_check()`). `summary(include_states = )` has been removed
 * mvgam no longer re-exports `te()` and `ti()`
+* `coef()` follows 'brms': each level's coefficients per grouping factor. `fixef()` gives the population-level effects
 * `mvgam_forecast` objects store `train_times` and `test_times` as per-series lists
 * Parameter names and `summary()` blocks follow 'brms', with smooths, Gaussian processes and monotonic effects named by term and trend parameters indexed by series name, as in `sigma_trend[DM]`
 * `series_to_mvgam()` takes a `tsibble`, `ts`, `mts`, `msts` or wide data frame, fills gaps and returns one data frame unless `h` or `train_prop` is given. `xts` input has been removed
@@ -34,7 +36,10 @@ mvgam now uses 'brms' to build its models. The observation model takes the full 
 * AR factor models with estimated loadings give every draw one factor order and orientation. `summary()` reports their loadings as `Z` and their AR coefficients per factor
 * `jsdgam()` gained three arguments: `traits`, `trait_slopes`, `phylo`. `lv_axis()` in a `trend_formula` term gives each latent factor, or each series of a model without factors, its own effect
 * The 'brms' post-processing methods work on mvgam fits. Examples: `posterior_predict()`, `log_lik()`, `update()`, `hypothesis()`, `as_draws_*()`
-* `bayes_R2(by_series = TRUE)` scores each series, adding Tjur's R^2 and the AUC for binary responses. `residual_cor()` takes `prob_threshold`. `plot()` of its result outlines the pairs above it and can hide the rest
+* Exact `gp()` terms (no `k`) under any 'brms' kernel, with predictions and forecasts at new covariate values
+* `species_effects()` gives each species' response to named covariates with the posterior probability of its sign, plus the trait effects of a `trait_slopes` fit
+* `bayes_R2(by_series = TRUE)` scores each series, adding Tjur's R^2 and the AUC for binary responses
+* Four functions take `prob_threshold`, the sign probability a supported entry exceeds: `residual_cor()`, `posterior_transition_matrix()`, `community()`, `species_effects()`. Their heatmaps outline the entries whose sign probability exceeds it and can hide the rest
 * Model comparison: `bridge_sampler()`, `bayes_factor()`, `waic()`, `loo_model_weights()`, `pp_average()`, `compare_scores()`, `compare_elpds()`
 * `threads`, `init = "pathfinder"`, `mvgam_multiple()` for imputed data, and helpers to pivot wide occupancy and species data
 * `methods_md()` writes a model description. `bibtex()` extracts the citation

@@ -238,6 +238,7 @@ prepare_linpred_data <- function(draws, brmsfit, newdata,
   })
   sdata <- restore_fixed_assign(sdata, predictors, brmsfit$data)
 
+
   # `ranef` gives each group-level term's block `id` and place `cn`,
   # which name its design and coefficients. `me` numbers the model's
   # `me()` terms as `Xn_<k>` and `Xme_<k>` take them.

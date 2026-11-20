@@ -61,11 +61,12 @@ A fit with up to 10 series then has every arrow labelled. \code{"all"}
 labels every arrow and \code{"none"} labels none.}
 
 \item{traits}{\code{NULL}, \code{"auto"}, or a data frame or matrix of series
-traits. \code{"auto"} takes the traits a \code{jsdgam(traits = ...)} fit
-stores. Each numeric trait is regressed on the plotted loadings.
-Its arrow points the way the trait increases. Rows match the
-series by \code{rownames(traits)} when those name every series and by
-position otherwise. Drawn only with \code{biplot = TRUE}.}
+traits. \code{"auto"} takes the traits the fit was built with, those of
+\code{jsdgam(traits = )} or else of \code{jsdgam(trait_slopes = )}. Each
+numeric trait is regressed on the plotted loadings. Its arrow
+points the way the trait increases. Rows match the series by a
+\code{series} column, else by \code{rownames(traits)} when those name every
+series, else by position. Drawn only with \code{biplot = TRUE}.}
 
 \item{trait_arrow_scale}{Positive number. The longest trait arrow is
 \code{trait_arrow_scale} times the longest loading arrow.}

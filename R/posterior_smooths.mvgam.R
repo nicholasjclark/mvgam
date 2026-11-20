@@ -336,10 +336,20 @@ smooth_condition_facet <- function(df) {
 }
 
 
-# The panel of one smooth. A smooth of one variable is drawn here as
-# a ribbon and a median line, with the optional spaghetti. A surface
-# or a smooth drawn as faceted lines goes to brms's plot method.
-#'@noRd
+#' The panel of one smooth
+#'
+#' A smooth of one variable is drawn here as a ribbon and a median
+#' line, with the optional spaghetti. A smooth over a factor is drawn
+#' as one interval per level. A surface or a smooth drawn as faceted
+#' lines goes to brms's plot method.
+#'
+#' @param df Data frame of one smooth's plotting data, one element of
+#'   the list `conditional_smooths.mvgam()` returns, with its
+#'   `effects`, `surface`, `response` and `spaghetti` attributes
+#' @param label Character y-axis label, or `NULL` to take the
+#'   `response` attribute
+#' @return A `ggplot` object
+#' @noRd
 build_mvgam_smooth_plot <- function(df, label) {
   effs <- attr(df, "effects")
   is_surface <- isTRUE(attr(df, "surface"))
@@ -474,8 +484,9 @@ smooths <- function(x) {
 #'   `resp`, `dpar` and `nlpar`, naming the predictor as
 #'   `predictor_suffix()` takes them; `objects`, the numbers of its
 #'   smooth objects; `covars`, the variables it is a smooth of;
-#'   `by_var`, its `by` variable or `NA`; and `bylevels`, the `by`
-#'   level of each object in turn, `NULL` without a `by` factor
+#'   `by_var` and `by_vars`, as `smooth_term_specs()` gives them; and
+#'   `bylevels`, the `by` level of each object in turn, `NULL` without
+#'   a `by` factor
 #' @noRd
 mvgam_smooth_terms <- function(x) {
   checkmate::assert_class(x, "mvgam")
@@ -549,8 +560,9 @@ smooth_term_objects <- function(Xs) {
 #' @param labels Smooth term labels as the formula writes them, or
 #'   `NULL` for none
 #' @return List along `labels`. Each entry holds `covars`, the
-#'   variables the term smooths. It also holds `by_var`, the term's `by`
-#'   variable or `NA`.
+#'   variables the term smooths. `by_var` holds the term's `by` as
+#'   written, or `NA`. `by_vars` holds the columns its `by` is computed
+#'   from: `hab` for `by = as.numeric(hab == "b")`.
 #' @noRd
 smooth_term_specs <- function(labels) {
   checkmate::assert_character(labels, any.missing = FALSE, null.ok = TRUE)
@@ -560,8 +572,11 @@ smooth_term_specs <- function(labels) {
   )$smooth.spec
   checkmate::assert_list(specs, len = length(labels))
   lapply(specs, function(spec) {
-    list(covars = spec$term,
-         by_var = if (identical(spec$by, "NA")) NA_character_ else spec$by)
+    by_var <- if (identical(spec$by, "NA")) NA_character_ else spec$by
+    list(covars = spec$term, by_var = by_var,
+         by_vars = if (is.na(by_var)) character(0L) else {
+           all.vars(str2lang(by_var))
+         })
   })
 }
 
@@ -686,7 +701,7 @@ mvgam_smooth_eta <- function(object, hit, newdata, draw_ids = NULL) {
     brmsfit = side_model(object, hit$side),
     newdata = newdata %||% mvgam_side_data(object, hit$side),
     re_formula = NA,
-    req_vars = setdiff(c(hit$covars, hit$by_var), NA_character_)
+    req_vars = c(hit$covars, hit$by_vars)
   )
   smooth_pred(
     as_plain_matrix(prep$draws), prep$sdata,
@@ -697,16 +712,34 @@ mvgam_smooth_eta <- function(object, hit, newdata, draw_ids = NULL) {
 }
 
 
-# The prediction grid of one smooth term, as brms builds it. A smooth
-# of one variable sweeps it. A smooth of two takes a surface, or lines
-# at `facets` values of the second variable with `surface = FALSE`.
-# Variables past the second join the `by` variables as facets.
-#'@noRd
+#' The prediction grid of one smooth term, as brms builds it
+#'
+#' A smooth of one variable sweeps it. A smooth of two takes a
+#' surface, or lines at `facets` values of the second variable with
+#' `surface = FALSE`. Variables past the second join the `by` variables
+#' as facets.
+#'
+#' @param x Fitted `mvgam` object
+#' @param hit One element of the list `mvgam_smooth_terms()` returns,
+#'   with its `side`, `covars` and `by_vars`
+#' @param surface Logical; draw a smooth of two variables as a surface
+#' @param facets Integer number of values of a second or `by` numeric
+#'   variable
+#' @param resolution Integer number of points in a sweep
+#' @param int_conditions Named list of values, or functions of the
+#'   training values, that fix a variable's grid
+#' @param too_far Numeric distance past which `mgcv::exclude.too.far()`
+#'   drops a surface's grid points
+#' @return List of `newdata` (the grid of the term's own variables),
+#'   `cond_data` (the grid with `effect1__`, `effect2__` and `cond__`
+#'   columns), `effects` (character names of the swept variables) and
+#'   `surface` (logical scalar)
+#' @noRd
 build_smooth_grid <- function(x, hit, surface, facets, resolution,
                                 int_conditions, too_far) {
   mf <- mvgam_side_data(x, hit$side)
   covars <- hit$covars
-  byvars <- if (is.na(hit$by_var)) character(0L) else hit$by_var
+  byvars <- hit$by_vars
   if (length(covars) > 2L) {
     byvars <- c(covars[-(1:2)], byvars)
     covars <- covars[1:2]
@@ -757,9 +790,13 @@ build_smooth_grid <- function(x, hit, surface, facets, resolution,
     }
   }
   if (length(byvars) > 0L) {
-    cond_data$cond__ <- factor(do.call(
-      paste, c(cond_data[byvars], list(sep = " : "))
-    ))
+    # A numeric value is labelled to three decimals, as `effect2__` is
+    labels <- lapply(cond_data[byvars], function(v) {
+      if (is.numeric(v)) round(v, 3L) else v
+    })
+    # The facets keep the grid's order of values
+    cond <- do.call(paste, c(labels, list(sep = " : ")))
+    cond_data$cond__ <- factor(cond, levels = unique(cond))
   } else {
     cond_data$cond__ <- factor(1L)
   }
@@ -773,10 +810,17 @@ build_smooth_grid <- function(x, hit, surface, facets, resolution,
 }
 
 
-# The draws `build_mvgam_smooth_plot()` draws as spaghetti: one row
-# per draw and grid point, in the columns `effect1__`, `estimate__` and
-# `sample__`.
-#'@noRd
+#' The draws build_mvgam_smooth_plot() draws as spaghetti
+#'
+#' @param eta Numeric matrix of the smooth's draws, one row per draw
+#'   and one column per grid point
+#' @param cond_data Data frame of grid points, as `build_smooth_grid()`
+#'   returns it
+#' @param effects Character names of the smooth's variables. The first
+#'   gives the x values.
+#' @return Data frame with one row per draw and grid point, in the
+#'   columns `effect1__`, `estimate__` and `sample__`
+#' @noRd
 build_spaghetti_data <- function(eta, cond_data, effects) {
   data.frame(
     effect1__ = rep(cond_data[[effects[1L]]], times = nrow(eta)),
@@ -786,9 +830,17 @@ build_spaghetti_data <- function(eta, cond_data, effects) {
 }
 
 
-# The training values of a smooth's own variables, from every row of
-# the frame its side was fitted on.
-#'@noRd
+#' The training values of a smooth's own variables
+#'
+#' Takes every row of the frame the smooth's side was fitted on.
+#'
+#' @param x Fitted `mvgam` object
+#' @param hit One element of the list `mvgam_smooth_terms()` returns
+#' @param grid_spec List returned by `build_smooth_grid()`
+#' @return Data frame with one column per variable in
+#'   `grid_spec$effects`, named `effect1__`, `effect2__` and so on.
+#'   Empty when the frame lacks any of those variables.
+#' @noRd
 mvgam_smooth_points <- function(x, hit, grid_spec) {
   mf <- mvgam_side_data(x, hit$side)
   effects <- grid_spec$effects

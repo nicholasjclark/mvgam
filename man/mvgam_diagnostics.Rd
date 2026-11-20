@@ -19,7 +19,7 @@
 \alias{vcov.mvgam}
 \title{Posterior summaries and sampler diagnostics of mvgam models}
 \usage{
-\method{coef}{mvgam}(object, summary = TRUE, trend_effects = FALSE, ...)
+\method{coef}{mvgam}(object, summary = TRUE, robust = FALSE, probs = c(0.025, 0.975), ...)
 
 \method{nuts_params}{mvgam}(object, pars = NULL, ...)
 
@@ -76,12 +76,14 @@
 \item{object, x}{A fitted \code{mvgam} object.}
 
 \item{summary}{Logical. \code{TRUE} (the default) returns a summary.
-\code{FALSE} returns the draws. \code{coef()} summarises to posterior means.}
+\code{FALSE} returns the draws.}
 
-\item{trend_effects}{Logical. \code{coef()}, \code{fixef()} and \code{vcov()}
-report the coefficients of the observation formula by default.
-\code{TRUE} reports those of the \code{trend_formula} instead. Their names
-end in \verb{_trend}.}
+\item{robust}{Logical. \code{TRUE} summarises by the median and the median
+absolute deviation. Defaults to \code{FALSE}, the mean and the standard
+deviation.}
+
+\item{probs}{Numeric vector of the two interval probabilities,
+\code{c(0.025, 0.975)} by default.}
 
 \item{...}{Further arguments. \code{nuts_params()} and \code{log_posterior()}
 pass them to \pkg{bayesplot}. \code{bayes_R2()} passes them to
@@ -91,12 +93,10 @@ pass them to \pkg{bayesplot}. \code{bayes_R2()} passes them to
 sampler parameters such as \code{"divergent__"} for \code{nuts_params()}.
 \code{NULL} takes all of them.}
 
-\item{robust}{Logical. \code{TRUE} summarises by the median and the median
-absolute deviation. Defaults to \code{FALSE}, the mean and the standard
-deviation.}
-
-\item{probs}{Numeric vector of the two interval probabilities,
-\code{c(0.025, 0.975)} by default.}
+\item{trend_effects}{Logical. \code{fixef()} and \code{vcov()} report the
+coefficients of the observation formula by default.
+\code{TRUE} reports those of the \code{trend_formula} instead. Their names
+end in \verb{_trend}.}
 
 \item{resp}{Optional name of one response of a multivariate model.}
 
@@ -122,8 +122,14 @@ matrix with columns \code{Estimate}, \code{Est.Error} and one per quantile,
 or the draws with \code{summary = FALSE}. Under \code{by_series = TRUE}
 \code{bayes_R2()} returns a data frame with one row per series and
 measure, or draws in columns named \verb{<measure>[<series>]}, such as
-\code{AUC[sp1]}. \code{coef()} returns the posterior
-means. \code{vcov()} returns the covariance matrix of the coefficients.
+\code{AUC[sp1]}. \code{coef()} returns a named list with one array per
+grouping factor: levels, statistics and coefficients, or draws,
+levels and coefficients with \code{summary = FALSE}. A fit without
+group-level effects in its observation formula is refused. A
+level's coefficient omits the terms of other covariates that
+change it, such as \code{env:size} under \code{\link[=jsdgam]{jsdgam()}}'s \code{trait_slopes}.
+\code{\link[=species_effects]{species_effects()}} gives each species' full response.
+\code{vcov()} returns the covariance matrix of the coefficients.
 \code{rhat()} and \code{neff_ratio()} return a named vector with one value
 per parameter. \code{nuts_params()} and \code{log_posterior()} return the
 long data frames of \pkg{bayesplot}. The counting methods return
@@ -131,10 +137,12 @@ an integer.
 }
 \description{
 The \pkg{brms} and \pkg{bayesplot} accessors for a fitted model.
-\code{fixef()}, \code{coef()} and \code{vcov()} summarise the population-level
-coefficients of the observation formula, or of the trend formula
-with \code{trend_effects = TRUE}. \code{posterior_summary()} summarises any
-parameters. \code{rhat()} and \code{neff_ratio()} report convergence.
+\code{fixef()} and \code{vcov()} summarise the population-level coefficients
+of the observation formula, or of the trend formula with
+\code{trend_effects = TRUE}. \code{coef()} gives each level of each grouping
+factor its coefficients: the population effect plus that level's
+deviation, as \code{\link[brms:coef.brmsfit]{brms::coef.brmsfit()}} does. \code{posterior_summary()}
+summarises any parameters. \code{rhat()} and \code{neff_ratio()} report convergence.
 \code{nuts_params()} and \code{log_posterior()} return the sampler's own
 quantities.
 \code{bayes_R2()} is the Bayesian R^2 of Gelman et al. (2019).

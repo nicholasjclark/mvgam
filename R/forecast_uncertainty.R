@@ -2,9 +2,10 @@
 #'
 #' @description
 #' Shows where a forecast's uncertainty comes from and how each source
-#' grows with the horizon. The variance of the forecast at each horizon splits among the
-#' model's terms, its random effects, the latent dynamics, process error
-#' and, on the response scale, observation noise.
+#' grows with the horizon. The variance of the forecast at each horizon
+#' splits among the model's terms, its random effects, the latent
+#' dynamics, process error and, on the response scale, observation
+#' noise.
 #'
 #' @param object A fitted `mvgam` object.
 #' @param newdata Data frame of future times, as [forecast.mvgam()] takes
@@ -70,6 +71,11 @@
 #' Terms that overlap, such as `s(x)` with `t2(x, z)`, can take large
 #' contributions of opposite sign. The sum over a kind stays stable, which
 #' is why the overview and the default plot work by kind.
+#'
+#' A [diri()], [multi()] or [categ()] fit gives each species' share
+#' through a softmax, which ignores a shift every species at a site
+#' shares. Its link scale is centred across the species at each site,
+#' the centred log-ratio scale.
 #'
 #' On the link scale the contributions are exact. On the other scales a
 #' term's values are the expected value less the expected value without
@@ -262,7 +268,13 @@ forecast_variance_cells <- function(object, parts, setup, scale, resp) {
     sources[["latent dynamics"]] <- centre - fixed
     kinds[["latent dynamics"]] <- "latent dynamics"
   }
-  expect <- if (scale == "link") {
+  expect <- if (scale == "link" &&
+                   is_simplex_response_family(model_families(object, resp))) {
+    # A softmax ignores a shift shared by a unit's rows, which the data
+    # leave to the prior. The link scale centres each unit.
+    row_unit <- closure_unit_arrays_for(object, parts$frame)$row_unit
+    function(m) centre_within_groups(m, row_unit)
+  } else if (scale == "link") {
     identity
   } else {
     do.call(epred_map, c(

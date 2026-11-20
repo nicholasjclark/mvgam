@@ -182,7 +182,7 @@ compare_loadings <- function(
           x = .data$x, y = .data$y,
           xend = .data$xend, yend = .data$yend
         ),
-        colour = "grey70", linewidth = 0.3
+        colour = mvgam_neutral("faint"), linewidth = 0.3
       ) +
       ggplot2::geom_point(
         data = df,

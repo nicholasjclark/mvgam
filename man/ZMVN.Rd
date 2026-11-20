@@ -12,7 +12,8 @@ ZMVN(
   n_lv = NULL,
   cor = TRUE,
   trend_map = NULL,
-  df = Inf
+  df = Inf,
+  centred = FALSE
 )
 }
 \arguments{
@@ -56,7 +57,15 @@ for an ungrouped trend and \code{TRUE} when \code{gr} names a
 grouping variable. \code{VAR()}, \code{ZMVN()} and grouped
 \code{AR()} and \code{RW()} trends always estimate correlations.
 They refuse \code{cor = FALSE}. \code{CAR()} defaults to
-\code{FALSE}.}
+\code{FALSE}.
+
+In a factor model with every loading sampled, the factors take
+independent shocks. The loadings carry the correlation among
+series, which \code{\link[=residual_cor]{residual_cor()}} reports. A correlation among the
+factors would trade off against the loadings. \code{AR()}, \code{RW()} and
+\code{LLT()} refuse \code{cor = TRUE} there. A \code{trend_map} that fixes the
+loadings keeps the factors apart. \code{cor = TRUE} then estimates
+their correlation.}
 
 \item{trend_map}{Optional specification of which latent process each
 series maps onto. It fixes the loadings of a dynamic factor model.
@@ -102,6 +111,10 @@ close to the prior.
 }
 \code{VAR()} samples its states directly and \code{PW()} has no
 innovations. Neither takes \code{df}.}
+
+\item{centred}{Logical. Sample the latent states directly rather
+than their innovations? Default \code{FALSE}. The model and its
+posterior are the same. See \emph{Centred states} below.}
 }
 \value{
 An object of class \code{mvgam_trend}.

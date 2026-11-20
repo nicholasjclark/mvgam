@@ -252,7 +252,7 @@ plot.mvgam_compare_scores <- function(x, relative = NULL,
       "No rows to plot for the requested score.",
       x = paste0("score = '", score_type, "'."),
       i = "Check the source forecasts have the expected series."
-    )))
+    )), call. = FALSE)
   }
   y_lab <- score_label(score_type)
   if (!is.null(relative)) {
@@ -277,7 +277,7 @@ plot.mvgam_compare_scores <- function(x, relative = NULL,
     p <- p + reference_line(yintercept = 0)
   }
   if (!is_joint && isTRUE(facet)) {
-    p <- p + ggplot2::facet_wrap(~ series, scales = "free_y")
+    p <- p + mvgam_facet_series()
   } else if (!is_joint && !isTRUE(facet)) {
     p <- p + ggplot2::aes(linetype = .data$series)
   }

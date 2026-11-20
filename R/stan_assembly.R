@@ -1150,17 +1150,26 @@ shared_innovations_are_states <- function(trend_specs, data_info) {
 #'   states are its scaled innovations (see
 #'   `shared_innovations_are_states()`). Unit factors then make the
 #'   standard innovations the states, sampled as `lv_trend`.
+#' @param start From `centred_start_rows()`: the start rows of a
+#'   centred trend, or `NULL` for the non-centred form. A
+#'   centred trend samples `innovations_start_trend` for those rows and
+#'   `lv_dev_trend` for the later states. `innovations_trend` is then
+#'   a transformed parameter. This function scales its start rows.
+#'   `centred_states_stancode()` fills the rest.
 #' @return A stanvars object
 #' @noRd
 generate_shared_innovation_stanvars <- function(cor = FALSE,
                                                unit_factors = FALSE,
                                                hierarchical_info = NULL,
                                                states =
-                                                 "scaled_innovations_trend") {
+                                                 "scaled_innovations_trend",
+                                               start = NULL) {
   checkmate::assert_flag(cor)
   checkmate::assert_flag(unit_factors)
   checkmate::assert_choice(states, c("scaled_innovations_trend",
                                      "lv_trend"))
+  checkmate::assert_int(start, lower = 0L, null.ok = TRUE)
+  centred <- !is.null(start)
 
   effective_dim <- "N_lv_trend"
   is_hierarchical <- isTRUE(hierarchical_info$has_groups)
@@ -1185,12 +1194,22 @@ generate_shared_innovation_stanvars <- function(cor = FALSE,
                                     covariance = !scaled_cor)
   }
   innovations <- if (sampled_states) "lv_trend" else "innovations_trend"
-  innovations_trend_stanvar <- brms::stanvar(
-    name = innovations,
-    scode = paste0("matrix[N_time_trend, ", effective_dim, "] ",
-                   innovations, ";"),
-    block = "parameters"
-  )
+  innovations_trend_stanvar <- if (centred) {
+    centred_parameter_stanvar(start, effective_dim)
+  } else {
+    brms::stanvar(
+      name = innovations,
+      scode = paste0("matrix[N_time_trend, ", effective_dim, "] ",
+                     innovations, ";"),
+      block = "parameters"
+    )
+  }
+  # A centred trend scales only its start rows here, none for a
+  # `ZMVN()`. Its later rows are the residuals
+  # `centred_states_stancode()` recovers.
+  rows <- if (centred) paste0("[1:", start, "]") else ""
+  source <- paste0("innovations_trend", rows)
+  scale <- !identical(start, 0L)
 
   # A derived scale is declared in the block that uses it. Stan needs
   # the declaration before the first use.
@@ -1206,13 +1225,33 @@ generate_shared_innovation_stanvars <- function(cor = FALSE,
     )
   }
   scaled_decl <- paste0(
+    if (centred) centred_declarations_stancode(start, effective_dim),
     "\n    matrix[N_time_trend, ", effective_dim, "] ", states, ";"
   )
   final_innovations_code <- if (sampled_states) {
     ""
   } else if (is_hierarchical) {
-    paste0("\n    // Innovations scaled by each group's Cholesky factor,",
-           " filled below", scaled_decl)
+    paste0(
+      if (!centred) {
+        "\n    // Innovations scaled by each group's Cholesky factor, filled below"
+      } else if (scale) {
+        "\n    // Start rows scaled by each group's Cholesky factor below"
+      },
+      scaled_decl
+    )
+  } else if (scaled_cor && centred) {
+    # The centred states solve their residuals against the same factor
+    paste0(
+      scaled_decl,
+      "\n    matrix[", effective_dim, ", ", effective_dim,
+      "] L_Sigma_trend\n",
+      "      = diag_pre_multiply(sigma_trend, L_Omega_trend);\n",
+      "    cov_matrix[", effective_dim, "] Sigma_trend\n",
+      "      = multiply_lower_tri_self_transpose(L_Sigma_trend);",
+      if (scale) {
+        paste0("\n    ", states, rows, " = ", source, " * L_Sigma_trend';")
+      }
+    )
   } else if (scaled_cor) {
     paste0(
       scaled_decl,
@@ -1223,16 +1262,19 @@ generate_shared_innovation_stanvars <- function(cor = FALSE,
       "] L_Sigma_trend\n",
       "        = diag_pre_multiply(sigma_trend, L_Omega_trend);\n",
       "      Sigma_trend = multiply_lower_tri_self_transpose(L_Sigma_trend);\n",
-      "      ", states, " = innovations_trend * L_Sigma_trend';\n",
+      "      ", states, rows, " = ", source, " * L_Sigma_trend';\n",
       "    }"
     )
   } else {
     paste0(
-      scaled_decl, "\n    ",
-      if (unit_factors) {
-        paste0(states, " = innovations_trend;")
+      scaled_decl,
+      if (!scale) {
+        ""
+      } else if (unit_factors) {
+        paste0("\n    ", states, rows, " = ", source, ";")
       } else {
-        independent_scaling_stancode(states)
+        paste0("\n    ",
+               independent_scaling_stancode(paste0(states, rows), source))
       }
     )
   }
@@ -1442,6 +1484,8 @@ nu_trend_stanvars <- function(df, prior = NULL) {
 #' @param trend_obj The trend specification, for the default
 #'   `sigma_trend` prior
 #' @param innovations Name of the standard innovations matrix
+#' @param centred Whether the trend samples its states centred. Its
+#'   `log_jacobian_trend` then joins the target.
 #' @return A stanvars object
 #' @noRd
 generate_innovation_model <- function(effective_dim, cor = FALSE,
@@ -1449,10 +1493,12 @@ generate_innovation_model <- function(effective_dim, cor = FALSE,
                                       prior = NULL, df = Inf,
                                       unit_factors = FALSE,
                                       trend_obj = NULL,
-                                      innovations = "innovations_trend") {
+                                      innovations = "innovations_trend",
+                                      centred = FALSE) {
   checkmate::assert_flag(cor)
   checkmate::assert_flag(is_hierarchical)
   checkmate::assert_flag(unit_factors)
+  checkmate::assert_flag(centred)
 
   prior_code <- "// Shared innovation priors"
   if (!is_hierarchical) {
@@ -1468,7 +1514,8 @@ generate_innovation_model <- function(effective_dim, cor = FALSE,
     }
   }
   prior_code <- c(prior_code,
-                  innovation_sampling_code(effective_dim, df, innovations))
+                  innovation_sampling_code(effective_dim, df, innovations),
+                  if (centred) "target += log_jacobian_trend;")
 
   combine_stanvars(
     brms::stanvar(
@@ -1479,6 +1526,208 @@ generate_innovation_model <- function(effective_dim, cor = FALSE,
     nu_trend_stanvars(df, prior)
   )
 }
+
+#' The start rows of a trend that samples its states centred
+#'
+#' `centred = TRUE` on the constructor. The start rows keep their
+#' innovations. A random walk, a local linear trend or a CAR has one,
+#' its first state. An AR(p) has its first `p` states. The independent
+#' states of a `ZMVN()` have none. A `ZMVN()` whose factors take every
+#' loading sampled already samples its states as `lv_trend`.
+#'
+#' @param trend_specs The trend specification
+#' @param data_info Data information list
+#' @return Integer scalar, or `NULL` for a trend sampled non-centred
+#' @noRd
+centred_start_rows <- function(trend_specs, data_info) {
+  checkmate::assert_list(trend_specs)
+  checkmate::assert_list(data_info)
+  if (!isTRUE(trend_specs$centred) ||
+      (samples_factor_loadings(trend_specs) &&
+         shared_innovations_are_states(trend_specs, data_info))) {
+    return(NULL)
+  }
+  max(c(0L, derive_ar_lags(trend_specs)))
+}
+
+
+#' Parameter stanvar of a centred trend
+#'
+#' The standard innovations of the start rows and the later states as
+#' their distance from the first. The distance keeps a shift of the
+#' observation intercept against the level in two coordinates: the
+#' first innovation and the intercept.
+#'
+#' @param start Start rows from `centred_start_rows()`
+#' @param effective_dim Stan dimension of the processes
+#' @return A stanvar
+#' @noRd
+centred_parameter_stanvar <- function(start, effective_dim = "N_lv_trend") {
+  checkmate::assert_int(start, lower = 0L)
+  checkmate::assert_string(effective_dim, min.chars = 1L)
+  brms::stanvar(
+    name = "innovations_trend",
+    scode = paste0(
+      if (start > 0L) {
+        paste0("matrix[", start, ", ", effective_dim,
+               "] innovations_start_trend;\n")
+      },
+      "// Each later state's distance from the first state\n",
+      "matrix[N_time_trend - ", start, ", ", effective_dim,
+      "] lv_dev_trend;"
+    ),
+    block = "parameters"
+  )
+}
+
+
+#' How a trend's innovations correlate across processes
+#'
+#' Each group's own factor under `gr`, the global factor under `cor`,
+#' and none otherwise. Sampled loadings fix the factors' correlation at
+#' the identity, which gives none.
+#'
+#' @param trend_specs The trend specification
+#' @return `"group"`, `"global"` or `"none"`
+#' @noRd
+innovation_correlation <- function(trend_specs) {
+  checkmate::assert_list(trend_specs)
+  if (named_var(trend_specs$gr)) {
+    "group"
+  } else if (isTRUE(trend_specs$cor) &&
+             !samples_factor_loadings(trend_specs)) {
+    "global"
+  } else {
+    "none"
+  }
+}
+
+
+#' Stan declarations of a centred trend's transformed innovations
+#'
+#' `innovations_trend` becomes a transformed parameter. Its start rows
+#' are the sampled `innovations_start_trend`. `centred_states_stancode()`
+#' fills the rest and adds to `log_jacobian_trend`.
+#'
+#' @param start Start rows from `centred_start_rows()`
+#' @param effective_dim Stan dimension of the processes
+#' @return Character scalar of Stan statements, led by a newline
+#' @noRd
+centred_declarations_stancode <- function(start,
+                                          effective_dim = "N_lv_trend") {
+  checkmate::assert_int(start, lower = 0L)
+  checkmate::assert_string(effective_dim, min.chars = 1L)
+  paste0(
+    "\n    // Log Jacobian of the map from the centred states to the",
+    "\n    // standard innovations",
+    "\n    real log_jacobian_trend = 0;",
+    "\n    matrix[N_time_trend, ", effective_dim, "] innovations_trend;",
+    if (start > 0L) {
+      paste0("\n    innovations_trend[1:", start,
+             "] = innovations_start_trend;")
+    }
+  )
+}
+
+
+#' Stan text of a centred trend's states and recovered innovations
+#'
+#' The states after the start rows are the first state plus their
+#' sampled distance. A trend without start rows samples its states
+#' outright. `residual` inverts the trend's recursion at each later
+#' state and writes the result into the rows of `{resid}`, indexed by
+#' time. The helper names the matrix it fills: `scaled_innovations_trend`,
+#' or `ma_innovations_trend` under a moving-average term, whose shocks
+#' then follow as `e_t = resid_t - theta e_{t-1}`. A residual already on
+#' the standard scale fills `innovations_trend` itself. The standardised
+#' shocks fill `innovations_trend`, to which the innovation law applies
+#' as in the non-centred form. The map from the distances to the
+#' standard innovations is triangular. Each later state adds minus the
+#' sum of the log diagonal of its shocks' Cholesky factor to
+#' `log_jacobian_trend`.
+#'
+#' @param start Start rows from `centred_start_rows()`
+#' @param residual Stan statements writing the later rows of `{resid}`
+#' @param kind Correlation from `innovation_correlation()`. Unit
+#'   factors take `"none"`: their `sigma_trend` of one gives a Jacobian
+#'   of zero. `"standard"` marks a residual already on the standard
+#'   scale, as a correlated `CAR()` solves each gap's factor itself.
+#' @param has_ma Whether a first-order moving-average term applies
+#' @return Character scalar of Stan statements
+#' @noRd
+centred_states_stancode <- function(start, residual, kind,
+                                    has_ma = FALSE) {
+  checkmate::assert_int(start, lower = 0L)
+  checkmate::assert_string(residual, min.chars = 1L)
+  checkmate::assert_choice(kind, c("group", "global", "none", "standard"))
+  checkmate::assert_flag(has_ma)
+  # The later rows, or every row for a trend without start rows
+  rows <- if (start > 0L) paste0(start + 1L, ":N_time_trend") else " : "
+  later <- if (start > 0L) paste0("[", rows, "]") else ""
+  n_later <- if (start > 0L) paste0("(N_time_trend - ", start, ")") else {
+    "N_time_trend"
+  }
+  target <- if (identical(kind, "standard")) {
+    "innovations_trend"
+  } else if (has_ma) {
+    "ma_innovations_trend"
+  } else {
+    "scaled_innovations_trend"
+  }
+  shocks <- if (has_ma) {
+    paste0(
+      "      for (i in ", start + 1L, ":N_time_trend) {\n",
+      "        scaled_innovations_trend[i] = ma_innovations_trend[i]\n",
+      "          - (theta1_trend .* scaled_innovations_trend[i - 1]')';\n",
+      "      }\n"
+    )
+  }
+  shocked <- paste0("scaled_innovations_trend", later)
+  standardise <- switch(
+    kind,
+    none = paste0(
+      "      innovations_trend", later, "\n",
+      "        = diag_post_multiply(", shocked, ", inv(sigma_trend));\n",
+      "      log_jacobian_trend += -", n_later, " * sum(log(sigma_trend));\n"
+    ),
+    global = paste0(
+      "      innovations_trend", later, "\n",
+      "        = mdivide_left_tri_low(L_Sigma_trend, ", shocked, "')';\n",
+      "      log_jacobian_trend\n",
+      "        += -", n_later, " * sum(log(diagonal(L_Sigma_trend)));\n"
+    ),
+    group = paste0(
+      group_members_stanblock(),
+      "        innovations_trend[", rows, ", members]\n",
+      "          = mdivide_left_tri_low(L_group_trend[g_idx],\n",
+      "              scaled_innovations_trend[", rows, ", members]')';\n",
+      "        log_jacobian_trend += -", n_later,
+      " * sum(log(diagonal(L_group_trend[g_idx])));\n",
+      "      }\n"
+    ),
+    standard = ""
+  )
+  paste0(
+    if (start > 0L) {
+      paste0(
+        "      // Centred states: each later state is the first plus its\n",
+        "      // sampled distance. Inverting the recursion recovers the\n",
+        "      // innovations.\n"
+      )
+    } else {
+      "      // Centred states: the innovations are the sampled states.\n"
+    },
+    "      lv_trend", later, " = ",
+    if (start > 0L) {
+      paste0("rep_matrix(lv_trend[1], ", n_later, ")\n        + ")
+    },
+    "lv_dev_trend;\n",
+    gsub("{resid}", target, residual, fixed = TRUE), "\n",
+    shocks,
+    standardise
+  )
+}
+
 
 #' The number of series a trend runs on
 #'
@@ -1579,7 +1828,10 @@ grouped_trend_stanvars <- function(hierarchical_info, data_info, prior,
     generate_hierarchical_functions(),
     generate_hierarchical_correlation_parameters(
       hierarchical_info$n_groups, hierarchical_info$n_subgroups,
-      scale_innovations = scale_innovations
+      scale_innovations = scale_innovations,
+      start = if (scale_innovations) {
+        centred_start_rows(trend_specs, data_info)
+      }
     ),
     generate_hierarchical_correlation_model(prior, trend_obj = trend_specs)
   )
@@ -2192,9 +2444,17 @@ loadings_z_branch <- function(spec) {
 }
 
 
-# The Stan statement each branch emits for `Z`, keyed by
-# `loadings_z_branch()`. The prior table reports the same strings.
-#'@noRd
+#' The Stan prior statement each loadings branch emits for Z
+#'
+#' Keyed by `loadings_z_branch()`. `get_default_trend_parameter_prior()`
+#' returns the same strings. The prior table and the Stan emitter then
+#' report the prior the model samples.
+#'
+#' @param branch Character scalar from `loadings_z_branch()`: `"kernel"`,
+#'   `"mgp"` or `"unstructured"`
+#' @return Character scalar Stan distribution, or `NULL` for the
+#'   unstructured branch, which takes the shared default prior
+#' @noRd
 loadings_z_prior_string <- function(branch) {
   switch(
     branch,
@@ -2570,13 +2830,19 @@ generate_hierarchical_data_structures <- function(hierarchical_info,
 #' @param scale_innovations Logical. TRUE also scales the shared
 #'   innovations by `L_group_trend`. A VAR samples its states directly
 #'   and takes the covariances alone.
+#' @param start From `centred_start_rows()`. A centred trend scales only
+#'   its start rows here.
 #' @return A stanvars object
 #' @noRd
 generate_hierarchical_correlation_parameters <- function(
-    n_groups, n_subgroups, scale_innovations = TRUE) {
+    n_groups, n_subgroups, scale_innovations = TRUE, start = NULL) {
   checkmate::assert_integer(n_groups, len = 1, lower = 1)
   checkmate::assert_integer(n_subgroups, len = 1, lower = 1)
   checkmate::assert_flag(scale_innovations)
+  checkmate::assert_int(start, lower = 0L, null.ok = TRUE)
+  # A centred trend scales its start rows here and recovers the rest
+  rows <- if (is.null(start)) " : " else paste0("1:", start)
+  scale_innovations <- scale_innovations && !identical(start, 0L)
 
   sampled <- combine_stanvars(
     brms::stanvar(
@@ -2635,8 +2901,8 @@ generate_hierarchical_correlation_parameters <- function(
           "\n// Scale each group's innovations by its Cholesky factor,\n",
           "// every occasion in one product\n",
           "for (g_idx in 1:N_groups_trend) {\n",
-          "  scaled_innovations_trend[ : , group_members_trend[g_idx]]\n",
-          "    = innovations_trend[ : , group_members_trend[g_idx]]\n",
+          "  scaled_innovations_trend[", rows, ", group_members_trend[g_idx]]\n",
+          "    = innovations_trend[", rows, ", group_members_trend[g_idx]]\n",
           "      * L_group_trend[g_idx]';\n",
           "}"
         )
@@ -2729,7 +2995,11 @@ generate_trend_specific_stanvars <- function(trend_specs, data_info,
     cor <- trend_specs$cor %||% FALSE
     unit_factors <- samples_factor_loadings(trend_specs)
     refuse_unit_factor_priors(prior, unit_factors)
-    states <- if (shared_innovations_are_states(trend_specs, data_info)) {
+    start <- centred_start_rows(trend_specs, data_info)
+    centred <- !is.null(start)
+    # A centred trend recovers its scaled innovations from its states
+    states <- if (shared_innovations_are_states(trend_specs, data_info) &&
+                  !centred) {
       "lv_trend"
     } else {
       "scaled_innovations_trend"
@@ -2739,7 +3009,8 @@ generate_trend_specific_stanvars <- function(trend_specs, data_info,
         cor = cor,
         unit_factors = unit_factors,
         hierarchical_info = hierarchical_info,
-        states = states
+        states = states,
+        start = start
       ),
       generate_innovation_model(
         effective_dim = "N_lv_trend",
@@ -2753,7 +3024,8 @@ generate_trend_specific_stanvars <- function(trend_specs, data_info,
           "lv_trend"
         } else {
           "innovations_trend"
-        }
+        },
+        centred = centred
       )
     )
   }
@@ -2800,15 +3072,29 @@ generate_rw_trend_stanvars <- function(trend_specs, data_info,
   } else {
     "scaled_innovations_trend"
   }
+  start <- centred_start_rows(trend_specs, data_info)
   dynamics <- brms::stanvar(
     name = "rw_tparameters",
     scode = paste0(
-      ma_innovations_stanblock(trend_specs$ma), "\n",
+      ma_innovations_stanblock(trend_specs$ma, start), "\n",
       "// Random walk: each state adds one innovation to the last\n",
       "lv_trend[1, :] = ", innovations, "[1, :];\n",
-      "for (i in 2:N_time_trend) {\n",
-      "  lv_trend[i, :] = lv_trend[i - 1, :] + ", innovations, "[i, :];\n",
-      "}"
+      if (is.null(start)) {
+        paste0(
+          "for (i in 2:N_time_trend) {\n",
+          "  lv_trend[i, :] = lv_trend[i - 1, :] + ", innovations,
+          "[i, :];\n",
+          "}"
+        )
+      } else {
+        centred_states_stancode(
+          start,
+          paste0("      {resid}[2:N_time_trend] = lv_trend[2:N_time_trend]\n",
+                 "        - lv_trend[1:(N_time_trend - 1)];"),
+          innovation_correlation(trend_specs),
+          has_ma = isTRUE(trend_specs$ma)
+        )
+      }
     ),
     block = "tparameters"
   )
@@ -2823,7 +3109,9 @@ generate_rw_trend_stanvars <- function(trend_specs, data_info,
 #' The slope adds its own Gaussian shock to the last slope, damped by
 #' `ar1_slope_trend` when `damped = TRUE`. The slope starts at the
 #' free `init_slope_trend` either way. The slope shocks take the
-#' level's correlation factor with their own scales. Under sampled
+#' level's correlation factor with their own scales, as
+#' `correlated_shocks_stancode()` writes it. A season's shocks take it
+#' too. Under sampled
 #' loadings the factors share one slope scale and one damping. The
 #' level and an undamped slope are cumulative sums down each process,
 #' vectorised over time. A damped slope recurses one step at a time.
@@ -2842,8 +3130,6 @@ generate_llt_trend_stanvars <- function(trend_specs, data_info,
   checkmate::assert_class(prior, "brmsprior", null.ok = TRUE)
   damped <- isTRUE(trend_specs$damped)
   shared <- samples_factor_loadings(trend_specs)
-  has_gr <- named_var(trend_specs$gr)
-  cor <- isTRUE(trend_specs$cor) && !shared
   n_par <- if (shared) "1" else "N_lv_trend"
   # A parameter at every latent process, broadcast when shared
   per_process <- function(name) {
@@ -2879,24 +3165,12 @@ generate_llt_trend_stanvars <- function(trend_specs, data_info,
     block = "parameters"
   )
 
-  # The slope shocks take the level's correlation: the global factor,
-  # or each group's own
-  scale_shocks <- if (has_gr) {
-    paste0(
-      group_members_stanblock(),
-      "        slope_shocks[ : , members]\n",
-      "          = innovations_slope_trend[ : , members]\n",
-      "            * diag_pre_multiply(slope_sd[members],\n",
-      "                                L_Omega_group_trend[g_idx])';\n",
-      "      }"
-    )
-  } else if (cor) {
-    paste0("      slope_shocks = innovations_slope_trend\n",
-           "        * diag_pre_multiply(slope_sd, L_Omega_trend)';")
-  } else {
-    paste0("      slope_shocks = diag_post_multiply(innovations_slope_trend,",
-           " slope_sd);")
-  }
+  # The slope and season shocks take the level's correlation
+  correlation <- innovation_correlation(trend_specs)
+  start <- centred_start_rows(trend_specs, data_info)
+  scale_shocks <- correlated_shocks_stancode(
+    "slope_shocks", "innovations_slope_trend", "slope_sd", correlation
+  )
 
   dynamics <- brms::stanvar(
     name = "llt_tparameters",
@@ -2927,17 +3201,39 @@ generate_llt_trend_stanvars <- function(trend_specs, data_info,
       } else {
         "      slope_trend[2:N_time_trend] = slope_shocks;\n"
       },
-      "      // The level adds the last slope and its shock. Each state is a\n",
-      "      // cumulative sum down its process.\n",
-      "      for (k in 1:N_lv_trend) {\n",
-      if (!damped) {
-        "        slope_trend[ : , k] = cumulative_sum(slope_trend[ : , k]);\n"
+      if (is.null(start)) {
+        paste0(
+          "      // The level adds the last slope and its shock. Each state is a\n",
+          "      // cumulative sum down its process.\n",
+          "      for (k in 1:N_lv_trend) {\n",
+          if (!damped) {
+            "        slope_trend[ : , k] = cumulative_sum(slope_trend[ : , k]);\n"
+          },
+          "        lv_trend[ : , k] = cumulative_sum(append_row(\n",
+          "          scaled_innovations_trend[1, k],\n",
+          "          scaled_innovations_trend[2:N_time_trend, k]\n",
+          "            + slope_trend[1:(N_time_trend - 1), k]));\n",
+          "      }\n"
+        )
+      } else {
+        paste0(
+          if (!damped) {
+            paste0(
+              "      for (k in 1:N_lv_trend) {\n",
+              "        slope_trend[ : , k] = cumulative_sum(slope_trend[ : , k]);\n",
+              "      }\n"
+            )
+          },
+          "      lv_trend[1] = scaled_innovations_trend[1];\n",
+          centred_states_stancode(
+            start,
+            paste0("      {resid}[2:N_time_trend] = lv_trend[2:N_time_trend]\n",
+                   "        - lv_trend[1:(N_time_trend - 1)]\n",
+                   "        - slope_trend[1:(N_time_trend - 1)];"),
+            correlation
+          )
+        )
       },
-      "        lv_trend[ : , k] = cumulative_sum(append_row(\n",
-      "          scaled_innovations_trend[1, k],\n",
-      "          scaled_innovations_trend[2:N_time_trend, k]\n",
-      "            + slope_trend[1:(N_time_trend - 1), k]));\n",
-      "      }\n",
       "    }"
     ),
     block = "tparameters"
@@ -2960,7 +3256,7 @@ generate_llt_trend_stanvars <- function(trend_specs, data_info,
   )
 
   season <- llt_season_stanvars(trend_specs, scales, n_par, per_process,
-                                prior)
+                                correlation, prior)
   assemble_shared_innovation_trend(
     c(list(data, parameters, dynamics, model), season$stanvars),
     trend_specs, data_info, prior,
@@ -2972,7 +3268,9 @@ generate_llt_trend_stanvars <- function(trend_specs, data_info,
 #' Stanvars of the season of an LLT trend
 #'
 #' Each harmonic holds a state pair that turns by its frequency at
-#' every step and takes two shocks of scale `sigma_season_trend`. The
+#' every step and takes two shocks of scale `sigma_season_trend`. Under
+#' `cor` or `gr` the shocks of one harmonic's state across the processes
+#' take the level's correlation factor. The
 #' season is the sum of the first states. It runs after the level
 #' recursion and adds to `lv_trend`, which then holds the level plus
 #' the season. The program stores the season and the last pair of each
@@ -2995,13 +3293,17 @@ generate_llt_trend_stanvars <- function(trend_specs, data_info,
 #' @param n_par Stan size of a per-process parameter
 #' @param per_process Function writing a parameter's value at every
 #'   process
+#' @param correlation The level's correlation, as
+#'   `correlated_shocks_stancode()` takes it. Each harmonic's shocks
+#'   across the processes take it.
 #' @param prior A `brmsprior` or NULL
 #' @return List of `stanvars` and `paths`. `paths` names the season's
 #'   factor-indexed matrices with their row counts. Both are empty
 #'   without a season.
 #' @noRd
 llt_season_stanvars <- function(trend_specs, scales, n_par, per_process,
-                                prior = NULL) {
+                                correlation = "none", prior = NULL) {
+  checkmate::assert_choice(correlation, c("group", "global", "none"))
   freq <- llt_season_frequencies(trend_specs)
   if (!length(freq)) {
     return(list(stanvars = list(), paths = character(0L)))
@@ -3028,6 +3330,34 @@ llt_season_stanvars <- function(trend_specs, scales, n_par, per_process,
   }
   first <- "1:N_harm_trend"
   second <- "(N_harm_trend + 1):(2 * N_harm_trend)"
+  # Independent shocks scale every column at once. Correlated ones take
+  # each state of each harmonic in turn, its column in every process.
+  season_shocks <- if (correlation == "none") {
+    paste0(
+      "      row_vector[n_hp] season_sd = to_row_vector(\n",
+      "        rep_matrix(", per_process("sigma_season_trend"),
+      "', N_harm_trend));\n",
+      "      season_shocks = diag_post_multiply(innovations_season_trend,\n",
+      "                                         append_col(season_sd,",
+      " season_sd));"
+    )
+  } else {
+    paste0(
+      "      vector[N_lv_trend] season_sd = ",
+      per_process("sigma_season_trend"), ";\n",
+      "      // Columns hold the harmonic within each process, first states\n",
+      "      // then second\n",
+      "      for (j in 1:(2 * N_harm_trend)) {\n",
+      "        array[N_lv_trend] int cols;\n",
+      "        for (k in 1:N_lv_trend) {\n",
+      "          cols[k] = j + (k - 1) * N_harm_trend\n",
+      "                    + (j > N_harm_trend ? n_hp - N_harm_trend : 0);\n",
+      "        }\n",
+      correlated_shocks_stancode("season_shocks", "innovations_season_trend",
+                                 "season_sd", correlation, cols = "cols"),
+      "\n      }"
+    )
+  }
   data <- combine_stanvars(
     data_stanvar(length(freq), "N_harm_trend", "int<lower=1>"),
     data_stanvar(freq, "freq_season_trend", "vector[N_harm_trend]"),
@@ -3076,19 +3406,15 @@ llt_season_stanvars <- function(trend_specs, scales, n_par, per_process,
       "matrix[2 * N_harm_trend, N_lv_trend] season_state_trend;\n",
       "    {\n",
       "      int n_hp = N_harm_trend * N_lv_trend;\n",
-      "      row_vector[n_hp] season_sd = to_row_vector(\n",
-      "        rep_matrix(", per_process("sigma_season_trend"),
-      "', N_harm_trend));\n",
+      "      matrix[N_time_trend - 1, 2 * n_hp] season_shocks;\n",
+      season_shocks, "\n",
       "      // The starting pairs, then the shocks of every later step\n",
       "      matrix", t_by_hp, " w = append_row(\n",
       "        to_row_vector(init_season_trend[", first, "]),\n",
-      "        diag_post_multiply(innovations_season_trend[ : , 1:n_hp],\n",
-      "                           season_sd));\n",
+      "        season_shocks[ : , 1:n_hp]);\n",
       "      matrix", t_by_hp, " w_star = append_row(\n",
       "        to_row_vector(init_season_trend[", second, "]),\n",
-      "        diag_post_multiply(\n",
-      "          innovations_season_trend[ : , (n_hp + 1):(2 * n_hp)],\n",
-      "          season_sd));\n",
+      "        season_shocks[ : , (n_hp + 1):(2 * n_hp)]);\n",
       "      // Each shock turned by its angle, then summed over time\n",
       "      matrix", t_by_hp, " re = cos_season_trend .* w\n",
       "                                  - sin_season_trend .* w_star;\n",
@@ -3695,20 +4021,40 @@ ar_pacf_functions_stanvar <- function(with_init = TRUE) {
 #' the first occasion.
 #'
 #' @param has_ma Logical, whether the trend carries an `ma` term
+#' @param start From `centred_start_rows()`. A centred trend fills its
+#'   start rows here. `centred_states_stancode()` writes the later rows
+#'   as residuals. Each later row's moving-average shock subtracts the
+#'   shock before it, which the first start row supplies.
 #' @return Character scalar, empty when the term was not asked for
 #' @noRd
-ma_innovations_stanblock <- function(has_ma) {
+ma_innovations_stanblock <- function(has_ma, start = NULL) {
+  checkmate::assert_int(start, lower = 1L, null.ok = TRUE)
   if (!isTRUE(has_ma)) {
     return("")
   }
+  if (is.null(start)) {
+    return(paste0(
+      "matrix[N_time_trend, N_lv_trend] ma_innovations_trend",
+      " = scaled_innovations_trend;\n",
+      "      // Moving-average term of order one: row i adds theta times\n",
+      "      // innovation row i - 1\n",
+      "      ma_innovations_trend[2:N_time_trend]\n",
+      "        += diag_post_multiply(\n",
+      "          scaled_innovations_trend[1:(N_time_trend - 1)], theta1_trend);"
+    ))
+  }
   paste0(
-    "matrix[N_time_trend, N_lv_trend] ma_innovations_trend",
-    " = scaled_innovations_trend;\n",
-    "      // Moving-average term of order one: row i adds theta times\n",
-    "      // innovation row i - 1\n",
-    "      ma_innovations_trend[2:N_time_trend]\n",
-    "        += diag_post_multiply(\n",
-    "          scaled_innovations_trend[1:(N_time_trend - 1)], theta1_trend);"
+    "matrix[N_time_trend, N_lv_trend] ma_innovations_trend;\n",
+    "      // The start rows' moving-average term of order one\n",
+    "      ma_innovations_trend[1:", start, "] = scaled_innovations_trend[1:",
+    start, "];",
+    if (start > 1L) {
+      paste0(
+        "\n      ma_innovations_trend[2:", start, "]\n",
+        "        += diag_post_multiply(scaled_innovations_trend[1:",
+        start - 1L, "], theta1_trend);"
+      )
+    }
   )
 }
 
@@ -3766,12 +4112,66 @@ refuse_unit_factor_priors <- function(prior, unit_factors) {
 #' column-scaling product costs `O(T n)`, against `O(T n^2)` for a
 #' product with a dense diagonal matrix.
 #'
+#' @param states Stan target of the scaled innovations
+#' @param source Stan expression of the standard innovations
 #' @return Character scalar
 #' @noRd
 independent_scaling_stancode <- function(
-    states = "scaled_innovations_trend") {
+    states = "scaled_innovations_trend", source = "innovations_trend") {
   checkmate::assert_string(states, min.chars = 1L)
-  paste0(states, " = diag_post_multiply(innovations_trend, sigma_trend);")
+  checkmate::assert_string(source, min.chars = 1L)
+  paste0(states, " = diag_post_multiply(", source, ", sigma_trend);")
+}
+
+#' Stan text giving standard shocks the level's correlation
+#'
+#' The shocks of every process at one step take the level shocks'
+#' correlation factor with scales of their own: each group's factor
+#' under `gr`, the global factor under `cor`, none otherwise. The LLT
+#' slope and season shocks take it.
+#'
+#' @param target,source Stan names of the scaled and the standard shock
+#'   matrices, one column per process
+#' @param sd Stan name of the vector of per-process scales
+#' @param correlation `"group"`, `"global"` or `"none"`
+#' @param cols Stan name of an integer array choosing the columns of
+#'   `target` and `source` that hold the processes, or `NULL` for every
+#'   column
+#' @return Character scalar of Stan statements
+#' @noRd
+correlated_shocks_stancode <- function(target, source, sd, correlation,
+                                       cols = NULL) {
+  checkmate::assert_string(target, min.chars = 1L)
+  checkmate::assert_string(source, min.chars = 1L)
+  checkmate::assert_string(sd, min.chars = 1L)
+  checkmate::assert_choice(correlation, c("group", "global", "none"))
+  checkmate::assert_string(cols, min.chars = 1L, null.ok = TRUE)
+  at <- function(rows) {
+    if (is.null(cols)) {
+      if (is.null(rows)) "" else paste0("[ : , ", rows, "]")
+    } else {
+      paste0("[ : , ", cols, if (!is.null(rows)) paste0("[", rows, "]"), "]")
+    }
+  }
+  switch(
+    correlation,
+    group = paste0(
+      group_members_stanblock(),
+      "        ", target, at("members"), "\n",
+      "          = ", source, at("members"), "\n",
+      "            * diag_pre_multiply(", sd, "[members],\n",
+      "                                L_Omega_group_trend[g_idx])';\n",
+      "      }"
+    ),
+    global = paste0(
+      "      ", target, at(NULL), " = ", source, at(NULL), "\n",
+      "        * diag_pre_multiply(", sd, ", L_Omega_trend)';"
+    ),
+    none = paste0(
+      "      ", target, at(NULL), " = diag_post_multiply(", source, at(NULL),
+      ", ", sd, ");"
+    )
+  )
 }
 
 #' Stan text opening a loop over groups with each group's members
@@ -3988,12 +4388,11 @@ generate_ar_trend_stanvars <- function(trend_specs, data_info,
   has_ma <- trend_specs$ma %||% FALSE
   max_lag <- max(ar_lags)
   # The start branch below and the gate on the joint stationary
-  # functions both use `cor`. Sampled loadings fix the factor
-  # correlation at the identity, which gives each factor its own
-  # independent start.
-  cor <- isTRUE(trend_specs$cor %||% FALSE) &&
-    !samples_factor_loadings(trend_specs)
-  has_gr <- named_var(trend_specs$gr)
+  # functions both use `cor`, true for the global and the group factors
+  # alike. Sampled loadings give each factor its own independent start.
+  correlation <- innovation_correlation(trend_specs)
+  cor <- !identical(correlation, "none")
+  has_gr <- identical(correlation, "group")
   # A contiguous lag set above one lag samples partial
   # autocorrelations, which makes every draw jointly stationary. The
   # multi-lag starts below need that guarantee. A sparse set bounds
@@ -4119,11 +4518,9 @@ generate_ar_trend_stanvars <- function(trend_specs, data_info,
     "scaled_innovations_trend"
   ar_sum <- paste0("ar", ar_lags, "_trend[j] * lv_trend[i - ", ar_lags,
                    ", j]", collapse = "\n            + ")
-  ar_tparameters_stanvar <- brms::stanvar(
-    name = "ar_tparameters",
-    scode = paste0(
-      "\n      ", ma_innovations_stanblock(has_ma), "\n\n",
-      ar_init_block, "\n\n",
+  start <- centred_start_rows(trend_specs, data_info)
+  dynamics <- if (is.null(start)) {
+    paste0(
       "      // AR dynamics\n",
       "      for (i in ", max_lag + 1, ":N_time_trend) {\n",
       "        for (j in 1:N_lv_trend) {\n",
@@ -4131,6 +4528,27 @@ generate_ar_trend_stanvars <- function(trend_specs, data_info,
       "            + ", innovations, "[i, j];\n",
       "        }\n",
       "      }\n"
+    )
+  } else {
+    centred_states_stancode(
+      start,
+      paste0(
+        "      {resid}[", max_lag + 1, ":N_time_trend]\n",
+        "        = lv_trend[", max_lag + 1, ":N_time_trend]",
+        paste0("\n          - diag_post_multiply(lv_trend[",
+               max_lag + 1L - ar_lags, ":(N_time_trend - ", ar_lags,
+               ")], ar", ar_lags, "_trend)", collapse = ""), ";"
+      ),
+      innovation_correlation(trend_specs),
+      has_ma = has_ma
+    )
+  }
+  ar_tparameters_stanvar <- brms::stanvar(
+    name = "ar_tparameters",
+    scode = paste0(
+      "\n      ", ma_innovations_stanblock(has_ma, start), "\n\n",
+      ar_init_block, "\n\n",
+      dynamics
     ),
     block = "tparameters"
   )
@@ -4886,24 +5304,52 @@ calculate_car_time_distances <- function(data_info) {
 
 #' Stan dynamics of a CAR trend with independent innovations
 #'
+#' Centred, each step's residual divided by its gap's innovation scale
+#' is the scaled innovation. The log of that scale joins the Jacobian.
+#'
+#' @param start From `centred_start_rows()`: the start rows of a
+#'   centred trend, or `NULL` for the non-centred form
 #' @return A stanvars object for the transformed parameters block
 #' @noRd
-car_independent_dynamics_stanvars <- function() {
+car_independent_dynamics_stanvars <- function(start = NULL) {
+  checkmate::assert_int(start, lower = 1L, null.ok = TRUE)
+  centred <- !is.null(start)
   combine_stanvars(
     brms::stanvar(
       name = "car_innovation_computation",
       scode = paste0(
+        if (centred) centred_declarations_stancode(start),
         "matrix[N_time_trend, N_lv_trend] scaled_innovations_trend;\n  ",
-        independent_scaling_stancode()
+        if (centred) {
+          rows <- paste0("[1:", start, "]")
+          independent_scaling_stancode(
+            paste0("scaled_innovations_trend", rows),
+            paste0("innovations_trend", rows)
+          )
+        } else {
+          independent_scaling_stancode()
+        }
       ),
       block = "tparameters"
     ),
     brms::stanvar(
       name = "car_tparameters",
       scode = paste0(
-        scalar_init_stanblock(has_ma = FALSE), "
-
-      // The gap scales the decay and the innovation together. The
+        scalar_init_stanblock(has_ma = FALSE), "\n\n",
+        if (centred) {
+          centred_states_stancode(start, paste0("
+        // Each step's residual over its gap's innovation scale
+        for (i in 2:N_time_trend) {
+          real gap = gap_trend[gap_index_trend[i]];
+          vector[N_lv_trend] gap_sd = sqrt((1 - pow(ar1_trend, 2 * gap))
+                                           ./ (1 - square(ar1_trend)));
+          {resid}[i] = ((lv_trend[i]' - pow(ar1_trend, gap)
+                                         .* lv_trend[i - 1]')
+                        ./ gap_sd)';
+          log_jacobian_trend += -sum(log(gap_sd));
+        }"), "none")
+        } else {
+          "      // The gap scales the decay and the innovation together. The
       // marginal variance is the same at every occasion.
       for (i in 2:N_time_trend) {
         real gap = gap_trend[gap_index_trend[i]];
@@ -4914,7 +5360,9 @@ car_independent_dynamics_stanvars <- function() {
                                     / (1 - square(ar1_trend[j])));
         }
       }
-    "),
+    "
+        }
+      ),
       block = "tparameters"
     )
   )
@@ -4943,7 +5391,9 @@ car_independent_dynamics_stanvars <- function() {
 #' @return A stanvars object: `L_Omega_trend`,
 #'   `Sigma_trend` and the dynamics
 #' @noRd
-car_correlated_dynamics_stanvars <- function() {
+car_correlated_dynamics_stanvars <- function(start = NULL) {
+  checkmate::assert_int(start, lower = 1L, null.ok = TRUE)
+  centred <- !is.null(start)
   coherence <- brms::stanvar(
     name = "car_unit_coherence",
     scode = "
@@ -4974,7 +5424,7 @@ car_correlated_dynamics_stanvars <- function() {
   )
   dynamics <- brms::stanvar(
     name = "car_tparameters",
-    scode = "
+    scode = paste0(if (centred) centred_declarations_stancode(start), "
       {
         matrix[N_lv_trend, N_lv_trend] log_ar_cross_trend
           = log(ar1_trend * ar1_trend');
@@ -4992,16 +5442,27 @@ car_correlated_dynamics_stanvars <- function() {
         // Start at the stationary law of the continuous-time AR(1)
         lv_trend[1] = (cholesky_decompose(Gamma_trend)
                        * innovations_trend[1]')';
-
+", if (centred) {
+      centred_states_stancode(start, "
+        // Each step's residual solved against its gap's factor
+        for (i in 2:N_time_trend) {
+          int g = gap_index_trend[i];
+          {resid}[i] = mdivide_left_tri_low(L_gap_trend[g],
+            lv_trend[i]' - pow(ar1_trend, gap_trend[g]) .* lv_trend[i - 1]')';
+          log_jacobian_trend += -sum(log(diagonal(L_gap_trend[g])));
+        }", "standard")
+    } else {
+      "
         // The gap scales the decay and the innovation together
         for (i in 2:N_time_trend) {
           lv_trend[i] = (pow(ar1_trend, gap_trend[gap_index_trend[i]])
                            .* lv_trend[i - 1]'
                          + L_gap_trend[gap_index_trend[i]]
                            * innovations_trend[i]')';
-        }
+        }"
+    }, "
       }
-    ",
+    "),
     block = "tparameters"
   )
   do.call(combine_stanvars, c(
@@ -5040,6 +5501,8 @@ generate_car_trend_stanvars <- function(trend_specs, data_info,
   has_cor <- isTRUE(trend_specs$cor)
   df <- trend_specs$df %||% Inf
   gaps <- calculate_car_time_distances(data_info)
+  start <- centred_start_rows(trend_specs, data_info)
+  centred <- !is.null(start)
 
   combine_stanvars(
     generate_matrix_z_multiblock_stanvars(
@@ -5057,16 +5520,17 @@ generate_car_trend_stanvars <- function(trend_specs, data_info,
       name = "car_parameters",
       scode = paste0(
         "vector<lower=0>[N_lv_trend] sigma_trend;\n",
-        "matrix[N_time_trend, N_lv_trend] innovations_trend;\n",
+        if (!centred) "matrix[N_time_trend, N_lv_trend] innovations_trend;\n",
         "// CAR AR1 damping\n",
         "vector<lower=0.001,upper=0.999>[N_lv_trend] ar1_trend;"
       ),
       block = "parameters"
     ),
+    if (centred) centred_parameter_stanvar(start),
     if (has_cor) {
-      car_correlated_dynamics_stanvars()
+      car_correlated_dynamics_stanvars(start)
     } else {
-      car_independent_dynamics_stanvars()
+      car_independent_dynamics_stanvars(start)
     },
     generate_trend_priors_stanvar(
       param_names = c("sigma_trend", "ar1_trend",
@@ -5079,7 +5543,9 @@ generate_car_trend_stanvars <- function(trend_specs, data_info,
     brms::stanvar(
       name = "car_innovations_sampling",
       scode = paste(
-        innovation_sampling_code("N_lv_trend", df), collapse = "\n  "
+        c(innovation_sampling_code("N_lv_trend", df),
+          if (centred) "target += log_jacobian_trend;"),
+        collapse = "\n  "
       ),
       block = "model"
     ),
@@ -5107,8 +5573,19 @@ generate_zmvn_trend_stanvars <- function(trend_specs, data_info,
   checkmate::assert_list(data_info, names = "named")
   checkmate::assert_class(prior, "brmsprior", null.ok = TRUE)
   # A grouped trend fills `scaled_innovations_trend` in its group loop.
-  # Every other ZMVN writes its states in the shared system.
-  dynamics <- if (!shared_innovations_are_states(trend_specs, data_info)) {
+  # Every other ZMVN writes its states in the shared system. A centred
+  # ZMVN samples its states, which are its scaled innovations.
+  start <- centred_start_rows(trend_specs, data_info)
+  dynamics <- if (!is.null(start)) {
+    brms::stanvar(
+      name = "zmvn_tparameters",
+      scode = centred_states_stancode(
+        start, "      {resid} = lv_trend;",
+        innovation_correlation(trend_specs)
+      ),
+      block = "tparameters"
+    )
+  } else if (!shared_innovations_are_states(trend_specs, data_info)) {
     brms::stanvar(
       name = "zmvn_tparameters",
       scode = "lv_trend = scaled_innovations_trend;",

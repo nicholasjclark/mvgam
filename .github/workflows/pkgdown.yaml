@@ -73,6 +73,14 @@ jobs:
       - name: Keep development notes off the site
         run: rm -f CLAUDE.md
 
+      # misc/ holds the cheatsheet sources and their PDFs. pkgdown copies
+      # pkgdown/assets/ into the site root, which serves them at
+      # cheatsheets/.
+      - name: Copy the cheatsheets into the site
+        run: |
+          mkdir -p pkgdown/assets/cheatsheets
+          cp misc/*_cheatsheet.pdf misc/*_cheatsheet.png pkgdown/assets/cheatsheets/
+
       - name: Build site
         run: pkgdown::build_site_github_pages(lazy = TRUE, run_dont_run = TRUE, new_process = FALSE, install = FALSE)
         shell: Rscript {0}

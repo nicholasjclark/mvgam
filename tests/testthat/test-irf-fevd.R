@@ -237,10 +237,9 @@ test_that("posterior_transition_matrix(summary = FALSE) keeps the draws", {
                ignore_attr = TRUE)
 
   # The heatmap puts the lagged process (column) across and outlines
-  # the one cell whose interval excludes zero, row 1 and column 2.
-  out$A_lower[] <- -1
-  out$A_upper[] <- 1
-  out$A_lower[1L, 2L] <- 0.1
+  # the one cell whose sign probability passes 0.95, row 1 and column 2
+  out$prob_nonzero[] <- 0.6
+  out$prob_nonzero[1L, 2L] <- 0.99
   p <- plot(out)
   expect_identical(rlang::as_label(p$mapping$x), "Var2")
   # The columns are labelled by the matrix's own lag

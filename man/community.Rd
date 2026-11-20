@@ -22,7 +22,8 @@ community(object, ...)
   n_nodes = 100L,
   ndraws = NULL,
   draw_ids = NULL,
-  resp = NULL
+  resp = NULL,
+  prob_threshold = 0.95
 )
 
 \method{summary}{mvgam_community}(object, probs = c(0.025, 0.975), ...)
@@ -33,7 +34,13 @@ community(object, ...)
 
 \method{print}{mvgam_community}(x, digits = 2L, ...)
 
-\method{plot}{mvgam_community}(x, type = c("richness", "diversity", "cooccurrence"), along = NULL, ...)
+\method{plot}{mvgam_community}(
+  x,
+  type = c("richness", "diversity", "cooccurrence"),
+  along = NULL,
+  supported_only = FALSE,
+  ...
+)
 }
 \arguments{
 \item{object}{A fitted \code{mvgam} object.}
@@ -55,8 +62,9 @@ a biomass. Under \code{\link[=nmix]{nmix()}} it applies to the latent abundance.
 
 \item{traits}{Species traits for community-weighted means: a data
 frame with one row per species, matched as \code{\link[=jsdgam]{jsdgam()}} matches its
-\code{traits}, or \code{"auto"} for the traits the fit was built with. \code{NULL}
-(the default) computes none.}
+\code{traits}, or \code{"auto"} for the traits the fit was built with, those
+of \code{traits} or else of \code{trait_slopes}. \code{NULL} (the default)
+computes none.}
 
 \item{latent}{How the latent state enters. \code{"marginal"} (the default)
 averages over it. \code{"conditional"} takes the state the model fitted,
@@ -72,6 +80,11 @@ it to zero, a typical site. See \emph{Latent state}.}
 
 \item{resp}{The response to report, needed on a model with several.}
 
+\item{prob_threshold}{The posterior probability of its sign a pair's
+excess co-occurrence needs to count as supported, at least 0.5 and
+below 1. Defaults to 0.95. It sets the \code{sig} column of the
+co-occurrence table and the pairs \code{plot()} outlines.}
+
 \item{probs}{Interval probabilities of the tables. Defaults to
 \code{c(0.025, 0.975)}.}
 
@@ -81,11 +94,15 @@ it to zero, a typical site. See \emph{Latent state}.}
 
 \item{type}{\code{"richness"} (the default) draws richness along a column
 of the communities. \code{"diversity"} draws each diversity measure.
-\code{"cooccurrence"} draws each pair's excess co-occurrence, outlining
-a pair whose 95\% interval excludes zero.}
+\code{"cooccurrence"} draws each pair's median excess co-occurrence,
+outlining a pair whose \code{prob_nonzero} exceeds \code{prob_threshold}.}
 
 \item{along}{The column of the communities to draw along. \code{NULL}
 takes the first numeric column that varies.}
+
+\item{supported_only}{Logical, for \code{type = "cooccurrence"}. \code{TRUE}
+leaves blank every pair whose \code{prob_nonzero} is at most
+\code{prob_threshold}. Defaults to \code{FALSE}.}
 }
 \value{
 An object of class \code{mvgam_community}. \code{print()} gives each
@@ -200,6 +217,9 @@ summary(mod)
 # detection
 conditional_effects(mod)
 
+# Each species' response to env, outlined where its sign is clear
+plot(species_effects(mod, variables = "env"))
+
 # The residual correlations among species the factors imply
 plot(residual_cor(mod))
 
@@ -224,6 +244,7 @@ rv$richness[20] - rv$richness[1]
 }
 \seealso{
 \code{\link[=residual_cor]{residual_cor()}} for the associations between species,
+\code{\link[=species_effects]{species_effects()}} for each species' response to the covariates,
 \code{\link[=variance_partition]{variance_partition()}} for what moves each species
 }
 \author{

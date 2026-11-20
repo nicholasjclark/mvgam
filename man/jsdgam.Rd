@@ -26,17 +26,16 @@ jsdgam(
 )
 }
 \arguments{
-\item{formula}{Main observation model formula (supports brms syntax).
-Smooth specials \code{s()}, \code{t2()}, \code{gp()}, varying intercepts and
-slopes, multi-membership \code{mm()}, monotonic \code{mo()}, measurement-error
-\code{me()}, imputed \code{mi()}, distributional \code{dpar} sub-formulas and
-\code{offset()} are all available. A response leaves rows out by holding
-\code{NA} there. \code{subset()} and \code{index()} are not supported. \code{gp()}
-accepts both the approximate Hilbert-space form
-(\code{gp(x, k = 20)}) and the exact full-covariance form
-(\code{gp(x)}, no \code{k}). Prediction at \code{newdata} requires the
-approximate form. An exact \code{gp()} term fits and scores
-in-sample. \code{mvgam()} says so once per session.}
+\item{formula}{The observation model formula, in brms syntax:
+smooths \code{s()} and \code{t2()}, \code{gp()}, varying intercepts and slopes,
+\code{mm()}, \code{mo()}, \code{me()}, \code{mi()}, distributional and non-linear
+sub-formulas and \code{offset()}. A response leaves rows out by holding
+\code{NA} there. \code{\link[=mvgam_formula]{mvgam_formula()}} lists the terms each formula refuses.
+\code{gp()} takes the approximate Hilbert-space form (\code{gp(x, k = 20)})
+or the exact form (\code{gp(x)}, no \code{k}), under any brms kernel. An
+exact term predicts at new covariate values by conditioning on its
+fitted values, as brms does. Its cost grows with the cube of the
+number of unique values.}
 
 \item{factor_formula}{A one-sided formula for the latent factors'
 linear predictor. Write \code{\link[=lv_axis]{lv_axis()}} in a term to give each factor
@@ -73,6 +72,12 @@ family object. \link{mvgam_families} lists them. Defaults to
 \code{binomial()} for presence-absence data. Counts take a count family
 such as \code{poisson()} or \code{negbinomial()}.
 
+The factors and a family's dispersion parameter, such as \code{shape},
+\code{phi} or \code{sigma}, explain the same residual variation. Where the
+factors explain it, the dispersion posterior runs toward its limit
+and the sampler can diverge there. An informative dispersion prior
+or a family without dispersion, such as \code{poisson()}, settles it.
+
 For one family per species, write \code{formula} with one \code{\link[brms:brmsformula]{brms::bf()}}
 per species, each naming its family, as in
 \code{bf(count ~ env, family = poisson()) + bf(seen ~ env, family = bernoulli())}. The responses then form the
@@ -94,7 +99,9 @@ species. Defaults to \code{series}, as in other mvgam models.}
 
 \item{priors}{Optional \code{brmsprior} of priors to set, from
 \code{\link[brms:set_prior]{brms::prior()}}. \code{prior}, the brms spelling, is accepted in \code{...}.
-\code{\link[=get_prior.mvgam_formula]{get_prior.mvgam_formula()}} lists the classes a model takes.}
+\code{get_prior()} of a model built with \code{run_model = FALSE} lists every
+class and coefficient with its default, the \code{trait_slopes} terms
+among them. See \emph{Trait-mediated responses} for their scales.}
 
 \item{n_lv}{Integer number of latent factors, from 1 to the number
 of species. Defaults to 2. The residual covariance
@@ -119,18 +126,15 @@ standardised. They become \code{loadings_prior$features}. Supplying an
 explicit \code{loadings_prior} as well is refused.}
 
 \item{trait_slopes}{Optional one-sided formula of traits, such as
-\code{~ trait1 + trait2}, for trait-mediated responses to the
-environment (the fourth-corner model of \pkg{Hmsc}). Each
-population-level term of \code{formula} becomes a non-linear parameter
-regressed on the traits, plus a species-level deviation. The
-deviations of intercept and slope correlate under an LKJ prior
-(\code{(1 | sp | species)}). The traits must be columns of \code{data},
-constant within species. A smooth of a trait goes in
-\code{trait_slopes}, as \code{~ s(trait1)}. A smooth in \code{formula} is
-refused, because brms's top-level non-linear formula takes none.
-The defaults are \code{std_normal()} on each trait coefficient and
-\code{student_t(3, 0, 2.5)} on the species SD. \code{priors} overrides
-them.}
+\code{~ trait1 + trait2}, for species responses that depend on their
+traits (the fourth-corner model of \pkg{Hmsc}). The traits must be
+columns of \code{data}, constant within species, as \pkg{brms} takes
+every variable of a formula. A prediction frame that omits a trait
+takes each species' value from the fit. The grids of
+\code{\link[=conditional_effects]{conditional_effects()}} and \pkg{marginaleffects} omit the traits,
+which draws each species at its own. Each term of \code{formula}
+takes a shared effect, an effect of each trait and a species
+deviation. See \emph{Trait-mediated responses}.}
 
 \item{phylo}{Optional phylogeny: an \code{ape::phylo} tree, whose
 cophenetic distances are taken, or a numeric distance matrix
@@ -195,6 +199,65 @@ The factors take their own predictors through \code{factor_formula}.
 Write \code{\link[=lv_axis]{lv_axis()}} in one of its terms to give each factor its own
 effect of a covariate, a constrained ordination.
 }
+\section{Trait-mediated responses}{
+
+\code{trait_slopes = ~ size} adds terms to \code{formula}. Each term takes a
+shared effect, an effect of each trait and a species deviation:
+\describe{
+\item{Intercept}{\code{size}, with the species deviation \code{1} in
+\code{(1 + ... | sp | series)}}
+\item{A term with design columns}{a numeric or factor covariate, an
+interaction, \code{I()}, \code{poly()}, \code{mo()}, \code{me()} or \code{mi()}: the term
+\code{env:size} and the deviation \code{env} in \code{(1 + env | sp | series)}.
+The \verb{|sp|} tag correlates the deviations under one LKJ prior.}
+\item{A smooth, \code{s()} or \code{t2()}}{\code{s(x, by = size)} scales the
+smooth by the trait. \code{s(x, by = series, m = 1)} gives each species
+a smooth penalised towards a flat line.}
+\item{A Gaussian process, \code{gp()}}{\code{gp(x, by = size)} and
+\code{gp(x, by = series)}, one approximate process per species}
+\item{A group-level term}{entered as written, as is a smooth with
+\code{bs = "re"} or \code{bs = "fs"}}
+}
+A smooth trait, \code{~ s(size)}, gives the intercept \code{s(size)}. Each
+design column of a covariate scales the trait's smooth: \code{env} takes
+\code{s(size, by = env)} and a factor \code{hab} takes \code{s(size, by = habb)}. A
+smooth of \code{x} takes the surface \code{t2(x, size)}. A smooth with its own
+\code{by}, such as \code{s(x, by = hab)}, crosses the trait level by level.
+Its species deviations keep the \code{by}. \code{mo()}, \code{me()} and \code{mi()}
+terms cross linear traits alone.
+
+A smooth or \code{gp()} takes one column of \code{data} as its \code{by}. A factor
+level, a \code{poly()} column or a \code{by} scaled per species enters through
+a derived column. Its name follows \code{\link[=fixef.mvgam]{fixef.mvgam()}}, such as \code{habb},
+\code{polyx21} or \code{env_size}. Each prediction frame recomputes these
+columns from the variables they come from. A frame that changes
+\code{env} then changes \code{env_size}.
+
+A crossing of a centred smooth passes through zero at the mean of its
+covariates (mgcv's \code{pc}). The shared term then carries the effect at
+the means. mgcv leaves a smooth with a numeric \code{by} uncentred. Its
+crossing keeps the constant, the trait's effect on that column's
+slope. A \code{t2()} surface takes first-order margins. Their penalties
+separate it from the main smooths. A margin of one covariate is a thin
+plate spline, or keeps a cyclic basis. An \code{s()} of several covariates
+gives one isotropic Duchon spline margin.
+
+The coefficients take their brms names, such as \code{b_env:size}. Each
+population-level coefficient takes \code{normal(0, r / s)} by default. \code{s}
+is the SD of its design column. \code{r} is 1, or the SD of the response
+under an identity link, which keeps the coefficients in its units.
+Every covariate then has one prior scale on the link, whatever its
+units or the basis \code{poly()} gives it, as rstanarm's autoscaled priors
+do. \verb{student_t(3, 0, 2.5 r)} is the default on the SDs of the
+correlated species deviations. The smooth and \code{gp()} deviations take
+the brms defaults. \code{priors} overrides any of them. A prior on class
+\code{b} without a \code{coef} replaces every coefficient's default. A term of
+\code{formula} naming the species is refused: each species already takes
+its own response. For some of these terms alone, write them in
+\code{formula} directly, as in
+\code{y ~ env + size + env:size + (1 + env | series)}.
+}
+
 \examples{
 \dontrun{
 # Detections of 6 species at 80 sites, 4 visits each. Occupancy
@@ -227,6 +290,9 @@ summary(mod)
 # The effect of `env` on the chance of a detection, occupancy times
 # detection
 conditional_effects(mod)
+
+# Each species' response to env, outlined where its sign is clear
+plot(species_effects(mod, variables = "env"))
 
 # The residual correlations among species the factors imply
 plot(residual_cor(mod))
@@ -281,14 +347,15 @@ models. \emph{Statistics and Computing}, 34:143.
 \code{\link[=sim_closure_unit_data]{sim_closure_unit_data()}} simulates the \code{occ()} and \code{nmix()}
 case. \code{\link[=residual_cor]{residual_cor()}}, \code{\link[=ordinate]{ordinate()}}, \code{\link[=shared_variation]{shared_variation()}},
 \code{\link[=active_factors]{active_factors()}} and \code{\link[=compare_loadings]{compare_loadings()}} interpret the fitted
-factors. \code{\link[=community]{community()}} gives richness, diversity and
+factors. \code{\link[=species_effects]{species_effects()}} gives each species' response to the
+covariates. \code{\link[=community]{community()}} gives richness, diversity and
 co-occurrence. \code{\link[=lv_axis]{lv_axis()}} gives each factor its own covariate
 effect. \code{\link[=how_to_cite]{how_to_cite()}} drafts a methods paragraph for the fit and
 \code{\link[=methods_md]{methods_md()}} writes its equations.
 The \href{https://nicholasjclark.github.io/mvgam/dev/articles/jsdgam.html}{JSDM article} fits a negative
 binomial model with a trait-informed loadings prior, ordination
 biplots and multiplicative gamma process shrinkage. The
-\href{https://github.com/nicholasjclark/mvgam/raw/master/misc/jsdgam_cheatsheet.pdf}{JSDM cheatsheet} summarises the
+\href{https://nicholasjclark.github.io/mvgam/dev/cheatsheets/jsdgam_cheatsheet.pdf}{JSDM cheatsheet} summarises the
 functions on one page.
 
 Other model fitting: 

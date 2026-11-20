@@ -227,6 +227,73 @@ test_that("jsdgam records the unit column name the user gave", {
   expect_true("time" %in% names(mod$data))
 })
 
+test_that("newdata takes the columns data takes, derived ones too", {
+  dat <- build_jsdgam_toy()
+  names(dat)[names(dat) == "time"] <- "site"
+  dat$hab <- factor(ifelse(dat$site %% 2 == 0, "a", "b"))
+  dat$size <- as.numeric(dat$species)
+  mod <- jsdgam(
+    formula = y ~ s(elev, k = 4, by = hab), trait_slopes = ~ size,
+    data = dat[dat$site <= 20, ], newdata = dat[dat$site > 20, ],
+    unit = site, species = species, family = poisson(), n_lv = 1L,
+    run_model = FALSE, silent = 2, validate = FALSE
+  )
+  test <- mod$test_data
+  # The held-out frame takes the `time` and `series` copies
+  expect_identical(test$time, test$site)
+  expect_identical(as.character(test$series), as.character(test$species))
+  # The factor `by` crosses the trait level by level
+  expect_identical(test$habb_size, (test$hab == "b") * test$size)
+  expect_identical(as.character(test$hab_series),
+                   paste(test$hab, test$species, sep = "_"))
+  # A frame naming the user's columns alone gets every derived column
+  raw <- dat[dat$site > 20, c("site", "species", "elev", "hab")]
+  expect_identical(
+    mvgam:::jsdgam_prediction_columns(mod, raw)$habb_size,
+    test$habb_size
+  )
+  # A refit passes both frames as the user gave them. jsdgam() derives
+  # the columns again under the same names.
+  refit <- update(mod, n_lv = 2L, run_model = FALSE)
+  expect_identical(names(refit$trait_columns$derived),
+                   names(mod$trait_columns$derived))
+  expect_identical(refit$test_data$habb_size, test$habb_size)
+  # kfold() and lfo_cv() refit on frames of the fit's own data
+  args <- mvgam:::jsdgam_update_call(mod, NULL, mod$data, list())
+  expect_setequal(names(args$data), names(dat))
+})
+
+test_that("trait_slopes priors scale by column and give way to the user's", {
+  dat <- build_jsdgam_toy()
+  dat$size <- as.numeric(dat$species)
+  prefit <- function(...) {
+    jsdgam(y ~ elev, trait_slopes = ~ size, data = dat, unit = time,
+           species = species, family = poisson(), n_lv = 1L,
+           run_model = FALSE, silent = 2, validate = FALSE, ...)
+  }
+  rows <- function(fit, coef) {
+    tab <- get_prior(fit)
+    tab[tab$class == "b" & tab$coef == coef, c("prior", "source")]
+  }
+  # get_prior() shows each scaled default, labelled as a default
+  expect_identical(
+    unname(unlist(rows(prefit(), "elev:size"))),
+    c(sprintf("normal(0, %s)", signif(1 / sd(dat$elev * dat$size), 3)),
+      "default")
+  )
+  # A user prior on the class reaches every coefficient
+  fit <- prefit(priors = brms::prior(normal(0, 3), class = b))
+  tab <- get_prior(fit)
+  b_rows <- tab[tab$class == "b", ]
+  expect_identical(b_rows$prior[!nzchar(b_rows$coef)], "normal(0, 3)")
+  expect_false(any(grepl("normal(0, 0", b_rows$prior, fixed = TRUE)))
+  # A user prior on one coefficient replaces that default alone
+  fit <- prefit(priors = brms::prior(normal(0, 9), class = b,
+                                     coef = "elev:size"))
+  expect_identical(rows(fit, "elev:size")$prior, "normal(0, 9)")
+  expect_identical(rows(fit, "elev")$source, "default")
+})
+
 test_that("jsdgam with by = lv_axis() composes the per-factor smooth path", {
   dat <- build_jsdgam_toy(n_time = 60L)
   mod <- jsdgam(
@@ -542,7 +609,7 @@ test_that("a frame takes the series and time a jsdgam fit uses", {
   fit <- list(data = train,
               jsdgam_args = list(unit = "site", species = "sp"))
   # A frame naming only the user's columns takes both copies.
-  filled <- jsdgam_axis_columns(fit, train[c("site", "sp")])
+  filled <- jsdgam_prediction_columns(fit, train[c("site", "sp")])
   expect_identical(filled$time, train$site)
   expect_identical(filled$series, train$sp)
   # A grid varies one name of the species and holds the other at one
@@ -552,7 +619,7 @@ test_that("a frame takes the series and time a jsdgam fit uses", {
     data.frame(sp = factor(lev, levels = lev), series = held, time = 1L),
     data.frame(sp = held, series = factor(lev, levels = lev), time = 1L)
   )) {
-    aligned <- jsdgam_axis_columns(fit, grid)
+    aligned <- jsdgam_prediction_columns(fit, grid)
     expect_identical(as.character(aligned$sp), lev)
     expect_identical(aligned$series, aligned$sp)
   }

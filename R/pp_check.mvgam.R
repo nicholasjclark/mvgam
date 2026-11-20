@@ -717,7 +717,7 @@ resid_series_rows <- function(object, data, series = NULL) {
       stop(insight::format_error(c(
         "'series' selects among the series a model records.",
         x = "The fit records no series axis."
-      )))
+      )), call. = FALSE)
     }
     rows <- seq_len(nrow(data))
     label <- NULL
@@ -728,14 +728,14 @@ resid_series_rows <- function(object, data, series = NULL) {
         "A residual plot shows one series.",
         x = paste0("Got ", length(idx), " of ", length(levs), " series."),
         i = "Pass one series name or index to 'series'."
-      )))
+      )), call. = FALSE)
     }
     label <- levs[idx]
     rows <- which(row_series == label)
     if (length(rows) == 0L) {
       stop(insight::format_error(
         paste0("Series '", label, "' has no rows in the training data.")
-      ))
+      ), call. = FALSE)
     }
   }
   time_var <- axis_vars(object)$time_var
@@ -750,13 +750,14 @@ resid_series_rows <- function(object, data, series = NULL) {
 }
 
 
-#' A residual plot titled with the series it shows
+#' A residual plot subtitled with the series it shows
 #'
-#' Only fits with more than one series get the title.
+#' Only fits with more than one series get the subtitle. The title keeps
+#' naming the statistic.
 #'
 #' @param p A `ggplot` object
 #' @param series_sel List from `resid_series_rows()`, or `NULL`
-#' @return `p`, with a title when the fit has several series
+#' @return `p`, with a subtitle when the fit has several series
 #' @noRd
 label_resid_series <- function(p, series_sel) {
   checkmate::assert_class(p, "ggplot")
@@ -764,7 +765,7 @@ label_resid_series <- function(p, series_sel) {
   if (is.null(series_sel$label) || series_sel$n_series < 2L) {
     return(p)
   }
-  p + ggplot2::labs(title = resid_series_title(series_sel$label))
+  p + ggplot2::labs(subtitle = resid_series_title(series_sel$label))
 }
 
 #' The title naming the series a residual plot shows
@@ -892,7 +893,6 @@ resid_lag_plot <- function(bands, reference, title, x_label) {
   checkmate::assert_list(reference)
   checkmate::assert_string(title)
   checkmate::assert_string(x_label)
-  palette <- mvgam_palette()
   segment <- function(colour, lo, hi) {
     ggplot2::geom_segment(
       ggplot2::aes(y = .data[[lo]], yend = .data[[hi]]),
@@ -903,9 +903,9 @@ resid_lag_plot <- function(bands, reference, title, x_label) {
   # panel under the Q-Q panel, where a y title would join the Q-Q one.
   ggplot2::ggplot(bands, ggplot2::aes(x = .data$lag, xend = .data$lag)) +
     reference +
-    segment(palette[1L], "q025", "q975") +
-    segment(palette[3L], "q100", "q900") +
-    segment(palette[6L], "q250", "q750") +
+    segment(mvgam_colour("light"), "q025", "q975") +
+    segment(mvgam_colour("mid"), "q100", "q900") +
+    segment(mvgam_colour("dark_highlight"), "q250", "q750") +
     ggplot2::labs(title = title, x = x_label, y = NULL) +
     mvgam_theme()
 }
@@ -949,17 +949,8 @@ build_resid_lag_panel <- function(
   values <- values[, lag > 0, drop = FALSE]
   lag <- lag[lag > 0]
 
-  palette <- mvgam_palette()
   ci_bound <- stats::qnorm(0.975) / sqrt(sum(!is.na(resid_draws[1L, ])))
-  reference <- list(
-    ggplot2::geom_hline(
-      yintercept = c(-1, 1) * ci_bound,
-      linetype = "dashed", colour = "black"
-    ),
-    ggplot2::geom_hline(
-      yintercept = 0, colour = palette[6L], linewidth = 0.25
-    )
-  )
+  reference <- acf_reference_layers(ci_bound)
   resid_lag_plot(
     resid_lag_bands(values, lag), reference,
     title = if (lag_type == "acf") "ACF" else "pACF",
@@ -1032,9 +1023,7 @@ build_resid_variogram_panel <- function(resid_draws, times,
   }, numeric(length(lags))), ncol = length(lags), byrow = TRUE)
 
   sill <- stats::median(row_var(resid_draws))
-  reference <- list(ggplot2::geom_hline(
-    yintercept = sill, linetype = "dashed", colour = "black"
-  ))
+  reference <- list(reference_line(yintercept = sill))
   resid_lag_plot(resid_lag_bands(values, lags), reference,
                  title = "Semivariogram", x_label = "Time lag")
 }
@@ -1049,10 +1038,9 @@ build_resid_variogram_panel <- function(resid_draws, times,
 #' @noRd
 build_resid_qq_panel <- function(resid_draws) {
   checkmate::assert_numeric(resid_draws)
-  palette <- mvgam_palette()
   df <- data.frame(resids = as.numeric(resid_draws))
   ggplot2::ggplot(df, ggplot2::aes(sample = resids)) +
-    ggplot2::stat_qq_line(colour = palette[5L], linewidth = 1) +
+    ggplot2::stat_qq_line(colour = mvgam_colour("dark"), linewidth = 1) +
     ggplot2::stat_qq(
       shape = 16, colour = "white", size = 1.25, alpha = 0.4
     ) +
@@ -1087,7 +1075,6 @@ build_resid_vs_fitted_panel <- function(
   checkmate::assert_matrix(resid_draws)
   checkmate::assert_matrix(fitted_draws)
   checkmate::assert_flag(per_obs)
-  palette <- mvgam_palette()
   if (per_obs) {
     df <- data.frame(
       preds = apply(fitted_draws, 2L, stats::median, na.rm = TRUE),
@@ -1115,8 +1102,8 @@ build_resid_vs_fitted_panel <- function(
     ) +
     ggplot2::geom_smooth(
       method = "gam", formula = y ~ s(x, bs = "cs"),
-      colour = paste0(palette[6L], "60"),
-      fill = paste0(palette[6L], "40")
+      colour = paste0(mvgam_colour("dark_highlight"), "60"),
+      fill = paste0(mvgam_colour("dark_highlight"), "40")
     ) +
     ggplot2::labs(
       title = "Resids vs Fitted",
@@ -1282,8 +1269,7 @@ plot.mvgam_ppc_fit_stat <- function(x, ...) {
   stat_lab <- fit_stat_label(x$stat)
   ggplot2::ggplot(d, ggplot2::aes(x = .data$T_obs, y = .data$T_rep)) +
     ggplot2::geom_point(alpha = 0.4, colour = mvgam_colour("dark")) +
-    ggplot2::geom_abline(intercept = 0, slope = 1,
-                         linetype = 2, colour = "grey40") +
+    reference_line(slope = 1) +
     ggplot2::coord_equal(xlim = rng, ylim = rng) +
     ggplot2::annotate(
       "text", x = -Inf, y = Inf, hjust = -0.1, vjust = 1.5,
@@ -1342,11 +1328,16 @@ mvgam_resid_panel <- function(
       c("resid_acf", "resid_pacf")
     })
   }
-  panels <- lapply(
-    resid_diagnostic_panels(object, types, draw_ids = draw_ids,
-                            resp = resp, series = series),
-    function(p) p + ggplot2::labs(title = NULL)
-  )
+  panels <- resid_diagnostic_panels(object, types, draw_ids = draw_ids,
+                                    resp = resp, series = series)
+  # The figure's own title names the series. The fitted and Q-Q panels
+  # name their axes. A lag panel has no y title. Its title names the
+  # statistic.
+  panels <- lapply(panels, function(p) p + ggplot2::labs(subtitle = NULL))
+  labelled <- intersect(names(panels), c("resid_vs_fitted", "resid_qq"))
+  panels[labelled] <- lapply(panels[labelled], function(p) {
+    p + ggplot2::labs(title = NULL)
+  })
   out <- patchwork::wrap_plots(panels, ncol = min(2L, length(panels)))
   label <- series_sel$label
   if (is.null(label)) {

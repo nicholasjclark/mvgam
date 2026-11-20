@@ -76,10 +76,10 @@ target="_blank"><code>cmdstanr</code></a>.
 ## Cheatsheet
 
 [![`mvgam` usage
-cheatsheet](https://github.com/nicholasjclark/mvgam/raw/master/misc/mvgam_cheatsheet.png)](https://github.com/nicholasjclark/mvgam/raw/master/misc/mvgam_cheatsheet.pdf)
+cheatsheet](https://nicholasjclark.github.io/mvgam/dev/cheatsheets/mvgam_cheatsheet.png)](https://nicholasjclark.github.io/mvgam/dev/cheatsheets/mvgam_cheatsheet.pdf)
 
 [![`jsdgam` cheatsheet for joint species distribution
-models](https://github.com/nicholasjclark/mvgam/raw/master/misc/jsdgam_cheatsheet.png)](https://github.com/nicholasjclark/mvgam/raw/master/misc/jsdgam_cheatsheet.pdf)
+models](https://nicholasjclark.github.io/mvgam/dev/cheatsheets/jsdgam_cheatsheet.png)](https://nicholasjclark.github.io/mvgam/dev/cheatsheets/jsdgam_cheatsheet.pdf)
 
 ## A state-space model of rodent captures
 

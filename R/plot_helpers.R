@@ -49,6 +49,25 @@ mvgam_colour <- function(role, scheme = NULL) {
 }
 
 
+#' One neutral grey, selected by its role
+#'
+#' The greys of every figure come from this helper. Each role names
+#' what the grey draws.
+#'
+#' @param role One of `paper`, the midpoint of a diverging heatmap;
+#'   `strip`, a facet strip's fill; `border`, a strip's or tile's
+#'   outline; `faint`, a background guide or band; `rule`, a reference
+#'   line or secondary label; `ink`, a neutral data mark.
+#' @return A single colour string
+#' @noRd
+mvgam_neutral <- function(role) {
+  greys <- c(paper = "grey95", strip = "grey85", faint = "grey70",
+             border = "grey60", rule = "grey40", ink = "grey30")
+  checkmate::assert_choice(role, names(greys))
+  greys[[role]]
+}
+
+
 #' Put back a scheme `color_scheme_get()` returned
 #'
 #' `color_scheme_set()` takes a scheme name or six colours. A scheme
@@ -156,7 +175,7 @@ mvgam_theme <- function(base_size = 11, base_family = "") {
       # faceted plots (lfo, kfold, pp_check residual panels,
       # conditional_smooths) from the canvas.
       strip.background = ggplot2::element_rect(
-        fill = "grey85", colour = "grey60"
+        fill = mvgam_neutral("strip"), colour = mvgam_neutral("border")
       ),
       strip.text = ggplot2::element_text(face = "bold"),
       axis.title = ggplot2::element_text(size = base_size),
@@ -599,36 +618,71 @@ cv_diagnostic_plot <- function(long) {
       linewidth = 1
     ) +
     ggplot2::geom_line(ggplot2::aes(group = .data$facet),
-                       linewidth = 0.5, colour = "grey30") +
+                       linewidth = 0.5, colour = mvgam_neutral("ink")) +
     ggplot2::geom_point(shape = 16, colour = "white", size = 2) +
     ggplot2::geom_point(ggplot2::aes(colour = .data$colour),
                         shape = 16, show.legend = FALSE, size = 1.5) +
     ggplot2::scale_colour_manual(
-      values = c(inlier = "grey30", outlier = mvgam_colour("dark"))
+      values = c(inlier = mvgam_neutral("ink"),
+                 outlier = mvgam_colour("dark"))
     ) +
     ggplot2::labs(y = NULL) +
     mvgam_theme()
 }
 
 
-#' A dashed reference line, such as zero or a cutoff
+#' A dashed reference line, such as zero, a cutoff or the diagonal
 #'
-#' Give exactly one of `yintercept` and `xintercept`.
+#' Give exactly one of `yintercept`, `xintercept`, `slope` and `data`.
 #'
-#' @param yintercept Numeric height of a horizontal line, or `NULL`
-#' @param xintercept Numeric position of a vertical line, or `NULL`
+#' @param yintercept Numeric heights of horizontal lines, or `NULL`
+#' @param xintercept Numeric positions of vertical lines, or `NULL`
+#' @param slope Numeric slope of a line through the origin, such as the
+#'   1:1 line, or `NULL`
+#' @param data Data frame with a column `x`, one vertical line per row,
+#'   or `NULL`. Its facet columns place each line in its own panel.
 #' @return A ggplot2 layer
 #' @noRd
-reference_line <- function(yintercept = NULL, xintercept = NULL) {
-  checkmate::assert_number(yintercept, null.ok = TRUE)
-  checkmate::assert_number(xintercept, null.ok = TRUE)
-  stopifnot(xor(is.null(yintercept), is.null(xintercept)))
-  if (is.null(xintercept)) {
-    return(ggplot2::geom_hline(yintercept = yintercept,
-                               linetype = "dashed", colour = "grey40"))
+reference_line <- function(yintercept = NULL, xintercept = NULL,
+                           slope = NULL, data = NULL) {
+  checkmate::assert_numeric(yintercept, min.len = 1L, null.ok = TRUE)
+  checkmate::assert_numeric(xintercept, min.len = 1L, null.ok = TRUE)
+  checkmate::assert_number(slope, null.ok = TRUE)
+  checkmate::assert_data_frame(data, null.ok = TRUE)
+  given <- !vapply(list(yintercept, xintercept, slope, data), is.null,
+                   logical(1L))
+  stopifnot(sum(given) == 1L)
+  style <- list(linetype = "dashed", colour = mvgam_neutral("rule"))
+  if (!is.null(yintercept)) {
+    return(do.call(ggplot2::geom_hline,
+                   c(list(yintercept = yintercept), style)))
   }
-  ggplot2::geom_vline(xintercept = xintercept, linetype = "dashed",
-                      colour = "grey40")
+  if (!is.null(xintercept)) {
+    return(do.call(ggplot2::geom_vline,
+                   c(list(xintercept = xintercept), style)))
+  }
+  if (!is.null(slope)) {
+    return(do.call(ggplot2::geom_abline,
+                   c(list(intercept = 0, slope = slope), style)))
+  }
+  do.call(ggplot2::geom_vline, c(
+    list(data = data, mapping = ggplot2::aes(xintercept = .data$x)), style
+  ))
+}
+
+
+#' The bounds and zero line of an autocorrelation plot
+#'
+#' @param bound The approximate 95% bound, `qnorm(0.975) / sqrt(n)`
+#' @return List of two ggplot2 layers
+#' @noRd
+acf_reference_layers <- function(bound) {
+  checkmate::assert_number(bound, lower = 0)
+  list(
+    reference_line(yintercept = c(-1, 1) * bound),
+    ggplot2::geom_hline(yintercept = 0, colour = mvgam_colour("dark"),
+                        linewidth = 0.25)
+  )
 }
 
 
@@ -653,17 +707,22 @@ stack_response_plots <- function(plots) {
   patchwork::wrap_plots(titled, ncol = 1L)
 }
 
-#' `facet_wrap(~series)` with the defaults of every faceted plot
+#' One panel per series, with the defaults of every faceted plot
 #'
 #' @param scales Character scales argument of
 #'   [ggplot2::facet_wrap()]
 #' @param ncol Integer number of facet columns, or `NULL`
+#' @param var The series column of the plotted data
+#' @param labeller Strip labeller of [ggplot2::facet_wrap()]
 #' @return A ggplot2 facet
 #' @noRd
-mvgam_facet_series <- function(scales = "free_y", ncol = NULL) {
+mvgam_facet_series <- function(scales = "free_y", ncol = NULL,
+                               var = "series", labeller = "label_value") {
   checkmate::assert_string(scales)
   checkmate::assert_count(ncol, positive = TRUE, null.ok = TRUE)
-  ggplot2::facet_wrap(~series, scales = scales, ncol = ncol)
+  checkmate::assert_string(var)
+  ggplot2::facet_wrap(ggplot2::vars(.data[[var]]), scales = scales,
+                      ncol = ncol, labeller = labeller)
 }
 
 #' Repelled text or label layer for label-heavy plots
@@ -722,11 +781,11 @@ mvgam_diverging_scale <- function(
   checkmate::assert_numeric(limits, len = 2L, any.missing = FALSE)
   checkmate::assert_numeric(breaks)
   checkmate::assert_string(na.value)
-  warm <- mvgam_palette("red")[5L]
+  warm <- mvgam_colour("dark", "red")
   cool <- okabe_ito_palette()[2L]
   ggplot2::scale_fill_gradient2(
     name = name,
-    low = cool, mid = "grey95", high = warm,
+    low = cool, mid = mvgam_neutral("paper"), high = warm,
     midpoint = 0,
     limits = limits,
     breaks = breaks,
@@ -760,38 +819,52 @@ pretty_symmetric_breaks <- function(limits) {
 }
 
 
-#' Lower triangle of a correlation matrix for a heatmap
+#' The half-width of a colour scale symmetric about zero
 #'
-#' A symmetric matrix repeats each entry in its upper triangle. The
-#' diagonal of a correlation matrix is 1. The panel keeps the entries
-#' below the diagonal.
-#'
-#' @param estimate Symmetric matrix of posterior point estimates.
-#' @param clear Optional logical matrix, `TRUE` where an entry takes an
-#'   outline.
-#' @return Frame from `matrix_panel()`.
-#'
+#' @param values Numeric values the scale must span, blanks included
+#' @return The largest absolute finite value, or 1 when every value is
+#'   blank or zero, which would leave a scale of no width
 #' @noRd
-residcor_panel_data <- function(estimate, clear = NULL) {
-  # A single series has no off-diagonal entry. The assertion names
-  # that cause before an empty frame fails in ggplot2.
-  checkmate::assert_matrix(estimate, mode = "numeric", min.rows = 2L)
-  matrix_panel(estimate, clear = clear, lower_only = TRUE)
+symmetric_limit <- function(values) {
+  shown <- abs(values[is.finite(values)])
+  if (any(shown > 0)) max(shown) else 1
 }
 
 
-#' Which entries of a summarised matrix have an interval clear of zero
+#' A matrix of estimates for a heatmap, with the supported entries
+#' outlined
 #'
-#' @param lower,upper Matrices of interval bounds, or `NULL`
-#' @return Logical matrix, or `NULL` when either bound is missing
+#' An entry is supported when the posterior probability of its sign
+#' exceeds `prob_threshold`. A symmetric matrix keeps the entries below
+#' its diagonal alone.
+#'
+#' @param estimate Matrix of posterior point estimates
+#' @param prob_nonzero Matrix of the posterior probability of each
+#'   entry's sign
+#' @param prob_threshold The probability a supported entry exceeds
+#' @param supported_only Leave every other entry blank
+#' @param rows,cols The order of the rows and columns
+#' @param lower_only Keep the entries below the diagonal
+#' @return Frame from `matrix_panel()`
 #' @noRd
-interval_excludes_zero <- function(lower, upper) {
-  if (is.null(lower) || is.null(upper)) {
-    return(NULL)
-  }
-  out <- lower > 0 | upper < 0
-  out[is.na(out)] <- FALSE
-  out
+support_panel <- function(estimate, prob_nonzero, prob_threshold,
+                          supported_only = FALSE,
+                          rows = seq_len(nrow(estimate)),
+                          cols = seq_len(ncol(estimate)),
+                          lower_only = FALSE) {
+  # A single series has no off-diagonal entry. The assertion names
+  # that cause before an empty frame fails in ggplot2.
+  checkmate::assert_matrix(estimate, mode = "numeric",
+                           min.rows = if (lower_only) 2L else 1L)
+  checkmate::assert_matrix(prob_nonzero, nrows = nrow(estimate),
+                           ncols = ncol(estimate))
+  checkmate::assert_number(prob_threshold)
+  checkmate::assert_flag(supported_only)
+  supported <- prob_nonzero > prob_threshold
+  if (supported_only) estimate[!supported] <- NA_real_
+  matrix_panel(estimate[rows, cols, drop = FALSE],
+               clear = supported[rows, cols, drop = FALSE],
+               lower_only = lower_only)
 }
 
 
@@ -840,7 +913,8 @@ matrix_heatmap <- function(panel, fill_scale,
   }
   clear <- panel[panel$clear %in% TRUE, , drop = FALSE]
   p <- ggplot2::ggplot(panel, position) +
-    ggplot2::geom_tile(ggplot2::aes(fill = .data$value), colour = "grey60") +
+    ggplot2::geom_tile(ggplot2::aes(fill = .data$value),
+                       colour = mvgam_neutral("border")) +
     ggplot2::geom_tile(data = clear, fill = NA, colour = "black",
                        linewidth = 0.9) +
     fill_scale +
@@ -870,7 +944,7 @@ matrix_heatmap <- function(panel, fill_scale,
 #'
 #' @param mat Numeric matrix
 #' @param clear Optional logical matrix the shape of `mat`, `TRUE` where
-#'   an entry's interval excludes zero. `NULL` marks no entry.
+#'   an entry takes an outline. `NULL` marks no entry.
 #' @param lower_only Logical. `TRUE` keeps the entries below the
 #'   diagonal. Rows then start at the second name and columns end at
 #'   the second last. The triangle then has no empty row or column.

@@ -136,9 +136,13 @@ lv_axis <- function() {
 }
 
 
-# The smooth and Gaussian-process constructors brms fits. Each takes
-# its covariates as unnamed arguments and a grouping as `by`.
-#'@noRd
+#' The smooth and Gaussian-process constructors brms fits
+#'
+#' Each takes its covariates as unnamed arguments and a grouping as
+#' `by`.
+#'
+#' @format Character vector of constructor function names
+#' @noRd
 MVGAM_SMOOTH_CALLS <- c("s", "t2", "gp")
 
 #' Is an expression a call to `lv_axis()`?
@@ -256,7 +260,7 @@ walk_by_lv <- function(expr, state, depth = 0L) {
     stop(insight::format_error(c(
       "Formula nesting too deep (>50 levels).",
       i = "Simplify the trend formula structure."
-    )))
+    )), call. = FALSE)
   }
   if (is_lv_axis_call(expr)) {
     state$n_by_lv <- state$n_by_lv + 1L

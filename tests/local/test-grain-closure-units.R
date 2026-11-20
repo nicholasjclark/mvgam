@@ -1554,6 +1554,21 @@ test_that("multi-season: a community is a site in a season", {
 })
 
 
+test_that("multi-season: a factor's effects follow its levels", {
+  fit <- fit_multi_season()
+  se <- species_effects(fit, variables = "site", draw_ids = 1:3)
+  expect_identical(dimnames(se$draws$species)[[3L]],
+                   paste0("site: ", 2:10, " - 1"))
+})
+
+
+test_that("species_effects refuses a covariate of detection alone", {
+  # `tod_c` enters the detection formula `p ~ tod_c` alone
+  expect_error(species_effects(fit, variables = "tod_c", draw_ids = 1:3),
+               "'tod_c' leaves every species' predictor unchanged")
+})
+
+
 test_that("multi-season: the saturation table names its units", {
   sim <- sim_multi_season()
   fit <- fit_multi_season()

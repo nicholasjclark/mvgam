@@ -201,7 +201,7 @@ lfo_cv.mvgam <- function(object,
       i = paste0("Choose 'fc_horizon' < ", n_times,
                  " to leave room for at least one ",
                  "training observation.")
-    )))
+    )), call. = FALSE)
   }
 
   # The default `min_t` is the 30th, 20th, 10th or first observed time,
@@ -245,7 +245,7 @@ lfo_cv.mvgam <- function(object,
                  largest_valid, "."),
       i = paste0("For a single evaluation fold, set ",
                  "min_t = ", largest_valid, ".")
-    )))
+    )), call. = FALSE)
   }
 
   # The arithmetic below is over positions in `all_unique_times`. A
@@ -791,7 +791,7 @@ loo_compare.mvgam_lfo <- function(x, ..., model_names = NULL) {
       stop(insight::format_error(c(
         paste0("Model ", i, " has no ELPDs to compare."),
         i = "Include 'elpd' in the 'score' argument of lfo_cv()."
-      )))
+      )), call. = FALSE)
     }
   }
 
@@ -930,7 +930,7 @@ loo_model_weights.mvgam_lfo <- function(x, ...,
       stop(insight::format_error(c(
         "An mvgam_lfo object has no ELPDs to weight.",
         i = "Include 'elpd' in the 'score' argument of lfo_cv()."
-      )))
+      )), call. = FALSE)
     }
     sum(m$elpds, na.rm = TRUE)
   }, numeric(1L))
@@ -967,7 +967,7 @@ stack_mvgam_lfo <- function(models, model_names) {
                    "') has no '$log_lik' slot."),
         i = paste0("Re-run lfo_cv() with save_log_lik = TRUE on ",
                    "every candidate model, then call again.")
-      )))
+      )), call. = FALSE)
     }
     ll
   })

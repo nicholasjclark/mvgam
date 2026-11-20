@@ -1176,6 +1176,8 @@ hidden_par_pattern <- function(pars) {
     patterns <- c(
       patterns,
       "^innovations_trend\\[",
+      "^innovations_start_trend\\[",
+      "^lv_dev_trend\\[",
       "^scaled_innovations_trend\\[",
       "^sigma_trend\\[",
       "^L_Omega_trend\\[",

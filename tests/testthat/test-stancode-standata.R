@@ -100,7 +100,7 @@ trend_shapes <- list(
       formula = bf(count ~ x, family = poisson()) +
         bf(presence ~ x, family = bernoulli()) +
         bf(biomass ~ x, family = Gamma(link = "log")),
-      trend_formula = ~ -1 + AR(p = 1, n_lv = 2, cor = TRUE)
+      trend_formula = ~ -1 + AR(p = 1, n_lv = 2)
     ),
     data = setup_stan_test_data()$multivariate
   )),
@@ -255,6 +255,42 @@ test_that("an RW program steps its states and drops the trend's sigma", {
   expect_true(stan_pattern("scaled_innovations_trend = diag_post_multiply(innovations_trend, sigma_trend);", code_with_trend, fixed = TRUE))
   expect_true(stan_pattern("lv_trend\\[1,\\s*:\\s*\\] = scaled_innovations_trend\\[1,\\s*:\\s*\\]", code_with_trend))
   expect_true(stan_pattern("lv_trend\\[i, : \\] = lv_trend\\[i - 1, : \\] \\+ scaled_innovations_trend\\[i, : \\]", code_with_trend))
+
+  # Centred, the program samples the first state's innovation and each
+  # later state's distance from it. The recursion runs backwards to the
+  # innovations, which the same law scores, with the Jacobian of the map.
+  centred <- stancode(
+    mvgam_formula(count ~ 1, trend_formula = ~ RW(cor = TRUE, centred = TRUE)),
+    data = setup_stan_test_data()$multivariate, family = poisson(),
+    validate = FALSE
+  )
+  for (line in c(
+    "matrix[1, N_lv_trend] innovations_start_trend;",
+    "matrix[N_time_trend - 1, N_lv_trend] lv_dev_trend;",
+    "lv_trend[2 : N_time_trend] = rep_matrix(lv_trend[1], (N_time_trend - 1)) + lv_dev_trend;",
+    "scaled_innovations_trend[2 : N_time_trend] = lv_trend[2 : N_time_trend] - lv_trend[1 : (N_time_trend - 1)];",
+    "innovations_trend[2 : N_time_trend] = mdivide_left_tri_low(L_Sigma_trend, scaled_innovations_trend[2 : N_time_trend]')';",
+    "log_jacobian_trend += -(N_time_trend - 1) * sum(log(diagonal(L_Sigma_trend)));",
+    "target += std_normal_lpdf(to_vector(innovations_trend));",
+    "target += log_jacobian_trend;"
+  )) {
+    expect_true(stan_pattern(line, centred, fixed = TRUE), label = line)
+  }
+  # Every trend with a centred form samples its states and adds the
+  # Jacobian of their map to the innovations
+  for (tf in list(~ AR(p = 2, ma = TRUE, centred = TRUE),
+                  ~ LLT(season = 12, harmonics = 1, centred = TRUE),
+                  ~ ZMVN(centred = TRUE), ~ CAR(cor = TRUE, centred = TRUE))) {
+    code <- stancode(
+      mvgam_formula(count ~ 1, trend_formula = tf),
+      data = setup_stan_test_data()$multivariate, family = poisson(),
+      validate = FALSE
+    )
+    expect_true(grepl("] lv_dev_trend;", code, fixed = TRUE),
+                label = deparse(tf))
+    expect_true(grepl("target += log_jacobian_trend;", code, fixed = TRUE),
+                label = deparse(tf))
+  }
 })
 
 test_that("stancode generates correct AR(p = c(1, 12)) seasonal model with negative binomial family", {
@@ -396,16 +432,13 @@ test_that("a factor AR program fixes the factor scale and keeps its labels", {
   code_with_trend <- trend_shape_code("factor_ar")
   line <- function(x) stan_pattern(x, code_with_trend, fixed = TRUE)
 
-  # Sampled loadings absorb the factors' scale and correlation, which
-  # the program fixes at 1 and the identity. Unit-scale innovations
-  # need no Cholesky product and carry no priors.
+  # Sampled loadings absorb the factors' scale and correlation. The
+  # program fixes the scale at 1 and declares no correlation. Unit-scale
+  # innovations need no Cholesky product and carry no priors.
   expect_true(line(
     "vector<lower=0>[N_lv_trend] sigma_trend = rep_vector(1.0, N_lv_trend);"
   ))
-  expect_true(line(paste0(
-    "cholesky_factor_corr[N_lv_trend] L_Omega_trend = ",
-    "identity_matrix(N_lv_trend);"
-  )))
+  expect_false(grepl("L_Omega_trend", code_with_trend, fixed = TRUE))
   expect_false(grepl("L_Sigma_trend", code_with_trend, fixed = TRUE))
   expect_false(stan_pattern("sigma_trend ~", code_with_trend))
   expect_false(stan_pattern("L_Omega_trend ~", code_with_trend))
@@ -532,6 +565,28 @@ test_that("a grouped RW fills its innovations before stepping them", {
   expect_true(stan_pattern(
     "lv_trend\\[i,\\s*:\\s*\\] = lv_trend\\[i - 1,\\s*:\\s*\\]\\s*\\+ scaled_innovations_trend\\[i,\\s*:\\s*\\]",
     code))
+
+  # Centred, the group loop scales the start row alone. Each group then
+  # solves the later residuals against its own factor.
+  centred <- stancode(
+    mvgam_formula(count ~ 1,
+                  trend_formula = ~ RW(gr = habitat, centred = TRUE)),
+    data = setup_stan_test_data()$multivariate, family = poisson(),
+    validate = FALSE
+  )
+  expect_true(stan_pattern(
+    paste0("scaled_innovations_trend[1 : 1, group_members_trend[g_idx]]",
+           " = innovations_trend[1 : 1, group_members_trend[g_idx]]",
+           " * L_group_trend[g_idx]';"),
+    centred, fixed = TRUE))
+  expect_true(stan_pattern(
+    paste0("innovations_trend[2 : N_time_trend, members]",
+           " = mdivide_left_tri_low(L_group_trend[g_idx],",
+           " scaled_innovations_trend[2 : N_time_trend, members]')';"),
+    centred, fixed = TRUE))
+  expect_true(stan_pattern(
+    "log_jacobian_trend += -(N_time_trend - 1) * sum(log(diagonal(L_group_trend[g_idx])));",
+    centred, fixed = TRUE))
 })
 
 test_that("a grouped VAR places each group's blocks at its member series", {
@@ -1732,7 +1787,7 @@ test_that("stan functions work with complex model specifications", {
   mf <- mvgam_formula(
     bf(mvbind(count, biomass) ~ s(x, by = habitat) + habitat) +
       set_rescor(FALSE),
-    trend_formula = ~ AR(p = 1, cor = TRUE, n_lv = 2)
+    trend_formula = ~ AR(p = 1, n_lv = 2)
   )
   out <- mvgam_stan_setup(
     mf, data = data,

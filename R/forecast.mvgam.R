@@ -51,8 +51,9 @@
 #' @param coef_uncertainty Logical, `TRUE` by default. `FALSE` holds
 #'   the coefficients of the observation and trend formulas at one
 #'   posterior draw, the first that `ndraws` or `draw_ids` selects. That
-#'   includes smooth, random-effect and Hilbert-space `gp(x, k)`
-#'   coefficients. The forecast then leaves out their uncertainty.
+#'   includes smooth, random-effect and `gp()` coefficients. An exact
+#'   `gp()` term's draw at new values is held too. The forecast then
+#'   leaves out their uncertainty.
 #'   Turning off one source of uncertainty at a time shows how much each
 #'   contributes to a forecast.
 #' @param trend_uncertainty Logical, `TRUE` by default. `FALSE` holds
@@ -239,7 +240,7 @@ forecast_setup <- function(object, newdata, type, resp, ndraws, draw_ids,
   validate_draw_selectors(ndraws, draw_ids)
   validate_group_level_args(re_formula, allow_new_levels, sample_new_levels)
   newdata <- ensure_obs_placeholder(
-    jsdgam_axis_columns(object, newdata %||% object$test_data), object
+    jsdgam_prediction_columns(object, newdata %||% object$test_data), object
   )
   trend_specs <- object$mv_spec$trend_specs
   # A trendless fit forecasts its observation predictor at the new

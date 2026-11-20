@@ -157,11 +157,8 @@ plot.mvgam_irf <- function(x, series = 1, responses = NULL, ...) {
       draws_mat, times = times, probs = band_probs, group = group
     ) +
     mvgam_median_layer(draws_mat, times = times, group = group) +
-    ggplot2::geom_hline(
-      yintercept = 0, linetype = "dashed", colour = "black"
-    ) +
-    ggplot2::facet_wrap(~series, scales = "free_y",
-                        labeller = irf_panel_labeller()) +
+    reference_line(yintercept = 0) +
+    mvgam_facet_series(labeller = irf_panel_labeller()) +
     scale_x_steps() +
     ggplot2::labs(y = irf_axis_label(attr(x, "irf_type"))) +
     mvgam_theme()

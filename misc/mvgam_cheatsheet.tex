@@ -176,7 +176,7 @@ Use \texttt{\color{Orchid} stancode(model)} to see the auto-generated \texttt{St
 {{\fontsize{11}{11} \selectfont \color{mygray} What effects has the model estimated?}}
 
 \medskip
-\texttt{\color{Orchid} summary(model)} and \texttt{\color{Orchid} coef(model)}: posterior summaries and diagnostics
+\texttt{\color{Orchid} summary(model)} and \texttt{\color{Orchid} fixef(model)}: posterior summaries and diagnostics
 
 \medskip
 \texttt{\color{Orchid} fitted(model)}, \texttt{\color{Orchid} logLik(model)} and \texttt{\color{Orchid} residuals(model)}: posterior expectations, pointwise Log-Likelihoods and randomized quantile residuals
@@ -277,7 +277,7 @@ Compute probabilistic forecast scores using proper scoring rules with the \textt
 ## DRPS of 1 forecast series, lower is better
 ## 
 ##  series     mean_score coverage times
-##  series_1   5.3        0.85     20   
+##  series_1   5.3        0.9      20   
 ##  all_series 5.3                 20   
 ## 
 ## 'all_series' sums the series at each time.

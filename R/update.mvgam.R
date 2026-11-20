@@ -474,8 +474,17 @@ drop_mvgam_sourced_priors <- function(prior) {
 }
 
 
-# Vectorised `==` that returns FALSE for an NA source.
-#'@noRd
+#' Which prior rows come from a given source
+#'
+#' A vectorised `==` that returns `FALSE` for an `NA` source. A plain
+#' `==` returns `NA` there. An `NA` in a logical row index selects a
+#' row of `NA`s.
+#'
+#' @param source Character vector, the `source` column of a
+#'   `brmsprior`
+#' @param value Character scalar source to match, such as `"user"`
+#' @return Logical vector the length of `source`, with no `NA`
+#' @noRd
 identical_source <- function(source, value) {
   !is.na(source) & source == value
 }
@@ -864,8 +873,8 @@ mvgam_update_call <- function(object, formula., newdata, dots) {
 #' Arguments for refitting a `jsdgam` fit
 #'
 #' `jsdgam()` stores the arguments it was called with. The refit takes
-#' those, the caller's overrides and the training frame with the
-#' `time` and `series` columns `jsdgam()` added removed.
+#' those, the caller's overrides and the fit's frames as the user gave
+#' them, from `jsdgam_user_frame()`.
 #'
 #' @inheritParams mvgam_update_call
 #' @return A list ready to feed `do.call(jsdgam, ...)`.
@@ -880,17 +889,16 @@ jsdgam_update_call <- function(object, formula., newdata, dots) {
   }
   stored_prior <- args$prior
   args$formula <- updated_formula(args$formula, formula.)
-  columns <- c(time = args$unit, series = args$species)
-  added <- names(columns)[columns != names(columns)]
-  args$data <- newdata %||%
-    object$data[setdiff(names(object$data), added)]
+  # `kfold()` and `lfo_cv()` pass frames of the fit's own data, which
+  # hold the added columns too
+  args$data <- jsdgam_user_frame(object, newdata %||% object$data)
   # The held-out frame is the fit's own, as on the 'mvgam()' path.
-  args$newdata <- if (is.null(newdata)) {
+  args$newdata <- jsdgam_user_frame(object, if (is.null(newdata)) {
     object$test_data
   } else {
     inherited_holdout(object, args$data,
                       dots$silent %||% object$silent %||% 1L)
-  }
+  })
   args[names(dots)] <- dots
   if (!is.null(stored_prior)) {
     # `jsdgam()` builds its formulas from these arguments. A prefit of

@@ -398,7 +398,8 @@ sample_horizon_changepoints <- function(delta_train_s, t_change_train,
 #' `slope_trend[t]` is in the Stan program.
 #'
 #' A season turns each harmonic's state pair by its frequency and adds
-#' shocks of scale `sigma_season`. The fitted state holds the last
+#' shocks of scale `sigma_season`. Each harmonic's shocks across the
+#' series take the level's correlation. The fitted state holds the last
 #' pairs. The fitted trend holds the level plus the season, which the
 #' level start subtracts. A simulation draws each starting pair from
 #' `normal(0, 1 / sqrt(K))` over `K` harmonics. With no season scale
@@ -427,9 +428,11 @@ propagate_llt <- function(trend_model, params, h, n_series, last_state,
   sigma_slope <- rep_len(
     as.numeric(params$sigma_slope %||% (sigma * sqrt(3) / h)), n_series
   )
-  # The slope shocks take the level's correlation with their own scales
+  # The slope and season shocks take the level's correlation with their
+  # own scales
+  R <- stats::cov2cor(Sigma)
   Sigma_slope <- params$Sigma_slope %||%
-    (sigma_slope * stats::cov2cor(Sigma) * rep(sigma_slope, each = n_series))
+    (sigma_slope * R * rep(sigma_slope, each = n_series))
 
   if (is.null(last_state)) {
     level <- rep(0, n_series)
@@ -450,6 +453,12 @@ propagate_llt <- function(trend_model, params, h, n_series, last_state,
     pair <- function(sd) {
       matrix(stats::rnorm(n_harm * n_series, 0, sd), n_harm, n_series)
     }
+    # Each harmonic's shocks across the series. The identity factor of
+    # uncorrelated series leaves the standard draws as they are.
+    U <- chol(R)
+    shocks <- function() {
+      pair(1) %*% U * rep(sigma_season, each = n_harm)
+    }
     if (is.null(last_state)) {
       g <- pair(1 / sqrt(n_harm))
       g_star <- pair(1 / sqrt(n_harm))
@@ -459,7 +468,6 @@ propagate_llt <- function(trend_model, params, h, n_series, last_state,
                        n_harm, n_series)
       level <- level - colSums(g)
     }
-    shock_sd <- rep(sigma_season, each = n_harm)
   }
   out <- matrix(NA_real_, nrow = h, ncol = n_series)
   slopes <- out
@@ -478,8 +486,8 @@ propagate_llt <- function(trend_model, params, h, n_series, last_state,
     out[step, ] <- level
     if (n_harm > 0L) {
       g_last <- g
-      g <- cos(freq) * g_last + sin(freq) * g_star + pair(shock_sd)
-      g_star <- cos(freq) * g_star - sin(freq) * g_last + pair(shock_sd)
+      g <- cos(freq) * g_last + sin(freq) * g_star + shocks()
+      g_star <- cos(freq) * g_star - sin(freq) * g_last + shocks()
       seasons[step, ] <- colSums(g)
       out[step, ] <- level + seasons[step, ]
       for (p in seq_len(NROW(periods))) {
@@ -833,6 +841,8 @@ enrich_trend_metadata <- function(trend_metadata, trend_specs) {
   trend_metadata$n_lv <- spec_n_lv(spec)
   # Forecasts draw from the innovation law the model was fitted with
   trend_metadata$df <- spec$df %||% Inf
+  # The methods text names the form the states were sampled in
+  trend_metadata$centred <- isTRUE(spec$centred)
   # The numeric loadings a `trend_map` gave, which
   # `resolve_factor_loadings()` broadcasts across draws
   trend_metadata$fixed_Z <- spec$fixed_Z
