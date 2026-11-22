@@ -58,6 +58,7 @@ articles:
     Closure-unit families that separate what is there from what was
     seen.
   contents:
+  - articles/occupancy
   - articles/nmix
 
 - title: Evaluating forecasts

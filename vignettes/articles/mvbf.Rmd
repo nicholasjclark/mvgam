@@ -263,7 +263,7 @@ out its equations.
 Related articles:
 
 - [Integrated distribution models](idm.html)
-  combine survey protocols that share one log-intensity.
+  combine data sources that share one log-intensity.
 - [Joint species distribution models](jsdgam.html)
   share latent factors among many species.
 - [State-space VARs](var.html)
