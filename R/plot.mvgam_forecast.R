@@ -132,6 +132,7 @@ plot.mvgam_forecast <- function(
       link = "Linear predictor",
       expected = "Expected value",
       trend = "Latent trend",
+      latent_state = closure_unit_state_labels(x$family)$label,
       "Predictions"
     )
   }

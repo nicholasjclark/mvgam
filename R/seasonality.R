@@ -263,7 +263,9 @@ season_forecast_effect <- function(object, newdata, cmp, draw_ids, resp,
     group_level = setup$group_level,
     effect_of = function(whole, season, frame) {
       season_effect(object, whole, season, frame, setup$draw_idx, resp, scale)
-    }
+    },
+    # A season belongs to the occasion, which `test_times` lists
+    per_row = FALSE
   )
   list(forecasts = forecasts, test_times = setup$fc_grid$times[setup$reported])
 }

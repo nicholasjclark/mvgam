@@ -1234,7 +1234,7 @@ how_to_cite.mvgam <- function(object, ...) {
       detect = "occ" %in% family_names,
       text = paste0(
         " Detection / non-detection histories were modelled with",
-        " the single-season Bernoulli-binomial occupancy family",
+        " the Bernoulli-binomial occupancy family",
         " (MacKenzie et al. 2002), with the latent occupancy state",
         " marginalised analytically per closure unit via",
         " log-sum-exp under the hierarchical framing of Royle and",
@@ -1244,6 +1244,15 @@ how_to_cite.mvgam <- function(object, ...) {
         "mackenzie_occu_2002",
         "royle_dorazio_2008"
       )
+    ),
+    list(
+      detect = any_family(is_multi_season_family),
+      text = paste0(
+        " Each site was assumed closed to change within a season.",
+        " Every site and season formed its own closure unit, which",
+        " let the latent state of a site change between seasons."
+      ),
+      refs = character(0)
     ),
     list(
       detect = any_family(is_simplex_response_family),

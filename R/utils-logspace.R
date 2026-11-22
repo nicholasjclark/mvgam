@@ -161,10 +161,34 @@ row_var <- function(m) {
 #'   mean zero in every row.
 #' @noRd
 centre_within_groups <- function(m, group) {
-  means <- t(rowsum(t(m), group, reorder = FALSE)) /
-    rep(as.vector(table(factor(group, levels = unique(group)))),
-        each = nrow(m))
-  m - means[, match(group, unique(group)), drop = FALSE]
+  idx <- match(group, unique(group))
+  m - group_column_means(m, idx)[, idx, drop = FALSE]
+}
+
+
+#' Mean of each row of a matrix within groups of its columns
+#'
+#' `rowsum()` sums each group without a dense columns-by-groups weight
+#' matrix.
+#'
+#' @param m Numeric matrix, one row per draw.
+#' @param group Integer group of each column, every value from 1 to the
+#'   number of groups present.
+#' @return `[nrow(m) x n_group]` matrix, group `g` in column `g`.
+#' @noRd
+group_column_means <- function(m, group) {
+  checkmate::assert_matrix(m, mode = "numeric")
+  checkmate::assert_integerish(group, lower = 1L, len = ncol(m),
+                               any.missing = FALSE)
+  counts <- tabulate(group)
+  if (any(counts == 0L)) {
+    stop_mvgam_fault(
+      "Every group from 1 to the largest needs a column.",
+      paste0("Group ", which(counts == 0L)[1L], " is empty.")
+    )
+  }
+  unname(t(rowsum(t(m), group, reorder = TRUE)) /
+           rep(counts, each = nrow(m)))
 }
 
 

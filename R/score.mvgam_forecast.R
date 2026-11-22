@@ -287,10 +287,11 @@ print.mvgam_score <- function(x, digits = 2L, ...) {
 
 #' Refuse a forecast that cannot be scored
 #'
-#' Both score branches call it. A `link` or `trend` forecast is on the
-#' link scale and cannot be scored against observations. A forecast
-#' needs held-out forecasts and observations. The `brier` score needs a
-#' Bernoulli family for every series.
+#' Both score branches call it. A forecast scores against observations
+#' only on their own scale. A `link` or `trend` forecast is on the link
+#' scale. A `latent_state` forecast is of a state no visit records. A
+#' forecast needs held-out forecasts and observations. The `brier` score
+#' needs a Bernoulli family for every series.
 #'
 #' @param object Object of class `mvgam_forecast`
 #' @param score Character name of the score
@@ -299,10 +300,11 @@ print.mvgam_score <- function(x, digits = 2L, ...) {
 validate_scoreable_forecast <- function(object, score) {
   checkmate::assert_list(object)
   checkmate::assert_string(score)
-  if (object$type %in% c("link", "trend")) {
+  if (!on_observation_scale(object$type)) {
     stop(insight::format_error(c(
       "Scoring requires a 'response' or 'expected' forecast.",
-      x = paste0("A '", object$type, "' forecast holds link-scale draws."),
+      x = paste0("A '", object$type, "' forecast is on another scale ",
+                 "from the observations."),
       i = "Re-run 'forecast()' with type = 'response' or 'expected'."
     )), call. = FALSE)
   }

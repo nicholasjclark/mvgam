@@ -47,8 +47,7 @@ columns of the summary. Default \code{c(0.025, 0.975)}, a 95\% interval.}
 }
 \value{
 With \code{summary = FALSE}, an \verb{[ndraws, nobs]} matrix of residual
-draws. A continuous family on the empirical route has one interval
-per observation. Its rows are then identical. With \code{summary = TRUE},
+draws. With \code{summary = TRUE},
 an \verb{[nobs, 2 + length(probs)]} matrix. Its columns are \code{Estimate}
 (the mean, or the median with \code{robust = TRUE}), \code{Est.Error} (the
 standard deviation, or the MAD) and one quantile per \code{probs}.
@@ -100,23 +99,22 @@ the marginal of one component: a Beta for \code{diri()}, a Binomial
 against the site's own total for \code{multi()} and a Bernoulli for
 \code{categ()}.
 
-Every other family takes the empirical route of DHARMa (Hartig 2024),
-among them the zero-inflated, hurdle and mixture families, \code{occ()}
-and \code{nmix()}. The bounds are \code{mean(yrep < y)} and \code{mean(yrep <= y)}
-over the pooled \code{\link[=posterior_predict.mvgam]{posterior_predict.mvgam()}} draws. The pooled
-predictive carries the posterior uncertainty in the latent state.
-Its residuals are narrower than N(0, 1). A QQ-plot of them is
-conservative.
+Every other family takes the empirical route, among them the
+zero-inflated, hurdle and mixture families, \code{occ()} and \code{nmix()}.
+Under the model the observation and the \code{n} pooled
+\code{\link[=posterior_predict.mvgam]{posterior_predict.mvgam()}} draws are exchangeable. The rank of the
+observation among those \code{n + 1} values, with ties broken at random,
+is then uniform. The bounds are \code{sum(yrep < y) / (n + 1)} and
+\code{(sum(yrep <= y) + 1) / (n + 1)}. An observation beyond every draw
+takes the top interval, \verb{[n / (n + 1), 1]}. The pooled predictive
+carries the posterior uncertainty in the latent state. Its residuals
+are narrower than N(0, 1). A QQ-plot of them is conservative.
 
 The PIT value is clamped to \verb{[eps, 1 - eps]}, with
 \code{eps = .Machine$double.eps}, to keep the residual finite. The clamp
 bounds a residual at about +/-8.13. On the analytic route one draw
 can place an observation beyond that bound. Such isolated values
 describe that draw. A misfit shifts the residual across most draws.
-The empirical route reaches the clamp whenever an observation lies
-outside every simulated value. With few draws that happens often.
-Use \code{ndraws >= 500} there, the default of the residual histograms
-and ribbons of \code{\link[=pp_check.mvgam]{pp_check.mvgam()}}.
 }
 \section{Multivariate families (\code{mvn()}, \code{mvt()}, \code{diri()})}{
 
@@ -187,10 +185,6 @@ qqline(r1[1, ])
 Dunn, P. K. and Smyth, G. K. (1996). Randomized quantile
 residuals. \emph{Journal of Computational and Graphical
 Statistics}, 5(3), 236-244.
-
-Hartig, F. (2024). DHARMa: Residual diagnostics for
-hierarchical (multi-level / mixed) regression models.
-R package. \url{https://CRAN.R-project.org/package=DHARMa}
 }
 \seealso{
 \code{\link[=augment.mvgam]{augment.mvgam()}}, \code{\link[=posterior_predict.mvgam]{posterior_predict.mvgam()}},

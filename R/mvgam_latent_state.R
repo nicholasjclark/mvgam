@@ -13,9 +13,10 @@
 #'
 #' @param draws Numeric matrix `[ndraws, n_unit]` of latent-state
 #'   draws from `posterior_latent_N()`
-#' @param unit `data.frame` with one row per closure unit and
-#'   columns `series` (factor) and `time` (integer / numeric). Row
-#'   order matches the columns of `draws`.
+#' @param unit `data.frame` with one row per closure unit, from
+#'   `closure_unit_meta()`: `series` (factor), `time` and any further
+#'   key columns, such as `site`. Row order matches the columns of
+#'   `draws`.
 #' @param family The fitted family object.
 #' @param has_time Logical. `TRUE` when `time` indexes seasons or a
 #'   trend, `FALSE` when it only keys units.
@@ -67,12 +68,25 @@ closure_unit_labels <- function(family) {
   } else {
     "Detection probability (p)"
   }
-  if (models_latent_count(family)) {
-    list(label = "Latent abundance (N)", short = "abundance",
-         detection = detection)
+  c(closure_unit_state_labels(resolve_family_name(family)),
+    list(detection = detection))
+}
+
+
+#' Axis labels of a closure-unit family's state, from the family's name
+#'
+#' A forecast records its family by name alone. The `nmix()` variants
+#' hold a latent abundance. `occ()` holds a probability of occupancy.
+#'
+#' @param family_name The name `resolve_family_name()` gives.
+#' @return List with the state's axis `label` and its `short` name.
+#' @noRd
+closure_unit_state_labels <- function(family_name) {
+  checkmate::assert_string(family_name)
+  if (startsWith(family_name, "nmix")) {
+    list(label = "Latent abundance (N)", short = "abundance")
   } else {
-    list(label = "Occupancy probability", short = "occupancy",
-         detection = detection)
+    list(label = "Occupancy probability", short = "occupancy")
   }
 }
 
@@ -85,20 +99,34 @@ summary.mvgam_latent_state <- function(object,
                                                      0.75, 0.975),
                                           ...) {
   checkmate::assert_class(object, "mvgam_latent_state")
-  checkmate::assert_numeric(probs, len = 4L, lower = 0, upper = 1,
-                             sorted = TRUE, unique = TRUE)
   rlang::check_dots_empty()
-  q <- apply(object$draws, 2L,
-              stats::quantile, probs = c(0.5, probs),
-              na.rm = TRUE)
-  out <- object$unit
+  latent_state_quantiles(object$draws, object$unit, probs)
+}
+
+
+#' The median and interval bounds of each column of latent-state draws
+#'
+#' @param draws `[S x n]` matrix of draws.
+#' @param rows Data frame with one row per column of `draws`, whose
+#'   columns lead the result.
+#' @param probs The four interval bounds, lowest first.
+#' @return `rows` with `median`, `lower_50`, `upper_50`, `lower_95` and
+#'   `upper_95` appended.
+#' @noRd
+latent_state_quantiles <- function(draws, rows,
+                                   probs = c(0.025, 0.25, 0.75, 0.975)) {
+  checkmate::assert_matrix(draws, mode = "numeric", ncols = nrow(rows))
+  checkmate::assert_numeric(probs, len = 4L, lower = 0, upper = 1,
+                            sorted = TRUE, unique = TRUE)
+  q <- apply(draws, 2L, stats::quantile, probs = c(0.5, probs),
+             na.rm = TRUE)
+  out <- rows
   out$median   <- q[1L, ]
-  out$lower_95 <- q[2L, ]
   out$lower_50 <- q[3L, ]
   out$upper_50 <- q[4L, ]
+  out$lower_95 <- q[2L, ]
   out$upper_95 <- q[5L, ]
-  out[c("series", "time", "median",
-         "lower_50", "upper_50", "lower_95", "upper_95")]
+  out
 }
 
 
@@ -142,7 +170,14 @@ plot.mvgam_latent_state <- function(x, series = NULL, ...) {
   checkmate::assert_class(x, "mvgam_latent_state")
   rlang::check_dots_empty()
   set_color_scheme_local()
-  smry <- summary(x)
+  # Several units share an occasion in a multi-season fit, one per site.
+  # The plot then draws their mean in each draw.
+  smry <- if (anyDuplicated(x$unit[c("series", "time")]) > 0L) {
+    pooled <- pool_units_by_occasion(x$draws, x$unit)
+    latent_state_quantiles(pooled$draws, pooled$occasions)
+  } else {
+    summary(x)
+  }
   if (!is.null(series)) {
     levs <- levels(smry$series)
     keep <- levs[resolve_series(series, levs)]

@@ -40,9 +40,13 @@ returns the occupancy probability \code{psi} of an \code{\link[=occ]{occ()}} mod
 abundance \code{N} of an \code{\link[=nmix]{nmix()}} model at each closure unit, as an
 \code{mvgam_latent_state} object. Its \code{print()} gives the range of the
 unit medians. \code{summary()} and \code{as.data.frame()} return one row per
-unit with the median and the 50\% and 95\% interval bounds. \code{plot()}
-draws them per series, as a line with ribbons over time or as
-points with interval bars over units without an order.}
+unit, with its key columns (\code{series}, \code{time} and the \code{site} of a
+multi-season fit), the median and the 50\% and 95\% interval bounds.
+\code{plot()} draws them per series, as a line with ribbons over time or
+as points with interval bars over units without an order. A
+multi-season fit holds several sites in each season. Its plot draws
+the mean over those sites in each draw: the expected share of sites
+occupied, or the mean abundance per site.}
 
 \item{component}{\code{NULL} (the default) for the summed trend, or the
 names of state components of the trend, with \code{type = "trend"}.

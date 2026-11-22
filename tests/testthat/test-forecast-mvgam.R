@@ -701,18 +701,21 @@ test_that("slice_per_series picks the right cells per raw time", {
                             series_levels = c("a", "b"))
   expect_equal(as.numeric(out[["a"]]), c(411, 421, 431))
   expect_equal(as.numeric(out[["b"]]), c(412, 422, 432))
-  # A closure unit's visit rows share an occasion. Each keeps its own
-  # column when the prediction varies by visit.
+  # Rows sharing an occasion, as the sites of a multi-season fit do,
+  # keep their own columns with `per_row` and are averaged without it
   visits <- make_obs_struct_for_grid(
     times = c(41, 41, 42, 42), series_int = c(1, 1, 1, 1),
     series_levels = "a"
   )
-  per_row <- slice_per_series(
-    matrix(1:4, nrow = 1L),
-    make_fc_grid_for_slice(c(41, 41, 42, 42), list(a = c(41, 42))),
-    visits, ndraws_use = 1L, series_levels = "a", per_row = TRUE
-  )
-  expect_equal(as.numeric(per_row[["a"]]), 1:4)
+  slice_visits <- function(per_row) {
+    slice_per_series(
+      matrix(c(1, 2, 3, 5), nrow = 1L),
+      make_fc_grid_for_slice(c(41, 41, 42, 42), list(a = c(41, 42))),
+      visits, ndraws_use = 1L, series_levels = "a", per_row = per_row
+    )[["a"]]
+  }
+  expect_equal(as.numeric(slice_visits(TRUE)), c(1, 2, 3, 5))
+  expect_equal(as.numeric(slice_visits(FALSE)), c(1.5, 4))
 })
 
 

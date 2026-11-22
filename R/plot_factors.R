@@ -69,11 +69,12 @@ plot_factors <- function(
 #' Posterior latent state of a closure-unit fit by series and time
 #'
 #' Serves `plot.mvgam(type = "latent_state")`. The state is drawn from
-#' the covariates alone: abundance `N` for `nmix()`, the probability of
-#' occupancy `psi` for `occ()`. Unit columns are grouped by series and
-#' time. A
-#' multi-season fit pools the draws over sites. The plot shows a
-#' ribbon and median line in one facet per series.
+#' the covariates and the fitted trend, unconditioned on the visits:
+#' abundance `N` for `nmix()`, the probability of occupancy `psi` for
+#' `occ()`. `hindcast(type = "latent_state")` conditions each unit on
+#' its visits as well. A multi-season fit holds one unit per
+#' site in each season. The plot draws the mean over those sites in each
+#' draw, as a ribbon and median line in one facet per series.
 #'
 #' @param object Fitted `mvgam` object with a closure-unit family
 #' @param probs Numeric vector of credible interval widths for the
@@ -93,45 +94,30 @@ plot_latent_state <- function(object, probs = c(0.5, 0.8, 0.95),
   # `mvt()`, `diri()`, `multi()` and `categ()`. The family registry
   # records which families expose one.
   require_closure_unit_predict_type(object$family, "latent_state")
-  # The state drawn from the covariates alone, unconditioned on the
-  # detections, as flocker's `get_Z(history_condition = FALSE)` is.
-  state <- posterior_latent_N(object, conditional = FALSE)
-  state <- subset_draws_rows(state, ndraws = ndraws)
-
-  # Per-unit labels come from the unit grid of the closure-unit
-  # arrays, one row per unit in unit order. The grid stores the
-  # grouping values. A fit whose closure unit uses columns other than
-  # `series` and `time` is labelled by its own grouping columns. The
-  # grouping lists series first and time last. A multi-season fit
-  # adds a `site` axis between them.
-  data <- object$data
-  arrays <- closure_unit_arrays_for(object, data)
-  unit_vars <- arrays$unit_vars
-  unit_meta <- data.frame(
-    series = as.factor(arrays$unit_grid[[unit_vars[1L]]]),
-    time = arrays$unit_grid[[unit_vars[length(unit_vars)]]]
+  # The state unconditioned on the detections, as flocker's
+  # `get_Z(history_condition = FALSE)` is, with the fitted trend
+  state <- posterior_latent_N(
+    object, draw_ids = resolve_draw_ids(object, ndraws, NULL),
+    conditional = FALSE, incl_autocor = TRUE
   )
-  if (ncol(state) != nrow(unit_meta)) {
-    stop_shape_fault("The latent-state matrix", ncol(state),
-                     nrow(unit_meta))
-  }
+  pooled <- pool_units_by_occasion(
+    state, closure_unit_meta(object, closure_unit_arrays_for(object))
+  )
+  occasions <- pooled$occasions
 
-  # The band helpers pool the columns that share a time. A
-  # multi-season fit has one column per site at each time. Its bands
-  # cover site and posterior uncertainty together.
   set_color_scheme_local()
-  series_levels <- levels(unit_meta$series)
+  series_levels <- levels(occasions$series)
   layers <- list()
   for (sp in series_levels) {
-    cols <- which(unit_meta$series == sp)
+    cols <- which(occasions$series == sp)
     if (!length(cols)) next
     panel <- factor(sp, levels = series_levels)
+    draws <- pooled$draws[, cols, drop = FALSE]
     layers <- c(
       layers,
-      mvgam_band_layer(state[, cols, drop = FALSE], unit_meta$time[cols],
-                       probs = probs, group = panel),
-      list(mvgam_median_layer(state[, cols, drop = FALSE],
-                              unit_meta$time[cols], group = panel))
+      mvgam_band_layer(draws, occasions$time[cols], probs = probs,
+                       group = panel),
+      list(mvgam_median_layer(draws, occasions$time[cols], group = panel))
     )
   }
   ggplot2::ggplot() +

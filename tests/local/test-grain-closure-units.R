@@ -1526,6 +1526,31 @@ test_that("multi-season: every per-unit surface uses the unit axis", {
   expect_identical(nrow(residuals(fit, ndraws = 5L)), sim$n_unit)
   expect_identical(nrow(latent_N_saturation(fit)), sim$n_unit)
 
+  # A latent-state forecast holds one column per species and season,
+  # the mean over that season's sites of the per-unit hindcast
+  hc <- hindcast(fit, type = "latent_state", draw_ids = 1:5)
+  future <- fit$data[fit$data$time == sim$T_s, ]
+  future$time <- sim$T_s + 1L
+  future$y <- NA
+  fc <- forecast(fit, newdata = future, type = "latent_state",
+                 draw_ids = 1:5)
+  site_mean <- sapply(seq_len(sim$T_s), function(t) {
+    rowMeans(hc$draws[, hc$unit$series == "sp2" & hc$unit$time == t])
+  })
+  expect_equal(unname(fc$hindcasts$sp2), site_mean)
+
+  # A multi-season link keeps one column per visit row, conditioned on
+  # the fitted trend: its predictor without the trend plus its season's
+  # fitted trend. A first-site slice or a marginal predictor fails it.
+  rows <- which(fit$data$series == "sp2")
+  rows <- rows[order(fit$data$time[rows])]
+  link <- hindcast(fit, type = "link", draw_ids = 1:5)$hindcasts$sp2
+  marginal <- posterior_linpred(fit, newdata = fit$data[rows, ],
+                                draw_ids = 1:5)
+  trend <- hindcast(fit, type = "trend", draw_ids = 1:5)$hindcasts$sp2
+  expect_equal(unname(link),
+               unname(marginal + trend[, fit$data$time[rows]]))
+
   # The per-visit surfaces answer on rows, which is the other grain
   # and is correct on this fit. Stating both is what makes the
   # failures above a confusion between two axes rather than a

@@ -2054,6 +2054,12 @@ complete_closure_unit_newdata <- function(object, newdata,
   # training, which would otherwise collapse the whole grid into
   # one unit and flatten the predicted curve.
   newdata[[vars$time_var]] <- seq_len(nrow(newdata))
+  # A key column the formulas do not name, as the `site` of a
+  # multi-season fit, is absent from the grid. It takes the template's
+  # value. The time column above already gives every row its own unit.
+  for (key in setdiff(fit_closure_unit_keys(object), names(newdata))) {
+    newdata[[key]] <- rep(template[[key]], nrow(newdata))
+  }
   newdata$visit <- 1L
   # A grid's response takes whatever value `datagrid()` assigned. A
   # synthetic unit has no observation attached. The safe default
@@ -4922,9 +4928,11 @@ closure_unit_arrays_for <- function(object, newdata = NULL) {
 #' @param newdata Long-format observation data; defaults to the
 #'   training data stored on `object`.
 #' @param draw_ids Optional vector of posterior draw indices.
+#' @param linpred `[S x N_visit]` predictor of the state at the rows of
+#'   `newdata`, or `NULL` to compute it from the fit.
 #' @param incl_autocor Logical. `TRUE` conditions the state on the
 #'   fitted latent trend, as [posterior_linpred.mvgam()] does. `FALSE`
-#'   takes the state from the covariates alone.
+#'   takes the state from the covariates alone. Ignored with `linpred`.
 #' @return Named list with `state` (`[S x N_unit]`), `p`
 #'   (`[S x N_visit]`), `arrays`, `ndraws`, `n_unit`, `n_visit`.
 #' @noRd
@@ -4970,14 +4978,10 @@ extract_closure_unit_components <- function(object, newdata = NULL,
       process_error = FALSE, incl_autocor = incl_autocor
     )
   }
-  state_visit <- object$family$linkinv(linpred)
-  ndraws   <- nrow(state_visit)
-  n_visit  <- ncol(state_visit)
+  state    <- closure_unit_state(object, linpred, arrays)
+  ndraws   <- nrow(linpred)
+  n_visit  <- ncol(linpred)
   n_unit   <- arrays$N_unit
-  # The frame's own row, because `state_visit` has one column per
-  # row of `newdata`. Using `visit_idx` here would shift a unit's first
-  # visit by the number of missing responses before it.
-  state <- state_visit[, closure_unit_first_rows(arrays), drop = FALSE]
   # p extraction. brms emits the scalar `p` in the posterior when
   # there is no detection sub-formula; with a sub-formula
   # (`bf(y ~ x, p ~ tod)`) `p` is transient in the model block
@@ -5449,6 +5453,80 @@ closure_unit_first_rows <- function(arrays,
 }
 
 
+#' Each closure unit's latent state from a predictor of the frame's rows
+#'
+#' Because the state's predictor is constant within a unit, the unit's
+#' first row gives it. That is the frame's own row. `visit_idx` would
+#' shift it by the missing responses before it. The family's inverse
+#' link then gives `psi` under `occ()` or `lambda` under `nmix()`.
+#'
+#' @param object A fitted `mvgam` object with a closure-unit family.
+#' @param linpred `[S x N_row]` predictor, one column per frame row.
+#' @param arrays The list `build_closure_unit_arrays()` returns for the
+#'   same frame.
+#' @return `[S x N_unit]` matrix.
+#' @noRd
+closure_unit_state <- function(object, linpred, arrays) {
+  checkmate::assert_matrix(linpred, mode = "numeric")
+  object$family$linkinv(
+    linpred[, closure_unit_first_rows(arrays), drop = FALSE]
+  )
+}
+
+
+#' The key values of each closure unit, with the axes named
+#'
+#' One row per unit, in the unit order of `arrays`. The fit's series and
+#' time columns take the names `series` and `time`. Every other key
+#' column, as the `site` of a multi-season fit, keeps its own name.
+#'
+#' @param object A fitted `mvgam` object with a closure-unit family.
+#' @param arrays The list `build_closure_unit_arrays()` returns.
+#' @return A data frame with a factor `series`, `time` and any further
+#'   key columns.
+#' @noRd
+closure_unit_meta <- function(object, arrays) {
+  vars <- axis_vars(object)
+  meta <- arrays$unit_grid
+  checkmate::assert_subset(c(vars$series_var, vars$time_var), names(meta))
+  names(meta)[match(c(vars$series_var, vars$time_var), names(meta))] <-
+    c("series", "time")
+  meta$series <- as.factor(meta$series)
+  rownames(meta) <- NULL
+  meta
+}
+
+
+#' The latent state averaged over the units of each occasion
+#'
+#' A multi-season fit holds one unit per site in each season. The mean
+#' of their occupancy probabilities is the expected share of sites
+#' occupied. The mean of their abundances is the mean abundance per
+#' site. A design with one unit per occasion keeps its values.
+#'
+#' @param draws `[S x N_unit]` matrix of latent-state draws.
+#' @param meta The unit table `closure_unit_meta()` returns.
+#' @return List holding `draws` (`[S x n_occasion]`), `occasions` (a
+#'   data frame of `series` and `time`, ordered by both) and
+#'   `unit_occasion` (the occasion of each unit).
+#' @noRd
+pool_units_by_occasion <- function(draws, meta) {
+  checkmate::assert_matrix(draws, mode = "numeric", ncols = nrow(meta))
+  checkmate::assert_subset(c("series", "time"), names(meta))
+  occasions <- unique(meta[c("series", "time")])
+  occasions <- occasions[order(occasions$series, occasions$time), ,
+                         drop = FALSE]
+  rownames(occasions) <- NULL
+  key <- function(d) paste(as.integer(d$series), d$time, sep = "\r")
+  unit_occasion <- match(key(meta), key(occasions))
+  list(
+    draws = group_column_means(draws, unit_occasion),
+    occasions = occasions,
+    unit_occasion = unit_occasion
+  )
+}
+
+
 #' The closure units whose components were all observed
 #'
 #' A composition has a density only where every component of the unit was
@@ -5523,20 +5601,24 @@ sum_within_closure_units <- function(arrays, x) {
 #'   of occupancy unless `draw = TRUE`, which draws the 0 / 1 state.
 #'   The abundance kernels always draw.
 #' @param incl_autocor As `extract_closure_unit_components()` takes it
+#' @param linpred The state's predictor at the rows of `newdata`, or
+#'   `NULL` to compute it. A forecast supplies the predictor of its
+#'   propagated trend, which no frame reproduces.
 #' @return `[S x N_unit]` matrix of latent state draws or occupancy
 #'   probabilities
 #' @noRd
 posterior_latent_N <- function(object, newdata = NULL,
                                 draw_ids = NULL,
                                 conditional = TRUE, draw = FALSE,
-                                incl_autocor = FALSE) {
+                                incl_autocor = FALSE, linpred = NULL) {
   checkmate::assert_flag(draw)
   # Sharing the closure-unit pipeline does not mean exposing a latent
   # state. The registry records which families do.
   require_closure_unit_predict_type(object$family, "latent_state")
   kernel <- dispatch_closure_unit_method(object$family, "latent_state")
   args <- list(object, newdata = newdata, draw_ids = draw_ids,
-               conditional = conditional, incl_autocor = incl_autocor)
+               conditional = conditional, incl_autocor = incl_autocor,
+               linpred = linpred)
   if ("draw" %in% names(formals(kernel))) args$draw <- draw
   do.call(kernel, args)
 }
@@ -5732,8 +5814,10 @@ reduce_closure_unit_joint <- function(family, y, state, p, arrays,
 posterior_latent_N_nmix <- function(object, newdata = NULL,
                                     draw_ids = NULL,
                                     conditional = TRUE,
-                                    incl_autocor = FALSE) {
+                                    incl_autocor = FALSE,
+                                    linpred = NULL) {
   comp <- extract_closure_unit_components(object, newdata, draw_ids,
+                                          linpred = linpred,
                                           incl_autocor = incl_autocor)
   if (!conditional) {
     return(matrix(stats::rpois(length(comp$state), comp$state),
@@ -6362,7 +6446,8 @@ log_lik_categ <- function(linpred, link, y, family_pars, trials) {
 #' @param draw_ids Posterior draw indices, or `NULL`
 #' @param conditional Logical. `TRUE` conditions on the detections.
 #' @param draw Logical. `TRUE` returns 0 / 1 state draws.
-#' @param incl_autocor As `extract_closure_unit_components()` takes it
+#' @param incl_autocor,linpred As `extract_closure_unit_components()`
+#'   takes them
 #' @return `[S x N_unit]` matrix of probabilities, or of integer 0 / 1
 #'   draws with `draw = TRUE`
 #' @noRd
@@ -6370,9 +6455,11 @@ posterior_occupancy <- function(object, newdata = NULL,
                                 draw_ids = NULL,
                                 conditional = TRUE,
                                 draw = FALSE,
-                                incl_autocor = FALSE) {
+                                incl_autocor = FALSE,
+                                linpred = NULL) {
   checkmate::assert_flag(draw)
   comp <- extract_closure_unit_components(object, newdata, draw_ids,
+                                          linpred = linpred,
                                           incl_autocor = incl_autocor)
   probs <- if (conditional) {
     # The grid ends at z = 1. A unit with a detection has no z = 0.

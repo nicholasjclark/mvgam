@@ -8,7 +8,7 @@
   object,
   newdata = NULL,
   ...,
-  type = c("response", "link", "expected", "trend"),
+  type = c("response", "link", "expected", "trend", "latent_state"),
   component = NULL,
   ndraws = NULL,
   draw_ids = NULL,
@@ -54,6 +54,14 @@ series.}
 \code{trials * p} and a zero-inflated mean is \code{(1 - zi) * mu}.
 \item \code{"link"} returns the linear predictor on the link scale.
 \item \code{"trend"} returns the latent trend on the link scale.
+\item \code{"latent_state"} returns the latent state of an \code{\link[=occ]{occ()}} or
+\code{\link[=nmix]{nmix()}} fit: the occupancy probability, or the abundance \code{N}.
+The hindcast conditions each closure unit on its own visits, as
+\code{hindcast(type = "latent_state")} does. The forecast takes the
+state from the covariates and the propagated trend. A
+multi-season fit holds one unit per site in each season and
+returns the mean over those sites, which for \code{\link[=occ]{occ()}} is the
+expected share of sites occupied.
 }}
 
 \item{component}{\code{NULL} (the default) for the summed trend, or the

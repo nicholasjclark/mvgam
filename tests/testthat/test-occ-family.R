@@ -222,6 +222,27 @@ test_that("log_lik_detection() marginalises each draw with its own p", {
   expect_equal(ll, hand)
 })
 
+test_that("a multi-season occasion's state is the mean of its sites", {
+  # Two sites in each of two seasons, the later season's rows first.
+  # The units then run (2, a), (2, b), (1, a), (1, b).
+  fam <- occ(multi_season = TRUE)
+  d <- expand.grid(visit = 1:2, site = c("a", "b"), time = 2:1)
+  d$series <- factor("sp")
+  d$y <- 0L
+  obj <- structure(list(family = fam, data = d), class = "mvgam")
+  arrays <- mvgam:::build_closure_unit_arrays(d, response_var = "y",
+                                              family = fam)
+  meta <- mvgam:::closure_unit_meta(obj, arrays)
+  state <- matrix(c(0.2, 0.4, 0.6, 1.0), nrow = 1L)
+  pooled <- mvgam:::pool_units_by_occasion(state, meta)
+  expect_identical(pooled$occasions$time, 1:2)
+  expect_equal(pooled$draws, matrix(c(0.8, 0.3), nrow = 1L))
+
+  # summary() keeps the site that tells the units of a season apart
+  ls <- mvgam:::new_mvgam_latent_state(state, meta, fam, has_time = TRUE)
+  expect_identical(summary(ls)$site, meta$site)
+})
+
 test_that("dispatch_closure_unit_method() errors on a non-closure family", {
   expect_error(
     dispatch_closure_unit_method(gaussian(), "epred"),

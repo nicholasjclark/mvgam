@@ -51,7 +51,6 @@ test_that("aggregate_closure_unit_visits() sums per-visit observations within ea
   expect_equal(as.numeric(agg$y_unit), as.numeric(expected_y))
   # Every yrep row was a copy of y, so the unit-summed rows equal y_unit.
   expect_true(all(apply(agg$yrep_unit, 1L, identical, agg$y_unit)))
-  expect_identical(ncol(agg$yrep_unit), 3L)
   expect_identical(colnames(agg$yrep_unit), agg$arrays$unit_labels)
 })
 
@@ -129,8 +128,15 @@ test_that("compute_closure_unit_residuals() returns [ndraws x N_unit] for both t
   arrs <- build_closure_unit_arrays(d, response_var = "y",
                                       default_cap = 1L)
   expect_identical(dim(r_quant), c(ndraws, arrs$N_unit))
-  # The clamp bounds a quantile residual at about 8.13
-  expect_true(all(abs(r_quant) < 9))
+  # A unit total above or below every draw takes the outer rank
+  # interval of the n + 1 values, [n, n + 1] / (n + 1) or [0, 1] /
+  # (n + 1). Its residual stays inside qnorm(1 / (n + 1)) of the
+  # tail and never reaches the 8.13 clamp.
+  edge <- compute_quantile_residuals_empirical(
+    c(2, 0), matrix(1, nrow = 3L, ncol = 2L)
+  )
+  expect_true(all(pnorm(edge[, 1L]) >= 3 / 4 & edge[, 1L] < 6))
+  expect_true(all(pnorm(edge[, 2L]) <= 1 / 4 & edge[, 2L] > -6))
   # Ordinary residuals are y_unit - yrep_unit per draw
   y_unit <- vapply(seq_len(arrs$N_unit), function(g) {
     sum(d$y[arrs$visit_idx[g, seq_len(arrs$n_rep[g])]])

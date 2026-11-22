@@ -295,9 +295,18 @@ test_that("complete_closure_unit_newdata stamps occ defaults", {
   expect_identical(out$cap, rep(1L, 5L))
   expect_identical(out$visit, rep(1L, 5L))
   expect_identical(out$time, 1:5)
-  expect_identical(as.character(out$series), rep("1", 5L))
+  expect_identical(out$series, factor(rep("1", 5L), levels = c("1", "2")))
   # Response overridden to satisfy binary_y_check.
   expect_identical(out$y, rep(0L, 5L))
+
+  # A multi-season fit also keys its units on `site`, which no formula
+  # names. The grid takes the template's site.
+  ms <- stub_with_family(occ(multi_season = TRUE))
+  ms$data$site <- factor(rep(c("a", "b"), 3L))
+  expect_identical(
+    mvgam:::complete_closure_unit_newdata(ms, make_stripped_grid(2L))$site,
+    factor(c("a", "a"), levels = c("a", "b"))
+  )
 })
 
 test_that("complete_closure_unit_newdata stamps nmix(PB) cap from template", {
@@ -341,11 +350,18 @@ test_that(
 
 test_that(
   "complete_closure_unit_newdata returns a complete frame as is", {
+  # A frame holding `visit` and `cap` is real data. Its times, here
+  # 7 and 8, label the occasions of a forecast or a season.
   stub <- stub_with_family(occ())
-  full <- stub$data[1:3, , drop = FALSE]
-  out  <- mvgam:::complete_closure_unit_newdata(stub, full)
-  # Nothing changed (no rowid, no synthetic time stamp).
-  expect_identical(out, full)
+  real <- data.frame(
+    series = factor(rep(1:2, each = 3L), levels = c("1", "2")),
+    time   = c(7L, 7L, 7L, 8L, 8L, 8L),
+    visit  = rep(1:3, 2L),
+    y      = c(1L, 0L, 1L, 0L, 1L, 0L),
+    cap    = rep(3L, 6L),
+    env    = rnorm(6L)
+  )
+  expect_identical(mvgam:::complete_closure_unit_newdata(stub, real), real)
 })
 
 test_that(
@@ -359,19 +375,8 @@ test_that(
   partial <- partial[rep(1L, 3L), , drop = FALSE]
   rownames(partial) <- NULL
   out <- mvgam:::complete_closure_unit_newdata(stub, partial)
-  # The supplied series stays as given. The response is replaced.
+  # The supplied series stays as given
   expect_identical(as.character(out$series), rep("1", 3L))
-  expect_identical(out$y, rep(0L, 3L))
-})
-
-test_that("complete_closure_unit_newdata handles multi-species fits", {
-  stub <- stub_with_family(occ())
-  # Original series factor has levels c("1", "2"); helper picks
-  # the FIRST level as the default fill.
-  out  <- mvgam:::complete_closure_unit_newdata(
-    stub, make_stripped_grid(3L)
-  )
-  expect_identical(levels(out$series), levels(stub$data$series))
 })
 
 test_that("complete_closure_unit_newdata overrides datagrid-pinned time", {
@@ -389,29 +394,6 @@ test_that("complete_closure_unit_newdata overrides datagrid-pinned time", {
   )
   out <- mvgam:::complete_closure_unit_newdata(stub, grid)
   expect_identical(out$time, 1:5)
-  expect_identical(out$visit, rep(1L, 5L))
-})
-
-test_that(
-  "complete_closure_unit_newdata respects user long-format newdata", {
-  # The complement to the grid-path overwrite: when the user passes
-  # real long-format data (visit + cap present), the helper must
-  # leave (series, time, visit, cap) untouched. Forecasting and
-  # multi-season fits encode meaningful time labels that we cannot
-  # silently rewrite.
-  stub <- stub_with_family(occ())
-  real <- data.frame(
-    series = factor(rep(1:2, each = 3L), levels = c("1", "2")),
-    time   = c(7L, 7L, 7L, 8L, 8L, 8L),  # non-1:n on purpose
-    visit  = rep(1:3, 2L),
-    y      = c(1L, 0L, 1L, 0L, 1L, 0L),
-    cap    = rep(3L, 6L),
-    env    = rnorm(6L)
-  )
-  out <- mvgam:::complete_closure_unit_newdata(stub, real)
-  expect_identical(out$time, real$time)
-  expect_identical(out$visit, real$visit)
-  expect_identical(out$cap, real$cap)
 })
 
 test_that("pp_check() refuses the covariate part for loo_* types", {

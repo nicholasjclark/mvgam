@@ -915,6 +915,11 @@ test_that("a multi-season unit is indexed by series, site and season", {
   expect_match(out, "y_{i,s,t,j} \\mid z_{i,s,t} &\\sim", fixed = TRUE)
   expect_match(out, "family        = occ(multi_season = TRUE)",
                fixed = TRUE)
+  # Only a multi-season fit states that a site changes between seasons
+  season_text <- "closed to change within a season"
+  expect_match(how_to_cite(mod)$methods_text, season_text, fixed = TRUE)
+  expect_no_match(how_to_cite(make_occ_prefit())$methods_text,
+                  season_text, fixed = TRUE)
   # Each constructor setting off its default is named in the call
   expect_identical(
     vapply(list(nmix("royle_nichols"), tweedie(M = 50L), com_binomial(),

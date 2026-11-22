@@ -24,6 +24,7 @@ mvgam now uses 'brms' to build its models. The observation model takes the full 
 
 ## New features
 * Families: `tweedie()`, `beta_nb()`, `com_binomial()`, `occ()`, `diri()`, `multi()`, `categ()`, `mvn()`, `mvt()`. `nmix()` gained Royle-Nichols, Poisson-Poisson and multi-season variants
+* `forecast(type = "latent_state")` forecasts the occupancy or abundance of an `occ()` or `nmix()` fit. A multi-season fit reports the mean over the sites of each season
 * @jbogomolovas2 contributed the `com_binomial()` mathematics and tested the bounded count families
 * Multivariate responses through `mvbind()` and `mvbf()`. Each response keeps the rows where it was observed. `summary()` reports each response's count
 * `forecast_uncertainty()` splits a forecast's variance by source and horizon. It also compares covariate scenarios. `variance_partition()` splits the fitted predictor's variance by source
@@ -52,6 +53,7 @@ mvgam now uses 'brms' to build its models. The observation model takes the full 
 * Predictions with `incl_autocor = TRUE` and `log_lik()` refuse times outside the fitted times. Use `forecast()`
 * `ZMVN()` and `PW()` forecasts require every series to share one set of forecast times
 * `conditional_effects()` defaults to `type = "expected"`
+* Quantile residuals of families without a distribution function place each observation by its rank among the posterior predictive draws. An observation beyond every draw keeps a finite residual
 * `pp_check()` draws bars for a bernoulli or ordinal response and a rootogram for counts
 * Trend scale priors take the response's spread on the link scale as 'brms' defaults do. `LLT()` and `PW()` growth priors also scale with the series length
 * `PW()` `changepoint_scale` (default `0.3`) is a change in growth over the whole series

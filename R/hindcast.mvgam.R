@@ -35,9 +35,13 @@ hindcast <- function(object, ...) {
 #'   abundance `N` of an [nmix()] model at each closure unit, as an
 #'   `mvgam_latent_state` object. Its `print()` gives the range of the
 #'   unit medians. `summary()` and `as.data.frame()` return one row per
-#'   unit with the median and the 50% and 95% interval bounds. `plot()`
-#'   draws them per series, as a line with ribbons over time or as
-#'   points with interval bars over units without an order.
+#'   unit, with its key columns (`series`, `time` and the `site` of a
+#'   multi-season fit), the median and the 50% and 95% interval bounds.
+#'   `plot()` draws them per series, as a line with ribbons over time or
+#'   as points with interval bars over units without an order. A
+#'   multi-season fit holds several sites in each season. Its plot draws
+#'   the mean over those sites in each draw: the expected share of sites
+#'   occupied, or the mean abundance per site.
 #' @param process_error Logical. `FALSE` (the default) takes the
 #'   fitted latent state of each draw. `type = "response"` then adds
 #'   the observation noise alone. `TRUE` replaces the fitted states
@@ -172,15 +176,14 @@ hindcast.mvgam <- function(object,
 #' The hindcast of a closure-unit model's latent state
 #'
 #' Builds an `mvgam_latent_state` object from a fitted closure-unit
-#' model. `posterior_latent_N()` gives the per-draw latent state. The
-#' closure-unit arrays give the (`series`, `time`) label of each draw
-#' column.
+#' model. `posterior_latent_N()` gives the per-draw latent state.
+#' `closure_unit_meta()` gives the key values of each draw column.
 #'
 #' @param object Fitted `mvgam` object with a closure-unit family
 #' @param ndraws Integer number of draws to take, or `NULL` for all
 #' @param draw_ids Integer indices of the draws to take, or `NULL`
 #' @return An `mvgam_latent_state` object holding a draws by units
-#'   matrix and one (`series`, `time`) row per unit
+#'   matrix and one row of key values per unit
 #' @noRd
 hindcast_latent_state <- function(object, ndraws = NULL,
                                   draw_ids = NULL) {
@@ -194,13 +197,8 @@ hindcast_latent_state <- function(object, ndraws = NULL,
                             any.missing = FALSE,
                             .var.name = "kernel return value")
 
-  # `build_closure_unit_arrays()` records the grouping values of each
-  # unit in `unit_grid`, in the order of the draw columns.
-  meta <- axis_vars(object)
-  unit_df <- closure_unit_arrays_for(object)$unit_grid
-  names(unit_df)[match(c(meta$series_var, meta$time_var),
-                         names(unit_df))] <- c("series", "time")
-  rownames(unit_df) <- NULL
+  # The key values of each unit, in the order of the draw columns
+  unit_df <- closure_unit_meta(object, closure_unit_arrays_for(object))
 
   # `time` is a time axis when a multi-season fit indexes seasons by
   # it, or when a trend evolves along it. A single-season fit without

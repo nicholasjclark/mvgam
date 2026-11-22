@@ -95,27 +95,25 @@
 #'   against the site's own total for `multi()` and a Bernoulli for
 #'   `categ()`.
 #'
-#'   Every other family takes the empirical route of DHARMa (Hartig 2024),
-#'   among them the zero-inflated, hurdle and mixture families, `occ()`
-#'   and `nmix()`. The bounds are `mean(yrep < y)` and `mean(yrep <= y)`
-#'   over the pooled [posterior_predict.mvgam()] draws. The pooled
-#'   predictive carries the posterior uncertainty in the latent state.
-#'   Its residuals are narrower than N(0, 1). A QQ-plot of them is
-#'   conservative.
+#'   Every other family takes the empirical route, among them the
+#'   zero-inflated, hurdle and mixture families, `occ()` and `nmix()`.
+#'   Under the model the observation and the `n` pooled
+#'   [posterior_predict.mvgam()] draws are exchangeable. The rank of the
+#'   observation among those `n + 1` values, with ties broken at random,
+#'   is then uniform. The bounds are `sum(yrep < y) / (n + 1)` and
+#'   `(sum(yrep <= y) + 1) / (n + 1)`. An observation beyond every draw
+#'   takes the top interval, `[n / (n + 1), 1]`. The pooled predictive
+#'   carries the posterior uncertainty in the latent state. Its residuals
+#'   are narrower than N(0, 1). A QQ-plot of them is conservative.
 #'
 #'   The PIT value is clamped to `[eps, 1 - eps]`, with
 #'   `eps = .Machine$double.eps`, to keep the residual finite. The clamp
 #'   bounds a residual at about +/-8.13. On the analytic route one draw
 #'   can place an observation beyond that bound. Such isolated values
 #'   describe that draw. A misfit shifts the residual across most draws.
-#'   The empirical route reaches the clamp whenever an observation lies
-#'   outside every simulated value. With few draws that happens often.
-#'   Use `ndraws >= 500` there, the default of the residual histograms
-#'   and ribbons of [pp_check.mvgam()].
 #'
 #' @return With `summary = FALSE`, an `[ndraws, nobs]` matrix of residual
-#'   draws. A continuous family on the empirical route has one interval
-#'   per observation. Its rows are then identical. With `summary = TRUE`,
+#'   draws. With `summary = TRUE`,
 #'   an `[nobs, 2 + length(probs)]` matrix. Its columns are `Estimate`
 #'   (the mean, or the median with `robust = TRUE`), `Est.Error` (the
 #'   standard deviation, or the MAD) and one quantile per `probs`.
@@ -124,10 +122,6 @@
 #' Dunn, P. K. and Smyth, G. K. (1996). Randomized quantile
 #'   residuals. *Journal of Computational and Graphical
 #'   Statistics*, 5(3), 236-244.
-#'
-#' Hartig, F. (2024). DHARMa: Residual diagnostics for
-#'   hierarchical (multi-level / mixed) regression models.
-#'   R package. \url{https://CRAN.R-project.org/package=DHARMa}
 #'
 #' @seealso [augment.mvgam()], [posterior_predict.mvgam()],
 #'   [pp_check.mvgam()]
@@ -557,13 +551,16 @@ randomised_quantile_residuals <- function(lower, upper, y) {
 
 #' Empirical-PIT quantile residuals
 #'
-#' The PIT bounds of each observation are `mean(yrep < y)` and
-#' `mean(yrep <= y)`, pooled over draws, following the `getQuantile()`
-#' convention of DHARMa (Hartig 2024). One interval serves every draw.
-#' A family without an analytic distribution function takes this
-#' route. Its residuals have less spread than the per-draw construction
-#' gives. The pooled predictive absorbs the posterior uncertainty in
-#' the latent state that the conditional CDF holds fixed.
+#' The PIT interval of each observation is that of its rank among the
+#' `n + 1` values it forms with its `n` pooled draws,
+#' `[sum(yrep < y), sum(yrep <= y) + 1] / (n + 1)`. The rank is uniform
+#' when the observation is exchangeable with the draws. An observation
+#' beyond every draw then keeps a finite residual. One interval serves
+#' every draw. A family without an analytic distribution function takes
+#' this route. Its residuals have less spread than the per-draw
+#' construction gives. The pooled predictive absorbs the posterior
+#' uncertainty in the latent state that the conditional CDF holds
+#' fixed.
 #'
 #' @param y Numeric vector of observed responses
 #' @param yrep Numeric matrix of predictive draws, one column per
@@ -574,15 +571,16 @@ compute_quantile_residuals_empirical <- function(y, yrep) {
   checkmate::assert_numeric(y)
   checkmate::assert_matrix(yrep, ncols = length(y))
   nobs <- length(y)
-  bound <- function(cmp) {
+  bound <- function(cmp, shift) {
     vapply(seq_len(nobs), function(i) {
       if (is.na(y[i])) return(NA_real_)
-      mean(cmp(yrep[, i], y[i]), na.rm = TRUE)
+      draws <- yrep[!is.na(yrep[, i]), i]
+      (sum(cmp(draws, y[i])) + shift) / (length(draws) + 1)
     }, numeric(1L))
   }
   randomised_quantile_residuals(
-    data2draws(bound(`<`), dim(yrep)),
-    data2draws(bound(`<=`), dim(yrep)),
+    data2draws(bound(`<`, 0), dim(yrep)),
+    data2draws(bound(`<=`, 1), dim(yrep)),
     y
   )
 }

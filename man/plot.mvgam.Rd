@@ -40,9 +40,11 @@ A \code{\link[=jsdgam]{jsdgam()}} fit has sites in place of times and refuses it
 \item{\code{"series"}}{The observed data the fit carries.
 \code{\link[=mvgam_data]{mvgam_data()}} plots data before a fit.}
 \item{\code{"latent_state"}}{The latent state of an \code{\link[=occ]{occ()}} or
-\code{\link[=nmix]{nmix()}} fit drawn from the covariates alone: occupancy \code{psi} or
-abundance \code{N}, by series and time. A multi-season fit pools the
-sites of each time.}
+\code{\link[=nmix]{nmix()}} fit drawn from the covariates and the fitted trend,
+unconditioned on the visits: occupancy \code{psi} or abundance \code{N},
+by series and time. A multi-season fit draws the mean over the
+sites of each season. \code{hindcast(type = "latent_state")}
+conditions each unit on its visits as well.}
 }}
 
 \item{series}{A series index or name. \code{"trend"} and \code{"series"} also

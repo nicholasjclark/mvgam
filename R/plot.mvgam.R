@@ -26,9 +26,11 @@
 #'     \item{`"series"`}{The observed data the fit carries.
 #'       [mvgam_data()] plots data before a fit.}
 #'     \item{`"latent_state"`}{The latent state of an [occ()] or
-#'       [nmix()] fit drawn from the covariates alone: occupancy `psi` or
-#'       abundance `N`, by series and time. A multi-season fit pools the
-#'       sites of each time.}
+#'       [nmix()] fit drawn from the covariates and the fitted trend,
+#'       unconditioned on the visits: occupancy `psi` or abundance `N`,
+#'       by series and time. A multi-season fit draws the mean over the
+#'       sites of each season. `hindcast(type = "latent_state")`
+#'       conditions each unit on its visits as well.}
 #'   }
 #' @param series A series index or name. `"trend"` and `"series"` also
 #'   take `"all"`, their default. `"residuals"` draws one series, the

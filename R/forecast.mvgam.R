@@ -39,6 +39,14 @@
 #'     `trials * p` and a zero-inflated mean is `(1 - zi) * mu`.
 #'   * `"link"` returns the linear predictor on the link scale.
 #'   * `"trend"` returns the latent trend on the link scale.
+#'   * `"latent_state"` returns the latent state of an [occ()] or
+#'     [nmix()] fit: the occupancy probability, or the abundance `N`.
+#'     The hindcast conditions each closure unit on its own visits, as
+#'     `hindcast(type = "latent_state")` does. The forecast takes the
+#'     state from the covariates and the propagated trend. A
+#'     multi-season fit holds one unit per site in each season and
+#'     returns the mean over those sites, which for [occ()] is the
+#'     expected share of sites occupied.
 #' @param component `NULL` (the default) for the summed trend, or the
 #'   names of state components of the trend, with `type = "trend"`.
 #'   Several names give the sum of their components. [LLT()] has
@@ -131,7 +139,8 @@ forecast.mvgam <- function(object,
                            newdata = NULL,
                            ...,
                            type = c("response", "link",
-                                    "expected", "trend"),
+                                    "expected", "trend",
+                                    "latent_state"),
                            component = NULL,
                            ndraws = NULL,
                            draw_ids = NULL,
@@ -149,6 +158,10 @@ forecast.mvgam <- function(object,
   # `...` and leave its default in force.
   rlang::check_dots_empty()
   type <- match.arg(type)
+  is_state <- type == "latent_state"
+  if (is_state) {
+    require_closure_unit_predict_type(object$family, type)
+  }
   checkmate::assert_flag(coef_uncertainty)
   checkmate::assert_flag(trend_uncertainty)
   checkmate::assert_flag(obs_uncertainty)
@@ -168,11 +181,22 @@ forecast.mvgam <- function(object,
 
   # The hindcast slot holds the fitted states, as hindcast() does with
   # `process_error = FALSE`. The two then agree on the training grid.
-  hindcasts <- build_hindcast_arms(
-    object, training, type, draw_idx, obs_uncertainty,
-    process_error = FALSE, resp = resp, series_levels = reported,
-    component = component
-  )
+  # A latent state's forecast maps the forecast predictor to the state
+  # of each occasion, unconditioned on visits that have not happened.
+  hindcasts <- if (is_state) {
+    latent_state_hindcast_arms(object, training, draw_idx, reported)
+  } else {
+    build_hindcast_arms(
+      object, training, type, draw_idx, obs_uncertainty,
+      process_error = FALSE, resp = resp, series_levels = reported,
+      component = component
+    )
+  }
+  state_of <- if (is_state) {
+    function(whole, trend, frame) {
+      occasion_state_rows(object, whole, frame, draw_idx)
+    }
+  }
 
   forecasts <- if (is.null(fc_grid)) {
     NULL
@@ -185,7 +209,8 @@ forecast.mvgam <- function(object,
       obs_uncertainty = obs_uncertainty,
       series_levels = reported,
       resp = resp,
-      group_level = setup$group_level
+      group_level = setup$group_level,
+      effect_of = state_of
     )
   } else {
     build_forecast_arms(
@@ -204,7 +229,8 @@ forecast.mvgam <- function(object,
       resp = resp,
       reported = reported,
       component = component,
-      group_level = setup$group_level
+      group_level = setup$group_level,
+      effect_of = state_of
     )
   }
 
@@ -351,10 +377,11 @@ forecast_parts_of <- function(object, setup, coef_uncertainty,
       i = "Pass a frame holding future times in 'newdata'."
     )), call. = FALSE)
   }
+  # The parts are split at each occasion, which the forecast times list
   if (is.null(setup$trend_model)) {
     return(build_trendless_forecast_arms(
       object, setup$fc_grid, "link", setup$draw_idx, TRUE, setup$reported,
-      resp, setup$group_level, parts = TRUE
+      resp, setup$group_level, parts = TRUE, per_row = FALSE
     ))
   }
   build_forecast_arms(
@@ -366,7 +393,7 @@ forecast_parts_of <- function(object, setup, coef_uncertainty,
     trend_uncertainty = trend_uncertainty, obs_uncertainty = TRUE,
     series_levels = setup$series_levels, resp = resp,
     reported = setup$reported, group_level = setup$group_level, parts = TRUE,
-    replicates = replicates
+    replicates = replicates, per_row = FALSE
   )
 }
 
@@ -564,9 +591,10 @@ build_training_arms <- function(object, series_levels, resp = NULL,
 #' The time of each column of a hindcast or forecast matrix
 #'
 #' A closure-unit family's `expected` and `response` predictions take
-#' one column per visit row. Every other type takes one column per
-#' occasion. `plot()`, `summary()` and `score()` pair each column with
-#' its time by position.
+#' one column per visit row, as does the `link` of a multi-season fit.
+#' Every other type takes one column per occasion. `plot()`,
+#' `summary()` and `score()` pair each column with its time by
+#' position.
 #'
 #' @param object A fitted `mvgam` object
 #' @param type The prediction type
@@ -585,8 +613,10 @@ column_times <- function(object, type, resp, grid) {
 #'
 #' A closure-unit family has one row per visit. Its detection-
 #' marginalised `expected` and `response` predictions vary by visit.
-#' `trend` and `link` belong to the occasion. The response's own family
-#' decides: a multivariate fit's top-level family is a placeholder.
+#' `trend` belongs to the occasion. So does `link`, except in a
+#' multi-season fit, whose sites share an occasion and differ in their
+#' covariates. The response's own family decides: a multivariate fit's
+#' top-level family is a placeholder.
 #'
 #' @param object A fitted `mvgam` object
 #' @param type The prediction type
@@ -595,8 +625,10 @@ column_times <- function(object, type, resp, grid) {
 #' @noRd
 hindcast_per_row <- function(object, type, resp) {
   checkmate::assert_string(type)
-  type %in% c("expected", "response") &&
-    uses_closure_unit_layout(model_families(object, resp))
+  family <- model_families(object, resp)
+  uses_closure_unit_layout(family) &&
+    (type %in% c("expected", "response") ||
+       (type == "link" && is_multi_season_family(family)))
 }
 
 
@@ -921,9 +953,11 @@ build_hindcast_arms <- function(object, training, type, draw_idx,
 #' added to the trend gives the `link` hindcast. A fit without a trend
 #' takes a zero trend. A closure-unit family's `expected` and `response`
 #' marginalise over the latent state of each unit. `posterior_epred()`
-#' and `posterior_predict()` give those per visit row.
-#' `process_error = TRUE` takes the marginal draws of those functions
-#' for every family.
+#' and `posterior_predict()` give those per visit row, as
+#' `posterior_linpred()` gives a multi-season `link`. With
+#' `process_error = FALSE` they condition on the fitted trend, as the
+#' other types do. `process_error = TRUE` takes the marginal draws of
+#' those functions for every family.
 #'
 #' @inheritParams build_hindcast_arms
 #' @param sub_data Rows of the training frame
@@ -940,7 +974,8 @@ hindcast_draws <- function(object, sub_data, type, draw_idx,
   if (hindcast_per_row(object, type, resp)) {
     full <- predictor_for_type(type, sample_family)(
       object, newdata = sub_data, draw_ids = draw_idx,
-      process_error = process_error, resp = resp
+      process_error = process_error, incl_autocor = !process_error,
+      resp = resp
     )
   } else if (process_error) {
     # The marginal draws, with fresh innovations in place of the fitted
@@ -986,6 +1021,59 @@ hindcast_draws <- function(object, sub_data, type, draw_idx,
 }
 
 
+#' The hindcast of each series' latent state
+#'
+#' The state of each closure unit given its visits and the fitted trend,
+#' as `hindcast(type = "latent_state")` gives it. The units of each
+#' occasion are averaged. Each series then takes one column per training
+#' occasion, in time order.
+#'
+#' @param object A fitted `mvgam` object with a closure-unit family
+#' @param training The training data from `build_training_arms()`
+#' @param draw_idx Indices of the draws to keep
+#' @param series_levels The series to report
+#' @return Named list of draws matrices, one per series
+#' @noRd
+latent_state_hindcast_arms <- function(object, training, draw_idx,
+                                       series_levels) {
+  checkmate::assert_list(training)
+  hc <- hindcast_latent_state(object, draw_ids = draw_idx)
+  pooled <- pool_units_by_occasion(hc$draws, hc$unit)
+  lapply(stats::setNames(nm = series_levels), function(lv) {
+    cols <- which(pooled$occasions$series == lv)
+    if (length(cols) != length(training$times[[lv]])) {
+      stop_shape_fault(paste0("The latent-state occasions of '", lv, "'"),
+                       length(cols), length(training$times[[lv]]))
+    }
+    pooled$draws[, cols, drop = FALSE]
+  })
+}
+
+
+#' The latent state of each occasion, at the grain of the frame's rows
+#'
+#' The state of each closure unit comes from the covariates and the
+#' supplied predictor, unconditioned on visits, as at a future
+#' occasion. The units of an occasion are averaged. Every row of the
+#' occasion holds that mean, which the per-occasion columns of
+#' `slice_per_series()` take.
+#'
+#' @param object A fitted `mvgam` object with a closure-unit family
+#' @param linpred `[S x N_row]` predictor at the rows of `frame`
+#' @param frame The frame of visit rows
+#' @param draw_idx Indices of the draws `linpred` holds
+#' @return `[S x N_row]` matrix
+#' @noRd
+occasion_state_rows <- function(object, linpred, frame, draw_idx) {
+  frame <- closure_unit_frame(object, frame)
+  state <- posterior_latent_N(object, newdata = frame, draw_ids = draw_idx,
+                              conditional = FALSE, linpred = linpred)
+  arrays <- closure_unit_arrays_for(object, frame)
+  pooled <- pool_units_by_occasion(state, closure_unit_meta(object, arrays))
+  pooled$draws[, pooled$unit_occasion[arrays$row_unit], drop = FALSE]
+}
+
+
 #' The prediction function that gives draws of a type
 #'
 #' @param type `"link"`, `"expected"` or `"response"`
@@ -1014,8 +1102,8 @@ predictor_for_type <- function(type, sample_family) {
 #'
 #' @param object A fitted `mvgam` object
 #' @param fc_grid The forecast grid
-#' @param type "link", "expected" or "response". `forecast.mvgam()`
-#'   refuses "trend" for a trendless fit.
+#' @param type "link", "expected", "response" or "latent_state".
+#'   `forecast.mvgam()` refuses "trend" for a trendless fit.
 #' @param draw_idx Indices of the draws to keep
 #' @param obs_uncertainty Whether `type = "response"` samples the
 #'   family
@@ -1025,6 +1113,9 @@ predictor_for_type <- function(type, sample_family) {
 #'   `sample_new_levels`
 #' @param parts Whether to return what `forecast_parts_of()` gives, in
 #'   place of the draws of `type`
+#' @param effect_of As `build_forecast_arms()` takes it, applied to the
+#'   linear predictor with a `NULL` trend. `"latent_state"` needs one.
+#' @param per_row As `build_forecast_arms()` takes it
 #' @return Named list of draws matrices, one per series
 #' @noRd
 build_trendless_forecast_arms <- function(object, fc_grid, type,
@@ -1033,16 +1124,23 @@ build_trendless_forecast_arms <- function(object, fc_grid, type,
                                           series_levels,
                                           resp = NULL,
                                           group_level = list(),
-                                          parts = FALSE) {
-  checkmate::assert_choice(type, c("link", "expected", "response"))
+                                          parts = FALSE,
+                                          effect_of = NULL,
+                                          per_row = hindcast_per_row(
+                                            object, type, resp
+                                          )) {
+  checkmate::assert_choice(type, c("link", "expected", "response",
+                                   "latent_state"))
   checkmate::assert_list(fc_grid)
   checkmate::assert_flag(parts)
+  checkmate::assert_function(effect_of, null.ok = type != "latent_state")
+  checkmate::assert_flag(per_row)
   fc_data <- fc_grid$data
   structure <- get_observation_structure(object, newdata = fc_data,
                                          resp = resp)
   arms_of <- function(mat) {
     slice_per_series(mat, fc_grid, structure, length(draw_idx), series_levels,
-                     per_row = hindcast_per_row(object, type, resp))
+                     per_row = per_row)
   }
   if (parts) {
     obs <- do.call(extract_component_parts, c(
@@ -1053,12 +1151,16 @@ build_trendless_forecast_arms <- function(object, fc_grid, type,
     return(list(obs = obs, trend = list(), latent = list(list()),
                 frame = fc_data, slice = arms_of))
   }
-  # Scoped to one response, which gives one draws matrix
-  arms_of(do.call(
-    predictor_for_type(type, type == "response" && obs_uncertainty),
+  # Scoped to one response, which gives one draws matrix. `effect_of`
+  # takes the linear predictor, as in `build_forecast_arms()`.
+  predict_type <- if (is.null(effect_of)) type else "link"
+  draws <- do.call(
+    predictor_for_type(predict_type,
+                       predict_type == "response" && obs_uncertainty),
     c(list(object, newdata = fc_data, draw_ids = draw_idx, resp = resp),
       group_level)
-  ))
+  )
+  arms_of(if (is.null(effect_of)) draws else effect_of(draws, NULL, fc_data))
 }
 
 
@@ -1095,6 +1197,10 @@ build_trendless_forecast_arms <- function(object, fc_grid, type,
 #' @param effect_of Function of the whole predictor, the `component` and
 #'   the frame, all in the rows of the grid. It gives the draws to
 #'   return. `NULL` returns the draws of `type`.
+#' @param per_row Whether each row of the grid keeps its own column.
+#'   Otherwise each occasion takes its first row. The default follows
+#'   `type`. A caller whose `effect_of` gives one value per occasion
+#'   passes `FALSE`.
 #' @return Named list of draws matrices, one per reported series
 #' @noRd
 build_forecast_arms <- function(object, trend_model, meta,
@@ -1110,12 +1216,15 @@ build_forecast_arms <- function(object, trend_model, meta,
                                 group_level = list(),
                                 parts = FALSE,
                                 replicates = 1L,
-                                effect_of = NULL) {
+                                effect_of = NULL,
+                                per_row = hindcast_per_row(object, type,
+                                                           resp)) {
   checkmate::assert_list(fc_grid)
   checkmate::assert_integerish(draw_idx, lower = 1L, min.len = 1L)
   checkmate::assert_flag(parts)
   checkmate::assert_count(replicates, positive = TRUE)
   checkmate::assert_function(effect_of, null.ok = TRUE)
+  checkmate::assert_flag(per_row)
   checkmate::assert_flag(coef_uncertainty)
   checkmate::assert_flag(trend_uncertainty)
   checkmate::assert_flag(obs_uncertainty)
@@ -1134,7 +1243,6 @@ build_forecast_arms <- function(object, trend_model, meta,
   # One step per occasion of the forecast grid. Series forecast at
   # their own times make the union longer than any one series.
   h_max <- length(obs_struct_fc$unique_times)
-  per_row <- hindcast_per_row(object, type, resp)
   arms_of <- function(mat) {
     slice_per_series(mat, fc_grid, obs_struct_fc, ndraws_use, reported,
                      per_row = per_row)
@@ -1748,7 +1856,9 @@ pw_cap_link_family <- function(families) {
 #' @param ndraws_use Number of draws
 #' @param series_levels The series to report
 #' @param per_row Whether each visit row of a closure unit keeps its
-#'   own column. Otherwise each occasion takes its first row.
+#'   own column. Otherwise each occasion takes the mean of its rows. An
+#'   occasion of one row, or of visits sharing one value, keeps that
+#'   value. The sites of a multi-season occasion are averaged.
 #' @return Named list of `[ndraws_use, h_s]` matrices, one column per
 #'   forecast time of each series, or per row with `per_row`
 #' @noRd
@@ -1768,16 +1878,17 @@ slice_per_series <- function(mat, fc_grid, obs_struct,
       obs_struct$series_int == match(lv, obs_struct$series_levels)
     )
     if (per_row) return(mat[, rows, drop = FALSE])
-    cells <- rows[match(as.numeric(ts), raw_times[rows])]
-    if (anyNA(cells)) {
+    occasion <- match(raw_times[rows], as.numeric(ts))
+    absent <- setdiff(seq_along(ts), occasion)
+    if (length(absent)) {
       stop_mvgam_fault(
         "Every forecast occasion needs a row in the forecast grid.",
         paste0("Series '", lv, "' at ",
-               format(ts[is.na(cells)][1L], trim = TRUE),
+               format(ts[absent[1L]], trim = TRUE),
                " is absent from the grid.")
       )
     }
-    mat[, cells, drop = FALSE]
+    group_column_means(mat[, rows, drop = FALSE], occasion)
   })
   names(out) <- series_levels
   out
