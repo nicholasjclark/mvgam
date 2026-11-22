@@ -203,6 +203,26 @@ model_families <- function(object, resp = NULL) {
   if (length(families) == 1L) families[[1L]] else families
 }
 
+#' The observations each response of a model contributes
+#'
+#' Each response of a multivariate model keeps the rows where it was
+#' observed. Protocols surveyed on different schedules then contribute
+#' different numbers of observations. The Stan data record each count
+#' as `N_<key>`, under brms's key for the response.
+#'
+#' @param object A fitted `mvgam` or a prefit.
+#' @return Integer vector named by response key, or `NULL` for a model
+#'   with one response.
+#' @noRd
+observed_by_response <- function(object) {
+  checkmate::assert_class(object, "mvgam")
+  keys <- names(response_columns(object))
+  if (length(keys) < 2L) return(NULL)
+  counts <- object$standata[paste0("N_", keys)]
+  if (any(vapply(counts, is.null, logical(1L)))) return(NULL)
+  stats::setNames(vapply(counts, as.integer, integer(1L)), keys)
+}
+
 #' Check the response a caller named against the model's own
 #'
 #' Every method taking `resp` checks that it names one of the model's

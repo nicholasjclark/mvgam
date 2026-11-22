@@ -236,6 +236,7 @@ summary.mvgam <- function(object, probs = c(0.025, 0.975),
   # The rows the model was given, or the units of a closure-unit
   # family. On a ragged design this is fewer than series x times.
   out$nobs <- nobs(object)
+  out$nobs_by_resp <- observed_by_response(object)
 
   out$data_name <- object$data.name
 
@@ -618,6 +619,25 @@ print_family_links <- function(x) {
   invisible(fams)
 }
 
+#' The observation count in the data line of `summary()`
+#'
+#' Responses observed on different rows each report their own count
+#' after the row count.
+#'
+#' @param nobs The rows the model was given.
+#' @param by_resp Integer vector of the observations of each response,
+#'   named by response key, or `NULL`.
+#' @return Character scalar.
+#' @noRd
+format_nobs <- function(nobs, by_resp = NULL) {
+  checkmate::assert_count(nobs)
+  checkmate::assert_integerish(by_resp, names = "named", null.ok = TRUE)
+  out <- paste0("Number of observations: ", nobs)
+  if (is.null(by_resp) || all(by_resp == nobs)) return(out)
+  paste0(out, "; observed ",
+         paste0(names(by_resp), ": ", by_resp, collapse = ", "))
+}
+
 #' @param x An `mvgam_summary` object.
 #' @param digits Integer number of decimal places. Defaults to 2.
 #' @rdname summary.mvgam
@@ -633,13 +653,8 @@ print.mvgam_summary <- function(x, digits = 2, ...) {
   cat("Formula: ", paste0(formulas, collapse = " \n         "), " \n",
       sep = "")
 
-  nobs <- x$nobs
-  if (!is.null(x$data_name)) {
-    cat("   Data: ", x$data_name, " (Number of observations: ", nobs, ") \n",
-        sep = "")
-  } else {
-    cat("   Data: (Number of observations: ", nobs, ") \n", sep = "")
-  }
+  cat("   Data: ", if (!is.null(x$data_name)) paste0(x$data_name, " "),
+      "(", format_nobs(x$nobs, x$nobs_by_resp), ") \n", sep = "")
 
   if (!is.null(x$n_series) && x$n_series > 1) {
     # The colons align under "Formula: "

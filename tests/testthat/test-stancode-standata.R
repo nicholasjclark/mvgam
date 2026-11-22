@@ -3041,6 +3041,24 @@ test_that("multi-response fits with NA preserve per-response valid rows", {
   # has different NA rows.
   expect_false(sd$N_count == sd$N_biomass &&
                  sd$N_biomass == sd$N_camera)
+
+  # summary() reports each response's count after the row count
+  prefit <- withCallingHandlers(
+    mvgam(f, trend_formula = ~ AR(p = 1), data = dat, run_model = FALSE),
+    warning = function(w) {
+      if (grepl("Rows containing NAs", conditionMessage(w))) {
+        invokeRestart("muffleWarning")
+      }
+    }
+  )
+  by_resp <- observed_by_response(prefit)
+  expect_identical(by_resp, c(count = 18L, biomass = 18L, camera = 16L))
+  expect_identical(
+    format_nobs(T_, by_resp),
+    "Number of observations: 20; observed count: 18, biomass: 18, camera: 16"
+  )
+  expect_identical(format_nobs(T_, c(a = 20L, b = 20L)),
+                   "Number of observations: 20")
 })
 
 
