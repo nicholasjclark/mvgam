@@ -11,10 +11,21 @@ program and the data a fit would use. Nothing is compiled or sampled.
 ## Usage
 
 ``` r
+# S3 method for class 'mvgam_formula'
+print(x, ...)
+
 mvgam_formula(formula, trend_formula = NULL)
 ```
 
 ## Arguments
+
+- x:
+
+  An `mvgam_formula` object.
+
+- ...:
+
+  Unused.
 
 - formula:
 
@@ -30,32 +41,67 @@ mvgam_formula(formula, trend_formula = NULL)
 ## Value
 
 An object of class `mvgam_formula` holding `formula` and
-`trend_formula`.
+`trend_formula`. [`print()`](https://rdrr.io/r/base/print.html) shows
+the two formulas.
 
 ## Details
 
-A trend formula holds one trend constructor
-([trend_constructors](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md)).
-It can also hold covariates of the trend, smooths such as `s()` and
-`t2()`, random effects such as `(1 | group)` and Gaussian processes
-through `gp()`.
+The observation formula takes the brms syntax, with distributional and
+non-linear sub-formulas through
+[`bf()`](https://paulbuerkner.com/brms/reference/brmsformula.html). It
+refuses:
 
-Some terms describe how the response was observed. They belong in the
-observation formula. A trend formula refuses them:
+- a trend constructor such as
+  [`AR()`](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md).
+  It belongs in `trend_formula`.
 
-- addition terms such as
-  [`weights()`](https://rdrr.io/r/stats/weights.html), `se()`, `cens()`,
-  [`trunc()`](https://rdrr.io/r/base/Round.html), `trials()`, `rate()`,
-  [`subset()`](https://rdrr.io/r/base/subset.html) and `thres()`
+- `.`, which would enter the time and series columns as predictors
 
-- [`offset()`](https://rdrr.io/r/stats/offset.html)
+- `rate()` and `se()`. Predictions leave them out. Write an exposure as
+  `offset(log(area))`.
 
-- `mi()`, which brms imputes as a response of the model
+- [`subset()`](https://rdrr.io/r/base/subset.html) and `index()`. A
+  response leaves rows out by holding `NA` there.
 
 - the brms autocorrelation terms
   [`ar()`](https://rdrr.io/r/stats/ar.html), `ma()`, `arma()`, `cosy()`,
-  `unstr()` and `autocor()`. The trend constructor models dependence
-  over time in their place.
+  `unstr()` and `autocor()`. Predictions, forecasts and
+  [`loo()`](https://mc-stan.org/loo/reference/loo.html) leave them out.
+  The trend constructor models dependence over time.
+
+A trend formula holds one trend constructor
+([trend_constructors](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md)),
+added as a term of its own, as in `~ x + AR()` or `~ x + mvgam::AR()`.
+It also holds covariates of the latent state: smooths such as `s()` and
+`t2()`, random effects such as `(1 | group)` and Gaussian processes
+through `gp()`.
+[`lv_axis()`](https://nicholasjclark.github.io/mvgam/dev/reference/lv_axis.md)
+in a term varies its effect by latent factor, or by series in a model
+without factors. It refuses:
+
+- a response, a second trend constructor and
+  [`bf()`](https://paulbuerkner.com/brms/reference/brmsformula.html)
+  sub-formulas
+
+- a constructor inside another term, as in `x:AR()` or
+  `s(x, by = AR())`, or subtracted, as in `- AR()`
+
+- the series column.
+  [`lv_axis()`](https://nicholasjclark.github.io/mvgam/dev/reference/lv_axis.md)
+  takes its place.
+
+- a response of the observation formula as a covariate
+
+- [`offset()`](https://rdrr.io/r/stats/offset.html) and addition terms
+  such as [`weights()`](https://rdrr.io/r/stats/weights.html), `cens()`,
+  [`trunc()`](https://rdrr.io/r/base/Round.html), `trials()` and
+  `thres()`. They describe how the response was observed.
+
+- `mi()`, which brms imputes as a response
+
+- `cs()`, which shifts an ordinal response's thresholds
+
+- the brms autocorrelation terms
 
 ## Multivariate models
 

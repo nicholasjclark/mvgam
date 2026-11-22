@@ -113,32 +113,32 @@ summary(mod)
 #> Multilevel Hyperparameters:
 #> ~lake (Number of levels: 5)
 #>               Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> sd(Intercept)     1.99      0.80     0.95     3.89 1.00     1007     1372
-#> sd(treated)       1.09      0.69     0.09     2.83 1.00      421      266
+#> sd(Intercept)     2.01      0.89     0.91     4.38 1.00      994     1199
+#> sd(treated)       1.14      0.68     0.29     2.85 1.00     1082     1010
 #> 
 #> Regression Coefficients:
 #>           Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> Intercept     0.18      0.87    -1.56     1.90 1.00      671      999
-#> treated      -0.37      0.64    -1.67     0.87 1.00      753      772
+#> Intercept     0.18      0.90    -1.56     2.15 1.00      671      876
+#> treated      -0.40      0.68    -1.77     1.09 1.00      687      506
 #> 
 #> Further Distributional Parameters:
 #>       Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> sigma     0.41      0.03     0.35     0.46 1.01      364      689
+#> sigma     0.41      0.03     0.35     0.46 1.01      424      612
 #> 
 #> == Trend Model ==
 #> Trend Specific Parameters:
 #>                      Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS
-#> sigma_trend[alpine]      0.34      0.08     0.21     0.50 1.00      519
-#> sigma_trend[boreal]      0.26      0.06     0.17     0.39 1.00      937
-#> sigma_trend[coastal]     0.24      0.06     0.14     0.37 1.00      699
-#> sigma_trend[delta]       0.35      0.07     0.22     0.51 1.00      668
-#> sigma_trend[estuary]     0.34      0.07     0.21     0.51 1.00      883
+#> sigma_trend[alpine]      0.33      0.08     0.21     0.51 1.00      469
+#> sigma_trend[boreal]      0.26      0.05     0.17     0.38 1.00     1178
+#> sigma_trend[coastal]     0.24      0.06     0.14     0.37 1.00      957
+#> sigma_trend[delta]       0.34      0.07     0.22     0.49 1.00     1168
+#> sigma_trend[estuary]     0.34      0.07     0.21     0.49 1.00      747
 #>                      Tail_ESS
-#> sigma_trend[alpine]       993
-#> sigma_trend[boreal]      1383
-#> sigma_trend[coastal]     1297
-#> sigma_trend[delta]       1142
-#> sigma_trend[estuary]     1172
+#> sigma_trend[alpine]      1222
+#> sigma_trend[boreal]      1496
+#> sigma_trend[coastal]     1553
+#> sigma_trend[delta]       1385
+#> sigma_trend[estuary]     1057
 #> 
 #> Draws were sampled using sampling(NUTS). For each parameter, Bulk_ESS
 #> and Tail_ESS are effective sample size measures, and Rhat is the potential
@@ -146,7 +146,7 @@ summary(mod)
 #> 
 #> Next steps:
 #>   - `pp_check(fit)`: posterior predictive checks
-#>   - `residual_cor(fit)`: implied cross-series correlations
+#>   - `residual_cor(fit)`: implied correlations among series
 #>   - `forecast(fit, newdata = ...)`: out-of-sample forecasts
 #>   - `lfo_cv(fit)`: leave-future-out model comparison
 #>   - `conditional_effects(fit)`: covariate effects

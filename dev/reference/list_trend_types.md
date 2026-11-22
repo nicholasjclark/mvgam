@@ -1,4 +1,4 @@
-# List Available Trend Types
+# List the available trend types
 
 List all registered trend types and their factor model support.
 
@@ -17,6 +17,6 @@ Data frame with trend types and their properties
 Other trend models:
 [`LLT()`](https://nicholasjclark.github.io/mvgam/dev/reference/LLT.md),
 [`PW()`](https://nicholasjclark.github.io/mvgam/dev/reference/piecewise_trends.md),
-[`RW()`](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md),
 [`ZMVN()`](https://nicholasjclark.github.io/mvgam/dev/reference/ZMVN.md),
-[`lv_axis()`](https://nicholasjclark.github.io/mvgam/dev/reference/lv_axis.md)
+[`lv_axis()`](https://nicholasjclark.github.io/mvgam/dev/reference/lv_axis.md),
+[`print.mvgam_trend()`](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md)

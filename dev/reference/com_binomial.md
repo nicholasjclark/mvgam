@@ -139,7 +139,7 @@ fit <- mvgam(
   chains = 2,
   silent = 2
 )
-#> Warning: 1 of 2000 (0.0%) transitions ended with a divergence.
+#> Warning: 6 of 2000 (0.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 
 # The posterior for `nu` lies above the binomial's value of 1
@@ -154,16 +154,16 @@ summary(fit)
 #> == Observation Model ==
 #> Smoothing Spline Hyperparameters:
 #>           Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> sds(sx_1)     4.48      1.59     2.24     8.24 1.00      774     1054
+#> sds(sx_1)     4.42      1.65     2.19     8.50 1.00      810      594
 #> 
 #> Regression Coefficients:
 #>           Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> Intercept    -0.12      0.10    -0.32     0.07 1.00     2116     1211
-#> sx_1         -3.11      5.64   -14.18     8.56 1.00      992     1234
+#> Intercept    -0.11      0.10    -0.30     0.08 1.00     2743     1466
+#> sx_1         -2.71      5.89   -13.99     9.66 1.00      801      469
 #> 
 #> Further Distributional Parameters:
 #>    Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> nu     3.11      0.39     2.39     3.91 1.00     1944     1644
+#> nu     3.11      0.39     2.40     3.92 1.00     2042     1128
 #> 
 #> Draws were sampled using sampling(NUTS). For each parameter, Bulk_ESS
 #> and Tail_ESS are effective sample size measures, and Rhat is the potential

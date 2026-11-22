@@ -40,13 +40,22 @@ kfold(
   silent = 1L,
   ...
 )
+
+# S3 method for class 'mvgam_kfold'
+print(x, digits = 2L, ...)
+
+# S3 method for class 'mvgam_kfold'
+summary(object, ...)
+
+# S3 method for class 'mvgam_kfold'
+plot(x, ...)
 ```
 
 ## Arguments
 
 - x:
 
-  A fitted `mvgam` object.
+  A fitted `mvgam` object, or for the methods an `mvgam_kfold` object.
 
 - K:
 
@@ -102,6 +111,14 @@ kfold(
 
   Unused. Anything passed here is refused.
 
+- digits:
+
+  Integer number of decimal places. Defaults to 2.
+
+- object:
+
+  An `mvgam_kfold` object.
+
 ## Value
 
 A `c("mvgam_kfold", "kfold", "loo")` object, which
@@ -130,6 +147,21 @@ results. It holds:
 - `pareto_k_threshold`: the threshold applied, with
   `pareto_k_threshold_adaptive` `TRUE` when the default rule set it.
 
+[`print()`](https://rdrr.io/r/base/print.html) shows the ELPD with its
+standard error, the folds and refits and the Pareto k of the PSIS
+estimates. It then names the groups with the lowest ELPD and the
+refitted groups whose ELPD moved most from the PSIS estimate.
+[`summary()`](https://rdrr.io/r/base/summary.html) returns a tibble with
+one row per held-out group: `group`, its `elpd` and `elpd_share` of the
+total, for a refitted group `elpd_psis` and the `lift` of the refit over
+it, `pareto_k` and `refit`.
+[`plot()`](https://rdrr.io/r/graphics/plot.default.html) draws the ELPD
+of each group and its Pareto k, as
+[`plot.mvgam_lfo()`](https://nicholasjclark.github.io/mvgam/dev/reference/lfo_cv.mvgam.md)
+does for time blocks. Dark red points mark a Pareto k above the dashed
+threshold, where PSIS is unreliable. In the ELPD panel they mark the
+groups below the 15% quantile.
+
 ## References
 
 Burkner, P.-C., Gabry, J. and Vehtari, A. (2020). Approximate
@@ -147,11 +179,8 @@ and Computing*, 27:1413-1432.
 [`loo.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/loo.mvgam.md)
 approximates leave-one-out cross-validation.
 [`lfo_cv.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/lfo_cv.mvgam.md)
-scores forecasts from rolling origins.
-[`summary.mvgam_kfold()`](https://nicholasjclark.github.io/mvgam/dev/reference/summary.mvgam_kfold.md)
-and
-[`plot.mvgam_kfold()`](https://nicholasjclark.github.io/mvgam/dev/reference/plot.mvgam_kfold.md)
-report each group. The [forecast evaluation
+scores forecasts from rolling origins. `summary.mvgam_kfold()` and
+`plot.mvgam_kfold()` report each group. The [forecast evaluation
 article](https://nicholasjclark.github.io/mvgam/dev/articles/forecast_evaluation.html)
 compares models by cross-validation.
 
@@ -183,7 +212,7 @@ mod <- mvgam(y ~ s(season, bs = "cc"),
               data    = simdat$data_train,
               family  = gaussian(),
               chains  = 2, silent = 2)
-#> Warning: 67 of 2000 (3.0%) transitions ended with a divergence.
+#> Warning: 4 of 2000 (0.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 
 # Neighbouring times share information through the trend. Folds of
@@ -192,33 +221,33 @@ mod <- mvgam(y ~ s(season, bs = "cc"),
 blocks <- cut(simdat$data_train$time, breaks = 4L, labels = FALSE)
 k <- kfold(mod, folds = blocks)
 #> kfold: refitting 4 fold(s) ...
-#> Warning: 7 of 2000 (0.0%) transitions ended with a divergence.
+#> Warning: 95 of 2000 (5.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
-#> Warning: 20 of 2000 (1.0%) transitions ended with a divergence.
+#> Warning: 1 of 2 chains had an E-BFMI less than 0.3.
 #> See https://mc-stan.org/misc/warnings for details.
-#> Warning: 2 of 2 chains had an E-BFMI less than 0.3.
+#> Warning: 10 of 2000 (0.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
-#> Warning: 7 of 2000 (0.0%) transitions ended with a divergence.
+#> Warning: 19 of 2000 (1.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
-#> Warning: 5 of 2000 (0.0%) transitions ended with a divergence.
+#> Warning: 31 of 2000 (2.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 k
 #> mvgam k-fold cross-validation
-#>   elpd_kfold : -135.38 (SE 9.61)
-#>   kfoldic    : 270.76 (SE 19.21)
+#>   elpd_kfold : -132.64 (SE 9.48)
+#>   kfoldic    : 265.28 (SE 18.96)
 #>   groups     : 4 (fold)
 #>   refits     : 4 of 4 folds
-#>   Pareto k   : max 1.76, median 1.18, threshold 0.70 (adaptive)
+#>   Pareto k   : max 1.45, median 1.14, threshold 0.70 (adaptive)
 #> 
 #> Lowest ELPD (share of the total):
-#>   2                    -39.64 (29.3%)
-#>   1                    -35.49 (26.2%)
-#>   4                    -31.75 (23.4%)
+#>   2                    -39.81 (30.0%)
+#>   1                    -33.09 (24.9%)
+#>   4                    -30.74 (23.2%)
 #> 
 #> Largest change from PSIS to refit:
-#>   1                    -31.38 -> -35.49
-#>   2                    -36.32 -> -39.64
-#>   4                    -29.31 -> -31.75
+#>   2                    -35.84 -> -39.81
+#>   4                    -29.04 -> -30.74
+#>   3                    -27.64 -> -29.00
 
 # The ELPD and Pareto k of each block
 plot(k)

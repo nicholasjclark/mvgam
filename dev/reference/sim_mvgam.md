@@ -20,6 +20,15 @@ sim_mvgam(
   family_pars = list(),
   seed = NULL
 )
+
+# S3 method for class 'mvgam_sim'
+summary(object, ...)
+
+# S3 method for class 'mvgam_sim_summary'
+print(x, digits = 3L, ...)
+
+# S3 method for class 'mvgam_sim'
+print(x, ...)
 ```
 
 ## Arguments
@@ -97,6 +106,22 @@ sim_mvgam(
   Optional integer seed. The session's random state is restored when the
   call returns.
 
+- object:
+
+  An `mvgam_sim` object.
+
+- ...:
+
+  Unused. Anything passed here is refused.
+
+- x:
+
+  An `mvgam_sim` object or its summary.
+
+- digits:
+
+  Integer number of significant digits. Defaults to 3.
+
 ## Value
 
 A list of class `"mvgam_sim"`:
@@ -131,6 +156,12 @@ A list of class `"mvgam_sim"`:
 - `true_sigma_obs`:
 
   The family's scale or dispersion, or `NA` for a family without one.
+
+[`summary()`](https://rdrr.io/r/base/summary.html) returns the design
+and these true parameters as an `mvgam_sim_summary` list, with the
+number of series, time points, training and test rows and the names of
+the true smooths. [`print()`](https://rdrr.io/r/base/print.html) shows
+that summary.
 
 ## Details
 

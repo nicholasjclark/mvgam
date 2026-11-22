@@ -22,6 +22,9 @@ active_factors(
   prob = 0.5,
   ...
 )
+
+# S3 method for class 'mvgam_active_factors'
+plot(x, ...)
 ```
 
 ## Arguments
@@ -50,6 +53,10 @@ active_factors(
   Numeric in `(0, 1)`. A dimension is reported active when its posterior
   probability of activity is at least `prob`. Defaults to `0.5`.
 
+- x:
+
+  An `mvgam_active_factors` object.
+
 ## Value
 
 A list with class `mvgam_active_factors` containing:
@@ -65,6 +72,12 @@ A list with class `mvgam_active_factors` containing:
 - `threshold`: list with `criterion`, `value` and `prob`.
 
 - `n_lv`: the number of factors the model was fitted with.
+
+[`print()`](https://rdrr.io/r/base/print.html) reports the posterior
+median count with its 95% interval.
+[`plot()`](https://rdrr.io/r/graphics/plot.default.html) draws the
+posterior probability that each dimension is active, largest first, with
+a dashed line at `prob`.
 
 ## Details
 
@@ -160,11 +173,11 @@ af
 #> 
 #> Posterior probability that each factor is active, largest first:
 #>  factor prob_active median_variance median_share is_active
-#>       1       1.000          9.3600        0.661      TRUE
-#>       2       1.000          4.0200        0.284      TRUE
-#>       3       0.110          0.5390        0.038     FALSE
-#>       4       0.001          0.1480        0.010     FALSE
-#>       5       0.000          0.0366        0.003     FALSE
+#>       1       1.000           9.370        0.664      TRUE
+#>       2       1.000           4.010        0.280      TRUE
+#>       3       0.083           0.526        0.037     FALSE
+#>       4       0.000           0.146        0.010     FALSE
+#>       5       0.000           0.037        0.003     FALSE
 plot(af)
 
 
@@ -177,11 +190,11 @@ active_factors(mod, criterion = "cumulative")
 #> 
 #> Posterior probability that each factor is active, largest first:
 #>  factor prob_active median_variance median_share is_active
-#>       1       1.000          9.3600        0.661      TRUE
-#>       2       1.000          4.0200        0.284      TRUE
-#>       3       0.054          0.5390        0.038     FALSE
-#>       4       0.000          0.1480        0.010     FALSE
-#>       5       0.000          0.0366        0.003     FALSE
+#>       1       1.000           9.370        0.664      TRUE
+#>       2       1.000           4.010        0.280      TRUE
+#>       3       0.037           0.526        0.037     FALSE
+#>       4       0.000           0.146        0.010     FALSE
+#>       5       0.000           0.037        0.003     FALSE
 
 # Next: ordinate() plots the species on the leading factors
 # }

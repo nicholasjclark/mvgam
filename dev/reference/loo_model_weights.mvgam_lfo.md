@@ -57,7 +57,7 @@ average Bayesian predictive distributions. *Bayesian Analysis* 13(3):
 [`lfo_cv()`](https://nicholasjclark.github.io/mvgam/dev/reference/lfo_cv.mvgam.md),
 [`ensemble.mvgam_forecast()`](https://nicholasjclark.github.io/mvgam/dev/reference/ensemble.mvgam_forecast.md),
 [`compare_elpds()`](https://nicholasjclark.github.io/mvgam/dev/reference/compare_elpds.md),
-[`plot.mvgam_compare_elpds()`](https://nicholasjclark.github.io/mvgam/dev/reference/plot.mvgam_compare_elpds.md)
+[`plot.mvgam_compare_elpds()`](https://nicholasjclark.github.io/mvgam/dev/reference/compare_elpds.md)
 
 ## Examples
 
@@ -72,27 +72,25 @@ simdat <- sim_mvgam(family = poisson(), n_series = 1L,
 # lfo_cv() refits it to shorter stretches of the series
 mod_gam <- mvgam(y ~ s(x, k = 5), data = simdat$data_train,
                  family = poisson(), chains = 2, silent = 2)
-#> Warning: 29 of 2000 (1.0%) transitions ended with a divergence.
+#> Warning: 16 of 2000 (1.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 mod_ar <- mvgam(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1),
                 data = simdat$data_train, family = poisson(),
                 chains = 2, silent = 2,
                 control = list(adapt_delta = 0.95))
-#> Warning: 2 of 2000 (0.0%) transitions ended with a divergence.
+#> Warning: 3 of 2000 (0.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 # }
 # \dontrun{
 # Each origin after t = 70 forecasts the next time step. The
 # pointwise log densities feed stacking weights
 lfo_gam <- lfo_cv(mod_gam, min_t = 70L, save_log_lik = TRUE)
-#> Warning: 21 of 2000 (1.0%) transitions ended with a divergence.
+#> Warning: 14 of 2000 (1.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 lfo_ar <- lfo_cv(mod_ar, min_t = 70L, save_log_lik = TRUE)
 #> Warning: 1 of 2000 (0.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
-#> Warning: 6 of 2000 (0.0%) transitions ended with a divergence.
-#> See https://mc-stan.org/misc/warnings for details.
-#> Warning: 5 of 2000 (0.0%) transitions ended with a divergence.
+#> Warning: 15 of 2000 (1.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 
 # Pseudo-BMA weights come from the summed ELPDs
@@ -110,8 +108,8 @@ w
 #> Method: stacking
 #> ------
 #>     weight
-#> GAM 0.177 
-#> AR  0.823 
+#> GAM 0.173 
+#> AR  0.827 
 
 # The stacking weights combine the two forecasts
 fc <- ensemble(forecast(mod_gam, newdata = simdat$data_test),

@@ -84,9 +84,9 @@ fits per-factor trait and covariate effects.
 Other trend models:
 [`LLT()`](https://nicholasjclark.github.io/mvgam/dev/reference/LLT.md),
 [`PW()`](https://nicholasjclark.github.io/mvgam/dev/reference/piecewise_trends.md),
-[`RW()`](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md),
 [`ZMVN()`](https://nicholasjclark.github.io/mvgam/dev/reference/ZMVN.md),
-[`list_trend_types()`](https://nicholasjclark.github.io/mvgam/dev/reference/list_trend_types.md)
+[`list_trend_types()`](https://nicholasjclark.github.io/mvgam/dev/reference/list_trend_types.md),
+[`print.mvgam_trend()`](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md)
 
 ## Examples
 
@@ -112,7 +112,7 @@ mod <- mvgam(
   chains        = 2,
   silent        = 2
 )
-#> Warning: 4 of 2000 (0.0%) transitions ended with a divergence.
+#> Warning: 19 of 2000 (1.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 summary(mod)
 #>  Family: gaussian 
@@ -127,38 +127,38 @@ summary(mod)
 #> == Observation Model ==
 #> Regression Coefficients:
 #>           Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> Intercept    -0.09      0.17    -0.39     0.25 1.00      376      479
+#> Intercept     0.09      0.25    -0.42     0.51 1.01      258      498
 #> 
 #> Further Distributional Parameters:
 #>       Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> sigma     0.98      0.10     0.79     1.17 1.01      299      450
+#> sigma     0.89      0.11     0.70     1.11 1.01      210      521
 #> 
 #> == Trend Model ==
 #> Regression Coefficients:
 #>                       Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS
-#> season:seriesseries_1     1.36      0.25     0.87     1.85 1.00     1740
-#> season:seriesseries_2     0.66      0.23     0.21     1.11 1.00     2130
-#> season:seriesseries_3    -1.32      0.27    -1.87    -0.81 1.00     1564
+#> season:seriesseries_1     1.32      0.24     0.86     1.82 1.00     1055
+#> season:seriesseries_2     0.71      0.31     0.10     1.34 1.00     1065
+#> season:seriesseries_3    -1.05      0.26    -1.59    -0.51 1.00     1388
 #>                       Tail_ESS
-#> season:seriesseries_1     1459
-#> season:seriesseries_2     1559
-#> season:seriesseries_3     1447
+#> season:seriesseries_1      594
+#> season:seriesseries_2     1146
+#> season:seriesseries_3     1257
 #> 
 #> Trend Specific Parameters:
 #>                       Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS
-#> sigma_trend[series_1]     0.38      0.18     0.06     0.77 1.02      231
-#> sigma_trend[series_2]     0.30      0.21     0.01     0.77 1.00      408
-#> sigma_trend[series_3]     0.45      0.24     0.08     0.96 1.01      349
-#> ar1_trend[series_1]       0.72      0.34    -0.34     0.99 1.01      315
-#> ar1_trend[series_2]      -0.00      0.40    -0.74     0.83 1.00     1079
-#> ar1_trend[series_3]       0.59      0.36    -0.32     0.98 1.01      297
+#> sigma_trend[series_1]     0.36      0.21     0.02     0.82 1.01      251
+#> sigma_trend[series_2]     0.72      0.25     0.15     1.19 1.01      251
+#> sigma_trend[series_3]     0.43      0.17     0.13     0.81 1.00      469
+#> ar1_trend[series_1]       0.38      0.50    -0.66     0.98 1.01      266
+#> ar1_trend[series_2]       0.50      0.30    -0.20     0.93 1.02      311
+#> ar1_trend[series_3]       0.77      0.22     0.17     0.98 1.00      419
 #>                       Tail_ESS
-#> sigma_trend[series_1]      224
-#> sigma_trend[series_2]      811
-#> sigma_trend[series_3]      288
-#> ar1_trend[series_1]        373
-#> ar1_trend[series_2]        749
-#> ar1_trend[series_3]        694
+#> sigma_trend[series_1]      449
+#> sigma_trend[series_2]      223
+#> sigma_trend[series_3]      543
+#> ar1_trend[series_1]        611
+#> ar1_trend[series_2]        494
+#> ar1_trend[series_3]        503
 #> 
 #> Draws were sampled using sampling(NUTS). For each parameter, Bulk_ESS
 #> and Tail_ESS are effective sample size measures, and Rhat is the potential
@@ -184,7 +184,7 @@ get_prior(
   family = gaussian()
 )
 #>                   prior     class           coef group resp dpar nlpar lb ub
-#>  student_t(3, 0.2, 2.5) Intercept                                           
+#>  student_t(3, 0.1, 2.5) Intercept                                           
 #>    student_t(3, 0, 2.5)     sigma                                       0   
 #>          normal(0, 0.5) ar1_trend                                      -1  1
 #>    student_t(3, 0, 0.5)         Z                                           

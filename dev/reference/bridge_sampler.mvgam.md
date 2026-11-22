@@ -123,23 +123,27 @@ mod_ar <- mvgam(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1),
                 data = simdat$data_train, family = poisson(),
                 save_pars = save_pars(all = TRUE), backend = "rstan",
                 chains = 2, iter = 3000, silent = 2)
-#> Warning: There were 21 divergent transitions after warmup. See
+#> Warning: There were 8 divergent transitions after warmup. See
 #> https://mc-stan.org/misc/warnings.html#divergent-transitions-after-warmup
 #> to find out why this is a problem and how to eliminate them.
 #> Warning: Examine the pairs() plot to diagnose sampling problems
 mod_rw <- update(mod_ar, trend_formula = ~ RW())
+#> Warning: There were 3 divergent transitions after warmup. See
+#> https://mc-stan.org/misc/warnings.html#divergent-transitions-after-warmup
+#> to find out why this is a problem and how to eliminate them.
+#> Warning: Examine the pairs() plot to diagnose sampling problems
 
 # The log marginal likelihood of each model
 bs_ar <- bridge_sampler(mod_ar, silent = TRUE)
 bs_rw <- bridge_sampler(mod_rw, silent = TRUE)
 bs_ar
-#> Bridge sampling estimate of the log marginal likelihood: -166.077
+#> Bridge sampling estimate of the log marginal likelihood: -166.0399
 #> Estimate obtained in 7 iteration(s) via method "normal".
 
 # A Bayes factor above 1 favours the AR(1) trend. Passing the
 # bridge objects reuses their estimates.
 bayes_factor(bs_ar, bs_rw)
-#> Estimated Bayes factor in favor of x1 over x2: 9.87397
+#> Estimated Bayes factor in favor of x1 over x2: 7.07457
 
 # Next, compare their forecasts with loo() or lfo_cv()
 # }

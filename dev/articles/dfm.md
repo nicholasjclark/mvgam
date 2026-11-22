@@ -1,16 +1,22 @@
 # Dynamic factor models
 
-Series measured together often move together. Sites in one habitat share
-weather. Species in one guild share resource pulses. A dynamic factor
-model describes that common variation with a small number of latent
-trends. It writes each series as a weighted sum of them (Zuur et
-al. [2003](https://doi.org/10.1002/env.611); Holmes et
-al. [2012](https://doi.org/10.32614/RJ-2012-002)). In mvgam the
-`trend_map` argument sets which series load on which trend. This
-vignette simulates six series from three trends and fits three models:
-one given the true loadings, one that estimates them and one that pools
-every series onto a single trend. Forecast scores on held-out data then
-compare the three.
+Time series collected together rarely evolve independently. Sites in the
+same habitat share their weather, just as species in the same guild
+share pulses of resources. Dynamic factor models capture this common
+variation by assuming that a small number of latent trends drive many
+observed series, with each series a weighted combination of those trends
+(Zuur et al. [2003](https://doi.org/10.1002/env.611); Holmes et al.
+[2012](https://doi.org/10.32614/RJ-2012-002)). In mvgam, the `trend_map`
+argument of a trend constructor controls which series load on which
+trends.
+
+This vignette works through a simulated example of six series driven by
+three trends. We fit three models to these data: one that is given the
+true loadings, one that estimates the loadings from the data and one
+that forces every series onto a single shared trend. Along the way, we
+show how to interpret estimated loadings, how to check whether a model
+describes its training data and how to compare competing models by their
+forecasts of held-out data.
 
 ## The model
 
@@ -43,8 +49,8 @@ trends than series, the model reduces the dimension of the problem.
 - A numeric matrix with one row per series and one column per trend.
   mvgam holds each number fixed and estimates each `NA`.
 
-The matrix form covers partial knowledge. Here five series have known
-loadings and the fifth series is free to load on any of three trends:
+The matrix form covers partial knowledge. Here series `s5` is free to
+load on any of three trends and the other five have known loadings:
 
 ``` r
 
@@ -58,19 +64,19 @@ Z_partial <- rbind(
 )
 ```
 
-Passed as `trend_map = Z_partial`, the fit estimates the three `NA`
+Passed as `AR(trend_map = Z_partial)`, the fit estimates the three `NA`
 entries. [`summary()`](https://rdrr.io/r/base/summary.html) lists them
 under `Factor Loadings`. A matrix of all `NA` estimates every loading,
-as shown later in this vignette.
+as `n_lv` alone does later in this vignette.
 
 ## Simulated data
 
-To compare the three models with known loadings, we simulated six series
+To compare the three models with known loadings, we simulate six series
 from three AR(1) trends. Trend 1 is strongly autocorrelated
 ($`\phi_1 = 0.85`$) and drives series 1 to 3. Trend 2 is weakly
 autocorrelated ($`\phi_2 = 0.15`$) and drives series 4 and 5. Trend 3
 ($`\phi_3 = 0.55`$) has the largest innovation SD and drives series 6
-alone. The last 15 of the 80 time points are held out.
+alone. We hold out the last 15 of the 80 time points.
 
 ``` r
 
@@ -111,7 +117,7 @@ test  <- sim_data[sim_data$time >  n_train, ]
 ```
 
 [`mvgam_data()`](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam_data.md)
-checks the training data and plots each series, with the held-out points
+checks the training data and plots each series, with the held-out data
 in black:
 
 ``` r
@@ -121,16 +127,16 @@ mvgam_data(train, family = gaussian(), trend_formula = ~ AR(),
 ```
 
 ![The six simulated series. Series 1 to 3 follow one trend, series 4 and
-5 a second, and series 6 a third. Black points after the dashed line are
-held out.](dfm_files/figure-html/plot-observed-1.png)
+5 a second, and series 6 a third. Black lines after the dashed line are
+the held-out data.](dfm_files/figure-html/plot-observed-1.png)
 
 The six simulated series. Series 1 to 3 follow one trend, series 4 and 5
-a second, and series 6 a third. Black points after the dashed line are
-held out.
+a second, and series 6 a third. Black lines after the dashed line are
+the held-out data.
 
 ## Fitting known loadings
 
-The first model is given the true grouping as a `data.frame`:
+We give the first model the true grouping as a `data.frame`:
 
 ``` r
 
@@ -148,8 +154,9 @@ tm_known
 #> 6     s6     3
 ```
 
-The observation formula holds an intercept alone. `AR(p = 1)` gives each
-of the three trends its own AR(1) process. Passing `newdata = test`
+The observation formula holds an intercept alone.
+`AR(p = 1, trend_map = tm_known)` gives each of the three trends its own
+AR(1) process and places the series on them. Passing `newdata = test`
 stores the held-out data on the fit for
 [`forecast()`](https://generics.r-lib.org/reference/forecast.html) to
 use later.
@@ -158,14 +165,14 @@ use later.
 
 fit_known <- mvgam(
   formula = y ~ 1,
-  trend_formula = ~ AR(p = 1),
-  trend_map = tm_known,
+  trend_formula = ~ AR(p = 1, trend_map = tm_known),
   data = train,
   newdata = test,
   family = gaussian(),
-  chains = 2L,
-  iter = 1000L,
-  warmup = 500L,
+  chains = 4L,
+  iter = 2000L,
+  warmup = 1000L,
+  seed = 1L,
   silent = 2L
 )
 ```
@@ -179,27 +186,27 @@ summary(fit_known)
 #>    Data: train (Number of observations: 390) 
 #>  Series: 6 
 #>  Trends: AR(1) 
-#>   Draws: 2 chains, each with iter = 1000; warmup = 500; thin = 1; 
-#>          total post-warmup draws = 1000
+#>   Draws: 4 chains, each with iter = 2000; warmup = 1000; thin = 1; 
+#>          total post-warmup draws = 4000
 #> 
 #> == Observation Model ==
 #> Regression Coefficients:
 #>           Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> Intercept     0.02      0.05    -0.07     0.12 1.02      203      431
+#> Intercept     0.03      0.05    -0.07     0.12 1.00     1199     2000
 #> 
 #> Further Distributional Parameters:
 #>       Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> sigma     0.20      0.01     0.18     0.22 1.01      377      469
+#> sigma     0.20      0.01     0.18     0.22 1.00     2006     2769
 #> 
 #> == Trend Model ==
 #> Trend Specific Parameters:
 #>                Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> sigma_trend[1]     0.54      0.05     0.45     0.65 1.01      207      370
-#> sigma_trend[2]     0.34      0.04     0.28     0.42 1.00      329      620
-#> sigma_trend[3]     0.82      0.08     0.67     0.99 1.01      214      474
-#> ar1_trend[1]       0.71      0.08     0.57     0.86 1.01      180      379
-#> ar1_trend[2]       0.06      0.13    -0.20     0.31 1.00      245      390
-#> ar1_trend[3]       0.46      0.12     0.21     0.71 1.01      168      282
+#> sigma_trend[1]     0.54      0.05     0.46     0.65 1.00      872     1327
+#> sigma_trend[2]     0.34      0.04     0.28     0.42 1.00     1289     1861
+#> sigma_trend[3]     0.82      0.08     0.68     0.99 1.00      985     1801
+#> ar1_trend[1]       0.72      0.08     0.56     0.88 1.01      643      970
+#> ar1_trend[2]       0.06      0.14    -0.22     0.34 1.00     1083     1529
+#> ar1_trend[3]       0.46      0.12     0.22     0.68 1.00      635      846
 #> 
 #> Draws were sampled using sampling(NUTS). For each parameter, Bulk_ESS
 #> and Tail_ESS are effective sample size measures, and Rhat is the potential
@@ -207,6 +214,7 @@ summary(fit_known)
 #> 
 #> Next steps:
 #>   - `pp_check(fit)`: posterior predictive checks
+#>   - `ordinate(fit)`: biplot of the factor scores and loadings
 #>   - `forecast(fit, newdata = ...)`: out-of-sample forecasts
 #>   - `lfo_cv(fit)`: leave-future-out model comparison
 #> Use `how_to_cite(fit)` for a methods paragraph and `methods_md(fit)` for its equations.
@@ -214,32 +222,33 @@ summary(fit_known)
 
 [`summary()`](https://rdrr.io/r/base/summary.html) reports one AR
 coefficient and one innovation SD per trend. The 95% intervals of all
-six parameters contain the simulated values. The observation SD is
-estimated at its true value of 0.2.
+six contain the simulated values. The model estimates the observation SD
+at its true value of 0.2.
 
-`plot(type = "factors")` draws each latent trend with the share of the
-series-level variance it explains. Because three of the six series load
-on it, trend 1 explains the most. Trend 3 drives one series and comes
-second, as its innovations are the largest.
+`plot(type = "factors")` draws the posterior path of each trend over the
+training times. Its panels use the name mvgam gives any latent process
+that series load on, a factor. With an AR coefficient of 0.85, trend 1
+moves slowly. Trend 2 has the smallest innovations and little memory. It
+stays close to zero. Trend 3 swings the most.
 
 ``` r
 
 plot(fit_known, type = "factors")
 ```
 
-![The three latent trends of the model given the true loadings, each
-labelled with the share of series-level variance it
-explains.](dfm_files/figure-html/plot-factors-known-1.png)
+![Posterior paths of the three latent trends of the model given the true
+loadings.](dfm_files/figure-html/plot-factors-known-1.png)
 
-The three latent trends of the model given the true loadings, each
-labelled with the share of series-level variance it explains.
+Posterior paths of the three latent trends of the model given the true
+loadings.
 
 [`forecast()`](https://generics.r-lib.org/reference/forecast.html)
 extends each trend over the held-out times and maps the draws back to
-the series through $`Z`$. Series on the same trend receive the same
-latent forecast. The forecast for the weakly autocorrelated trend
-returns to its mean within a few steps. The forecast for the strongly
-autocorrelated trend returns slowly.
+the series through $`Z`$. Series on the same trend share one latent
+forecast. Each forecast decays toward the series mean at the rate its AR
+coefficient sets. The decay is clearest for series 6, whose forecast
+starts near its last observation and reaches the mean within about five
+steps.
 
 ``` r
 
@@ -248,34 +257,34 @@ plot(fc_known)
 ```
 
 ![Forecasts from the model given the true loadings. Points are
-observations, and those after the dashed line were held
+observations, and those after the dashed line are held
 out.](dfm_files/figure-html/plot-forecast-known-1.png)
 
 Forecasts from the model given the true loadings. Points are
-observations, and those after the dashed line were held out.
+observations, and those after the dashed line are held out.
 
 ## Estimating the loadings
 
-When the grouping is unknown, a matrix of `NA` asks mvgam to estimate
-every loading. The loadings take a Student-t prior. The innovation SD of
-every factor is fixed at one to set the scale of the loadings. Because
-each factor has its own AR coefficient, the model distinguishes the
-factors by their dynamics. Only their order and signs are arbitrary.
-mvgam orders the factors by the variance they explain and gives each a
-positive largest loading.
+When the grouping is unknown, `n_lv` asks mvgam to estimate every
+loading of that many factors. The loadings take a Student-t prior. To
+set the scale of the loadings, the innovation SD of every factor is
+fixed at one. Each factor has its own AR coefficient, which lets the
+model tell the factors apart by their dynamics and leaves only their
+order and signs arbitrary. mvgam orders the factors by the variance they
+explain and gives each a positive largest loading.
 
 ``` r
 
 fit_free <- mvgam(
   formula = y ~ 1,
-  trend_formula = ~ AR(p = 1),
-  trend_map = matrix(NA_real_, nrow = n_series, ncol = n_lv),
+  trend_formula = ~ AR(p = 1, n_lv = n_lv),
   data = train,
   newdata = test,
   family = gaussian(),
-  chains = 2L,
-  iter = 1000L,
-  warmup = 500L,
+  chains = 4L,
+  iter = 2000L,
+  warmup = 1000L,
+  seed = 1L,
   silent = 2L
 )
 ```
@@ -289,45 +298,45 @@ summary(fit_free)
 #>    Data: train (Number of observations: 390) 
 #>  Series: 6 
 #>  Trends: AR(1) 
-#>   Draws: 2 chains, each with iter = 1000; warmup = 500; thin = 1; 
-#>          total post-warmup draws = 1000
+#>   Draws: 4 chains, each with iter = 2000; warmup = 1000; thin = 1; 
+#>          total post-warmup draws = 4000
 #> 
 #> == Observation Model ==
 #> Regression Coefficients:
 #>           Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> Intercept     0.03      0.05    -0.08     0.13 1.01      255      351
+#> Intercept     0.02      0.05    -0.08     0.13 1.01     1064     1523
 #> 
 #> Further Distributional Parameters:
 #>       Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> sigma     0.20      0.01     0.18     0.22 1.00      405      645
+#> sigma     0.20      0.01     0.18     0.22 1.00     1210     2010
 #> 
 #> == Trend Model ==
 #> Trend Specific Parameters:
 #>              Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> ar1_trend[1]     0.70      0.09     0.52     0.87 1.01      256      459
-#> ar1_trend[2]     0.42      0.13     0.16     0.67 1.01      182      355
-#> ar1_trend[3]     0.13      0.16    -0.20     0.46 1.02      157      197
+#> ar1_trend[1]     0.70      0.09     0.52     0.87 1.01      801     1439
+#> ar1_trend[2]     0.44      0.14     0.15     0.71 1.01      452     1210
+#> ar1_trend[3]     0.12      0.16    -0.18     0.45 1.00      925     1231
 #> 
 #> Factor Loadings:
 #>         Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> Z[s1,1]     0.55      0.07     0.40     0.67 1.01      141      263
-#> Z[s2,1]     0.54      0.06     0.42     0.65 1.01      208      254
-#> Z[s3,1]     0.54      0.06     0.42     0.66 1.01      205      252
-#> Z[s4,1]    -0.00      0.06    -0.12     0.11 1.05      102      213
-#> Z[s5,1]     0.02      0.06    -0.10     0.13 1.06      107      245
-#> Z[s6,1]     0.20      0.20    -0.20     0.59 1.03       49      178
-#> Z[s1,2]    -0.08      0.15    -0.40     0.19 1.04       54      185
-#> Z[s2,2]    -0.04      0.14    -0.33     0.23 1.04       55      174
-#> Z[s3,2]    -0.03      0.15    -0.32     0.24 1.03       67      187
-#> Z[s4,2]    -0.02      0.11    -0.24     0.19 1.04       59      127
-#> Z[s5,2]    -0.05      0.11    -0.27     0.15 1.04       59      161
-#> Z[s6,2]     0.75      0.11     0.51     0.95 1.01      119      306
-#> Z[s1,3]    -0.04      0.11    -0.23     0.18 1.05       73      136
-#> Z[s2,3]     0.02      0.10    -0.17     0.23 1.06       61      171
-#> Z[s3,3]     0.00      0.10    -0.19     0.22 1.06       44      169
-#> Z[s4,3]     0.34      0.05     0.24     0.45 1.01      180      247
-#> Z[s5,3]     0.34      0.05     0.23     0.44 1.01      156      192
-#> Z[s6,3]     0.12      0.26    -0.36     0.59 1.04       53      143
+#> Z[s1,1]     0.55      0.07     0.41     0.68 1.01      774      922
+#> Z[s2,1]     0.53      0.06     0.41     0.66 1.01      887     1112
+#> Z[s3,1]     0.54      0.06     0.41     0.66 1.01      932     1385
+#> Z[s4,1]    -0.00      0.06    -0.12     0.12 1.00      687     1030
+#> Z[s5,1]     0.02      0.06    -0.10     0.14 1.00      717      951
+#> Z[s6,1]     0.17      0.23    -0.31     0.60 1.01      400      582
+#> Z[s1,2]    -0.07      0.17    -0.39     0.28 1.01      385      559
+#> Z[s2,2]    -0.02      0.16    -0.34     0.31 1.01      391      561
+#> Z[s3,2]    -0.01      0.16    -0.33     0.32 1.01      397      608
+#> Z[s4,2]    -0.00      0.11    -0.24     0.22 1.01      382      656
+#> Z[s5,2]    -0.04      0.11    -0.27     0.18 1.01      387      605
+#> Z[s6,2]     0.77      0.12     0.51     0.99 1.01      507     1274
+#> Z[s1,3]    -0.04      0.11    -0.24     0.18 1.00      678     1081
+#> Z[s2,3]     0.01      0.10    -0.18     0.21 1.01      712     1044
+#> Z[s3,3]    -0.01      0.10    -0.20     0.20 1.00      714     1130
+#> Z[s4,3]     0.34      0.05     0.24     0.44 1.00      720      795
+#> Z[s5,3]     0.34      0.05     0.23     0.44 1.00      585      727
+#> Z[s6,3]     0.08      0.26    -0.41     0.61 1.01      359      620
 #> 
 #> Draws were sampled using sampling(NUTS). For each parameter, Bulk_ESS
 #> and Tail_ESS are effective sample size measures, and Rhat is the potential
@@ -335,21 +344,65 @@ summary(fit_free)
 #> 
 #> Next steps:
 #>   - `pp_check(fit)`: posterior predictive checks
-#>   - `shared_variation(fit)`: factor-implied Delta = Z Sigma Z' (rotation-invariant)
-#>   - `residual_cor(fit)`: implied cross-series correlations
+#>   - `shared_variation(fit)`: covariance the factors imply, unchanged by rotation
+#>   - `residual_cor(fit)`: implied correlations among series
+#>   - `ordinate(fit)`: biplot of the factor scores and loadings
 #>   - `forecast(fit, newdata = ...)`: out-of-sample forecasts
 #>   - `lfo_cv(fit)`: leave-future-out model comparison
 #> Use `how_to_cite(fit)` for a methods paragraph and `methods_md(fit)` for its equations.
 ```
 
-[`summary()`](https://rdrr.io/r/base/summary.html) reports the loading
-of every series on every factor, where `Z[i, k]` is the loading of
-series `i` on factor `k`. Series 1 to 3 load on the first factor and
-series 6 on the second. Series 4 and 5 load on the third. The 95%
-intervals of all other loadings contain zero. The model recovered the
-simulated grouping without being given it. The interval of each AR
-coefficient contains the simulated value of the trend its factor
-matches.
+[`summary()`](https://rdrr.io/r/base/summary.html) lists the loading
+`Z[i, k]` of every series `i` on every factor `k`. Every loading has an
+`Rhat` of at most 1.01 and a bulk effective sample size of at least 359,
+enough to support the 95% intervals interpreted below.
+
+Eighteen rows are hard to scan.
+[`mcmc_plot()`](https://paulbuerkner.com/brms/reference/mcmc_plot.brmsfit.html)
+draws the same posteriors as intervals:
+
+``` r
+
+mcmc_plot(fit_free, variable = "^Z\\[", regex = TRUE,
+          type = "intervals")
+```
+
+![Posterior medians of the 18 loadings of the model that estimates them,
+with 50% (thick) and 90% (thin)
+intervals.](dfm_files/figure-html/plot-loadings-free-1.png)
+
+Posterior medians of the 18 loadings of the model that estimates them,
+with 50% (thick) and 90% (thin) intervals.
+
+Series 1 to 3 load on factor 1 and series 6 on factor 2. Series 4 and 5
+load on factor 3. Every other loading has a median near zero and an
+interval that contains zero. The model recovers the simulated grouping
+without being given it. The interval of each AR coefficient contains the
+simulated value of the trend its factor matches.
+
+Fixing each factor’s innovation SD at one moves the scale of its trend
+into the loadings. A recovered loading should then match the innovation
+SD that the first model estimates for the same trend. The chunk below
+takes, for each trend, the loading of one of its series on the factor
+that matches it:
+
+``` r
+
+loading_free <- colMeans(as_draws_matrix(
+  fit_free, variable = c("Z[s1,1]", "Z[s4,3]", "Z[s6,2]")
+))
+sd_known <- colMeans(as_draws_matrix(
+  fit_known, variable = "^sigma_trend", regex = TRUE
+))
+round(data.frame(trend = 1:3, sd_known, loading_free,
+                 row.names = NULL), 2)
+#>   trend sd_known loading_free
+#> 1     1     0.54         0.55
+#> 2     2     0.34         0.34
+#> 3     3     0.82         0.77
+```
+
+The two estimates differ by at most 0.06 for any trend.
 
 ``` r
 
@@ -363,13 +416,42 @@ simulation.](dfm_files/figure-html/plot-factors-free-1.png)
 The three latent factors of the model that estimates its loadings.
 Factors 1, 2 and 3 match trends 1, 3 and 2 of the simulation.
 
-Each factor explains a similar share of the variance as its trend does
-in the model given the true loadings.
+[`active_factors()`](https://nicholasjclark.github.io/mvgam/dev/reference/active_factors.md)
+decomposes the covariance that the factors give the series into its
+principal dimensions and reports the share of the variance each carries.
+Each series here loads on a single factor, which lines the dimensions up
+with the factors:
+
+``` r
+
+af_free <- active_factors(fit_free)
+af_free
+#> Active latent factors
+#>   Rule: variance at least 0.1 times the leading factor's
+#>   Fitted with: n_lv = 3
+#>   Posterior median active count: 3.0 (95% CI 2.0 - 3.0)
+#> 
+#> Posterior probability that each factor is active, largest first:
+#>  factor prob_active median_variance median_share is_active
+#>       1       1.000           2.010        0.634      TRUE
+#>       2       0.998           0.873        0.277      TRUE
+#>       3       0.779           0.268        0.083      TRUE
+```
+
+The first dimension carries 63% of the variance and the third 8%. The
+third holds the trend of series 4 and 5, the trend with the smallest
+innovations. Its posterior probability of being active is 0.78. Under
+the Student-t prior, a factor the data do not need keeps the variance
+its prior gives it. The count can then exceed the number of factors the
+data need. The prior `loadings_prior = "mgp"` shrinks surplus factors
+toward zero. With it, fit more factors than you expect and count those
+that stay active.
 
 The dependence among series is often the target of a factor model.
 [`residual_cor()`](https://nicholasjclark.github.io/mvgam/dev/reference/residual_cor.md)
 computes the correlations that the loadings imply between each pair of
-series:
+series. They describe the latent predictor alone. Observation noise does
+not enter them:
 
 ``` r
 
@@ -386,43 +468,75 @@ The correlations show the same grouping. Series 1 to 3 are strongly
 correlated with one another, as are series 4 and 5. Series 6 is weakly
 correlated with the rest.
 
-[`ordinate()`](https://nicholasjclark.github.io/mvgam/dev/reference/ordinate.md)
-shows the same structure as a biplot. Each arrow is the loading of one
-series on the first two factors. Each numbered point is a time. Series
-that share a trend point in the same direction.
-
-``` r
-
-ordinate(fit_free)
-```
-
-![Ordination of the model that estimates its loadings. Arrows are series
-loadings on the first two factors, and numbered points are
-times.](dfm_files/figure-html/plot-ordinate-free-1.png)
-
-Ordination of the model that estimates its loadings. Arrows are series
-loadings on the first two factors, and numbered points are times.
-
 ## Pooling every series
 
-To see what a wrong grouping costs, the third model puts all six series
-on one trend with `trend_map = "shared"`:
+To measure what a wrong grouping costs, we fit a third model that puts
+all six series on one trend with `AR(trend_map = "shared")`:
 
 ``` r
 
 fit_pooled <- mvgam(
   formula = y ~ 1,
-  trend_formula = ~ AR(p = 1),
-  trend_map = "shared",
+  trend_formula = ~ AR(p = 1, trend_map = "shared"),
   data = train,
   newdata = test,
   family = gaussian(),
-  chains = 2L,
-  iter = 1000L,
-  warmup = 500L,
+  chains = 4L,
+  iter = 2000L,
+  warmup = 1000L,
+  seed = 1L,
   silent = 2L
 )
 ```
+
+### Checking the fit
+
+Before comparing forecasts, check that each fit describes its training
+data. For a fit that does, the randomised quantile residuals of a series
+look like independent standard normal draws. `plot(type = "residuals")`
+draws them for one series:
+
+``` r
+
+plot(fit_pooled, type = "residuals", series = "s1")
+```
+
+![Randomised quantile residuals of series 1 under the pooled model:
+against the fitted values, on a normal Q-Q plot and as autocorrelation
+and partial autocorrelation
+functions.](dfm_files/figure-html/plot-resid-pooled-1.png)
+
+Randomised quantile residuals of series 1 under the pooled model:
+against the fitted values, on a normal Q-Q plot and as autocorrelation
+and partial autocorrelation functions.
+
+The residuals of series 1 rise with the fitted values and are correlated
+at lag 1. Because one trend cannot follow three sets of dynamics, the
+residuals keep the part of series 1 that the shared trend misses. The
+same plot for `fit_free` shows neither pattern.
+
+[`pp_check()`](https://nicholasjclark.github.io/mvgam/dev/reference/pp_check.mvgam.md)
+compares the observed values of each series with values simulated from
+the fit:
+
+``` r
+
+pp_check(fit_pooled, type = "dens_overlay_grouped", group = "series",
+         ndraws = 50)
+```
+
+![Density of the observed values of each series (dark line) and of 50
+sets of values simulated from the pooled model (light
+lines).](dfm_files/figure-html/plot-ppc-pooled-1.png)
+
+Density of the observed values of each series (dark line) and of 50 sets
+of values simulated from the pooled model (light lines).
+
+The simulated values of series 4 and 5 spread far wider than the
+observed ones. The pooled model estimates an observation SD of 0.59,
+against 0.20 for the model that estimates its loadings. It assigns the
+variation its single trend misses to observation noise. That noise
+widens the forecast intervals of every series:
 
 ``` r
 
@@ -431,52 +545,75 @@ plot(fc_pooled)
 ```
 
 ![Forecasts from the model that pools all six series onto one trend. The
-intervals over the training period are much wider than those of the
-model given the true
+intervals over the training period are several times wider than those of
+the model given the true
 loadings.](dfm_files/figure-html/plot-forecast-pooled-1.png)
 
 Forecasts from the model that pools all six series onto one trend. The
-intervals over the training period are much wider than those of the
-model given the true loadings.
-
-One trend cannot follow three different sets of dynamics. The model
-assigns the remaining variation to observation noise. Its intervals over
-the training period are several times wider than those of the first
-model.
+intervals over the training period are several times wider than those of
+the model given the true loadings.
 
 ## Comparing forecasts
 
 [`compare_scores()`](https://nicholasjclark.github.io/mvgam/dev/reference/compare_scores.md)
-scores the three forecasts against the held-out data. The continuous
-ranked probability score (CRPS) and the log score are computed for each
-series and horizon. The energy score is computed across all series at
-each horizon. Lower values are better for all three. The chunk below
-sums each score over the held-out period.
+scores the three forecasts against the held-out data with one rule. Each
+argument name becomes the name of its model. We use the continuous
+ranked probability score (CRPS) and the log score, for which lower
+values are better. Printing the result ranks the models by their score
+at each horizon, summed over the six series and averaged over the 15
+horizons:
 
 ``` r
 
 fc_free <- forecast(fit_free)
-total_score <- function(score) {
-  by_horizon <- summary(compare_scores(
-    fc_known, fc_free, fc_pooled,
-    score = score, model_names = c("known", "free", "pooled")
-  ))
-  colSums(by_horizon[, c("known", "free", "pooled")])
-}
-totals <- sapply(c("crps", "logs", "energy"), total_score)
-round(totals, 1)
-#>        crps  logs energy
-#> known  38.2  92.6   19.5
-#> free   38.7  94.8   19.8
-#> pooled 41.4 110.9   20.5
+crps <- compare_scores(known = fc_known, free = fc_free,
+                       pooled = fc_pooled, score = "crps")
+crps
+#> CRPS of 3 models, lower is better
+#> 
+#>  model  mean_score difference
+#>  known  2.5        0.000     
+#>  free   2.6        0.028     
+#>  pooled 2.7        0.200     
+#> 
+#> 'difference' is the gap to the best. plot() shows each horizon.
+logs <- compare_scores(known = fc_known, free = fc_free,
+                       pooled = fc_pooled, score = "logs")
+logs
+#> Log score of 3 models, lower is better
+#> 
+#>  model  mean_score difference
+#>  known  6.2        0.000     
+#>  free   6.3        0.075     
+#>  pooled 7.4        1.200     
+#> 
+#> 'difference' is the gap to the best. plot() shows each horizon.
 ```
 
-The pooled model has the worst total on all three scores. Its log score
-of 110.9 compares with 92.6 for the model given the true loadings. The
-model that estimates its loadings scores 38.7 on CRPS and 94.8 on the
-log score, close to the 38.2 and 92.6 of the model given the true
-loadings. In this simulation, estimating the loadings cost little
-forecast accuracy. A wrong grouping cost much more.
+The pooled model ranks last on both scores. Its mean log score of 7.39
+compares with 6.22 for the model given the true loadings. The model that
+estimates its loadings scores 2.58 on CRPS and 6.30 on the log score,
+close to the 2.55 and 6.22 of the model given the true loadings. In this
+simulation, estimating the loadings costs little forecast accuracy. A
+wrong grouping costs much more.
+
+[`plot()`](https://rdrr.io/r/graphics/plot.default.html) draws the CRPS
+of each series at each horizon:
+
+``` r
+
+plot(crps)
+```
+
+![CRPS of each series at each forecast horizon for the three models.
+Lower values are better.](dfm_files/figure-html/plot-scores-1.png)
+
+CRPS of each series at each forecast horizon for the three models. Lower
+values are better.
+
+The pooled model scores worst on series 4 and 5 at most horizons. Its
+forecasts of those series carry the observation noise it estimates from
+all six series.
 
 A held-out forecast score is a practical check on a proposed grouping.
 Where two candidate `trend_map` structures are plausible, fit both and
@@ -484,12 +621,14 @@ compare their scores.
 
 ## Where to next
 
-- [`?mvgam`](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam.md)
-  describes `trend_map` and `loadings_prior`, which sets a structured
-  prior on estimated loadings.
+- [`?trend_constructors`](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md)
+  describes `trend_map`.
+  [`?mvgam`](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam.md)
+  describes `loadings_prior`, which sets a structured prior on estimated
+  loadings (Heaps and Jermyn 2024).
 - [`?compare_scores`](https://nicholasjclark.github.io/mvgam/dev/reference/compare_scores.md)
   and
-  [`?score`](https://nicholasjclark.github.io/mvgam/dev/reference/score.md)
+  [`?score`](https://nicholasjclark.github.io/mvgam/dev/reference/score.mvgam_forecast.md)
   list the available scoring rules.
 - [`?residual_cor`](https://nicholasjclark.github.io/mvgam/dev/reference/residual_cor.md)
   and
@@ -497,9 +636,7 @@ compare their scores.
   give the correlations and covariances among series, with their
   intervals.
 - [`?ordinate`](https://nicholasjclark.github.io/mvgam/dev/reference/ordinate.md)
-  describes the biplot.
-  [`?active_factors`](https://nicholasjclark.github.io/mvgam/dev/reference/active_factors.md)
-  helps choose the number of factors.
+  draws the series loadings and the factor scores as a biplot.
 - [`how_to_cite()`](https://nicholasjclark.github.io/mvgam/dev/reference/how_to_cite.mvgam.md)
   writes a methods paragraph for a fitted model with the references for
   its factor structure.

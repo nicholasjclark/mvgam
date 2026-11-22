@@ -4,7 +4,7 @@ An impulse response draws the posterior median and interval of each
 shock-response pair against the forecast horizon, with a dashed line at
 zero. A variance decomposition stacks the median shares of its sources
 in one panel per target, as
-[`plot.mvgam_fevd()`](https://nicholasjclark.github.io/mvgam/dev/reference/plot.mvgam_fevd.md)
+[`plot.mvgam_fevd()`](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam_fevd-class.md)
 does.
 
 ## Usage

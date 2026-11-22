@@ -1,26 +1,33 @@
-# Trait-mediated environmental slopes for `jsdgam()`
+# Trait-mediated responses for `jsdgam()`
 
-Internal helpers that rewrite `(obs_formula, trait_slopes)` into the
-brms non-linear formula that parameterises the fourth-corner regression
+Internal helpers that expand `formula` and `trait_slopes` into the
+fourth-corner model
 
 ## Details
 
-\$\$\beta\_{s,k} = \sum_l T\_{s, l}\\ \gamma\_{l, k} + \epsilon\_{s,
-k}\$\$
+\$\$\beta\_{s,k} = \gamma\_{0,k} + \sum_l T\_{s,l}\\ \gamma\_{l,k} +
+\epsilon\_{s,k}\$\$
 
-where every fixed slope on an environmental covariate becomes a
-trait-regressed nlpar carrying its own species-level random deviation.
-The rewrite expands
+where each term `k` of `formula` takes a shared effect, an effect of
+each trait `l` and a species deviation. The expansion adds terms to
+`formula` and leaves its own terms as written:
 
-`obs_formula = y ~ env1 + env2` `trait_slopes = ~ trait1`
+`formula = y ~ env + s(x)` `trait_slopes = ~ size`
 
-into
+becomes
 
-`bf(y ~ a + b1 * env1 + b2 * env2, a ~ trait1 + (1 | sp | species), b1 ~ trait1 + (1 | sp | species), b2 ~ trait1 + (1 | sp | species), nl = TRUE)`
+`y ~ env + s(x) + size + env:size + s(x, by = size) + (1 + env | sp | series) + s(x, by = series, m = 1)`
 
-The `|sp|` correlated-random-effect tag jointly parameterises the
-species-level intercept and slope deviations under an LKJ prior so the
-trait wrapper composes with the rest of the jsdgam factor model. The
-actual nl plumbing (priors, parameter aliasing, discovery for
-marginaleffects) is in `R/insight.mvgam.R`, `R/as.data.frame.mvgam.R`
-and `R/conditional_effects.mvgam.R`.
+The `|sp|` tag correlates the species deviations of the intercept and
+the linear terms under one LKJ prior. A smooth's species deviation is a
+smooth per species penalised towards a flat line (the "GI" model of
+Pedersen et al. 2019).
+[`species_effects()`](https://nicholasjclark.github.io/mvgam/dev/reference/species_effects.md)
+reports the species' responses and the trait effects.
+
+## References
+
+Pedersen, E. J., Miller, D. L., Simpson, G. L. and Ross, N. (2019).
+Hierarchical generalized additive models in ecology: an introduction
+with mgcv. *PeerJ* 7:e6876.
+[doi:10.7717/peerj.6876](https://doi.org/10.7717/peerj.6876)

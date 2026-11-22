@@ -650,16 +650,20 @@ mvgam_data(jsdm_dat, y = "present", formula = present ~ elev,
 ## Custom column names
 
 The `time` and `series` arguments of a trend constructor name other
-columns. A fit to `birdsong` can use `week` and `species` directly:
+columns. A model of `birdsong` can use `week` and `species` directly.
+[`mvgam_data()`](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam_data.md)
+takes the column names from the constructor, as
+[`mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam.md)
+does. It finds the four species in `species` and the 80 weeks in `week`:
 
 ``` r
 
-mvgam(
-  y ~ s(week_in_year, bs = "cc", k = 10),
+mvgam_data(
+  birdsong,
+  formula       = y ~ s(week_in_year, bs = "cc", k = 10),
   trend_formula = ~ AR(time = week, series = species),
-  data    = birdsong,
-  family  = poisson(),
-  chains  = 2L, silent = 2L
+  family        = poisson(),
+  plot          = FALSE
 )
 ```
 

@@ -245,19 +245,19 @@ simdat <- sim_mvgam(family = poisson(), n_series = 1L,
 mod <- mvgam(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1),
              data = simdat$data_train, family = poisson(),
              chains = 2, silent = 2)
-#> Warning: 5 of 2000 (0.0%) transitions ended with a divergence.
+#> Warning: 9 of 2000 (0.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 
 # Quantile residuals summarised per observation
 r <- residuals(mod)
 head(r)
-#>         Estimate Est.Error       Q2.5      Q97.5
-#> [1,]  0.04305444 0.6276094 -1.2293330  1.2065680
-#> [2,]  0.43102182 0.9100175 -1.4328467  2.1089368
-#> [3,]  0.08381852 0.7538234 -1.3775664  1.5728609
-#> [4,] -1.66884248 0.6492969 -2.9454988 -0.3349742
-#> [5,]  0.74917410 0.7539337 -0.7791357  2.2124208
-#> [6,]  0.11081097 0.7590387 -1.4080932  1.5538332
+#>         Estimate Est.Error       Q2.5     Q97.5
+#> [1,]  0.05016616 0.6208878 -1.1719081  1.188260
+#> [2,]  0.45159475 0.8897410 -1.3401760  2.193156
+#> [3,]  0.10471057 0.7602559 -1.4953299  1.494811
+#> [4,] -1.66500562 0.6209982 -2.9033198 -0.466234
+#> [5,]  0.76544423 0.7676848 -0.8074881  2.189400
+#> [6,]  0.06840744 0.7353594 -1.4522850  1.456570
 
 # One draw of the residuals should look like N(0, 1) draws
 r1 <- residuals(mod, summary = FALSE, draw_ids = 1)

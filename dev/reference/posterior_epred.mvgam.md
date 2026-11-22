@@ -68,7 +68,7 @@ posterior_epred(
   alone. It is the same at the first time point as at the fiftieth.
   Questions about covariate effects use this version. `TRUE` uses the
   fitted state, the value the trend took at each observed time as
-  [`hindcast()`](https://nicholasjclark.github.io/mvgam/dev/reference/hindcast.md)
+  [`hindcast()`](https://nicholasjclark.github.io/mvgam/dev/reference/hindcast.mvgam.md)
   returns it. The section 'Which prediction function?' of
   [`predict.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/predict.mvgam.md)
   compares the functions.
@@ -110,20 +110,23 @@ posterior_epred(
 - re_formula:
 
   Group-level terms to include: `NULL` (the default) for every one, `NA`
-  for none. A formula choosing some of them is not supported.
+  for none, or a formula naming the terms to keep, such as `~ (1 | g)`.
+  A formula applies to the observation and the trend formulas alike. Any
+  term it does not name is dropped.
 
 - allow_new_levels:
 
-  Logical; accepted for brms compatibility. A grouping level the model
-  never saw is refused whatever this is set to. A new level has no
-  fitted random effect. For a new series, it has no latent state to
-  propagate. Predict for levels the fit knows, or refit with the new
-  levels included.
+  Logical. `TRUE` predicts for grouping levels the model never saw, with
+  coefficients `sample_new_levels` draws. A new series stays refused: it
+  has no latent state to propagate.
 
 - sample_new_levels:
 
-  Character; accepted for brms compatibility. It has no effect, because
-  new levels are refused. See `allow_new_levels`.
+  How a new level's coefficients are drawn: `"uncertainty"` (the
+  default) takes those of a fitted level chosen in each draw,
+  `"old_levels"` those of one fitted level for all draws and
+  `"gaussian"` draws them from the group's normal distribution. Each
+  distributional parameter draws its own.
 
 - resp:
 
@@ -188,7 +191,7 @@ Other predictions:
 [`conditional_effects.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/conditional_effects.mvgam.md),
 [`conditional_smooths.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/conditional_smooths.mvgam.md),
 [`fitted.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/fitted.mvgam.md),
-[`hindcast.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/hindcast.mvgam.md),
+[`hindcast()`](https://nicholasjclark.github.io/mvgam/dev/reference/hindcast.mvgam.md),
 [`posterior_linpred.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/posterior_linpred.mvgam.md),
 [`posterior_predict.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/posterior_predict.mvgam.md),
 [`posterior_smooths.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/posterior_smooths.mvgam.md),
@@ -206,7 +209,7 @@ simdat <- sim_mvgam(family = poisson(), n_series = 1L,
 mod <- mvgam(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1),
              data = simdat$data_train, family = poisson(),
              chains = 2, silent = 2)
-#> Warning: 5 of 2000 (0.0%) transitions ended with a divergence.
+#> Warning: 9 of 2000 (0.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 
 # One row per draw, one column per observation
@@ -232,7 +235,23 @@ ggplot(simdat$data_train, aes(time, y)) +
 c(fixed = mean(ep),
   innovations = mean(posterior_epred(mod, process_error = TRUE)))
 #>       fixed innovations 
-#>    6.150306    7.364187 
+#>    6.116209    7.366952 
+
+# A site the fit never saw takes the spread of the fitted sites
+train <- simdat$data_train
+train$site <- rep(paste0("site", 1:6), length.out = nrow(train))
+mod_site <- mvgam(y ~ (1 | site), trend_formula = ~ AR(p = 1),
+                  data = train, family = poisson(),
+                  chains = 2, silent = 2)
+#> Warning: 10 of 2000 (0.0%) transitions ended with a divergence.
+#> See https://mc-stan.org/misc/warnings for details.
+new_site <- transform(train[1:3, ], site = "unseen")
+posterior_epred(mod_site, newdata = new_site, allow_new_levels = TRUE,
+                sample_new_levels = "gaussian", ndraws = 3)
+#>          [,1]     [,2]     [,3]
+#> [1,] 5.106027 5.106027 5.106027
+#> [2,] 4.820497 4.820497 4.820497
+#> [3,] 6.418029 6.418029 6.418029
 
 # Next: posterior_predict() adds observation noise to these means
 # }

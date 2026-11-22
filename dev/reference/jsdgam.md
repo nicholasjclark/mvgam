@@ -1,4 +1,4 @@
-# Fit Joint Species Distribution Models in mvgam
+# Fit a joint species distribution model
 
 Fits a joint species distribution model (JSDM) to the presences,
 detections or counts of many species across many sampling units. Species
@@ -41,16 +41,17 @@ jsdgam(
 
 - formula:
 
-  Main observation model formula (supports brms syntax). Smooth specials
-  `s()`, `t2()`, `gp()`, varying intercepts and slopes, monotonic
-  `mo()`, measurement-error `me()`, distributional `dpar` sub-formulas
-  and [`offset()`](https://rdrr.io/r/stats/offset.html) are all
-  available. `gp()` accepts both the approximate Hilbert-space form
-  (`gp(x, k = 20)`) and the exact full-covariance form (`gp(x)`, no
-  `k`). Prediction at `newdata` requires the approximate form. An exact
-  `gp()` term fits and scores in-sample.
-  [`mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam.md)
-  says so once per session.
+  The observation model formula, in brms syntax: smooths `s()` and
+  `t2()`, `gp()`, varying intercepts and slopes, `mm()`, `mo()`, `me()`,
+  `mi()`, distributional and non-linear sub-formulas and
+  [`offset()`](https://rdrr.io/r/stats/offset.html). A response leaves
+  rows out by holding `NA` there.
+  [`mvgam_formula()`](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam_formula.md)
+  lists the terms each formula refuses. `gp()` takes the approximate
+  Hilbert-space form (`gp(x, k = 20)`) or the exact form (`gp(x)`, no
+  `k`), under any brms kernel. An exact term predicts at new covariate
+  values by conditioning on its fitted values, as brms does. Its cost
+  grows with the cube of the number of unique values.
 
 - factor_formula:
 
@@ -103,6 +104,13 @@ jsdgam(
   [`poisson()`](https://rdrr.io/r/stats/family.html) or
   [`negbinomial()`](https://paulbuerkner.com/brms/reference/brmsfamily.html).
 
+  The factors and a family's dispersion parameter, such as `shape`,
+  `phi` or `sigma`, explain the same residual variation. Where the
+  factors explain it, the dispersion posterior runs toward its limit and
+  the sampler can diverge there. An informative dispersion prior or a
+  family without dispersion, such as
+  [`poisson()`](https://rdrr.io/r/stats/family.html), settles it.
+
   For one family per species, write `formula` with one
   [`brms::bf()`](https://paulbuerkner.com/brms/reference/brmsformula.html)
   per species, each naming its family, as in
@@ -137,8 +145,10 @@ jsdgam(
   Optional `brmsprior` of priors to set, from
   [`brms::prior()`](https://paulbuerkner.com/brms/reference/set_prior.html).
   `prior`, the brms spelling, is accepted in `...`.
-  [`get_prior.mvgam_formula()`](https://nicholasjclark.github.io/mvgam/dev/reference/get_prior.mvgam_formula.md)
-  lists the classes a model takes.
+  [`get_prior()`](https://nicholasjclark.github.io/mvgam/dev/reference/get_prior.md)
+  of a model built with `run_model = FALSE` lists every class and
+  coefficient with its default, the `trait_slopes` terms among them. See
+  *Trait-mediated responses* for their scales.
 
 - n_lv:
 
@@ -169,16 +179,15 @@ jsdgam(
 - trait_slopes:
 
   Optional one-sided formula of traits, such as `~ trait1 + trait2`, for
-  trait-mediated responses to the environment (the fourth-corner model
-  of Hmsc). Each population-level term of `formula` becomes a non-linear
-  parameter regressed on the traits, plus a species-level deviation. The
-  deviations of intercept and slope correlate under an LKJ prior
-  (`(1 | sp | species)`). The traits must be columns of `data`, constant
-  within species. A smooth of a trait goes in `trait_slopes`, as
-  `~ s(trait1)`. A smooth in `formula` is refused, because brms's
-  top-level non-linear formula takes none. The defaults are
-  `std_normal()` on each trait coefficient and `student_t(3, 0, 2.5)` on
-  the species SD. `priors` overrides them.
+  species responses that depend on their traits (the fourth-corner model
+  of Hmsc). The traits must be columns of `data`, constant within
+  species, as brms takes every variable of a formula. A prediction frame
+  that omits a trait takes each species' value from the fit. The grids
+  of
+  [`conditional_effects()`](https://paulbuerkner.com/brms/reference/conditional_effects.brmsfit.html)
+  and marginaleffects omit the traits, which draws each species at its
+  own. Each term of `formula` takes a shared effect, an effect of each
+  trait and a species deviation. See *Trait-mediated responses*.
 
 - phylo:
 
@@ -264,6 +273,79 @@ and
 describe the factors. `update(fit, n_lv = 3)` refits it through
 `jsdgam()` with the arguments given changed.
 
+## Trait-mediated responses
+
+`trait_slopes = ~ size` adds terms to `formula`. Each term takes a
+shared effect, an effect of each trait and a species deviation:
+
+- Intercept:
+
+  `size`, with the species deviation `1` in `(1 + ... | sp | series)`
+
+- A term with design columns:
+
+  a numeric or factor covariate, an interaction,
+  [`I()`](https://rdrr.io/r/base/AsIs.html),
+  [`poly()`](https://rdrr.io/r/stats/poly.html), `mo()`, `me()` or
+  `mi()`: the term `env:size` and the deviation `env` in
+  `(1 + env | sp | series)`. The `|sp|` tag correlates the deviations
+  under one LKJ prior.
+
+- A smooth, `s()` or `t2()`:
+
+  `s(x, by = size)` scales the smooth by the trait.
+  `s(x, by = series, m = 1)` gives each species a smooth penalised
+  towards a flat line.
+
+- A Gaussian process, `gp()`:
+
+  `gp(x, by = size)` and `gp(x, by = series)`, one approximate process
+  per species
+
+- A group-level term:
+
+  entered as written, as is a smooth with `bs = "re"` or `bs = "fs"`
+
+A smooth trait, `~ s(size)`, gives the intercept `s(size)`. Each design
+column of a covariate scales the trait's smooth: `env` takes
+`s(size, by = env)` and a factor `hab` takes `s(size, by = habb)`. A
+smooth of `x` takes the surface `t2(x, size)`. A smooth with its own
+`by`, such as `s(x, by = hab)`, crosses the trait level by level. Its
+species deviations keep the `by`. `mo()`, `me()` and `mi()` terms cross
+linear traits alone.
+
+A smooth or `gp()` takes one column of `data` as its `by`. A factor
+level, a [`poly()`](https://rdrr.io/r/stats/poly.html) column or a `by`
+scaled per species enters through a derived column. Its name follows
+[`fixef.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam_diagnostics.md),
+such as `habb`, `polyx21` or `env_size`. Each prediction frame
+recomputes these columns from the variables they come from. A frame that
+changes `env` then changes `env_size`.
+
+A crossing of a centred smooth passes through zero at the mean of its
+covariates (mgcv's `pc`). The shared term then carries the effect at the
+means. mgcv leaves a smooth with a numeric `by` uncentred. Its crossing
+keeps the constant, the trait's effect on that column's slope. A `t2()`
+surface takes first-order margins. Their penalties separate it from the
+main smooths. A margin of one covariate is a thin plate spline, or keeps
+a cyclic basis. An `s()` of several covariates gives one isotropic
+Duchon spline margin.
+
+The coefficients take their brms names, such as `b_env:size`. Each
+population-level coefficient takes `normal(0, r / s)` by default. `s` is
+the SD of its design column. `r` is 1, or the SD of the response under
+an identity link, which keeps the coefficients in its units. Every
+covariate then has one prior scale on the link, whatever its units or
+the basis [`poly()`](https://rdrr.io/r/stats/poly.html) gives it, as
+rstanarm's autoscaled priors do. `student_t(3, 0, 2.5 r)` is the default
+on the SDs of the correlated species deviations. The smooth and `gp()`
+deviations take the brms defaults. `priors` overrides any of them. A
+prior on class `b` without a `coef` replaces every coefficient's
+default. A term of `formula` naming the species is refused: each species
+already takes its own response. For some of these terms alone, write
+them in `formula` directly, as in
+`y ~ env + size + env:size + (1 + env | series)`.
+
 ## References
 
 Warton, D. I., Blanchet, F. G., O'Hara, R. B., Ovaskainen, O., Taskinen,
@@ -310,6 +392,10 @@ case.
 and
 [`compare_loadings()`](https://nicholasjclark.github.io/mvgam/dev/reference/compare_loadings.md)
 interpret the fitted factors.
+[`species_effects()`](https://nicholasjclark.github.io/mvgam/dev/reference/species_effects.md)
+gives each species' response to the covariates.
+[`community()`](https://nicholasjclark.github.io/mvgam/dev/reference/community.md)
+gives richness, diversity and co-occurrence.
 [`lv_axis()`](https://nicholasjclark.github.io/mvgam/dev/reference/lv_axis.md)
 gives each factor its own covariate effect.
 [`how_to_cite()`](https://nicholasjclark.github.io/mvgam/dev/reference/how_to_cite.mvgam.md)
@@ -318,16 +404,18 @@ drafts a methods paragraph for the fit and
 writes its equations. The [JSDM
 article](https://nicholasjclark.github.io/mvgam/dev/articles/jsdgam.html)
 fits a negative binomial model with a trait-informed loadings prior,
-ordination biplots and multiplicative gamma process shrinkage.
+ordination biplots and multiplicative gamma process shrinkage. The [JSDM
+cheatsheet](https://nicholasjclark.github.io/mvgam/dev/cheatsheets/jsdgam_cheatsheet.pdf)
+summarises the functions on one page.
 
 Other model fitting:
 [`check_newdata()`](https://nicholasjclark.github.io/mvgam/dev/reference/check_newdata.md),
 [`mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam.md),
 [`mvgam_data()`](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam_data.md),
-[`mvgam_formula()`](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam_formula.md),
 [`mvgam_multiple()`](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam_multiple.md),
 [`pivot_detection_array()`](https://nicholasjclark.github.io/mvgam/dev/reference/pivot_detection_array.md),
 [`pivot_species_matrix()`](https://nicholasjclark.github.io/mvgam/dev/reference/pivot_species_matrix.md),
+[`print.mvgam_formula()`](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam_formula.md),
 [`series_to_mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/series_to_mvgam.md),
 [`stancode.mvgam_formula()`](https://nicholasjclark.github.io/mvgam/dev/reference/stancode.mvgam_formula.md),
 [`update.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/update.mvgam.md)
@@ -360,7 +448,7 @@ mod <- jsdgam(
   chains         = 2,
   silent         = 2
 )
-#> Warning: 210 of 2000 (10.0%) transitions ended with a divergence.
+#> Warning: 1028 of 2000 (51.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 
 summary(mod)
@@ -369,48 +457,48 @@ summary(mod)
 #> Formula: y ~ series * env 
 #>          p ~ series + tod_c 
 #>    Data: simdat$data_train (Number of observations: 1920) 
-#>  Series: 6 
-#>  Trends: ZMVN; formula: ~-1 
+#> Species: 6 
+#>  Trends: 2 latent factors 
 #>   Draws: 2 chains, each with iter = 2000; warmup = 1000; thin = 1; 
 #>          total post-warmup draws = 2000
 #> 
 #> == Observation Model ==
 #> Regression Coefficients:
 #>                Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> Intercept          1.08      0.81     0.17     3.20 1.00      131       60
-#> p_Intercept       -0.22      0.18    -0.58     0.15 1.00      518      689
-#> seriessp_2        -0.39      0.99    -2.70     1.34 1.01       91       77
-#> seriessp_3        -1.32      0.88    -3.65    -0.18 1.01      119       46
-#> seriessp_4        -1.49      1.70    -4.73     1.74 1.02      194       80
-#> seriessp_5         0.16      1.63    -2.46     4.47 1.04       28       28
-#> seriessp_6        -3.13      0.97    -5.69    -1.76 1.01      146      105
-#> env               -2.30      1.22    -6.14    -0.92 1.01       91       39
-#> seriessp_2:env     1.57      1.39    -0.47     5.54 1.01       76       45
-#> seriessp_3:env     2.23      1.28     0.62     6.07 1.01      105       36
-#> seriessp_4:env    -0.03      2.16    -5.33     4.44 1.03       97       44
-#> seriessp_5:env     1.58      1.76    -3.02     5.69 1.04       29       23
-#> seriessp_6:env     0.40      1.36    -1.65     4.15 1.01      107       46
-#> p_seriessp_2       0.57      0.25     0.10     1.06 1.00      720     1016
-#> p_seriessp_3       1.12      0.26     0.61     1.63 1.00      690     1003
-#> p_seriessp_4      -1.03      0.41    -1.92    -0.30 1.00      558      576
-#> p_seriessp_5       0.52      0.24     0.05     1.00 1.00      648      948
-#> p_seriessp_6       0.63      0.34    -0.05     1.28 1.00     1077     1228
-#> p_tod_c            0.01      0.02    -0.03     0.05 1.00     1508     1386
+#> Intercept          0.98      0.40     0.23     2.04 2.24      285      118
+#> p_Intercept       -0.27      0.14    -0.54     0.07 2.23       53       60
+#> seriessp_2        -0.45      0.69    -1.59     1.35 2.23       39       78
+#> seriessp_3        -1.14      0.53    -2.61    -0.29 2.25      275       78
+#> seriessp_4         1.92      3.42    -2.97     5.20 2.23        3        2
+#> seriessp_5        -0.21      0.83    -1.35     1.95 2.24       21      105
+#> seriessp_6        -2.99      0.56    -4.47    -1.88 2.23      441       60
+#> env               -2.50      0.68    -3.63    -1.09 2.24        8      112
+#> seriessp_2:env     1.84      1.04    -0.51     3.09 2.23        7       88
+#> seriessp_3:env     2.55      0.86     0.57     3.80 2.27        7       54
+#> seriessp_4:env    -4.95      5.00    -9.83     1.94 2.25        3        2
+#> seriessp_5:env     2.23      0.93     0.09     3.30 2.23        6      120
+#> seriessp_6:env     0.58      0.80    -1.35     1.97 2.23       16       94
+#> p_seriessp_2       0.75      0.26     0.15     0.97 2.23        4        2
+#> p_seriessp_3       1.21      0.20     0.70     1.54 2.23       21       65
+#> p_seriessp_4      -1.21      0.35    -1.75    -0.38 2.24       10       92
+#> p_seriessp_5       0.46      0.18     0.14     0.92 2.23       59       81
+#> p_seriessp_6       0.69      0.26     0.06     1.24 2.23      611       81
+#> p_tod_c            0.01      0.01    -0.02     0.04 2.23     1582       75
 #> 
 #> == Trend Model ==
 #> Factor Loadings:
 #>                 Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> Z_tilde[sp_1,1]     1.08      1.28     0.12     5.42 1.00      108       42
-#> Z_tilde[sp_2,1]     0.19      1.15    -1.52     2.73 1.00      575      379
-#> Z_tilde[sp_3,1]    -0.09      1.00    -1.67     1.42 1.01     1633      254
-#> Z_tilde[sp_4,1]     0.13      1.19    -1.82     2.03 1.01     1312      585
-#> Z_tilde[sp_5,1]     0.85      2.82    -2.86     9.45 1.04      123       16
-#> Z_tilde[sp_6,1]     0.16      0.67    -1.02     1.66 1.00     1022      885
-#> Z_tilde[sp_2,2]     1.03      1.49     0.03     4.95 1.00      210       87
-#> Z_tilde[sp_3,2]     0.34      1.22    -1.22     2.92 1.01      786      121
-#> Z_tilde[sp_4,2]     0.20      1.41    -1.76     3.00 1.00     1111      278
-#> Z_tilde[sp_5,2]    -1.21      2.82   -10.16     2.27 1.04      176       35
-#> Z_tilde[sp_6,2]    -0.16      0.66    -1.52     1.01 1.00     1005      647
+#> Z_tilde[sp_1,1]     0.71      0.42     0.17     2.05 2.25      522       78
+#> Z_tilde[sp_2,1]     0.11      1.26    -1.35     3.09 2.23      548       83
+#> Z_tilde[sp_3,1]    -0.29      1.51    -3.48     1.73 2.34       31       17
+#> Z_tilde[sp_4,1]     1.19      1.20    -1.06     2.25 2.23        3        2
+#> Z_tilde[sp_5,1]     0.16      1.34    -1.26     4.07 2.23       15       93
+#> Z_tilde[sp_6,1]     0.01      0.52    -0.92     1.37 2.24       45       54
+#> Z_tilde[sp_2,2]     1.14      1.27     0.05     5.36 2.24       64       60
+#> Z_tilde[sp_3,2]     0.12      1.65    -1.33     5.64 2.34        7       21
+#> Z_tilde[sp_4,2]    -1.25      1.57    -2.71     1.56 2.23        3        2
+#> Z_tilde[sp_5,2]    -0.76      1.39    -5.33     0.79 2.25      327       93
+#> Z_tilde[sp_6,2]    -0.04      0.51    -1.15     0.95 2.24      632       66
 #> 
 #> Draws were sampled using sampling(NUTS). For each parameter, Bulk_ESS
 #> and Tail_ESS are effective sample size measures, and Rhat is the potential
@@ -419,10 +507,10 @@ summary(mod)
 #> Next steps:
 #>   - `pp_check(fit, type = "fit_stat")`: goodness of fit of unit totals
 #>   - `plot(hindcast(fit, type = "latent_state"))`: posterior occupancy of each unit
-#>   - `shared_variation(fit)`: factor-implied Delta = Z Sigma Z' (rotation-invariant)
-#>   - `residual_cor(fit)`: implied cross-series correlations
+#>   - `shared_variation(fit)`: covariance the factors imply, unchanged by rotation
+#>   - `residual_cor(fit)`: implied correlations among species
+#>   - `ordinate(fit)`: biplot of the factor scores and loadings
 #>   - `loo(fit)` / `loo_compare(...)`: model fit + comparison
-#>   - `conditional_effects(fit)`: covariate effects
 #> Use `how_to_cite(fit)` for a methods paragraph and `methods_md(fit)` for its equations.
 
 # The effect of `env` on the chance of a detection, occupancy times
@@ -433,17 +521,33 @@ conditional_effects(mod)
 
 
 
+# Each species' response to env, outlined where its sign is clear
+plot(species_effects(mod, variables = "env"))
+
+
 # The residual correlations among species the factors imply
 plot(residual_cor(mod))
 
 
 # Site scores and species loadings on the two factors
 ordinate(mod, rotation = "varimax")
-#> Registered S3 methods overwritten by 'ggpp':
-#>   method                  from   
-#>   heightDetails.titleGrob ggplot2
-#>   widthDetails.titleGrob  ggplot2
 
+
+# Expected richness along `env`. The second plot marks the pairs of
+# species found together more often than `env` predicts.
+gradient <- datagrid(model = mod, env = seq(-2, 2, length.out = 20))
+cm <- community(mod, newdata = gradient)
+plot(cm)
+
+plot(cm, type = "cooccurrence")
+
+
+# The draws, for any contrast: richness at the end of the gradient
+# less that at its start
+rv <- as_draws_rvars(cm)
+rv$richness[20] - rv$richness[1]
+#> rvar<2000>[1] mean ± sd:
+#> [1] -3.2 ± 0.33 
 
 # Next, compare n_lv = 1 with update(mod, n_lv = 1L) and loo()
 # }

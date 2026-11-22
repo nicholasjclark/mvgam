@@ -37,7 +37,7 @@ ensemble(object, ..., weights = NULL, ndraws = 5000L, seed = NULL)
   [`loo_model_weights.mvgam_lfo()`](https://nicholasjclark.github.io/mvgam/dev/reference/loo_model_weights.mvgam_lfo.md)
   on their
   [`lfo_cv()`](https://nicholasjclark.github.io/mvgam/dev/reference/lfo_cv.mvgam.md)
-  results. Pass the numeric result here.
+  results. `weights` takes either result as it is.
 
 - ndraws:
 
@@ -94,9 +94,10 @@ weights an ensemble by leave-future-out stacking weights.
 Other forecasting:
 [`compare_scores()`](https://nicholasjclark.github.io/mvgam/dev/reference/compare_scores.md),
 [`forecast.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/forecast.mvgam.md),
-[`hindcast.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/hindcast.mvgam.md),
+[`forecast_uncertainty()`](https://nicholasjclark.github.io/mvgam/dev/reference/forecast_uncertainty.md),
+[`hindcast()`](https://nicholasjclark.github.io/mvgam/dev/reference/hindcast.mvgam.md),
 [`lfo_cv.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/lfo_cv.mvgam.md),
-[`score.mvgam_forecast()`](https://nicholasjclark.github.io/mvgam/dev/reference/score.mvgam_forecast.md)
+[`score()`](https://nicholasjclark.github.io/mvgam/dev/reference/score.mvgam_forecast.md)
 
 ## Author
 
@@ -115,13 +116,13 @@ simdat <- sim_mvgam(family = poisson(), n_series = 1L,
 # lfo_cv() refits it to shorter stretches of the series
 mod_gam <- mvgam(y ~ s(x, k = 5), data = simdat$data_train,
                  family = poisson(), chains = 2, silent = 2)
-#> Warning: 209 of 2000 (10.0%) transitions ended with a divergence.
+#> Warning: 12 of 2000 (1.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 mod_ar <- mvgam(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1),
                 data = simdat$data_train, family = poisson(),
                 chains = 2, silent = 2,
                 control = list(adapt_delta = 0.95))
-#> Warning: 3 of 2000 (0.0%) transitions ended with a divergence.
+#> Warning: 2 of 2000 (0.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 # }
 # \dontrun{

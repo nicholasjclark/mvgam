@@ -153,7 +153,7 @@ Expected biomass by month and camera detection probability by deployment
 days, with 95% credible intervals.
 
 The fitted biomass curve peaks in month 3. The deployment slope is 0.08
-\[-0.04, 0.20\] on the logit scale, against the 0.05 used to simulate
+\[-0.04, 0.21\] on the logit scale, against the 0.05 used to simulate
 the data.
 
 ## What the joint model gains
@@ -210,13 +210,13 @@ recovery <- t(vapply(fits, function(fit) {
 round(recovery, 2)
 #>               RMSE Interval width
 #> Joint         0.26           1.26
-#> Counts alone  0.32           1.36
-#> Biomass alone 0.48           1.73
-#> Camera alone  0.57           3.99
+#> Counts alone  0.33           1.39
+#> Biomass alone 0.44           1.78
+#> Camera alone  0.57           3.93
 ```
 
 Ordered by root mean squared error against the simulated state, the fits
-rank joint (0.26), counts alone (0.32), biomass alone (0.48), and camera
+rank joint (0.26), counts alone (0.33), biomass alone (0.44), and camera
 alone (0.57). Intervals are narrowest in the joint fit and widest in the
 camera alone fit. A single binary record per month constrains abundance
 weakly.
@@ -252,16 +252,14 @@ Expected values for each response over the training months and a
 six-month forecast. Points are the observations.
 
 The forecast object also feeds
-[`score()`](https://nicholasjclark.github.io/mvgam/dev/reference/score.md)
+[`score()`](https://nicholasjclark.github.io/mvgam/dev/reference/score.mvgam_forecast.md)
 once the held-out observations arrive.
 
-Against the simulated abundance, the four fits ranked joint (0.26),
-counts alone (0.32), biomass alone (0.48), and camera alone (0.57) by
-error. A single binary outcome per month constrains the state weakly.
-Fitted jointly, the camera record takes the state the other methods
-estimate. A monitoring programme that measures one population by several
-methods can fit them to one latent process and let each method inform
-the rest.
+The joint fit estimated the simulated state more closely than any method
+alone. The camera record, weak on its own, takes the state the counts
+and biomass estimate. A monitoring programme that measures one
+population by several methods can fit them to one latent process and let
+each method inform the rest.
 
 ## Where to next
 

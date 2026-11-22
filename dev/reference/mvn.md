@@ -89,9 +89,7 @@ fit <- jsdgam(
   chains         = 2L,
   silent         = 2
 )
-#> Warning: 38 of 2000 (2.0%) transitions ended with a divergence.
-#> See https://mc-stan.org/misc/warnings for details.
-#> Warning: 1 of 2000 (0.0%) transitions hit the maximum treedepth limit of 10.
+#> Warning: 855 of 2000 (43.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 #> Warning: 2 of 2 chains had an E-BFMI less than 0.3.
 #> See https://mc-stan.org/misc/warnings for details.
@@ -100,45 +98,45 @@ summary(fit)
 #>   Links: mu = identity 
 #> Formula: y ~ env * series 
 #>    Data: simdat$data_train (Number of observations: 400) 
-#>  Series: 5 
-#>  Trends: ZMVN; formula: ~-1 
+#> Species: 5 
+#>  Trends: 2 latent factors 
 #>   Draws: 2 chains, each with iter = 2000; warmup = 1000; thin = 1; 
 #>          total post-warmup draws = 2000
 #> 
 #> == Observation Model ==
 #> Regression Coefficients:
 #>                Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> Intercept         -0.42      0.11    -0.64    -0.21 1.01      258      604
-#> env                0.34      0.12     0.11     0.55 1.00      261      515
-#> seriessp_2         1.49      0.16     1.19     1.80 1.01      270      552
-#> seriessp_3         1.35      0.16     1.03     1.68 1.00      326      528
-#> seriessp_4         1.18      0.25     0.70     1.68 1.01      267      507
-#> seriessp_5         2.09      0.13     1.84     2.36 1.01      289      518
-#> env:seriessp_2    -1.59      0.16    -1.89    -1.27 1.00      281      488
-#> env:seriessp_3    -0.76      0.18    -1.09    -0.41 1.00      360      602
-#> env:seriessp_4    -1.45      0.26    -1.95    -0.95 1.00      255      633
-#> env:seriessp_5    -0.78      0.14    -1.05    -0.50 1.00      301      841
+#> Intercept         -0.30      0.16    -0.60    -0.11 1.44        4       28
+#> env                0.30      0.10     0.14     0.54 1.39       27      188
+#> seriessp_2         1.31      0.24     1.02     1.72 1.44        4       68
+#> seriessp_3         1.19      0.22     0.91     1.61 1.40        4       46
+#> seriessp_4         1.00      0.29     0.67     1.57 1.52        4       52
+#> seriessp_5         1.99      0.15     1.80     2.29 1.35        5       78
+#> env:seriessp_2    -1.54      0.14    -1.87    -1.32 1.36       17      288
+#> env:seriessp_3    -0.74      0.15    -1.07    -0.42 1.13      131      149
+#> env:seriessp_4    -1.38      0.21    -1.88    -1.04 1.50       16      234
+#> env:seriessp_5    -0.76      0.11    -1.01    -0.54 1.14      151      284
 #> 
 #> Further Distributional Parameters:
 #>        Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> Psi[1]     0.42      0.15     0.13     0.66 1.13       12       97
-#> Psi[2]     0.49      0.04     0.42     0.58 1.00      597     1209
-#> Psi[3]     0.39      0.16     0.10     0.72 1.10       14       24
-#> Psi[4]     0.63      0.19     0.22     0.93 1.15       11      107
-#> Psi[5]     0.56      0.05     0.46     0.66 1.00      861      877
+#> Psi[1]     0.52      0.12     0.21     0.68 1.28        6       56
+#> Psi[2]     0.48      0.04     0.42     0.57 1.18       16      104
+#> Psi[3]     0.51      0.19     0.11     0.78 1.53        4       18
+#> Psi[4]     0.38      0.28     0.10     0.86 1.94        3       14
+#> Psi[5]     0.56      0.04     0.48     0.64 1.27      217      393
 #> 
 #> == Trend Model ==
 #> Factor Loadings:
 #>                 Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> Z_tilde[sp_1,1]     0.89      0.11     0.68     1.10 1.05       34      315
-#> Z_tilde[sp_2,1]    -0.28      0.07    -0.42    -0.16 1.00     1178     1400
-#> Z_tilde[sp_3,1]    -0.08      0.12    -0.32     0.16 1.00     1281     1328
-#> Z_tilde[sp_4,1]    -1.03      0.16    -1.35    -0.73 1.03      110      821
-#> Z_tilde[sp_5,1]     0.02      0.08    -0.13     0.18 1.01     1369     1172
-#> Z_tilde[sp_2,2]     0.07      0.05     0.00     0.19 1.00     1046     1624
-#> Z_tilde[sp_3,2]     0.54      0.70    -1.01     1.06 1.01      554      897
-#> Z_tilde[sp_4,2]    -0.42      0.56    -0.93     0.85 1.01     1502     1835
-#> Z_tilde[sp_5,2]    -0.20      0.25    -0.46     0.38 1.00     1422     1842
+#> Z_tilde[sp_1,1]     0.85      0.10     0.66     1.05 1.04       63      144
+#> Z_tilde[sp_2,1]    -0.31      0.06    -0.41    -0.18 1.13       11      141
+#> Z_tilde[sp_3,1]    -0.07      0.11    -0.30     0.15 1.04       63      159
+#> Z_tilde[sp_4,1]    -1.11      0.15    -1.35    -0.77 1.17       11      176
+#> Z_tilde[sp_5,1]     0.05      0.08    -0.11     0.21 1.11       12       46
+#> Z_tilde[sp_2,2]     0.08      0.05     0.00     0.18 1.10       15      234
+#> Z_tilde[sp_3,2]     0.59      0.53    -0.96     1.04 1.30       17       46
+#> Z_tilde[sp_4,2]    -0.62      0.49    -1.01     0.84 1.34        5      118
+#> Z_tilde[sp_5,2]    -0.23      0.19    -0.43     0.36 1.12      225      409
 #> 
 #> Draws were sampled using sampling(NUTS). For each parameter, Bulk_ESS
 #> and Tail_ESS are effective sample size measures, and Rhat is the potential
@@ -146,8 +144,9 @@ summary(fit)
 #> 
 #> Next steps:
 #>   - `pp_check(fit)`: posterior predictive checks
-#>   - `shared_variation(fit)`: factor-implied Delta = Z Sigma Z' (rotation-invariant)
-#>   - `residual_cor(fit)`: implied cross-series correlations
+#>   - `shared_variation(fit)`: covariance the factors imply, unchanged by rotation
+#>   - `residual_cor(fit)`: implied correlations among species
+#>   - `ordinate(fit)`: biplot of the factor scores and loadings
 #>   - `loo(fit)` / `loo_compare(...)`: model fit + comparison
 #>   - `conditional_effects(fit)`: covariate effects
 #> Use `how_to_cite(fit)` for a methods paragraph and `methods_md(fit)` for its equations.
@@ -156,11 +155,11 @@ summary(fit)
 # the simulation used
 round(residual_cor(fit)$cor, 2)
 #>       sp_1  sp_2  sp_3  sp_4  sp_5
-#> sp_1  1.00 -0.44 -0.07 -0.65  0.03
-#> sp_2 -0.44  1.00  0.13  0.31 -0.07
-#> sp_3 -0.07  0.13  1.00 -0.38 -0.44
-#> sp_4 -0.65  0.31 -0.38  1.00  0.21
-#> sp_5  0.03 -0.07 -0.44  0.21  1.00
+#> sp_1  1.00 -0.46 -0.06 -0.65  0.07
+#> sp_2 -0.46  1.00  0.13  0.35 -0.10
+#> sp_3 -0.06  0.13  1.00 -0.38 -0.38
+#> sp_4 -0.65  0.35 -0.38  1.00  0.18
+#> sp_5  0.07 -0.10 -0.38  0.18  1.00
 round(simdat$truth$residual_cor, 2)
 #>       sp_1  sp_2  sp_3  sp_4  sp_5
 #> sp_1  1.00 -0.46 -0.05 -0.64  0.04

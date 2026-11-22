@@ -11,6 +11,15 @@ scores all series together. Its per-series rows hold `NA`. The rows with
 
 ``` r
 compare_scores(..., score = "crps", model_names = NULL, score_args = list())
+
+# S3 method for class 'mvgam_compare_scores'
+plot(x, relative = NULL, facet = TRUE, ...)
+
+# S3 method for class 'mvgam_compare_scores'
+summary(object, ...)
+
+# S3 method for class 'mvgam_compare_scores'
+print(x, digits = 2L, ...)
 ```
 
 ## Arguments
@@ -40,9 +49,36 @@ compare_scores(..., score = "crps", model_names = NULL, score_args = list())
   [`score.mvgam_forecast()`](https://nicholasjclark.github.io/mvgam/dev/reference/score.mvgam_forecast.md),
   such as `score_args = list(interval_width = 0.6)`.
 
+- x:
+
+  An `mvgam_compare_scores` object.
+
+- relative:
+
+  Optional name of a model in `x$model`. Each score is then drawn less
+  that model's at the same series and horizon, with a dashed zero line.
+  Negative values favour the other model. The baseline itself is left
+  out.
+
+- facet:
+
+  Logical. `TRUE` (the default) gives a univariate score one panel per
+  series. `FALSE` overlays the series, told apart by line type. A joint
+  score ignores it.
+
+- object:
+
+  An `mvgam_compare_scores` object.
+
+- digits:
+
+  Integer number of significant digits. Defaults to 2.
+
 ## Value
 
-A `tibble` of class `mvgam_compare_scores`, with columns:
+A `tibble` of class `mvgam_compare_scores`. Its
+[`print()`](https://rdrr.io/r/base/print.html) method ranks the models
+by their mean score. Its columns are:
 
 - `model`: a factor with one level per forecast.
 
@@ -58,10 +94,16 @@ A `tibble` of class `mvgam_compare_scores`, with columns:
   [`score.mvgam_forecast()`](https://nicholasjclark.github.io/mvgam/dev/reference/score.mvgam_forecast.md)
   reports it.
 
+[`summary()`](https://rdrr.io/r/base/summary.html) returns the scores
+wide, one column per model and one row per series and horizon, or per
+horizon for a joint score.
+[`plot()`](https://rdrr.io/r/graphics/plot.default.html) draws each
+model's score by horizon. A univariate score takes one panel per series
+and a joint score one panel. An ensemble plots as one more model.
+
 ## See also
 
 [`score.mvgam_forecast()`](https://nicholasjclark.github.io/mvgam/dev/reference/score.mvgam_forecast.md),
-[`plot.mvgam_compare_scores()`](https://nicholasjclark.github.io/mvgam/dev/reference/plot.mvgam_compare_scores.md),
 [`compare_elpds()`](https://nicholasjclark.github.io/mvgam/dev/reference/compare_elpds.md),
 [`forecast.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/forecast.mvgam.md),
 [`ensemble.mvgam_forecast()`](https://nicholasjclark.github.io/mvgam/dev/reference/ensemble.mvgam_forecast.md)
@@ -69,9 +111,10 @@ A `tibble` of class `mvgam_compare_scores`, with columns:
 Other forecasting:
 [`ensemble.mvgam_forecast()`](https://nicholasjclark.github.io/mvgam/dev/reference/ensemble.mvgam_forecast.md),
 [`forecast.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/forecast.mvgam.md),
-[`hindcast.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/hindcast.mvgam.md),
+[`forecast_uncertainty()`](https://nicholasjclark.github.io/mvgam/dev/reference/forecast_uncertainty.md),
+[`hindcast()`](https://nicholasjclark.github.io/mvgam/dev/reference/hindcast.mvgam.md),
 [`lfo_cv.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/lfo_cv.mvgam.md),
-[`score.mvgam_forecast()`](https://nicholasjclark.github.io/mvgam/dev/reference/score.mvgam_forecast.md)
+[`score()`](https://nicholasjclark.github.io/mvgam/dev/reference/score.mvgam_forecast.md)
 
 ## Author
 
@@ -90,13 +133,13 @@ simdat <- sim_mvgam(family = poisson(), n_series = 1L,
 # lfo_cv() refits it to shorter stretches of the series
 mod_gam <- mvgam(y ~ s(x, k = 5), data = simdat$data_train,
                  family = poisson(), chains = 2, silent = 2)
-#> Warning: 209 of 2000 (10.0%) transitions ended with a divergence.
+#> Warning: 12 of 2000 (1.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 mod_ar <- mvgam(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1),
                 data = simdat$data_train, family = poisson(),
                 chains = 2, silent = 2,
                 control = list(adapt_delta = 0.95))
-#> Warning: 3 of 2000 (0.0%) transitions ended with a divergence.
+#> Warning: 2 of 2000 (0.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 # }
 # \dontrun{
@@ -111,16 +154,16 @@ summary(scores)
 #> # A tibble: 30 × 4
 #>    series   eval_horizon    GAM    AR
 #>    <fct>           <int>  <dbl> <dbl>
-#>  1 series_1            1  2.39  1.29 
-#>  2 series_1            2  2.59  1.18 
-#>  3 series_1            3 10.5   6.33 
-#>  4 series_1            4  7.96  5.82 
-#>  5 series_1            5  8.68  4.19 
-#>  6 series_1            6  4.07  2.28 
-#>  7 series_1            7  0.722 0.878
-#>  8 series_1            8  0.781 0.900
-#>  9 series_1            9  2.73  2.03 
-#> 10 series_1           10  4.58  2.71 
+#>  1 series_1            1  2.54  1.32 
+#>  2 series_1            2  2.46  1.17 
+#>  3 series_1            3 10.5   6.26 
+#>  4 series_1            4  8.11  5.79 
+#>  5 series_1            5  8.77  4.21 
+#>  6 series_1            6  4.14  2.15 
+#>  7 series_1            7  0.741 0.927
+#>  8 series_1            8  0.844 0.877
+#>  9 series_1            9  2.91  2.08 
+#> 10 series_1           10  4.49  2.74 
 #> # ℹ 20 more rows
 
 # The AR model's DRPS minus the GAM's. Negative values favour the

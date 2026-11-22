@@ -37,7 +37,7 @@ mcmc_plot(object, type = "intervals", variable = NULL, regex = FALSE, ...)
 
   - `"betas"`: population-level coefficients, the set
     [`brms::fixef()`](https://paulbuerkner.com/brms/reference/fixef.brmsfit.html)
-    reports (`b_*`, `bs_*` and `bsp_*`).
+    reports (`b_*`, `bs_*`, `bsp_*` and `bcs_*`).
 
   - `"obs_params"`: observation-family distributional parameters
     (`sigma`, `phi`, `shape`, ...).
@@ -106,7 +106,7 @@ mod <- mvgam(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1),
               data    = simdat$data_train,
               family  = poisson(),
               chains  = 2, silent = 2)
-#> Warning: 5 of 2000 (0.0%) transitions ended with a divergence.
+#> Warning: 9 of 2000 (0.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 
 # Posterior intervals of the trend parameters

@@ -37,7 +37,9 @@ predictive_error(
 - re_formula:
 
   Group-level terms to include: `NULL` (the default) for every one, `NA`
-  for none. A formula choosing some of them is not supported.
+  for none, or a formula naming the terms to keep, such as `~ (1 | g)`.
+  A formula applies to the observation and the trend formulas alike. Any
+  term it does not name is dropped.
 
 - re.form:
 
@@ -97,7 +99,7 @@ Other predictions:
 [`conditional_effects.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/conditional_effects.mvgam.md),
 [`conditional_smooths.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/conditional_smooths.mvgam.md),
 [`fitted.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/fitted.mvgam.md),
-[`hindcast.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/hindcast.mvgam.md),
+[`hindcast()`](https://nicholasjclark.github.io/mvgam/dev/reference/hindcast.mvgam.md),
 [`posterior_epred.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/posterior_epred.mvgam.md),
 [`posterior_linpred.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/posterior_linpred.mvgam.md),
 [`posterior_predict.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/posterior_predict.mvgam.md),
@@ -119,7 +121,7 @@ simdat <- sim_mvgam(family = poisson(), n_series = 1L,
 mod <- mvgam(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1),
              data = simdat$data_train, family = poisson(),
              chains = 2, silent = 2)
-#> Warning: 5 of 2000 (0.0%) transitions ended with a divergence.
+#> Warning: 9 of 2000 (0.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 
 # Observed minus predicted counts, one row per draw
@@ -132,8 +134,8 @@ mae <- colMeans(abs(err))
 simdat$data_train[order(mae, decreasing = TRUE)[1:3], c("time", "y")]
 #>    time  y
 #> 71   71 30
-#> 89   89 28
 #> 65   65 26
+#> 89   89 28
 
 # Next: residuals(mod) returns randomised quantile residuals
 # }

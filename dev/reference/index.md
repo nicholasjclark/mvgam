@@ -8,7 +8,7 @@ Entry points that compile a state-space model and sample it.
   : Fit a Bayesian multivariate state-space model
 
 - [`jsdgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/jsdgam.md)
-  : Fit Joint Species Distribution Models in mvgam
+  : Fit a joint species distribution model
 
 - [`mvgam_multiple()`](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam_multiple.md)
   : Fit mvgam models to multiply imputed datasets
@@ -46,16 +46,15 @@ Entry points that compile a state-space model and sample it.
 
 Building the observation formula and choosing a latent trend process.
 
-- [`mvgam_formula()`](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam_formula.md)
+- [`print(`*`<mvgam_formula>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam_formula.md)
+  [`mvgam_formula()`](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam_formula.md)
   : Pair an observation formula with a trend formula
-
-- [`print(`*`<mvgam_formula>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/print.mvgam_formula.md)
-  : Print method for mvgam_formula objects
 
 - [`formula(`*`<mvgam>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/formula.mvgam.md)
   : Extract formula from mvgam object
 
-- [`RW()`](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md)
+- [`print(`*`<mvgam_trend>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md)
+  [`RW()`](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md)
   [`AR()`](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md)
   [`CAR()`](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md)
   [`VAR()`](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md)
@@ -64,9 +63,7 @@ Building the observation formula and choosing a latent trend process.
   Latent trend models for mvgam
 
 - [`LLT()`](https://nicholasjclark.github.io/mvgam/dev/reference/LLT.md)
-  :
-
-  Specify local linear trends in mvgam models
+  : Local linear trends, with optional damping and seasons
 
 - [`PW()`](https://nicholasjclark.github.io/mvgam/dev/reference/piecewise_trends.md)
   : Piecewise linear or logistic trends
@@ -80,11 +77,8 @@ Building the observation formula and choosing a latent trend process.
 - [`is.mvgam_trend()`](https://nicholasjclark.github.io/mvgam/dev/reference/is.mvgam_trend.md)
   : Whether an object is an mvgam trend
 
-- [`print(`*`<mvgam_trend>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/print.mvgam_trend.md)
-  : Print method for mvgam trend objects
-
 - [`list_trend_types()`](https://nicholasjclark.github.io/mvgam/dev/reference/list_trend_types.md)
-  : List Available Trend Types
+  : List the available trend types
 
 - [`mvgam_trend_specification`](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam_trend_specification.md)
   : Fields of an mvgam_trend object
@@ -186,44 +180,22 @@ Generative recipes that return the truths they drew from, for recovery
 checks.
 
 - [`sim_mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/sim_mvgam.md)
+  [`summary(`*`<mvgam_sim>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/sim_mvgam.md)
+  [`print(`*`<mvgam_sim_summary>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/sim_mvgam.md)
+  [`print(`*`<mvgam_sim>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/sim_mvgam.md)
   :
 
   Simulate `mvgam`-shaped time-series data with known truth
 
-- [`print(`*`<mvgam_sim>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/print.mvgam_sim.md)
-  :
-
-  Print method for `mvgam_sim`
-
-- [`summary(`*`<mvgam_sim>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/summary.mvgam_sim.md)
-  :
-
-  Summary for
-  [`sim_mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/sim_mvgam.md)
-  output
-
-- [`print(`*`<mvgam_sim_summary>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/print.mvgam_sim_summary.md)
-  :
-
-  Print method for `mvgam_sim_summary`
-
 - [`sim_closure_unit_data()`](https://nicholasjclark.github.io/mvgam/dev/reference/sim_closure_unit_data.md)
+  [`summary(`*`<mvgam_sim_closure_unit>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/sim_closure_unit_data.md)
+  [`print(`*`<mvgam_sim_closure_unit_summary>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/sim_closure_unit_data.md)
   : Simulate closure-unit detection data with known truth
 
-- [`summary(`*`<mvgam_sim_closure_unit>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/summary.mvgam_sim_closure_unit.md)
-  : Summary method for sim_closure_unit_data() output
-
-- [`print(`*`<mvgam_sim_closure_unit_summary>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/print.mvgam_sim_closure_unit_summary.md)
-  : Print method for sim_closure_unit_data() summary output
-
 - [`sim_jsdgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/sim_jsdgam.md)
+  [`summary(`*`<mvgam_sim_jsdgam>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/sim_jsdgam.md)
+  [`print(`*`<mvgam_sim_jsdgam_summary>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/sim_jsdgam.md)
   : Simulate multi-species data for a joint species distribution model
-
-- [`summary(`*`<mvgam_sim_jsdgam>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/summary.mvgam_sim_jsdgam.md)
-  : Summary method for sim_jsdgam() output
-
-- [`print(`*`<mvgam_sim_jsdgam_summary>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/print.mvgam_sim_jsdgam_summary.md)
-  : Print method for sim_jsdgam() summary output
 
 ## Prediction and forecasting
 
@@ -245,43 +217,41 @@ covariates leave the fitted trend out.
 - [`posterior_predict(`*`<mvgam>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/posterior_predict.mvgam.md)
   : Posterior predictive draws of the response
 
-- [`hindcast()`](https://nicholasjclark.github.io/mvgam/dev/reference/hindcast.md)
-  : Generic for posterior hindcasts
-
-- [`hindcast(`*`<mvgam>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/hindcast.mvgam.md)
+- [`hindcast()`](https://nicholasjclark.github.io/mvgam/dev/reference/hindcast.mvgam.md)
+  [`summary(`*`<mvgam_latent_state>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/hindcast.mvgam.md)
+  [`print(`*`<mvgam_latent_state>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/hindcast.mvgam.md)
+  [`plot(`*`<mvgam_latent_state>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/hindcast.mvgam.md)
   : Posterior hindcasts for an mvgam state-space model
 
 - [`forecast(`*`<mvgam>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/forecast.mvgam.md)
   : Posterior forecasts for an mvgam state-space model
 
-- [`mvgam_forecast-class`](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam_forecast-class.md)
+- [`summary(`*`<mvgam_forecast>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam_forecast-class.md)
+  [`print(`*`<mvgam_forecast>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam_forecast-class.md)
   :
 
   `mvgam_forecast` object description
 
-- [`print(`*`<mvgam_forecast>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/print.mvgam_forecast.md)
-  :
-
-  Compact summary of an `mvgam_forecast` object
-
-- [`summary(`*`<mvgam_forecast>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/summary.mvgam_forecast.md)
-  : Posterior summary of hindcast and forecast objects
-
 - [`plot(`*`<mvgam_forecast>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/plot.mvgam_forecast.md)
   : Plot posterior hindcasts and forecasts
 
-- [`print(`*`<mvgam_latent_state>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/print.mvgam_latent_state.md)
-  :
+- [`seasonality()`](https://nicholasjclark.github.io/mvgam/dev/reference/seasonality.md)
+  [`summary(`*`<mvgam_seasonality>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/seasonality.md)
+  [`print(`*`<mvgam_seasonality>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/seasonality.md)
+  [`plot(`*`<mvgam_seasonality>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/seasonality.md)
+  : Seasonal patterns of a fitted local linear trend
 
-  Short print for a `mvgam_latent_state` object
+- [`forecast_uncertainty()`](https://nicholasjclark.github.io/mvgam/dev/reference/forecast_uncertainty.md)
+  [`summary(`*`<mvgam_forecast_uncertainty>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/forecast_uncertainty.md)
+  [`print(`*`<mvgam_forecast_uncertainty>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/forecast_uncertainty.md)
+  [`plot(`*`<mvgam_forecast_uncertainty>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/forecast_uncertainty.md)
+  [`summary(`*`<mvgam_forecast_scenarios>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/forecast_uncertainty.md)
+  [`print(`*`<mvgam_forecast_scenarios>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/forecast_uncertainty.md)
+  [`plot(`*`<mvgam_forecast_scenarios>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/forecast_uncertainty.md)
+  : Forecast uncertainty by source
 
-- [`summary(`*`<mvgam_latent_state>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/summary.mvgam_latent_state.md)
-  :
-
-  Per-unit posterior summary for a `mvgam_latent_state` object
-
-- [`plot(`*`<mvgam_latent_state>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/plot.mvgam_latent_state.md)
-  : Plot the posterior latent state
+- [`sample_innovations`](https://nicholasjclark.github.io/mvgam/dev/reference/sample_innovations.md)
+  : Process error innovation sampling for trend models
 
 - [`ensemble()`](https://nicholasjclark.github.io/mvgam/dev/reference/ensemble.mvgam_forecast.md)
   :
@@ -315,15 +285,11 @@ Posterior predictive checks, residuals, leave-one-out criteria and
 cross-validation of forecasts.
 
 - [`pp_check(`*`<mvgam>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/pp_check.mvgam.md)
+  [`print(`*`<mvgam_ppc_fit_stat>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/pp_check.mvgam.md)
+  [`plot(`*`<mvgam_ppc_fit_stat>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/pp_check.mvgam.md)
   :
 
   Posterior predictive checks for mvgam models
-
-- [`print(`*`<mvgam_ppc_fit_stat>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/print.mvgam_ppc_fit_stat.md)
-  : Print a closure-unit GOF discrepancy result
-
-- [`plot(`*`<mvgam_ppc_fit_stat>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/plot.mvgam_ppc_fit_stat.md)
-  : Plot a closure-unit GOF discrepancy result
 
 - [`residuals(`*`<mvgam>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/residuals.mvgam.md)
   :
@@ -365,43 +331,19 @@ cross-validation of forecasts.
   Bridge sampling and Bayes factors for `mvgam` fits
 
 - [`kfold(`*`<mvgam>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/kfold.mvgam.md)
+  [`print(`*`<mvgam_kfold>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/kfold.mvgam.md)
+  [`summary(`*`<mvgam_kfold>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/kfold.mvgam.md)
+  [`plot(`*`<mvgam_kfold>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/kfold.mvgam.md)
   :
 
   K-fold cross-validation for `mvgam` fits
 
-- [`print(`*`<mvgam_kfold>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/print.mvgam_kfold.md)
-  :
-
-  Print an `mvgam_kfold` object
-
-- [`summary(`*`<mvgam_kfold>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/summary.mvgam_kfold.md)
-  :
-
-  Tibble summary of an `mvgam_kfold` object
-
-- [`plot(`*`<mvgam_kfold>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/plot.mvgam_kfold.md)
-  :
-
-  Diagnostic plot for an `mvgam_kfold` object
-
 - [`lfo_cv()`](https://nicholasjclark.github.io/mvgam/dev/reference/lfo_cv.mvgam.md)
+  [`plot(`*`<mvgam_lfo>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/lfo_cv.mvgam.md)
+  [`summary(`*`<mvgam_lfo>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/lfo_cv.mvgam.md)
+  [`print(`*`<mvgam_lfo>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/lfo_cv.mvgam.md)
   : Approximate leave-future-out cross-validation of fitted mvgam
   objects
-
-- [`print(`*`<mvgam_lfo>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/print.mvgam_lfo.md)
-  :
-
-  Print headline summary of an `mvgam_lfo` object
-
-- [`summary(`*`<mvgam_lfo>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/summary.mvgam_lfo.md)
-  :
-
-  Posterior summary of an `mvgam_lfo` object
-
-- [`plot(`*`<mvgam_lfo>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/plot.mvgam_lfo.md)
-  :
-
-  Plot Pareto-k and per-fold scores from an `mvgam_lfo` object
 
 - [`loo_compare(`*`<mvgam_lfo>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/loo_compare.mvgam_lfo.md)
   : Compare leave-future-out evaluations across models
@@ -411,38 +353,21 @@ cross-validation of forecasts.
 
   Model weights from `mvgam_lfo` objects
 
-- [`score()`](https://nicholasjclark.github.io/mvgam/dev/reference/score.md)
-  : Generic for posterior forecast scoring
-
-- [`score(`*`<mvgam_forecast>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/score.mvgam_forecast.md)
+- [`score()`](https://nicholasjclark.github.io/mvgam/dev/reference/score.mvgam_forecast.md)
+  [`print(`*`<mvgam_score>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/score.mvgam_forecast.md)
   :
 
   Proper scoring rules for `mvgam_forecast` objects
 
 - [`compare_scores()`](https://nicholasjclark.github.io/mvgam/dev/reference/compare_scores.md)
+  [`plot(`*`<mvgam_compare_scores>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/compare_scores.md)
+  [`summary(`*`<mvgam_compare_scores>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/compare_scores.md)
+  [`print(`*`<mvgam_compare_scores>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/compare_scores.md)
   : Tidy comparison of forecast scores across mvgam models
 
-- [`summary(`*`<mvgam_compare_scores>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/summary.mvgam_compare_scores.md)
-  :
-
-  Wide-format summary of a
-  [`compare_scores()`](https://nicholasjclark.github.io/mvgam/dev/reference/compare_scores.md)
-  table
-
-- [`plot(`*`<mvgam_compare_scores>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/plot.mvgam_compare_scores.md)
-  :
-
-  Plot per-model score trajectories from
-  [`compare_scores()`](https://nicholasjclark.github.io/mvgam/dev/reference/compare_scores.md)
-
 - [`compare_elpds()`](https://nicholasjclark.github.io/mvgam/dev/reference/compare_elpds.md)
+  [`plot(`*`<mvgam_compare_elpds>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/compare_elpds.md)
   : Tidy comparison of leave-future-out ELPDs across mvgam_lfo runs
-
-- [`plot(`*`<mvgam_compare_elpds>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/plot.mvgam_compare_elpds.md)
-  :
-
-  Plot per-step LFO ELPDs from
-  [`compare_elpds()`](https://nicholasjclark.github.io/mvgam/dev/reference/compare_elpds.md)
 
 ## Posterior summaries and diagnostics
 
@@ -450,10 +375,8 @@ Parameter summaries and convergence checks for a fit. The Stan program
 and data that produced it.
 
 - [`summary(`*`<mvgam>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/summary.mvgam.md)
+  [`print(`*`<mvgam_summary>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/summary.mvgam.md)
   : Summary of mvgam model fits
-
-- [`print(`*`<mvgam_summary>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/print.mvgam_summary.md)
-  : Print method for mvgam_summary objects
 
 - [`summary(`*`<mvgam_pooled>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/summary.mvgam_pooled.md)
   [`print(`*`<mvgam_pooled_summary>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/summary.mvgam_pooled.md)
@@ -550,6 +473,7 @@ and data that produced it.
   [`standata(`*`<mvgam_formula>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/stancode.mvgam_formula.md)
   [`stancode(`*`<mvgam>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/stancode.mvgam_formula.md)
   [`standata(`*`<mvgam>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/stancode.mvgam_formula.md)
+  [`print(`*`<mvgamstancode>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/stancode.mvgam_formula.md)
   : Stan code and data of an mvgam model
 
 - [`stancode(`*`<formula>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/trend_formula_generation.md)
@@ -559,9 +483,6 @@ and data that produced it.
   :
 
   Stan program and data from a formula carrying a `trend_formula`
-
-- [`print(`*`<mvgamstancode>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/print.mvgamstancode.md)
-  : Print the Stan program of an mvgam model
 
 ## Reporting a model
 
@@ -605,126 +526,97 @@ computed from the posterior of a VAR trend.
 - [`irf()`](https://nicholasjclark.github.io/mvgam/dev/reference/irf.mvgam.md)
   : Calculate latent VAR impulse response functions
 
-- [`mvgam_irf-class`](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam_irf-class.md)
+- [`summary(`*`<mvgam_irf>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam_irf-class.md)
+  [`plot(`*`<mvgam_irf>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam_irf-class.md)
   :
 
   `mvgam_irf` object description
 
-- [`summary(`*`<mvgam_irf>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/summary.mvgam_irf.md)
-  : Posterior summary of impulse responses
-
-- [`plot(`*`<mvgam_irf>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/plot.mvgam_irf.md)
-  :
-
-  Plot impulse responses from an `mvgam_irf` object
-
 - [`fevd()`](https://nicholasjclark.github.io/mvgam/dev/reference/fevd.mvgam.md)
   : Calculate latent VAR forecast error variance decompositions
 
-- [`mvgam_fevd-class`](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam_fevd-class.md)
+- [`summary(`*`<mvgam_fevd>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam_fevd-class.md)
+  [`plot(`*`<mvgam_fevd>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam_fevd-class.md)
   :
 
   `mvgam_fevd` object description
 
-- [`summary(`*`<mvgam_fevd>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/summary.mvgam_fevd.md)
-  : Posterior summary of forecast error variance decompositions
-
-- [`plot(`*`<mvgam_fevd>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/plot.mvgam_fevd.md)
-  :
-
-  Plot forecast error variance decompositions from an `mvgam_fevd`
-  object
-
 - [`stability()`](https://nicholasjclark.github.io/mvgam/dev/reference/stability.mvgam.md)
+  [`summary(`*`<mvgam_stability>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/stability.mvgam.md)
+  [`plot(`*`<mvgam_stability_summary>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/stability.mvgam.md)
+  [`plot(`*`<mvgam_stability>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/stability.mvgam.md)
   : Calculate measures of latent VAR community stability
-
-- [`summary(`*`<mvgam_stability>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/summary.mvgam_stability.md)
-  : Summarise posterior stability metrics
-
-- [`plot(`*`<mvgam_stability>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/plot.mvgam_stability.md)
-  : Plot posterior distributions of latent VAR stability metrics
-
-- [`plot(`*`<mvgam_stability_summary>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/plot.mvgam_stability_summary.md)
-  : Plot summarised stability metrics
 
 - [`plot(`*`<mvgam_var_surface_summary>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/plot.mvgam_var_surface_summary.md)
   : Plot a summarised impulse response or variance decomposition
 
 - [`posterior_transition_matrix()`](https://nicholasjclark.github.io/mvgam/dev/reference/posterior_transition_matrix.md)
+  [`print(`*`<mvgam_var_matrix>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/posterior_transition_matrix.md)
+  [`plot(`*`<mvgam_var_matrix>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/posterior_transition_matrix.md)
+  [`print(`*`<mvgam_var_matrix_list>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/posterior_transition_matrix.md)
+  [`plot(`*`<mvgam_var_matrix_list>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/posterior_transition_matrix.md)
   : Posterior transition matrix of a VAR trend
 
-- [`print(`*`<mvgam_var_matrix>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/print.mvgam_var_matrix.md)
-  : Print a VAR transition matrix
+## Correlations among series
 
-- [`print(`*`<mvgam_var_matrix_list>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/print.mvgam_var_matrix_list.md)
-  : Print the VAR transition matrices of several panels
+The correlations a factor model, correlated innovations or a
+hierarchical trend implies among the series.
 
-- [`plot(`*`<mvgam_var_matrix>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/plot.mvgam_var_matrix.md)
-  : Plot a VAR transition matrix
+- [`residual_cor()`](https://nicholasjclark.github.io/mvgam/dev/reference/residual_cor.md)
+  : Residual correlations between the series of a fitted model
 
-- [`plot(`*`<mvgam_var_matrix_list>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/plot.mvgam_var_matrix_list.md)
-  : Plot the VAR transition matrices of several panels
+- [`plot(`*`<mvgam_residcor>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam_residcor-class.md)
+  [`plot(`*`<mvgam_residcor_list>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam_residcor-class.md)
+  [`summary(`*`<mvgam_residcor>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam_residcor-class.md)
+  [`print(`*`<mvgam_residcor>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam_residcor-class.md)
+  :
+
+  `mvgam_residcor` object description
 
 ## Latent factors and joint species distribution models
 
-Ordinations, loading comparisons, factor activity and the residual
-correlations a factor model implies.
+Ordinations, loading comparisons, factor activity, each species’
+responses to covariates and community summaries.
 
 - [`ordinate()`](https://nicholasjclark.github.io/mvgam/dev/reference/ordinate.md)
   : Ordination biplot of a latent factor model
 
 - [`active_factors()`](https://nicholasjclark.github.io/mvgam/dev/reference/active_factors.md)
+  [`plot(`*`<mvgam_active_factors>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/active_factors.md)
   : Posterior count of the latent factors a model uses
-
-- [`plot(`*`<mvgam_active_factors>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/plot.mvgam_active_factors.md)
-  : Plot the posterior active-factor probabilities
 
 - [`compare_loadings()`](https://nicholasjclark.github.io/mvgam/dev/reference/compare_loadings.md)
   : Compare posterior loadings between two latent-factor fits
 
 - [`shared_variation()`](https://nicholasjclark.github.io/mvgam/dev/reference/shared_variation.md)
+  [`plot(`*`<mvgam_shared_variation>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/shared_variation.md)
   : Posterior summary of the factor-implied shared variation matrix
 
-- [`plot(`*`<mvgam_shared_variation>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/plot.mvgam_shared_variation.md)
-  : Plot the factor-implied shared variation matrix
+- [`species_effects()`](https://nicholasjclark.github.io/mvgam/dev/reference/species_effects.md)
+  [`summary(`*`<mvgam_species_effects>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/species_effects.md)
+  [`print(`*`<mvgam_species_effects>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/species_effects.md)
+  [`plot(`*`<mvgam_species_effects>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/species_effects.md)
+  : How each species responds to covariates
 
-- [`residual_cor()`](https://nicholasjclark.github.io/mvgam/dev/reference/residual_cor.md)
-  : Residual correlations between the series of a fitted model
+- [`variance_partition()`](https://nicholasjclark.github.io/mvgam/dev/reference/variance_partition.md)
+  [`summary(`*`<mvgam_variance_partition>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/variance_partition.md)
+  [`print(`*`<mvgam_variance_partition>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/variance_partition.md)
+  [`plot(`*`<mvgam_variance_partition>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/variance_partition.md)
+  : Partition each series' predictor variance among its sources
 
-- [`mvgam_residcor-class`](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam_residcor-class.md)
-  :
-
-  `mvgam_residcor` object description
-
-- [`print(`*`<mvgam_residcor>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/print.mvgam_residcor.md)
-  :
-
-  Print a concise overview of an `mvgam_residcor` object
-
-- [`summary(`*`<mvgam_residcor>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/summary.mvgam_residcor.md)
-  :
-
-  Tidy summary of an `mvgam_residcor` object
-
-- [`plot(`*`<mvgam_residcor>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/plot.mvgam_residcor.md)
-  :
-
-  Plot residual correlations or precisions from a `mvgam_residcor`
-  object
-
-- [`plot(`*`<mvgam_residcor_list>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/plot.mvgam_residcor_list.md)
-  :
-
-  Plot method for an `mvgam_residcor_list`
+- [`community()`](https://nicholasjclark.github.io/mvgam/dev/reference/community.md)
+  [`summary(`*`<mvgam_community>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/community.md)
+  [`as_draws_rvars(`*`<mvgam_community>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/community.md)
+  [`as_draws_df(`*`<mvgam_community>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/community.md)
+  [`print(`*`<mvgam_community>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/community.md)
+  [`plot(`*`<mvgam_community>`*`)`](https://nicholasjclark.github.io/mvgam/dev/reference/community.md)
+  : Community quantities from a fitted model
 
 - [`trait_slopes_helpers`](https://nicholasjclark.github.io/mvgam/dev/reference/trait_slopes_helpers.md)
   :
 
-  Trait-mediated environmental slopes for
+  Trait-mediated responses for
   [`jsdgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/jsdgam.md)
-
-- [`sample_innovations`](https://nicholasjclark.github.io/mvgam/dev/reference/sample_innovations.md)
-  : Process error innovation sampling for trend models
 
 ## Plotting
 

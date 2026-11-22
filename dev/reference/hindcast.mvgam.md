@@ -10,6 +10,8 @@ predicts unseen times.
 ## Usage
 
 ``` r
+hindcast(object, ...)
+
 # S3 method for class 'mvgam'
 hindcast(
   object,
@@ -22,6 +24,15 @@ hindcast(
   process_error = FALSE,
   resp = NULL
 )
+
+# S3 method for class 'mvgam_latent_state'
+summary(object, probs = c(0.025, 0.25, 0.75, 0.975), ...)
+
+# S3 method for class 'mvgam_latent_state'
+print(x, digits = 2L, ...)
+
+# S3 method for class 'mvgam_latent_state'
+plot(x, series = NULL, ...)
 ```
 
 ## Arguments
@@ -30,7 +41,8 @@ hindcast(
 
   A fitted
   [mvgam](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam.md)
-  object.
+  object, or for [`summary()`](https://rdrr.io/r/base/summary.html) an
+  `mvgam_latent_state` object.
 
 - ...:
 
@@ -45,11 +57,14 @@ hindcast(
   [`occ()`](https://nicholasjclark.github.io/mvgam/dev/reference/occ.md)
   model or the abundance `N` of an
   [`nmix()`](https://nicholasjclark.github.io/mvgam/dev/reference/nmix.md)
-  model at each closure unit, as an `mvgam_latent_state` object with
-  [`print()`](https://rdrr.io/r/base/print.html),
-  [`summary()`](https://rdrr.io/r/base/summary.html),
-  [`as.data.frame()`](https://rdrr.io/r/base/as.data.frame.html) and
-  [`plot()`](https://rdrr.io/r/graphics/plot.default.html) methods.
+  model at each closure unit, as an `mvgam_latent_state` object. Its
+  [`print()`](https://rdrr.io/r/base/print.html) gives the range of the
+  unit medians. [`summary()`](https://rdrr.io/r/base/summary.html) and
+  [`as.data.frame()`](https://rdrr.io/r/base/as.data.frame.html) return
+  one row per unit with the median and the 50% and 95% interval bounds.
+  [`plot()`](https://rdrr.io/r/graphics/plot.default.html) draws them
+  per series, as a line with ribbons over time or as points with
+  interval bars over units without an order.
 
 - component:
 
@@ -96,6 +111,24 @@ hindcast(
   Character specifying which response variable for multivariate models.
   NULL (default) returns predictions for all responses.
 
+- probs:
+
+  For [`summary()`](https://rdrr.io/r/base/summary.html), the four
+  interval bounds, lowest first. Defaults to
+  `c(0.025, 0.25, 0.75, 0.975)`, the 50% and 95% intervals.
+
+- x:
+
+  An `mvgam_latent_state` object.
+
+- digits:
+
+  Integer number of digits in the printed range. Defaults to 2.
+
+- series:
+
+  Names or indices of the series to plot, or `NULL` for every series.
+
 ## Value
 
 An
@@ -133,8 +166,9 @@ Other forecasting:
 [`compare_scores()`](https://nicholasjclark.github.io/mvgam/dev/reference/compare_scores.md),
 [`ensemble.mvgam_forecast()`](https://nicholasjclark.github.io/mvgam/dev/reference/ensemble.mvgam_forecast.md),
 [`forecast.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/forecast.mvgam.md),
+[`forecast_uncertainty()`](https://nicholasjclark.github.io/mvgam/dev/reference/forecast_uncertainty.md),
 [`lfo_cv.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/lfo_cv.mvgam.md),
-[`score.mvgam_forecast()`](https://nicholasjclark.github.io/mvgam/dev/reference/score.mvgam_forecast.md)
+[`score()`](https://nicholasjclark.github.io/mvgam/dev/reference/score.mvgam_forecast.md)
 
 ## Examples
 
@@ -151,7 +185,7 @@ mod <- mvgam(
   family  = poisson(),
   chains  = 2, silent = 2
 )
-#> Warning: 36 of 2000 (2.0%) transitions ended with a divergence.
+#> Warning: 25 of 2000 (1.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 
 # The fitted states track the training counts
@@ -170,7 +204,7 @@ plot(hindcast(mod, process_error = TRUE))
 
 # A local linear trend's slope, the level's growth per step
 mod_llt <- update(mod, trend_formula = ~ LLT())
-#> Warning: 2 of 2000 (0.0%) transitions ended with a divergence.
+#> Warning: 1 of 2000 (0.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 plot(hindcast(mod_llt, type = "trend", component = "slope"))
 

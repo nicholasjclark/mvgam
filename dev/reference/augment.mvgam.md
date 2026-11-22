@@ -108,7 +108,7 @@ mod <- mvgam(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1),
               data    = simdat$data_train,
               family  = poisson(),
               chains  = 2, silent = 2)
-#> Warning: 5 of 2000 (0.0%) transitions ended with a divergence.
+#> Warning: 9 of 2000 (0.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 
 # The training data with fitted values and residuals appended
@@ -117,12 +117,12 @@ head(aug)
 #> # A tibble: 6 × 13
 #>       y series    time      x .observed .fitted .se.fit .lower .upper  .resid
 #>   <int> <fct>    <int>  <dbl>     <int>   <dbl>   <dbl>  <dbl>  <dbl>   <dbl>
-#> 1     2 series_1     1  0.841         2    2.21   0.950  0.844   4.48  0.0431
-#> 2    14 series_1     2 -1.02         14   12.9    3.24   7.63   20.2   0.431 
-#> 3     6 series_1     3 -0.441         6    6.13   1.86   3.11   10.2   0.0838
-#> 4     1 series_1     4 -1.63          1    4.27   1.54   1.75    7.82 -1.67  
-#> 5     5 series_1     5  1.85          5    3.79   1.41   1.64    7.15  0.749 
-#> 6     5 series_1     6 -1.96          5    5.10   1.75   2.35    9.12  0.111 
+#> 1     2 series_1     1  0.841         2    2.20   0.913  0.856   4.34  0.0502
+#> 2    14 series_1     2 -1.02         14   12.8    3.14   7.37   19.8   0.452 
+#> 3     6 series_1     3 -0.441         6    6.08   1.90   3.15   10.5   0.105 
+#> 4     1 series_1     4 -1.63          1    4.25   1.48   1.89    7.59 -1.67  
+#> 5     5 series_1     5  1.85          5    3.77   1.44   1.65    7.20  0.765 
+#> 6     5 series_1     6 -1.96          5    5.19   1.70   2.53    9.25  0.0684
 #> # ℹ 3 more variables: .resid.se <dbl>, .resid.lower <dbl>, .resid.upper <dbl>
 
 # Residuals against fitted values, from one tibble

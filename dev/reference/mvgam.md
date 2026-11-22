@@ -24,7 +24,6 @@ mvgam(
   trend_formula = NULL,
   data = NULL,
   newdata = NULL,
-  trend_map = NULL,
   loadings_prior = NULL,
   backend = getOption("brms.backend", "cmdstanr"),
   combine = TRUE,
@@ -40,15 +39,17 @@ mvgam(
 
 - formula:
 
-  Main observation model formula (supports brms syntax). Smooth specials
-  `s()`, `t2()`, `gp()`, varying intercepts and slopes, monotonic
-  `mo()`, measurement-error `me()`, distributional `dpar` sub-formulas
-  and [`offset()`](https://rdrr.io/r/stats/offset.html) are all
-  available. `gp()` accepts both the approximate Hilbert-space form
-  (`gp(x, k = 20)`) and the exact full-covariance form (`gp(x)`, no
-  `k`). Prediction at `newdata` requires the approximate form. An exact
-  `gp()` term fits and scores in-sample. `mvgam()` says so once per
-  session.
+  The observation model formula, in brms syntax: smooths `s()` and
+  `t2()`, `gp()`, varying intercepts and slopes, `mm()`, `mo()`, `me()`,
+  `mi()`, distributional and non-linear sub-formulas and
+  [`offset()`](https://rdrr.io/r/stats/offset.html). A response leaves
+  rows out by holding `NA` there.
+  [`mvgam_formula()`](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam_formula.md)
+  lists the terms each formula refuses. `gp()` takes the approximate
+  Hilbert-space form (`gp(x, k = 20)`) or the exact form (`gp(x)`, no
+  `k`), under any brms kernel. An exact term predicts at new covariate
+  values by conditioning on its fitted values, as brms does. Its cost
+  grows with the cube of the number of unique values.
 
 - trend_formula:
 
@@ -58,9 +59,7 @@ mvgam(
   with any predictors of the latent state. Write
   [`lv_axis()`](https://nicholasjclark.github.io/mvgam/dev/reference/lv_axis.md)
   in a term to vary its effect by latent factor, or by series in a model
-  without factors, as in `~ x:lv_axis() + AR()`. The series column
-  itself is not supported in a term of this formula. Forecasting
-  requires the approximate form of any `gp()` term here.
+  without factors, as in `~ x:lv_axis() + AR()`.
 
 - data:
 
@@ -85,27 +84,6 @@ mvgam(
   section 'Which prediction function?' of
   [`predict.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/predict.mvgam.md)
   compares the two.
-
-- trend_map:
-
-  Optional fixed factor loadings, in one of three forms:
-
-  - a numeric `n_series x n_lv` matrix of loadings. `NA` entries are
-    sampled. Finite entries stay fixed on `Z` in the posterior. An
-    all-`NA` matrix fixes nothing and acts as `trend_map = NULL`
-
-  - a `data.frame(series, trend)` assigning each series to one latent
-    process
-
-  - `"identity"`, one process per series, or `"shared"`, one process for
-    every series
-
-  A factor model without a `trend_map` samples every loading. It
-  identifies `Z` after sampling by a thin QR rotation (Heaps and Jermyn
-  2024). A `trend_map` with any fixed entry takes no rotation. The
-  argument requires a `trend_formula`. The trend constructor takes a
-  `trend_map` argument too. Supplying both is an error. `loadings_prior`
-  lists the `trend_map` forms a structured loadings prior accepts.
 
 - loadings_prior:
 
@@ -217,7 +195,8 @@ mvgam(
   mixture is identified by. Those are left out by default, as brms
   leaves them out. `save_pars(all = TRUE)` keeps every one. `group` and
   `latent` keep the per-level deviations and the latent values of a
-  `me()` covariate. `manual` names individual parameters to keep.
+  `me()` covariate or a `mi()` response with known noise. `manual` names
+  individual parameters to keep.
 
 - run_model:
 
@@ -373,11 +352,9 @@ section of
 describes the rotation.
 
 A `trend_map` with no fixed entries, `NULL` or a matrix of `NA`, is
-compatible.
-[`jsdgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/jsdgam.md)
-passes the second form. A `trend_map` that fixes any loading is refused.
-Its free entries take the default prior of class `Z`, which the
-structured prior would duplicate.
+compatible. A `trend_map` that fixes any loading is refused. Its free
+entries take the default prior of class `Z`, which the structured prior
+would duplicate.
 
 ## Terms used in this documentation
 
@@ -521,16 +498,18 @@ scores and compares forecasts. The [multivariate formula
 article](https://nicholasjclark.github.io/mvgam/dev/articles/mvbf.html)
 fits several responses at once. The [integrated distribution model
 article](https://nicholasjclark.github.io/mvgam/dev/articles/idm.html)
-ties several observation families to one latent process.
+ties several observation families to one latent process. The
+[cheatsheet](https://nicholasjclark.github.io/mvgam/dev/cheatsheets/mvgam_cheatsheet.pdf)
+summarises the main functions on one page.
 
 Other model fitting:
 [`check_newdata()`](https://nicholasjclark.github.io/mvgam/dev/reference/check_newdata.md),
 [`jsdgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/jsdgam.md),
 [`mvgam_data()`](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam_data.md),
-[`mvgam_formula()`](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam_formula.md),
 [`mvgam_multiple()`](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam_multiple.md),
 [`pivot_detection_array()`](https://nicholasjclark.github.io/mvgam/dev/reference/pivot_detection_array.md),
 [`pivot_species_matrix()`](https://nicholasjclark.github.io/mvgam/dev/reference/pivot_species_matrix.md),
+[`print.mvgam_formula()`](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam_formula.md),
 [`series_to_mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/series_to_mvgam.md),
 [`stancode.mvgam_formula()`](https://nicholasjclark.github.io/mvgam/dev/reference/stancode.mvgam_formula.md),
 [`update.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/update.mvgam.md)
@@ -588,7 +567,7 @@ mod <- mvgam(
   chains        = 2,
   silent        = 2
 )
-#> Warning: 20 of 2000 (1.0%) transitions ended with a divergence.
+#> Warning: 17 of 2000 (1.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 summary(mod)
 #>  Family: poisson 
@@ -602,21 +581,21 @@ summary(mod)
 #> == Observation Model ==
 #> Smoothing Spline Hyperparameters:
 #>           Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> sds(sx_1)     4.18      1.81     1.65     9.00 1.01      774      704
+#> sds(sx_1)     4.37      1.94     1.77     9.51 1.00      878     1293
 #> 
 #> Regression Coefficients:
 #>           Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> Intercept     1.55      0.15     1.25     1.85 1.00      855      843
-#> sx_1          7.17      2.77     1.64    12.60 1.00      781     1120
+#> Intercept     1.56      0.15     1.25     1.84 1.00     1004     1231
+#> sx_1          7.20      2.77     1.95    12.81 1.00      900      985
 #> 
 #> == Trend Model ==
 #> Trend Specific Parameters:
 #>                       Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS
-#> sigma_trend[series_1]     0.54      0.08     0.38     0.71 1.00      837
-#> ar1_trend[series_1]       0.46      0.17     0.11     0.76 1.00      522
+#> sigma_trend[series_1]     0.54      0.09     0.38     0.72 1.00      639
+#> ar1_trend[series_1]       0.48      0.17     0.11     0.78 1.00      458
 #>                       Tail_ESS
-#> sigma_trend[series_1]     1195
-#> ar1_trend[series_1]        918
+#> sigma_trend[series_1]      920
+#> ar1_trend[series_1]        732
 #> 
 #> Draws were sampled using sampling(NUTS). For each parameter, Bulk_ESS
 #> and Tail_ESS are effective sample size measures, and Rhat is the potential
@@ -649,7 +628,7 @@ how_to_cite(mod)
 #>   state-space models that combine flexible predictor effects in both the
 #>   process and observation components, using functionality from the brms
 #>   (Burkner 2017) and mgcv (Wood 2017) packages. Observations followed the
-#>   poisson family with a log link. The latent process followed AR(1)
+#>   poisson family with the log link. The latent process followed AR(1)
 #>   dynamics. The mvgam-constructed model and data were passed to Stan
 #>   (Carpenter et al. 2017) via the cmdstanr interface (Gabry et al. 2024).
 #>   We ran 2 Hamiltonian Monte Carlo chains for 1000 warmup iterations and

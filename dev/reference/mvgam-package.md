@@ -10,13 +10,14 @@ the software 'Stan'. References: Clark & Wells (2023)
 
 ## See also
 
-Useful links:
-
-- <https://github.com/nicholasjclark/mvgam>
-
-- <https://nicholasjclark.github.io/mvgam/>
-
-- Report bugs at <https://github.com/nicholasjclark/mvgam/issues>
+[`mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam.md)
+fits a state-space model and
+[`jsdgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/jsdgam.md)
+a joint species distribution model. The [mvgam
+cheatsheet](https://nicholasjclark.github.io/mvgam/dev/cheatsheets/mvgam_cheatsheet.pdf)
+and the [JSDM
+cheatsheet](https://nicholasjclark.github.io/mvgam/dev/cheatsheets/jsdgam_cheatsheet.pdf)
+summarise the main functions on one page each.
 
 ## Author
 

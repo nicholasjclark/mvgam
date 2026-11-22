@@ -6,6 +6,46 @@ Run `methods(class = "mvgam_fevd")` and
 `methods(class = "mvgam_fevd_summary")` to see an overview of available
 methods.
 
+## Usage
+
+``` r
+# S3 method for class 'mvgam_fevd'
+summary(object, probs = c(0.025, 0.975), ...)
+
+# S3 method for class 'mvgam_fevd'
+plot(x, series = NULL, contributing = NULL, ...)
+```
+
+## Arguments
+
+- object:
+
+  An `mvgam_fevd` object from `fevd(summary = FALSE)`.
+
+- probs:
+
+  The lower and upper percentiles of the interval. Defaults to
+  `c(0.025, 0.975)`.
+
+- ...:
+
+  Unused. Anything passed here is refused.
+
+- x:
+
+  An `mvgam_fevd` object.
+
+- series:
+
+  Optional positions or names of the target processes drawn as panels.
+  Defaults to every process.
+
+- contributing:
+
+  Optional positions or names of the source processes stacked in each
+  panel. Their shares are renormalised to sum to one. Defaults to every
+  process.
+
 ## Details
 
 A forecast error variance decomposition quantifies how much of the
@@ -50,6 +90,15 @@ returns that summary. The two forms have different classes:
 
 Both forms take `ndraws` and `draw_ids`. A subset of the posterior
 computes faster.
+
+## Methods
+
+[`summary()`](https://rdrr.io/r/base/summary.html) turns the draws into
+the `mvgam_fevd_summary` above, at the percentiles `probs` sets.
+[`plot()`](https://rdrr.io/r/graphics/plot.default.html) stacks the
+median share of each source in one panel per target, by horizon. A
+summary plots through
+[`plot.mvgam_var_surface_summary()`](https://nicholasjclark.github.io/mvgam/dev/reference/plot.mvgam_var_surface_summary.md).
 
 ## References
 

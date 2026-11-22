@@ -15,6 +15,9 @@ shared_variation(object, ...)
 
 # S3 method for class 'mvgam'
 shared_variation(object, probs = c(0.025, 0.975), robust = FALSE, ...)
+
+# S3 method for class 'mvgam_shared_variation'
+plot(x, type = c("point", "uncertainty"), ...)
 ```
 
 ## Arguments
@@ -39,6 +42,15 @@ shared_variation(object, probs = c(0.025, 0.975), robust = FALSE, ...)
   for summaries. If `TRUE`, uses median and median absolute deviation
   (MAD).
 
+- x:
+
+  An `mvgam_shared_variation` object.
+
+- type:
+
+  `"point"` (the default) draws the point estimate. `"uncertainty"`
+  draws the per-entry spread, `delta_se`.
+
 ## Value
 
 An object of class `mvgam_shared_variation`, a list with:
@@ -57,6 +69,11 @@ An object of class `mvgam_shared_variation`, a list with:
   labels.
 
 - `probs`, `robust`: the summary settings.
+
+[`plot()`](https://rdrr.io/r/graphics/plot.default.html) draws the point
+estimate, or under `type = "uncertainty"` the per-entry spread, as a
+heatmap. The diagonal shows the variance the factors capture in each
+series. The fill scale is symmetric about zero.
 
 ## Details
 
@@ -143,7 +160,7 @@ mod <- jsdgam(
   chains         = 2,
   silent         = 2
 )
-#> Warning: 49 of 2000 (2.0%) transitions ended with a divergence.
+#> Warning: 43 of 2000 (2.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 
 # The species-by-species covariance the two factors induce
@@ -155,12 +172,12 @@ sv
 #> 
 #> Diagonal (captured variance per series):
 #>      Estimate  Q2.5  Q97.5
-#> sp_1    3.181 0.014 35.988
-#> sp_2    2.668 0.037 20.761
-#> sp_3    2.014 0.013 16.764
-#> sp_4    1.267 0.015  7.893
-#> sp_5    6.781 0.036 63.237
-#> sp_6    1.807 0.017  9.492
+#> sp_1    0.985 0.011  5.502
+#> sp_2    4.658 0.022 46.389
+#> sp_3    4.836 0.013 31.330
+#> sp_4    1.739 0.011 12.583
+#> sp_5    5.495 0.046 48.798
+#> sp_6    1.233 0.017  8.519
 #> 
 #> plot() draws the full matrix as a heatmap.
 plot(sv)

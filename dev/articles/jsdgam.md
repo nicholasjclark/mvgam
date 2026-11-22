@@ -15,7 +15,9 @@ Australia (Gibb et al.
 [2015](https://doi.org/10.1007/s00442-014-3101-9)) and adds three
 extensions in turn: environmental effects that act through the factors,
 a loadings prior informed by species traits and a prior under which the
-data decide how many factors are active.
+data decide how many factors are active. The [JSDM
+cheatsheet](https://nicholasjclark.github.io/mvgam/dev/cheatsheets/jsdgam_cheatsheet.pdf)
+summarises the functions on one page.
 
 ## The data
 
@@ -136,58 +138,44 @@ mod_env <- jsdgam(
   chains = 4, seed = 2025, silent = 2
 )
 fixef(mod_env, trend_effects = TRUE)
-#>                               Estimate Est.Error       Q2.5     Q97.5
-#> Bare.ground:.trend1_trend   0.13564181 0.2762347 -0.4420674 0.6554589
-#> Bare.ground:.trend2_trend   0.17603198 0.3102579 -0.4708602 0.7279889
-#> .trend1:Canopy.cover_trend  0.45383186 0.5148217 -0.7700835 1.2997788
-#> .trend2:Canopy.cover_trend  0.57566623 0.5925456 -0.7755250 1.4164902
-#> .trend1:Shrub.cover_trend  -0.01004982 0.2378052 -0.4644986 0.4670960
-#> .trend2:Shrub.cover_trend   0.08467129 0.2624600 -0.4590928 0.5574199
+#>                                Estimate Est.Error       Q2.5     Q97.5
+#> Bare.ground:.trend1_trend   0.141879572 0.2780325 -0.4449011 0.6644610
+#> Bare.ground:.trend2_trend   0.189307196 0.3034796 -0.4435432 0.7335655
+#> .trend1:Canopy.cover_trend  0.469787357 0.5170706 -0.7592491 1.2901162
+#> .trend2:Canopy.cover_trend  0.555287758 0.5870969 -0.7556979 1.3949672
+#> .trend1:Shrub.cover_trend  -0.009004259 0.2338782 -0.4453334 0.4680144
+#> .trend2:Shrub.cover_trend   0.073719634 0.2554418 -0.4505435 0.5443604
 ```
 
 [`fixef()`](https://rdrr.io/pkg/nlme/man/fixed.effects.html) reports the
 slopes in the same rotated basis as the identified loadings `Z_tilde`. A
 species’ response is the product of its loadings and these slopes.
-`posterior_linpred()` returns it as the change in each species’ linear
-predictor between two sites that differ only in canopy cover:
+[`species_effects()`](https://nicholasjclark.github.io/mvgam/dev/reference/species_effects.md)
+returns each species’ response to each covariate, draw by draw, on the
+log scale of expected counts. A black outline marks a response whose
+sign has a posterior probability above 0.95:
 
 ``` r
 
-newdata <- expand.grid(species = levels(ant_data$species),
-                       Canopy.cover = c(0, 1))
-newdata$site <- 1
-newdata$Bare.ground <- 0
-newdata$Shrub.cover <- 0
-lp <- posterior_linpred(mod_env, newdata = newdata)
-canopy <- lp[, newdata$Canopy.cover == 1] - lp[, newdata$Canopy.cover == 0]
-canopy_q <- data.frame(
-  species = levels(ant_data$species),
-  t(apply(canopy, 2, quantile, c(0.025, 0.5, 0.975)))
-)
-names(canopy_q)[2:4] <- c("lo", "med", "hi")
-canopy_q$species <- reorder(canopy_q$species, canopy_q$med)
+se <- species_effects(mod_env, variables = c("Bare.ground", "Canopy.cover",
+                                             "Shrub.cover"))
+plot(se)
 ```
 
-``` r
+![Posterior mean response of each species to one standard deviation of
+each covariate, on the log scale of expected counts. Outlined cells have
+a posterior probability of their sign above
+0.95.](jsdgam_files/figure-html/species-effects-1.png)
 
-ggplot(canopy_q, aes(med, species)) +
-  geom_vline(xintercept = 0, colour = "grey60") +
-  geom_pointrange(aes(xmin = lo, xmax = hi), colour = "#8F2727",
-                  size = 0.25) +
-  labs(x = "Response to canopy cover", y = NULL)
-```
+Posterior mean response of each species to one standard deviation of
+each covariate, on the log scale of expected counts. Outlined cells have
+a posterior probability of their sign above 0.95.
 
-![Posterior median and 95% credible interval of each species' response
-to one standard deviation of canopy cover, on the log scale of expected
-counts.](jsdgam_files/figure-html/canopy-plot-1.png)
-
-Posterior median and 95% credible interval of each species’ response to
-one standard deviation of canopy cover, on the log scale of expected
-counts.
-
-The intervals of 16 of the 41 species exclude zero. The median responses
-run from -0.90 for Cardiocondyla nuda atalanta to 2.52 for Aphaenogaster
-longiceps.
+Under denser canopy 9 of the 41 species become more abundant and 13 less
+abundant, each with a posterior probability above 0.95. The mean
+responses run from -1.05 for Cardiocondyla nuda atalanta to 2.69 for
+Aphaenogaster longiceps. `summary(se)` lists every species’ estimate and
+interval.
 
 ## Trait-informed loadings
 
@@ -230,9 +218,9 @@ Posterior medians with 50% and 90% credible intervals of the length
 scale of each trait.
 
 The median length scale of Femur length, 0.28, is the shortest of the
-traits. It falls below the 5% quantile of 4 of the other 4 traits’
-length scales. A shorter length scale gives a trait’s differences
-between species more weight in the loadings prior.
+traits. It falls below the 5% quantile of every other trait’s length
+scale. A shorter length scale gives a trait’s differences between
+species more weight in the loadings prior.
 [`compare_loadings()`](https://nicholasjclark.github.io/mvgam/dev/reference/compare_loadings.md)
 aligns the two fits’ loadings by a Procrustes rotation and draws how far
 each species moved:
@@ -261,12 +249,12 @@ loo_cmp <- loo_compare(list(uninformed = loo(mod_base),
                             `trait-informed` = loo(mod_traits)))
 loo_cmp
 #>           model elpd_diff se_diff p_worse diag_diff       diag_elpd
-#>  trait-informed       0.0     0.0      NA           20 k_psis > 0.7
-#>      uninformed     -30.8     8.0    1.00           21 k_psis > 0.7
+#>  trait-informed       0.0     0.0      NA           21 k_psis > 0.7
+#>      uninformed     -30.8     8.5    1.00           23 k_psis > 0.7
 ```
 
 Leave-one-out ranks the trait-informed prior first. The other trails it
-by 30.8 (SE 8.0) in expected log predictive density.
+by 30.8 (SE 8.5) in expected log predictive density.
 
 ## Residual correlations
 
@@ -281,17 +269,70 @@ rcor <- residual_cor(mod_traits)
 plot(rcor, cluster = TRUE)
 ```
 
-![Posterior median residual correlations from the trait-informed model.
-Outlined cells have 95% intervals excluding
-zero.](jsdgam_files/figure-html/resid-cor-1.png)
+![Posterior mean residual correlations from the trait-informed model.
+Outlined cells have a posterior probability of their sign above
+0.95.](jsdgam_files/figure-html/resid-cor-1.png)
 
-Posterior median residual correlations from the trait-informed model.
-Outlined cells have 95% intervals excluding zero.
+Posterior mean residual correlations from the trait-informed model.
+Outlined cells have a posterior probability of their sign above 0.95.
 
-Of the 820 species pairs, 320 correlate positively and 51 negatively
-with intervals that exclude zero. A residual correlation may reflect a
-shared response to an unmeasured driver or an interaction between
-species. The model alone cannot tell the two apart.
+Of the 820 species pairs, 346 correlate positively and 62 negatively,
+each with a posterior probability of its sign above 0.95. A residual
+correlation may reflect a shared response to an unmeasured driver or an
+interaction between species. The model alone cannot tell the two apart.
+
+## The community along a gradient
+
+Ecologists report a community by its richness and the traits of its
+species. To see how canopy cover changes both,
+[`community()`](https://nicholasjclark.github.io/mvgam/dev/reference/community.md)
+predicts every species along a gradient of canopy cover and combines the
+predictions draw by draw. It averages over the latent factors, which
+gives the expected community of a site with that cover:
+
+``` r
+
+canopy <- data.frame(Canopy.cover = seq(-1.5, 1.5, length.out = 25),
+                     Bare.ground = 0, Shrub.cover = 0, site = 1)
+cm <- community(mod_env, newdata = canopy, traits = traits)
+plot(cm)
+```
+
+![Posterior median expected richness along canopy cover, with nested
+20%, 40%, 60% and 80% credible
+intervals.](jsdgam_files/figure-html/community-1.png)
+
+Posterior median expected richness along canopy cover, with nested 20%,
+40%, 60% and 80% credible intervals.
+
+Expected richness barely changes, from 20.2 species at the most open
+sites to 19.9 under the densest canopy. The posterior probability that
+dense canopy holds fewer species is 0.63.
+
+Richness counts species without regard to how common they are. Each
+species weighs into diversity and traits by its expected count. A Hill
+number gives how many equally common species would match the community’s
+evenness. Each trait panel gives the trait of an average individual ant:
+
+``` r
+
+plot(cm, type = "diversity")
+```
+
+![Hill numbers and abundance-weighted mean traits along canopy cover,
+with nested 20%, 40%, 60% and 80% credible
+intervals.](jsdgam_files/figure-html/community-diversity-1.png)
+
+Hill numbers and abundance-weighted mean traits along canopy cover, with
+nested 20%, 40%, 60% and 80% credible intervals.
+
+The exponential of Shannon entropy, the Hill number of order one, peaks
+at 27 species near a canopy cover of -0.2 and falls to 15 under the
+densest canopy. Dense canopy keeps a list of species as long as open
+ground does, while a few of them come to dominate the counts.
+
+`plot(cm, type = "cooccurrence")` draws the pairs of species found
+together more or less often than canopy cover predicts.
 
 ## How many factors?
 
@@ -336,17 +377,17 @@ threshold.](jsdgam_files/figure-html/active-factors-1.png)
 Posterior probability that each factor, largest first, is active. The
 dashed line marks the threshold.
 
-In this fit, 2 of the six factors are active, against the two the
-earlier models fixed.
+In this fit, 2 of the 6 factors are active, against the 2 the earlier
+models fixed.
 
 ## Summary
 
 The trait prior and column shrinkage tested two assumptions of the first
 ant community models: independent loadings and two factors.
 Leave-one-out ranked the trait-informed prior first, by 30.8 in expected
-log predictive density against a standard error of 8.0. Given a ceiling
-of six factors, the shrinkage prior kept 2 active, against the two the
-first models assumed. Each extension is one argument to a single
+log predictive density against a standard error of 8.5. Given a ceiling
+of 6 factors, the shrinkage prior kept 2 active, against the 2 the first
+models assumed. Each extension is one argument to a single
 [`jsdgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/jsdgam.md)
 call, as are the environmental slopes that gave all 41 species a canopy
 response from three covariates.
@@ -397,10 +438,6 @@ Heaps SE and Jermyn IH (2024). Structured prior distributions for the
 covariance matrix in latent factor models. *Statistics and Computing*
 34, 143.
 [doi:10.1007/s11222-024-10454-0](https://doi.org/10.1007/s11222-024-10454-0)
-
-Legramanti S, Durante D and Dunson DB (2020). Bayesian cumulative
-shrinkage for infinite factorizations. *Biometrika* 107(3), 745-752.
-[doi:10.1093/biomet/asaa008](https://doi.org/10.1093/biomet/asaa008)
 
 Ovaskainen O, Tikhonov G, Norberg A, Blanchet FG, Duan L, Dunson D,
 Roslin T and Abrego N (2017). How to make more out of community data? A

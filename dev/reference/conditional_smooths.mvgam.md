@@ -128,7 +128,7 @@ plots covariate effects on the response.
 Other predictions:
 [`conditional_effects.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/conditional_effects.mvgam.md),
 [`fitted.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/fitted.mvgam.md),
-[`hindcast.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/hindcast.mvgam.md),
+[`hindcast()`](https://nicholasjclark.github.io/mvgam/dev/reference/hindcast.mvgam.md),
 [`posterior_epred.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/posterior_epred.mvgam.md),
 [`posterior_linpred.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/posterior_linpred.mvgam.md),
 [`posterior_predict.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/posterior_predict.mvgam.md),
@@ -152,7 +152,7 @@ mod <- mvgam(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1),
               data    = simdat$data_train,
               family  = poisson(),
               chains  = 2, silent = 2)
-#> Warning: 5 of 2000 (0.0%) transitions ended with a divergence.
+#> Warning: 9 of 2000 (0.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 
 # The smooth with 30 of its draws
@@ -160,13 +160,13 @@ cs <- conditional_smooths(mod, spaghetti = TRUE, ndraws = 30)
 plot(cs)
 
 head(cs[[1]])
-#>           x effect1__ cond__ estimate__      se__     lower__   upper__
-#> 1 -1.956267 -1.956267      1  0.1395892 0.2528395 -0.33127905 0.6819955
-#> 2 -1.916330 -1.916330      1  0.1810723 0.2343669 -0.24878642 0.6823771
-#> 3 -1.876393 -1.876393      1  0.2233491 0.2146605 -0.16871206 0.6827754
-#> 4 -1.836457 -1.836457      1  0.2747993 0.1916381 -0.09094228 0.6832153
-#> 5 -1.796520 -1.796520      1  0.3282185 0.1809053 -0.01363752 0.6837284
-#> 6 -1.756583 -1.756583      1  0.3828878 0.1715279  0.06293585 0.6843500
+#>           x effect1__ cond__ estimate__      se__       lower__   upper__
+#> 1 -1.956267 -1.956267      1  0.2315575 0.2611709 -0.1295957312 0.7394862
+#> 2 -1.916330 -1.916330      1  0.2624873 0.2467684 -0.0650309078 0.7480911
+#> 3 -1.876393 -1.876393      1  0.2911005 0.2267610 -0.0005502739 0.7566807
+#> 4 -1.836457 -1.836457      1  0.3235633 0.1996097  0.0637125782 0.7652294
+#> 5 -1.796520 -1.796520      1  0.3558936 0.1765597  0.1275696394 0.7736999
+#> 6 -1.756583 -1.756583      1  0.4003457 0.1774376  0.1907877791 0.7820435
 
 # Next, plot(mod, type = "smooths") draws the same panels in one
 # figure

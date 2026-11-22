@@ -38,6 +38,10 @@ raw <- WDI::WDI(
 )
 ```
 
+The World Bank revises these series as national accounts are updated. A
+saved copy of the download of 15 October 2026 keeps the results below
+fixed. We fitted the model to it.
+
 The panel ends in 2019. The contractions and rebounds of the pandemic
 years would dominate every estimate. Growth is the difference in log
 levels from one year to the next, which leaves 49 years for each
@@ -76,7 +80,7 @@ Annual growth in real GDP, consumption and investment for the eight
 economies, 1971 to 2019, as the difference in log levels.
 
 Investment growth varies about 3 times as much as GDP growth. GDP fell
-in 2009 in 7 of the eight economies. The largest rises in the panel are
+in 2009 in 7 of the 8 economies. The largest rises in the panel are
 Ireland’s GDP growth of 25% in 2015 and Ireland’s investment growth of
 100% in 2019.
 
@@ -179,7 +183,7 @@ fit <- mvgam(
   trend_formula = ~ VAR(p = 1, gr = country, subgr = outcome, cor = TRUE),
   family = gaussian(),
   data = growth,
-  priors = c(
+  prior = c(
     prior(inv_gamma(20, 3), class = sigma),
     prior(lkj_corr_cholesky(10), class = L_deviation_group_trend),
     prior(beta(2, 2), class = alpha_cor_trend)
@@ -212,7 +216,7 @@ shocks.](hierarchical_var_files/figure-html/alpha-1.png)
 Posterior distribution of the weight on the shared correlation of the
 shocks.
 
-The weight is 0.81 \[0.75, 0.88\]. Savage estimated 0.82 \[0.75, 0.90\]
+The weight is 0.81 \[0.74, 0.87\]. Savage estimated 0.82 \[0.75, 0.90\]
 from 313 annual observations of an earlier vintage of the same
 indicators.
 
@@ -229,13 +233,13 @@ summary(rc)
 #> # A tibble: 3 × 11
 #>   series_1    series_2    Estimate Est.Error Q_lower Q_upper   ESS prob_positive
 #>   <chr>       <chr>          <dbl>     <dbl>   <dbl>   <dbl> <dbl>         <dbl>
-#> 1 GDP         Investment     0.923    0.186    0.855   0.965 2423.             1
-#> 2 GDP         Consumption    0.875    0.142    0.800   0.931 2419.             1
-#> 3 Consumption Investment     0.669    0.0996   0.557   0.771 2671.             1
+#> 1 GDP         Investment     0.923    0.186    0.854   0.965 2892.             1
+#> 2 GDP         Consumption    0.876    0.150    0.799   0.934 2444.             1
+#> 3 Consumption Investment     0.670    0.0992   0.559   0.773 3002.             1
 #> # ℹ 3 more variables: prob_negative <dbl>, prob_nonzero <dbl>, sig <lgl>
 ```
 
-GDP shocks correlate with investment shocks at 0.92 \[0.86, 0.96\] and
+GDP shocks correlate with investment shocks at 0.92 \[0.85, 0.97\] and
 with consumption shocks at 0.88 \[0.80, 0.93\]. Consumption and
 investment shocks correlate at 0.67 \[0.56, 0.77\]. Savage’s estimates
 were 0.93, 0.89 and 0.74, in the same order.
@@ -249,11 +253,11 @@ plot(rc_groups, include_global = FALSE)
 ```
 
 ![Posterior mean correlations of the shocks in each economy. Outlined
-pairs have 95% credible intervals that exclude
-zero.](hierarchical_var_files/figure-html/rc-groups-1.png)
+pairs have a posterior probability of their sign above
+0.95.](hierarchical_var_files/figure-html/rc-groups-1.png)
 
 Posterior mean correlations of the shocks in each economy. Outlined
-pairs have 95% credible intervals that exclude zero.
+pairs have a posterior probability of their sign above 0.95.
 
 The economies’ GDP and investment shocks correlate at 0.71 to 0.83,
 against the shared 0.92. Every economy’s correlation is below the shared
@@ -295,18 +299,18 @@ A
 #>   Point estimate:
 #>              GDP Consumption Investment
 #> GDP         0.05        0.27       0.12
-#> Consumption 0.04        0.47       0.02
+#> Consumption 0.05        0.46       0.02
 #> Investment  0.09        0.14       0.21
 #>   95% CI on each cell available in `A_lower` / `A_upper`.
 ```
 
 On average, consumption growth is the most persistent of the three
-outcomes. The average diagonal coefficient is 0.47 \[0.34, 0.61\] for
+outcomes. The average diagonal coefficient is 0.46 \[0.33, 0.60\] for
 consumption and 0.05 \[-0.15, 0.25\] for GDP.
 
-Consider the United States. Its GDP diagonal is -0.87 \[-1.79, -0.08\]
-and its GDP growth loads on last year’s consumption growth at 1.06
-\[0.48, 1.77\]. In the United States, the states of GDP and consumption
+Consider the United States. Its GDP diagonal is -0.85 \[-1.75, -0.09\]
+and its GDP growth loads on last year’s consumption growth at 1.05
+\[0.46, 1.71\]. In the United States, the states of GDP and consumption
 correlate at 0.82, the most strongly of the eight. Last year’s GDP and
 consumption then carry nearly the same information about this year. The
 model can trade a negative coefficient on one against a positive
@@ -348,7 +352,7 @@ Generalised impulse responses of Australian GDP, consumption and
 investment to a one standard deviation shock in Australian investment,
 with 95% credible intervals.
 
-The shock raises Australian investment by 0.62 \[0.51, 0.77\] standard
+The shock raises Australian investment by 0.62 \[0.52, 0.75\] standard
 deviations in its first year. Because investment and GDP shocks
 correlate, GDP moves with it, by 0.38 \[0.30, 0.49\]. In the second year
 consumption is at 0.14 \[0.05, 0.24\]. Every response stays within 0.01
@@ -419,9 +423,9 @@ zero reactivity.
 
 The median mean return rates run from 0.39 to 0.64. A deviation of
 growth from its mean halves within two years in every economy.
-Reactivity intervals lie above zero for United States. The United States
-has a reactivity of 0.85 \[0.11, 1.41\], shaped by the large offsetting
-coefficients of its transition matrix.
+Reactivity intervals lie above zero for the United States. The United
+States has a reactivity of 0.83 \[0.08, 1.40\], shaped by the large
+offsetting coefficients of its transition matrix.
 
 Partial pooling puts four fifths of the weight on a correlation of
 shocks shared by all eight economies, close to Savage’s estimate from an

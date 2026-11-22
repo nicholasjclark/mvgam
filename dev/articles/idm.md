@@ -146,28 +146,28 @@ summary(mod_joint)
 #> == Observation Model ==
 #> Regression Coefficients:
 #>                 Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> count_Intercept     1.13      0.12     0.86     1.34 1.00     1223     1932
-#> pa_Intercept       -0.32      0.18    -0.68     0.02 1.00     2085     2709
-#> po_Intercept        0.23      0.14    -0.06     0.48 1.00     1531     1945
+#> count_Intercept     1.14      0.12     0.89     1.35 1.00     1257     2000
+#> pa_Intercept       -0.31      0.18    -0.66     0.03 1.00     1904     2571
+#> po_Intercept        0.24      0.14    -0.06     0.48 1.00     1365     2024
 #> 
 #> == Trend Model ==
 #> Smoothing Spline Hyperparameters:
 #>             Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> sds(senv_1)     1.99      1.02     0.68     4.59 1.00     1726     2116
+#> sds(senv_1)     2.00      1.05     0.67     4.63 1.00     1999     2330
 #> 
 #> Regression Coefficients:
 #>        Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> senv_1    -0.52      3.28    -7.78     5.08 1.00     1736     1778
+#> senv_1    -0.54      3.31    -8.07     5.13 1.00     2104     2119
 #> 
 #> Trend Specific Parameters:
 #>                       Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS
-#> sigma_trend[species1]     0.32      0.06     0.21     0.45 1.00     1244
-#> ar1_trend[species1]       0.53      0.15     0.22     0.79 1.00     1039
-#> ar12_trend[species1]      0.19      0.16    -0.14     0.49 1.00      948
+#> sigma_trend[species1]     0.32      0.06     0.20     0.45 1.00     1405
+#> ar1_trend[species1]       0.52      0.15     0.18     0.77 1.00     1370
+#> ar12_trend[species1]      0.18      0.17    -0.17     0.48 1.00     1116
 #>                       Tail_ESS
-#> sigma_trend[species1]     1759
-#> ar1_trend[species1]       1603
-#> ar12_trend[species1]      1694
+#> sigma_trend[species1]     2150
+#> ar1_trend[species1]       1899
+#> ar12_trend[species1]      1836
 #> 
 #> Draws were sampled using sampling(NUTS). For each parameter, Bulk_ESS
 #> and Tail_ESS are effective sample size measures, and Rhat is the potential
@@ -183,7 +183,7 @@ summary(mod_joint)
 
 The autoregressive coefficients and the innovation SD each cover the
 values used to simulate the data. Because only eight annual cycles
-inform it, the lag-12 coefficient (0.19 \[-0.14, 0.49\]) is the least
+inform it, the lag-12 coefficient (0.18 \[-0.17, 0.48\]) is the least
 certain of these.
 
 The intercepts carry what the shared trend leaves to each protocol.
@@ -195,19 +195,20 @@ intercepts estimates the log thinning:
 
 ``` r
 
-b <- as_draws_df(
-  mod_joint,
-  variable = c("b_count_Intercept", "b_pa_Intercept", "b_po_Intercept")
-)
-contrasts <- data.frame(
-  `log area` = b$b_pa_Intercept - b$b_count_Intercept,
-  `log thinning` = b$b_po_Intercept - b$b_count_Intercept,
-  check.names = FALSE
-)
-round(t(apply(contrasts, 2, quantile, c(0.025, 0.5, 0.975))), 2)
-#>               2.5%   50% 97.5%
-#> log area     -1.75 -1.45 -1.17
-#> log thinning -1.09 -0.90 -0.72
+constants <- hypothesis(mod_joint, c(
+  `log area` = "pa_Intercept - count_Intercept = 0",
+  `log thinning` = "po_Intercept - count_Intercept = 0"
+))
+constants
+#> Hypothesis Tests for class :
+#>     Hypothesis Estimate Est.Error CI.Lower CI.Upper Evid.Ratio Post.Prob Star
+#> 1     log area    -1.45      0.15    -1.75    -1.16         NA        NA    *
+#> 2 log thinning    -0.90      0.10    -1.10    -0.71         NA        NA    *
+#> ---
+#> 'CI': 90%-CI for one-sided and 95%-CI for two-sided hypotheses.
+#> '*': For one-sided hypotheses, the posterior probability exceeds 95%;
+#> for two-sided hypotheses, the value tested against lies outside the 95%-CI.
+#> Posterior probabilities of point hypotheses assume equal prior probabilities.
 ```
 
 The simulated constants are $`\log 0.25 = -1.39`$ and $`-0.8`$. Both
@@ -343,16 +344,16 @@ recovery <- t(vapply(fits, function(draws) {
 }, numeric(3)))
 round(recovery, 2)
 #>                 RMSE Interval width Peak env
-#> Joint           0.17           0.67     0.38
-#> Counts alone    0.17           0.75     0.32
+#> Joint           0.18           0.67     0.38
+#> Counts alone    0.17           0.74     0.32
 #> Occupancy alone 0.62           1.23     2.02
-#> Sightings alone 0.41           0.85     1.07
+#> Sightings alone 0.42           0.86     1.14
 ```
 
 The joint model and the counts alone track the response with root mean
-squared errors of 0.17 and 0.17. Intervals are narrowest in the joint
+squared errors of 0.18 and 0.17. Intervals are narrowest in the joint
 fit. Against the simulated optimum of 0.4, the sightings alone put the
-peak at env 1.07 and the occupancy record alone at env 2.02. One binary
+peak at env 1.14 and the occupancy record alone at env 2.02. One binary
 outcome per month constrains the intensity weakly.
 
 ## Forecasts
@@ -385,7 +386,7 @@ Expected values for each protocol over the training months and a
 
 The three forecasts share one future for the state. Once the held-out
 records arrive,
-[`score()`](https://nicholasjclark.github.io/mvgam/dev/reference/score.md)
+[`score()`](https://nicholasjclark.github.io/mvgam/dev/reference/score.mvgam_forecast.md)
 evaluates them protocol by protocol.
 
 ## When protocols disagree

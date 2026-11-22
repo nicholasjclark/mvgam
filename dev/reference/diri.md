@@ -76,6 +76,12 @@ needs every model it compares scored at that grain.
 subtraction. `posterior_epred()` gives the expected shares, which sum to
 one within each unit.
 
+[`species_effects()`](https://nicholasjclark.github.io/mvgam/dev/reference/species_effects.md),
+[`variance_partition()`](https://nicholasjclark.github.io/mvgam/dev/reference/variance_partition.md)
+and `forecast_uncertainty(scale = "link")` report the predictor centred
+across each unit's components, the centred log-ratio scale. A shift
+shared by every component then drops out.
+
 ## References
 
 Aitchison, J. (1982). The statistical analysis of compositional data.
@@ -139,7 +145,7 @@ fit <- jsdgam(
   chains         = 2L,
   silent         = 2
 )
-#> Warning: 2 of 2 chains had an E-BFMI less than 0.3.
+#> Warning: 1 of 2 chains had an E-BFMI less than 0.3.
 #> See https://mc-stan.org/misc/warnings for details.
 
 # The species terms are contrasts with the first species. `Intercept`
@@ -150,33 +156,33 @@ summary(fit)
 #>   Links: mu = identity; phi = log 
 #> Formula: y ~ env * series 
 #>    Data: simdat$data_train (Number of observations: 180) 
-#>  Series: 3 
-#>  Trends: ZMVN; formula: ~-1 
+#> Species: 3 
+#>  Trends: 2 latent factors 
 #>   Draws: 2 chains, each with iter = 2000; warmup = 1000; thin = 1; 
 #>          total post-warmup draws = 2000
 #> 
 #> == Observation Model ==
 #> Regression Coefficients:
 #>                Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> Intercept         -1.45      4.24    -9.25     6.60 1.00     1768      697
-#> env               -0.00      4.03    -7.76     7.67 1.00     2649     1046
-#> seriessp_2         1.74      0.19     1.38     2.12 1.00      620     1172
-#> seriessp_3         2.41      0.27     1.89     2.96 1.00      608     1027
-#> env:seriessp_2    -0.04      0.14    -0.32     0.24 1.00      998      959
-#> env:seriessp_3     1.24      0.23     0.81     1.70 1.00      715      854
+#> Intercept         -1.17      4.95    -8.83     6.88 1.00     1370      611
+#> env                0.07      3.61    -7.03     7.43 1.00     2189      908
+#> seriessp_2         1.76      0.19     1.40     2.15 1.01      420      574
+#> seriessp_3         2.43      0.29     1.89     2.99 1.01      465      536
+#> env:seriessp_2    -0.04      0.15    -0.33     0.25 1.00      963     1556
+#> env:seriessp_3     1.25      0.23     0.79     1.71 1.00      859     1216
 #> 
 #> Further Distributional Parameters:
 #>     Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> phi    32.42     13.05    16.38    64.53 1.01      159      254
+#> phi    34.45     14.00    17.43    70.99 1.03      105      120
 #> 
 #> == Trend Model ==
 #> Factor Loadings:
 #>                 Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> Z_tilde[sp_1,1]     0.95      0.12     0.73     1.20 1.01      298      752
-#> Z_tilde[sp_2,1]    -0.06      0.07    -0.20     0.06 1.00      569      896
-#> Z_tilde[sp_3,1]    -0.89      0.11    -1.10    -0.69 1.00      523     1358
-#> Z_tilde[sp_2,2]     0.19      0.10     0.02     0.37 1.01      211      503
-#> Z_tilde[sp_3,2]    -0.19      0.10    -0.37    -0.02 1.01      211      503
+#> Z_tilde[sp_1,1]     0.97      0.12     0.76     1.24 1.01      249      904
+#> Z_tilde[sp_2,1]    -0.06      0.07    -0.20     0.07 1.00      655      754
+#> Z_tilde[sp_3,1]    -0.91      0.11    -1.14    -0.72 1.00      480     1189
+#> Z_tilde[sp_2,2]     0.20      0.09     0.02     0.37 1.02      210      263
+#> Z_tilde[sp_3,2]    -0.20      0.09    -0.37    -0.02 1.02      210      263
 #> 
 #> Draws were sampled using sampling(NUTS). For each parameter, Bulk_ESS
 #> and Tail_ESS are effective sample size measures, and Rhat is the potential
@@ -184,11 +190,21 @@ summary(fit)
 #> 
 #> Next steps:
 #>   - `pp_check(fit)`: posterior predictive checks
-#>   - `shared_variation(fit)`: factor-implied Delta = Z Sigma Z' (rotation-invariant)
-#>   - `residual_cor(fit)`: implied cross-series correlations
+#>   - `shared_variation(fit)`: covariance the factors imply, unchanged by rotation
+#>   - `residual_cor(fit)`: implied correlations among species
+#>   - `ordinate(fit)`: biplot of the factor scores and loadings
 #>   - `loo(fit)` / `loo_compare(...)`: model fit + comparison
 #>   - `conditional_effects(fit)`: covariate effects
 #> Use `how_to_cite(fit)` for a methods paragraph and `methods_md(fit)` for its equations.
+
+# Each species' response to env relative to the average species
+species_effects(fit, variables = "env")
+#> Species with a supported response, prob_nonzero > 0.95, 2000 draws
+#> 
+#>  effect positive negative species
+#>  env    1        2        3      
+#> 
+#> summary() gives each species' estimate and interval.
 
 # The expected shares move along the gradient
 conditional_effects(fit, effects = "env:series")

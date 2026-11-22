@@ -7,7 +7,9 @@ observation model is a `brms` formula (Bürkner 2017). A second formula,
 structure that the covariates do not explain is estimated as part of the
 latent state. Forecasts carry that structure forward. Stan fits the
 model. The fitted object works with the post-processing tools of four
-packages: `brms`, `marginaleffects`, `loo`, `bayesplot`.
+packages: `brms`, `marginaleffects`, `loo`, `bayesplot`. The
+[cheatsheet](https://nicholasjclark.github.io/mvgam/dev/cheatsheets/mvgam_cheatsheet.pdf)
+summarises the main functions on one page.
 
 For an observation $`y_{i,t}`$ on series $`i`$ at time $`t`$, with link
 function $`g`$ and a response distribution $`\mathcal{F}`$:
@@ -30,8 +32,10 @@ series when $`Z`$ has fewer columns than there are series.
 
 ## What mvgam can model
 
-Every `brms` family works as the observation model. `mvgam` adds
-families for ecological and count data:
+Any single `brms` family can be the observation model. Mixtures are not
+supported. Categorical, multinomial and Dirichlet responses take the
+long-format families below. `mvgam` adds families for ecological and
+count data:
 
 | Family | Use case |
 |:---|:---|
@@ -68,13 +72,23 @@ number of series. `df` gives the innovations Student-t tails.
 [`AR()`](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md)
 or
 [`VAR()`](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md).
+Outside
+[`VAR()`](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md)
+and
+[`PW()`](https://nicholasjclark.github.io/mvgam/dev/reference/piecewise_trends.md),
+`centred = TRUE` samples the states directly, which is faster when large
+counts pin them down.
 [`?trend_constructors`](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md)
 lists the options each constructor takes.
-[`hindcast()`](https://nicholasjclark.github.io/mvgam/dev/reference/hindcast.md)
+[`hindcast()`](https://nicholasjclark.github.io/mvgam/dev/reference/hindcast.mvgam.md)
 and [`forecast()`](https://generics.r-lib.org/reference/forecast.html)
 return the parts of a state through `component`, such as the level,
 slope and season of
 [`LLT()`](https://nicholasjclark.github.io/mvgam/dev/reference/LLT.md).
+[`seasonality()`](https://nicholasjclark.github.io/mvgam/dev/reference/seasonality.md)
+reports the swing and peak of an
+[`LLT()`](https://nicholasjclark.github.io/mvgam/dev/reference/LLT.md)
+season in each cycle.
 
 [`mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam.md)
 fits data in long format, one row per series and time.
@@ -177,23 +191,23 @@ summary(fit_ar)
 #> == Observation Model ==
 #> Regression Coefficients:
 #>           Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> Intercept     0.83      0.65    -0.54     2.09 1.00     1294     1215
+#> Intercept     0.82      0.58    -0.38     2.03 1.00     1234     1177
 #> 
 #> == Trend Model ==
 #> Smoothing Spline Hyperparameters:
 #>                   Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> sds(smintemp_1)       1.09      0.97     0.04     3.55 1.00     1753     1899
-#> sds(sndvi_ma12_1)     2.45      1.64     0.16     6.34 1.00     1648     1969
+#> sds(smintemp_1)       1.12      1.04     0.03     3.73 1.00     1394     1603
+#> sds(sndvi_ma12_1)     2.33      1.53     0.15     5.81 1.00     1408     1629
 #> 
 #> Regression Coefficients:
 #>              Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> smintemp_1       3.47      2.24    -0.91     8.29 1.00     1955     2110
-#> sndvi_ma12_1     2.92      4.12    -4.62    11.89 1.00     1753     1267
+#> smintemp_1       3.49      2.24    -1.11     8.35 1.00     1948     1911
+#> sndvi_ma12_1     2.89      4.15    -4.82    12.03 1.00      968      931
 #> 
 #> Trend Specific Parameters:
 #>                 Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> sigma_trend[PP]     0.70      0.15     0.45     1.02 1.00     1420     2277
-#> ar1_trend[PP]       0.81      0.10     0.60     0.96 1.00     1139     1271
+#> sigma_trend[PP]     0.70      0.14     0.45     1.01 1.00     1305     1991
+#> ar1_trend[PP]       0.81      0.09     0.60     0.96 1.00      975      837
 #> 
 #> Draws were sampled using sampling(NUTS). For each parameter, Bulk_ESS
 #> and Tail_ESS are effective sample size measures, and Rhat is the potential
@@ -279,29 +293,29 @@ summary(scores)
 #> # A tibble: 12 × 4
 #>    series eval_horizon    GAM     AR
 #>    <fct>         <int>  <dbl>  <dbl>
-#>  1 PP                1  8.38   4.80 
-#>  2 PP                2 14.4    9.87 
+#>  1 PP                1  8.32   4.80 
+#>  2 PP                2 14.4    9.54 
 #>  3 PP                3 NA     NA    
-#>  4 PP                4  0.483  1.63 
-#>  5 PP                5  6.12   4.04 
-#>  6 PP                6  4.52   3.16 
-#>  7 PP                7  2.06   1.87 
-#>  8 PP                8  0.386  0.770
-#>  9 PP                9  1.52   1.69 
-#> 10 PP               10  4.48   3.42 
-#> 11 PP               11  9.79   7.13 
-#> 12 PP               12  9.11   6.62
+#>  4 PP                4  0.474  1.62 
+#>  5 PP                5  6.06   4.11 
+#>  6 PP                6  4.58   3.16 
+#>  7 PP                7  2.00   1.88 
+#>  8 PP                8  0.451  0.750
+#>  9 PP                9  1.56   1.71 
+#> 10 PP               10  4.55   3.45 
+#> 11 PP               11  9.79   7.38 
+#> 12 PP               12  9.01   6.83
 plot(scores, relative = "GAM")
 ```
 
 ![](mvgam_overview_files/figure-html/scores-1.png)
 
 The latent state improves the forecasts. The AR model has the lower CRPS
-in 8 of the 11 scored months. Its CRPS sums to 45 against 61.3 for the
+in 8 of the 11 scored months. Its CRPS sums to 45.2 against 61.2 for the
 smooth-only model. Its 90% intervals contain 11 of the 11 held-out
 counts. Those of the model without a latent state contain 4.
 
-[`score()`](https://nicholasjclark.github.io/mvgam/dev/reference/score.md)
+[`score()`](https://nicholasjclark.github.io/mvgam/dev/reference/score.mvgam_forecast.md)
 also returns the log score, interval scores and, for several series,
 energy and variogram scores.
 [`lfo_cv()`](https://nicholasjclark.github.io/mvgam/dev/reference/lfo_cv.mvgam.md)
@@ -360,12 +374,23 @@ plot(fc_cor)
 ![](mvgam_overview_files/figure-html/cor-forecast-1.png)
 
 The forecasts track the held-out counts of all four species. Their 90%
-intervals contain 42 of the 44 held-out counts.
+intervals contain 41 of the 44 held-out counts.
+
+[`forecast_uncertainty()`](https://nicholasjclark.github.io/mvgam/dev/reference/forecast_uncertainty.md)
+splits the variance of each forecast by source at each horizon:
+
+``` r
+
+plot(forecast_uncertainty(fit_cor, ndraws = 200))
+```
+
+![](mvgam_overview_files/figure-html/cor-uncertainty-1.png)
 
 [`residual_cor()`](https://nicholasjclark.github.io/mvgam/dev/reference/residual_cor.md)
-returns the correlations among the species’ innovations, which measure
+returns the correlations among the species’ latent states, which measure
 how strongly the species rise and fall together once temperature and
-vegetation are accounted for:
+vegetation are accounted for. `covariance = "innovation"` gives those of
+one month’s shocks instead:
 
 ``` r
 
@@ -376,7 +401,7 @@ plot(rc)
 ![](mvgam_overview_files/figure-html/cor-resid-1.png)
 
 The two pocket mouse species, PB and PP, share the strongest
-correlation, 0.53 (95% interval 0.09 to 0.84). `n_lv` would instead
+correlation, 0.56 (95% interval 0.12 to 0.85). `n_lv` would instead
 estimate a few shared latent factors for many species.
 [`VAR()`](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md)
 would estimate how each species’ state affects the others at the next
@@ -413,7 +438,7 @@ Predictors:
 t &\in \{1, \ldots, 68\} \\
 \mathrm{captures}_{i,t} &\sim \text{Poisson}(\mu_{i,t}) \\
 \log \mu_{i,t} &= \alpha + \mu^{(\eta)}_{i,t} + \eta_{i,t} \\
-\mu^{(\eta)}_{i,t} &= f^{(\eta)}_{\mathrm{mintemp}}(\mathrm{mintemp}_{i,t}) + f^{(\eta)}_{\mathrm{ndvi\_ma12}}(\mathrm{ndvi\_ma12}_{i,t}) \\
+\mu^{(\eta)}_{i,t} &= \beta^{(\eta)}_{\mathrm{smintemp\_1}} \mathrm{smintemp\_1}_{i,t} + \beta^{(\eta)}_{\mathrm{sndvi\_ma12\_1}} \mathrm{sndvi\_ma12\_1}_{i,t} + f^{(\eta)}_{\mathrm{mintemp}}(\mathrm{mintemp}_{i,t}) + f^{(\eta)}_{\mathrm{ndvi\_ma12}}(\mathrm{ndvi\_ma12}_{i,t}) \\
 f^{(\eta)}_{\mathrm{mintemp}}(\mathrm{mintemp}) &= \sum_{m=1}^{K_{\mathrm{mintemp}}} \beta^{(\mathrm{mintemp}, \eta)}_m B_m(\mathrm{mintemp}) \\
 f^{(\eta)}_{\mathrm{ndvi\_ma12}}(\mathrm{ndvi\_ma12}) &= \sum_{m=1}^{K_{\mathrm{ndvi\_ma12}}} \beta^{(\mathrm{ndvi\_ma12}, \eta)}_m B_m(\mathrm{ndvi\_ma12}) \\
 \eta_{i,t} &= \phi_{1} \eta_{i,t-1} + \epsilon^{(\eta)}_{i,t} \\
@@ -426,8 +451,12 @@ where:
 - $`i`$ indexes series, $`t`$ indexes time
 - $`\mu_{i,t}`$: conditional mean of $`\mathrm{captures}_{i,t}`$
 - $`\alpha`$: population intercept
-- $`\eta_{i,t}`$: latent state at series $`i`$ time $`t`$
+- $`\eta_{i,t}`$: latent state of series $`i`$ at time $`t`$
 - $`\mu^{(\eta)}_{i,t}`$: trend predictor from ‘trend_formula’
+- $`\beta^{(\eta)}_{\mathrm{smintemp\_1}}`$: population effect of
+  $`\mathrm{smintemp\_1}`$
+- $`\beta^{(\eta)}_{\mathrm{sndvi\_ma12\_1}}`$: population effect of
+  $`\mathrm{sndvi\_ma12\_1}`$
 - $`f^{(\eta)}_{\mathrm{mintemp}}`$: thin plate regression spline in
   $`\mathrm{mintemp}`$, basis size $`K_{\mathrm{mintemp}} = 6`$,
   smoothing SD $`\sigma^{(s, \eta)}_{\mathrm{mintemp}}`$
@@ -477,7 +506,7 @@ how_to_cite(fit_ar)
 #>   state-space models that combine flexible predictor effects in both the
 #>   process and observation components, using functionality from the brms
 #>   (Burkner 2017) and mgcv (Wood 2017) packages. Observations followed the
-#>   poisson family with a log link. The latent process followed AR(1)
+#>   poisson family with the log link. The latent process followed AR(1)
 #>   dynamics. The mvgam-constructed model and data were passed to Stan
 #>   (Carpenter et al. 2017) via the cmdstanr interface (Gabry et al. 2024).
 #>   We ran 4 Hamiltonian Monte Carlo chains for 1000 warmup iterations and
@@ -548,7 +577,7 @@ how_to_cite(fit_ar)
 - The [forecast evaluation
   article](https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html)
   compares models with
-  [`score()`](https://nicholasjclark.github.io/mvgam/dev/reference/score.md)
+  [`score()`](https://nicholasjclark.github.io/mvgam/dev/reference/score.mvgam_forecast.md)
   and
   [`lfo_cv()`](https://nicholasjclark.github.io/mvgam/dev/reference/lfo_cv.mvgam.md)
   and combines them with

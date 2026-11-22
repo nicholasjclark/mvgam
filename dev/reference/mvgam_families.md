@@ -246,13 +246,13 @@ poisson(link = "sqrt")
 
 # The layout occ() takes: one row per visit to each site
 head(sim_closure_unit_data(family = occ())$data_train)
-#>   visit site series time y cap        env      tod_c
-#> 1     1    1   sp_1    1 1   1 -0.2228471  4.0020204
-#> 2     2    1   sp_1    1 0   1 -0.2228471  4.6148115
-#> 3     3    1   sp_1    1 1   1 -0.2228471  4.3712082
-#> 4     4    1   sp_1    1 0   1 -0.2228471 -0.8113259
-#> 5     1    2   sp_1    2 1   1 -0.3107994  2.2083795
-#> 6     2    2   sp_1    2 0   1 -0.3107994  2.8288534
+#>   visit site series time y cap        env       tod_c
+#> 1     1    1   sp_1    1 1   1 -0.8780263  4.38197926
+#> 2     2    1   sp_1    1 1   1 -0.8780263 -3.41110324
+#> 3     3    1   sp_1    1 1   1 -0.8780263  0.73687887
+#> 4     4    1   sp_1    1 0   1 -0.8780263 -0.09923768
+#> 5     1    2   sp_1    2 0   1  0.1894075  5.47529190
+#> 6     2    2   sp_1    2 1   1  0.1894075 -3.83222175
 
 # Next, get_prior() lists the priors a family's parameters take
 ```

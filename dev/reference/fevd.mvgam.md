@@ -87,7 +87,9 @@ Springer, Berlin.
 [`irf()`](https://nicholasjclark.github.io/mvgam/dev/reference/irf.mvgam.md)
 and
 [`stability()`](https://nicholasjclark.github.io/mvgam/dev/reference/stability.mvgam.md)
-summarise the same VAR dynamics. The [VAR
+summarise the same VAR dynamics.
+[`forecast_uncertainty()`](https://nicholasjclark.github.io/mvgam/dev/reference/forecast_uncertainty.md)
+splits a forecast of any model by source. The [VAR
 article](https://nicholasjclark.github.io/mvgam/dev/articles/var.html)
 runs `fevd()` on a plankton community.
 
@@ -116,10 +118,6 @@ simdat <- sim_mvgam(family = gaussian(), n_series = 3L,
 var_mod <- mvgam(y ~ 1, trend_formula = ~ VAR(p = 1),
                  data = simdat$data_train, family = gaussian(),
                  chains = 2, silent = 2)
-#> Warning: 44 of 2000 (2.0%) transitions ended with a divergence.
-#> See https://mc-stan.org/misc/warnings for details.
-#> Warning: 1 of 2 chains had an E-BFMI less than 0.3.
-#> See https://mc-stan.org/misc/warnings for details.
 
 # The share of each series' forecast-error variance due to each
 # shock, over an eight-step horizon

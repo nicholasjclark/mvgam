@@ -18,7 +18,6 @@ get_prior(
   family = gaussian(),
   loadings_prior = NULL,
   data2 = NULL,
-  trend_map = NULL,
   ...
 )
 
@@ -110,27 +109,6 @@ default_prior(object, ...)
   A named list of objects the model uses that are not variables in
   `data`, as in
   [`brms::brm()`](https://paulbuerkner.com/brms/reference/brm.html).
-
-- trend_map:
-
-  Optional fixed factor loadings, in one of three forms:
-
-  - a numeric `n_series x n_lv` matrix of loadings. `NA` entries are
-    sampled. Finite entries stay fixed on `Z` in the posterior. An
-    all-`NA` matrix fixes nothing and acts as `trend_map = NULL`
-
-  - a `data.frame(series, trend)` assigning each series to one latent
-    process
-
-  - `"identity"`, one process per series, or `"shared"`, one process for
-    every series
-
-  A factor model without a `trend_map` samples every loading. It
-  identifies `Z` after sampling by a thin QR rotation (Heaps and Jermyn
-  2024). A `trend_map` with any fixed entry takes no rotation. The
-  argument requires a `trend_formula`. The trend constructor takes a
-  `trend_map` argument too. Supplying both is an error. `loadings_prior`
-  lists the `trend_map` forms a structured loadings prior accepts.
 
 - ...:
 
@@ -263,7 +241,7 @@ prior_summary(pre)
 #>        source
 #>       default
 #>          user
-#>          user
+#>  (vectorized)
 #>       default
 #>  (vectorized)
 #>          user

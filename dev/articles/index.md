@@ -4,10 +4,10 @@
 
 Prepare your data and fit a first state-space model.
 
-- [Formatting data for
-  mvgam](https://nicholasjclark.github.io/mvgam/dev/articles/data.md):
 - [Overview of the mvgam
   package](https://nicholasjclark.github.io/mvgam/dev/articles/mvgam_overview.md):
+- [Formatting data for
+  mvgam](https://nicholasjclark.github.io/mvgam/dev/articles/data.md):
 
 ### Latent dynamics
 

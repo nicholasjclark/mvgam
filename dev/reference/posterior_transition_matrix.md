@@ -16,7 +16,26 @@ posterior_transition_matrix(
   summary = TRUE,
   robust = FALSE,
   probs = c(0.025, 0.975),
+  prob_threshold = 0.95,
   lag = 1L
+)
+
+# S3 method for class 'mvgam_var_matrix'
+print(x, digits = 2L, ...)
+
+# S3 method for class 'mvgam_var_matrix'
+plot(x, cluster = FALSE, supported_only = FALSE, ...)
+
+# S3 method for class 'mvgam_var_matrix_list'
+print(x, ...)
+
+# S3 method for class 'mvgam_var_matrix_list'
+plot(
+  x,
+  type = c("heatmap", "diagonal"),
+  ncol = NULL,
+  supported_only = FALSE,
+  ...
 )
 ```
 
@@ -33,7 +52,7 @@ posterior_transition_matrix(
   takes `NULL` alone. One panel returns its matrix. Several, or `"all"`,
   return a list whose
   [`plot()`](https://rdrr.io/r/graphics/plot.default.html) method is
-  [`plot.mvgam_var_matrix_list()`](https://nicholasjclark.github.io/mvgam/dev/reference/plot.mvgam_var_matrix_list.md).
+  `plot.mvgam_var_matrix_list()`.
 
 - summary:
 
@@ -52,20 +71,69 @@ posterior_transition_matrix(
   Numeric vector of probabilities for quantile computation. Default is
   `c(0.025, 0.975)` for 95% credible intervals.
 
+- prob_threshold:
+
+  The posterior probability of its sign a cell needs to count as
+  supported, at least 0.5 and below 1. Defaults to 0.95.
+  `plot.mvgam_var_matrix()` outlines the supported cells.
+
 - lag:
 
   The lag of the matrix, at most the order `p` of the fitted `VAR(p)`.
+
+- x:
+
+  An `mvgam_var_matrix` or `mvgam_var_matrix_list`.
+
+- digits:
+
+  Integer number of digits in the printed matrix. Defaults to 2.
+
+- ...:
+
+  Unused. Anything passed here is refused.
+
+- cluster:
+
+  Logical. `TRUE` orders the processes by a Robinson clustering of
+  `1 - A`, which suits a matrix close to symmetric.
+
+- supported_only:
+
+  Logical. `TRUE` leaves blank every cell whose `prob_nonzero` is at
+  most `prob_threshold`. Defaults to `FALSE`.
+
+- type:
+
+  For several panels, `"heatmap"` (the default) or `"diagonal"`.
+
+- ncol:
+
+  The number of facet columns of the heatmaps, or `NULL` for
+  `ceiling(sqrt(length(x)))`.
 
 ## Value
 
 With `summary = TRUE`, an `mvgam_var_matrix`: a list of the matrices
 `A`, `A_se`, `A_lower`, `A_upper`, `A_ess`, `prob_positive`,
 `prob_negative` and `prob_nonzero`, with `n_series`, `series_names`,
-`group_label`, `probs` and `lag`. It has
-[`print()`](https://rdrr.io/r/base/print.html) and
-[`plot()`](https://rdrr.io/r/graphics/plot.default.html) methods. With
+`group_label`, `probs`, `prob_threshold` and `lag`. With
 `summary = FALSE`, the array of draws. Several panels give a list of
-either.
+either, an `mvgam_var_matrix_list` when summarised.
+
+[`print()`](https://rdrr.io/r/base/print.html) gives the panel, the
+dimension, the mean absolute off-diagonal cell and the estimate of the
+matrix. For several panels it lists each panel's mean absolute
+off-diagonal cell. The panel with the largest has the strongest effects
+between processes.
+
+[`plot()`](https://rdrr.io/r/graphics/plot.default.html) draws the
+matrix as a heatmap. Row \\i\\, column \\j\\ is the effect of process
+\\j\\ at time \\t - l\\ on process \\i\\ at time \\t\\. A black outline
+marks each cell whose `prob_nonzero` exceeds `prob_threshold`. The
+colour scale is symmetric about zero. Several panels share one scale.
+Under `type = "diagonal"` they draw the persistence of each process as a
+point with its interval.
 
 ## Details
 
@@ -103,8 +171,7 @@ autoregressions. *Journal of Computational and Graphical Statistics*
 [`irf()`](https://nicholasjclark.github.io/mvgam/dev/reference/irf.mvgam.md),
 [`fevd()`](https://nicholasjclark.github.io/mvgam/dev/reference/fevd.mvgam.md),
 [`stability()`](https://nicholasjclark.github.io/mvgam/dev/reference/stability.mvgam.md),
-[`print.mvgam_var_matrix()`](https://nicholasjclark.github.io/mvgam/dev/reference/print.mvgam_var_matrix.md),
-[`plot.mvgam_var_matrix()`](https://nicholasjclark.github.io/mvgam/dev/reference/plot.mvgam_var_matrix.md).
+`print.mvgam_var_matrix()`, `plot.mvgam_var_matrix()`.
 
 Other latent dynamics:
 [`active_factors()`](https://nicholasjclark.github.io/mvgam/dev/reference/active_factors.md),
@@ -131,10 +198,6 @@ simdat <- sim_mvgam(family = gaussian(), n_series = 3L,
 var_mod <- mvgam(y ~ 1, trend_formula = ~ VAR(p = 1),
                  data = simdat$data_train, family = gaussian(),
                  chains = 2, silent = 2)
-#> Warning: 44 of 2000 (2.0%) transitions ended with a divergence.
-#> See https://mc-stan.org/misc/warnings for details.
-#> Warning: 1 of 2 chains had an E-BFMI less than 0.3.
-#> See https://mc-stan.org/misc/warnings for details.
 
 # Each series' persistence and its effects on the others
 A <- posterior_transition_matrix(var_mod)
@@ -145,9 +208,9 @@ A
 #>   Mean |A_ij| (i != j): 0.11
 #>   Point estimate:
 #>          series_1 series_2 series_3
-#> series_1     0.71     0.02     0.10
-#> series_2     0.10     0.54     0.16
-#> series_3     0.20     0.08     0.51
+#> series_1     0.73     0.03     0.10
+#> series_2     0.09     0.56     0.18
+#> series_3     0.19     0.08     0.54
 #>   95% CI on each cell available in `A_lower` / `A_upper`.
 plot(A)
 

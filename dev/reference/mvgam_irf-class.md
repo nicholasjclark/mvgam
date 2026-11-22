@@ -6,6 +6,44 @@ Run `methods(class = "mvgam_irf")` and
 `methods(class = "mvgam_irf_summary")` to see an overview of available
 methods.
 
+## Usage
+
+``` r
+# S3 method for class 'mvgam_irf'
+summary(object, probs = c(0.025, 0.975), ...)
+
+# S3 method for class 'mvgam_irf'
+plot(x, series = 1, responses = NULL, ...)
+```
+
+## Arguments
+
+- object:
+
+  An `mvgam_irf` object from `irf(summary = FALSE)`.
+
+- probs:
+
+  The lower and upper percentiles of the interval. Defaults to
+  `c(0.025, 0.975)`.
+
+- ...:
+
+  Unused. Anything passed here is refused.
+
+- x:
+
+  An `mvgam_irf` object.
+
+- series:
+
+  Position or name of the process given the shock.
+
+- responses:
+
+  Optional positions or names of the processes drawn as response panels.
+  Defaults to every process.
+
 ## Details
 
 Generalized or Orthogonalized Impulse Response Functions are computed
@@ -43,6 +81,15 @@ returns the summary by default. The two forms carry different classes:
 
 Both forms take `ndraws` and `draw_ids`. A subset of the posterior
 shortens the computation.
+
+## Methods
+
+[`summary()`](https://rdrr.io/r/base/summary.html) turns the draws into
+the `mvgam_irf_summary` above, at the percentiles `probs` sets.
+[`plot()`](https://rdrr.io/r/graphics/plot.default.html) draws the
+response of each process to a shock to `series`, with its median and
+interval by horizon. A summary plots through
+[`plot.mvgam_var_surface_summary()`](https://nicholasjclark.github.io/mvgam/dev/reference/plot.mvgam_var_surface_summary.md).
 
 ## References
 

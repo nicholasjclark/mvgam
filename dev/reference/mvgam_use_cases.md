@@ -7,7 +7,9 @@ section defines the vocabulary these pages use.
 [`mvgam_data`](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam_data.md)
 checks a data frame before fitting. The [overview
 article](https://nicholasjclark.github.io/mvgam/dev/articles/mvgam_overview.html)
-walks through a full analysis.
+walks through a full analysis. The
+[cheatsheet](https://github.com/nicholasjclark/mvgam/raw/master/misc/mvgam_cheatsheet.pdf)
+summarises the main functions on one page.
 
 mvgam fits dynamic generalized additive models (GAMs) to one or many
 time series. Smooth functions of covariates sit beside a latent
@@ -111,7 +113,9 @@ smooths and hierarchical smooths model other nonlinear effects.
 
 [`mvgam`](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam.md),
 [`mvgam_data`](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam_data.md),
-[`trend_constructors`](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md)
+[`trend_constructors`](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md),
+the
+[cheatsheet](https://github.com/nicholasjclark/mvgam/raw/master/misc/mvgam_cheatsheet.pdf)
 
 ## Author
 

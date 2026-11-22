@@ -91,9 +91,9 @@ irf(
 
 An object of
 [`mvgam_irf-class`](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam_irf-class.md).
-[`plot.mvgam_irf()`](https://nicholasjclark.github.io/mvgam/dev/reference/plot.mvgam_irf.md)
+[`plot.mvgam_irf()`](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam_irf-class.md)
 and
-[`summary.mvgam_irf()`](https://nicholasjclark.github.io/mvgam/dev/reference/summary.mvgam_irf.md)
+[`summary.mvgam_irf()`](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam_irf-class.md)
 take it.
 
 ## Details
@@ -148,10 +148,6 @@ simdat <- sim_mvgam(family = gaussian(), n_series = 3L,
 var_mod <- mvgam(y ~ 1, trend_formula = ~ VAR(p = 1),
                  data = simdat$data_train, family = gaussian(),
                  chains = 2, silent = 2)
-#> Warning: 44 of 2000 (2.0%) transitions ended with a divergence.
-#> See https://mc-stan.org/misc/warnings for details.
-#> Warning: 1 of 2 chains had an E-BFMI less than 0.3.
-#> See https://mc-stan.org/misc/warnings for details.
 
 # Generalised responses of every series to a shock in each
 irf_obj <- irf(var_mod, h = 8L)

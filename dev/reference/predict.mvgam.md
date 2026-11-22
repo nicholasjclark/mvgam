@@ -79,7 +79,7 @@ predict(
   alone. It is the same at the first time point as at the fiftieth.
   Questions about covariate effects use this version. `TRUE` uses the
   fitted state, the value the trend took at each observed time as
-  [`hindcast()`](https://nicholasjclark.github.io/mvgam/dev/reference/hindcast.md)
+  [`hindcast()`](https://nicholasjclark.github.io/mvgam/dev/reference/hindcast.mvgam.md)
   returns it. The section 'Which prediction function?' of
   `predict.mvgam()` compares the functions.
 
@@ -120,20 +120,23 @@ predict(
 - re_formula:
 
   Group-level terms to include: `NULL` (the default) for every one, `NA`
-  for none. A formula choosing some of them is not supported.
+  for none, or a formula naming the terms to keep, such as `~ (1 | g)`.
+  A formula applies to the observation and the trend formulas alike. Any
+  term it does not name is dropped.
 
 - allow_new_levels:
 
-  Logical; accepted for brms compatibility. A grouping level the model
-  never saw is refused whatever this is set to. A new level has no
-  fitted random effect. For a new series, it has no latent state to
-  propagate. Predict for levels the fit knows, or refit with the new
-  levels included.
+  Logical. `TRUE` predicts for grouping levels the model never saw, with
+  coefficients `sample_new_levels` draws. A new series stays refused: it
+  has no latent state to propagate.
 
 - sample_new_levels:
 
-  Character; accepted for brms compatibility. It has no effect, because
-  new levels are refused. See `allow_new_levels`.
+  How a new level's coefficients are drawn: `"uncertainty"` (the
+  default) takes those of a fitted level chosen in each draw,
+  `"old_levels"` those of one fitted level for all draws and
+  `"gaussian"` draws them from the group's normal distribution. Each
+  distributional parameter draws its own.
 
 - resp:
 
@@ -215,6 +218,9 @@ per response.
   - [`occ()`](https://nicholasjclark.github.io/mvgam/dev/reference/occ.md):
     the occupancy probability `P(z = 1 | y_g)`.
 
+  `incl_autocor = TRUE` takes the state from the fitted latent trend,
+  which a joint model shares across species.
+
 - `"detection"`: for
   [`nmix()`](https://nicholasjclark.github.io/mvgam/dev/reference/nmix.md)
   and
@@ -235,7 +241,7 @@ they add observation noise.
 | [`predict()`](https://rdrr.io/r/stats/predict.html) | any | covariate part | under `type = "response"` |
 | `posterior_predict()` | any | covariate part | yes |
 | `posterior_epred()`, `posterior_linpred()` | any | covariate part | no |
-| [`hindcast()`](https://nicholasjclark.github.io/mvgam/dev/reference/hindcast.md) | training data | fitted state | under `type = "response"` |
+| [`hindcast()`](https://nicholasjclark.github.io/mvgam/dev/reference/hindcast.mvgam.md) | training data | fitted state | under `type = "response"` |
 | [`forecast()`](https://generics.r-lib.org/reference/forecast.html) | after the training data | fitted state, carried forward | under `type = "response"` |
 | [`residuals()`](https://rdrr.io/r/stats/residuals.html), [`pp_check()`](https://nicholasjclark.github.io/mvgam/dev/reference/pp_check.mvgam.md) | training data | fitted state | yes |
 
@@ -269,7 +275,7 @@ Other predictions:
 [`conditional_effects.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/conditional_effects.mvgam.md),
 [`conditional_smooths.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/conditional_smooths.mvgam.md),
 [`fitted.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/fitted.mvgam.md),
-[`hindcast.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/hindcast.mvgam.md),
+[`hindcast()`](https://nicholasjclark.github.io/mvgam/dev/reference/hindcast.mvgam.md),
 [`posterior_epred.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/posterior_epred.mvgam.md),
 [`posterior_linpred.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/posterior_linpred.mvgam.md),
 [`posterior_predict.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/posterior_predict.mvgam.md),
@@ -288,40 +294,40 @@ mod <- mvgam(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1),
               data    = simdat$data_train,
               family  = poisson(),
               chains  = 2, silent = 2)
-#> Warning: 5 of 2000 (0.0%) transitions ended with a divergence.
+#> Warning: 9 of 2000 (0.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 
 # Predicted counts with their 95% intervals
 head(predict(mod))
-#>      Estimate Est.Error Q2.5 Q97.5
-#> [1,]   2.1910  1.565166    0     6
-#> [2,]  12.4240  4.268294    5    22
-#> [3,]   8.3345  3.215397    3    15
-#> [4,]   8.9215  3.415431    3    16
-#> [5,]   4.6050  2.370186    1    10
-#> [6,]   6.4860  3.172040    1    14
+#>      Estimate Est.Error  Q2.5 Q97.5
+#> [1,]   2.1990  1.548095 0.000     6
+#> [2,]  12.2930  4.300046 5.000    22
+#> [3,]   8.2280  3.120879 3.000    15
+#> [4,]   8.8850  3.509549 3.000    17
+#> [5,]   4.6105  2.399514 1.000    10
+#> [6,]   6.5915  3.159370 1.975    14
 
 # The same fit on the link scale, as an expected count and as the
 # variance of a count. A Poisson's variance equals its mean.
 head(predict(mod, type = "link"))
-#>       Estimate Est.Error      Q2.5    Q97.5
-#> [1,] 0.7549232 0.2202606 0.3150363 1.175764
-#> [2,] 2.5080541 0.1883211 2.1218304 2.894866
-#> [3,] 2.1026189 0.1674372 1.7491777 2.425207
-#> [4,] 2.1695926 0.1808300 1.8204763 2.532992
-#> [5,] 1.4893140 0.2361407 1.0250207 1.938754
-#> [6,] 1.8332095 0.2686246 1.3097121 2.354263
+#>      Estimate Est.Error      Q2.5    Q97.5
+#> [1,] 0.749281 0.2279990 0.2666378 1.198096
+#> [2,] 2.491617 0.1969154 2.1045983 2.862579
+#> [3,] 2.090921 0.1743357 1.7310270 2.428086
+#> [4,] 2.168891 0.1964567 1.7868074 2.565988
+#> [5,] 1.490823 0.2435497 0.9877793 1.973285
+#> [6,] 1.846478 0.2786232 1.2904415 2.412849
 head(cbind(
   expected = predict(mod, type = "expected")[, "Estimate"],
   variance = predict(mod, type = "variance")[, "Estimate"]
 ))
 #>       expected  variance
-#> [1,]  2.179257  2.179257
-#> [2,] 12.501430 12.501430
-#> [3,]  8.302232  8.302232
-#> [4,]  8.900367  8.900367
-#> [5,]  4.558828  4.558828
-#> [6,]  6.484566  6.484566
+#> [1,]  2.170475  2.170475
+#> [2,] 12.315698 12.315698
+#> [3,]  8.215015  8.215015
+#> [4,]  8.920217  8.920217
+#> [5,]  4.572829  4.572829
+#> [6,]  6.589161  6.589161
 
 # `summary = FALSE` returns the draws, one row per draw
 dim(predict(mod, summary = FALSE))

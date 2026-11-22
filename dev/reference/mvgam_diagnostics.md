@@ -1,11 +1,15 @@
 # Posterior summaries and sampler diagnostics of mvgam models
 
 The brms and bayesplot accessors for a fitted model.
-[`fixef()`](https://rdrr.io/pkg/nlme/man/fixed.effects.html),
-[`coef()`](https://rdrr.io/r/stats/coef.html) and
+[`fixef()`](https://rdrr.io/pkg/nlme/man/fixed.effects.html) and
 [`vcov()`](https://rdrr.io/r/stats/vcov.html) summarise the
 population-level coefficients of the observation formula, or of the
 trend formula with `trend_effects = TRUE`.
+[`coef()`](https://rdrr.io/r/stats/coef.html) gives each level of each
+grouping factor its coefficients: the population effect plus that
+level's deviation, as
+[`brms::coef.brmsfit()`](https://paulbuerkner.com/brms/reference/coef.brmsfit.html)
+does.
 [`posterior_summary()`](https://paulbuerkner.com/brms/reference/posterior_summary.html)
 summarises any parameters.
 [`rhat()`](https://mc-stan.org/posterior/reference/rhat.html) and
@@ -28,7 +32,7 @@ count the posterior.
 
 ``` r
 # S3 method for class 'mvgam'
-coef(object, summary = TRUE, trend_effects = FALSE, ...)
+coef(object, summary = TRUE, robust = FALSE, probs = c(0.025, 0.975), ...)
 
 # S3 method for class 'mvgam'
 nuts_params(object, pars = NULL, ...)
@@ -60,6 +64,7 @@ bayes_R2(
   summary = TRUE,
   robust = FALSE,
   probs = c(0.025, 0.975),
+  by_series = FALSE,
   ...
 )
 
@@ -104,16 +109,17 @@ vcov(object, correlation = FALSE, pars = NULL, trend_effects = FALSE, ...)
 - summary:
 
   Logical. `TRUE` (the default) returns a summary. `FALSE` returns the
-  draws. [`coef()`](https://rdrr.io/r/stats/coef.html) summarises to
-  posterior means.
+  draws.
 
-- trend_effects:
+- robust:
 
-  Logical. [`coef()`](https://rdrr.io/r/stats/coef.html),
-  [`fixef()`](https://rdrr.io/pkg/nlme/man/fixed.effects.html) and
-  [`vcov()`](https://rdrr.io/r/stats/vcov.html) report the coefficients
-  of the observation formula by default. `TRUE` reports those of the
-  `trend_formula` instead. Their names end in `_trend`.
+  Logical. `TRUE` summarises by the median and the median absolute
+  deviation. Defaults to `FALSE`, the mean and the standard deviation.
+
+- probs:
+
+  Numeric vector of the two interval probabilities, `c(0.025, 0.975)` by
+  default.
 
 - ...:
 
@@ -134,19 +140,31 @@ vcov(object, correlation = FALSE, pars = NULL, trend_effects = FALSE, ...)
   [`nuts_params()`](https://mc-stan.org/bayesplot/reference/bayesplot-extractors.html).
   `NULL` takes all of them.
 
-- robust:
+- trend_effects:
 
-  Logical. `TRUE` summarises by the median and the median absolute
-  deviation. Defaults to `FALSE`, the mean and the standard deviation.
-
-- probs:
-
-  Numeric vector of the two interval probabilities, `c(0.025, 0.975)` by
-  default.
+  Logical. [`fixef()`](https://rdrr.io/pkg/nlme/man/fixed.effects.html)
+  and [`vcov()`](https://rdrr.io/r/stats/vcov.html) report the
+  coefficients of the observation formula by default. `TRUE` reports
+  those of the `trend_formula` instead. Their names end in `_trend`.
 
 - resp:
 
   Optional name of one response of a multivariate model.
+
+- by_series:
+
+  Logical, for
+  [`bayes_R2()`](https://mc-stan.org/rstantools/reference/bayes_R2.html).
+  `TRUE` computes the fit of each series from its own rows. A binary
+  response, such as
+  [`bernoulli()`](https://paulbuerkner.com/brms/reference/brmsfamily.html)
+  or the detections of
+  [`occ()`](https://nicholasjclark.github.io/mvgam/dev/reference/occ.md),
+  adds Tjur's R^2 and the AUC. Tjur's R^2 is the mean predicted
+  probability of the rows observed as 1 less that of the rows observed
+  as 0. The AUC is the probability that a row observed as 1 is predicted
+  above a row observed as 0. A series observed at one value alone takes
+  `NA` for both. Defaults to `FALSE`.
 
 - variable:
 
@@ -166,10 +184,22 @@ vcov(object, correlation = FALSE, pars = NULL, trend_effects = FALSE, ...)
 and
 [`bayes_R2()`](https://mc-stan.org/rstantools/reference/bayes_R2.html)
 return a matrix with columns `Estimate`, `Est.Error` and one per
-quantile, or the draws with `summary = FALSE`.
-[`coef()`](https://rdrr.io/r/stats/coef.html) returns the posterior
-means. [`vcov()`](https://rdrr.io/r/stats/vcov.html) returns the
-covariance matrix of the coefficients.
+quantile, or the draws with `summary = FALSE`. Under `by_series = TRUE`
+[`bayes_R2()`](https://mc-stan.org/rstantools/reference/bayes_R2.html)
+returns a data frame with one row per series and measure, or draws in
+columns named `<measure>[<series>]`, such as `AUC[sp1]`.
+[`coef()`](https://rdrr.io/r/stats/coef.html) returns a named list with
+one array per grouping factor: levels, statistics and coefficients, or
+draws, levels and coefficients with `summary = FALSE`. A fit without
+group-level effects in its observation formula is refused. A level's
+coefficient omits the terms of other covariates that change it, such as
+`env:size` under
+[`jsdgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/jsdgam.md)'s
+`trait_slopes`.
+[`species_effects()`](https://nicholasjclark.github.io/mvgam/dev/reference/species_effects.md)
+gives each species' full response.
+[`vcov()`](https://rdrr.io/r/stats/vcov.html) returns the covariance
+matrix of the coefficients.
 [`rhat()`](https://mc-stan.org/posterior/reference/rhat.html) and
 [`neff_ratio()`](https://mc-stan.org/bayesplot/reference/bayesplot-extractors.html)
 return a named vector with one value per parameter.
@@ -247,28 +277,28 @@ mod <- mvgam(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1),
               data    = simdat$data_train,
               family  = poisson(),
               chains  = 2, silent = 2)
-#> Warning: 5 of 2000 (0.0%) transitions ended with a divergence.
+#> Warning: 9 of 2000 (0.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 
 # The population coefficients with 95% intervals
 fixef(mod)
 #>           Estimate Est.Error     Q2.5     Q97.5
-#> Intercept 1.632552 0.1392937 1.342661  1.910896
-#> sx_1      8.482562 2.3412990 3.681986 13.005870
+#> Intercept 1.626988 0.1529809 1.331672  1.929153
+#> sx_1      8.379396 2.2348174 3.962280 12.789509
 
 # Rhat below 1.01 and effective sample ratios above 0.1 suggest the
 # chains mixed
 rhat(mod, pars = c("ar1_trend", "sigma_trend"))
 #>   ar1_trend[series_1] sigma_trend[series_1] 
-#>              1.000484              1.000697 
+#>              1.000707              1.000583 
 neff_ratio(mod, pars = c("ar1_trend", "sigma_trend"))
 #>   ar1_trend[series_1] sigma_trend[series_1] 
-#>             0.1906273             0.3953472 
+#>             0.2524331             0.4218664 
 
 # The share of variance in the counts the model explains
 bayes_R2(mod)
-#>     Estimate  Est.Error     Q2.5     Q97.5
-#> R2 0.8310123 0.03899731 0.743291 0.8922462
+#>     Estimate  Est.Error      Q2.5     Q97.5
+#> R2 0.8321786 0.03770663 0.7452553 0.8924051
 
 # Next, mcmc_plot() draws the posterior of these parameters
 # }

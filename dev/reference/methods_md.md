@@ -84,7 +84,7 @@ mod <- mvgam(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1),
               data    = simdat$data_train,
               family  = poisson(),
               chains  = 2, silent = 2)
-#> Warning: 5 of 2000 (0.0%) transitions ended with a divergence.
+#> Warning: 9 of 2000 (0.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 
 # The equations, glossary and priors as Markdown
@@ -119,7 +119,7 @@ md
 #> - $\mu_{i,t}$: conditional mean of $y_{i,t}$
 #> - $\alpha$: population intercept
 #> - $f_{x}$: thin plate regression spline in $x$, basis size $K_{x} = 5$, smoothing SD $\sigma^{(s)}_{x}$
-#> - $\eta_{i,t}$: latent state at series $i$ time $t$
+#> - $\eta_{i,t}$: latent state of series $i$ at time $t$
 #> - $\epsilon^{(\eta)}_{i,t}$: process innovation, SD $\sigma_\eta$
 #> - $\phi_{l}$: autoregressive coefficient at lag $l$
 #> 

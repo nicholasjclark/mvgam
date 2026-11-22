@@ -44,7 +44,9 @@ fitted(
 - re_formula:
 
   Group-level terms to include: `NULL` (the default) for every one, `NA`
-  for none. A formula choosing some of them is not supported.
+  for none, or a formula naming the terms to keep, such as `~ (1 | g)`.
+  A formula applies to the observation and the trend formulas alike. Any
+  term it does not name is dropped.
 
 - scale:
 
@@ -157,16 +159,17 @@ fitted(
 
 - allow_new_levels:
 
-  Logical; accepted for brms compatibility. A grouping level the model
-  never saw is refused whatever this is set to. A new level has no
-  fitted random effect. For a new series, it has no latent state to
-  propagate. Predict for levels the fit knows, or refit with the new
-  levels included.
+  Logical. `TRUE` predicts for grouping levels the model never saw, with
+  coefficients `sample_new_levels` draws. A new series stays refused: it
+  has no latent state to propagate.
 
 - sample_new_levels:
 
-  Character; accepted for brms compatibility. It has no effect, because
-  new levels are refused. See `allow_new_levels`.
+  How a new level's coefficients are drawn: `"uncertainty"` (the
+  default) takes those of a fitted level chosen in each draw,
+  `"old_levels"` those of one fitted level for all draws and
+  `"gaussian"` draws them from the group's normal distribution. Each
+  distributional parameter draws its own.
 
 - ...:
 
@@ -220,7 +223,7 @@ predicts future times.
 Other predictions:
 [`conditional_effects.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/conditional_effects.mvgam.md),
 [`conditional_smooths.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/conditional_smooths.mvgam.md),
-[`hindcast.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/hindcast.mvgam.md),
+[`hindcast()`](https://nicholasjclark.github.io/mvgam/dev/reference/hindcast.mvgam.md),
 [`posterior_epred.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/posterior_epred.mvgam.md),
 [`posterior_linpred.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/posterior_linpred.mvgam.md),
 [`posterior_predict.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/posterior_predict.mvgam.md),
@@ -240,29 +243,29 @@ mod <- mvgam(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1),
               data    = simdat$data_train,
               family  = poisson(),
               chains  = 2, silent = 2)
-#> Warning: 5 of 2000 (0.0%) transitions ended with a divergence.
+#> Warning: 9 of 2000 (0.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 
 # Expected counts at the training observations: the posterior mean,
 # error and 95% interval of each
 head(fitted(mod))
 #>       Estimate Est.Error      Q2.5     Q97.5
-#> [1,]  2.213963 0.9497584 0.8443745  4.477423
-#> [2,] 12.868985 3.2440969 7.6262390 20.232959
-#> [3,]  6.133415 1.8591295 3.1063965 10.225225
-#> [4,]  4.267246 1.5377098 1.7451359  7.820154
-#> [5,]  3.792407 1.4073015 1.6404318  7.154235
-#> [6,]  5.103720 1.7479758 2.3529934  9.123604
+#> [1,]  2.201495 0.9133034 0.8559951  4.341769
+#> [2,] 12.786480 3.1369620 7.3655579 19.843166
+#> [3,]  6.083841 1.8984646 3.1543388 10.519939
+#> [4,]  4.245701 1.4786633 1.8909608  7.592866
+#> [5,]  3.766898 1.4416601 1.6478128  7.196900
+#> [6,]  5.186657 1.6996744 2.5258863  9.254669
 
 # The covariate effects alone, without the inferred trend state
 head(fitted(mod, incl_autocor = FALSE))
 #>       Estimate Est.Error     Q2.5     Q97.5
-#> [1,]  2.179257 0.4797681 1.370309  3.240618
-#> [2,] 12.501430 2.3923246 8.346400 18.081087
-#> [3,]  8.302232 1.3883129 5.749874 11.304569
-#> [4,]  8.900367 1.6533494 6.174799 12.591126
-#> [5,]  4.558828 1.0862699 2.787153  6.950084
-#> [6,]  6.484566 1.7949456 3.705107 10.530367
+#> [1,]  2.170475 0.4941905 1.305567  3.313801
+#> [2,] 12.315698 2.4428830 8.203807 17.506618
+#> [3,]  8.215015 1.4319236 5.646452 11.337167
+#> [4,]  8.920217 1.8005969 5.970362 13.013510
+#> [5,]  4.572829 1.1185029 2.685265  7.194270
+#> [6,]  6.589161 1.8880484 3.634391 11.165724
 
 # One row per posterior draw and one column per observation
 dim(fitted(mod, summary = FALSE))

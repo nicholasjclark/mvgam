@@ -95,7 +95,7 @@ mod <- mvgam(
   family = gaussian(),
   chains = 2, silent = 2
 )
-#> Warning: 69 of 2000 (3.0%) transitions ended with a divergence.
+#> Warning: 22 of 2000 (1.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 #> Warning: 2 of 2 chains had an E-BFMI less than 0.3.
 #> See https://mc-stan.org/misc/warnings for details.
@@ -112,33 +112,33 @@ summary(mod)
 #> == Observation Model ==
 #> Smoothing Spline Hyperparameters:
 #>             Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> sds(ssst_1)     1.69      0.92     0.40     4.05 1.01      343      542
+#> sds(ssst_1)     1.80      1.05     0.37     4.42 1.00      511      342
 #> 
 #> Regression Coefficients:
 #>           Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> Intercept     0.03      0.14    -0.23     0.30 1.01      391      479
-#> ssst_1       10.20      2.93     5.67    16.67 1.01      391      819
+#> Intercept     0.05      0.13    -0.20     0.31 1.01      449     1039
+#> ssst_1       10.58      3.15     5.46    17.32 1.00      660      834
 #> 
 #> Further Distributional Parameters:
 #>       Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> sigma     0.48      0.11     0.24     0.68 1.02       54       54
+#> sigma     0.50      0.10     0.30     0.69 1.01       75      121
 #> 
 #> == Trend Model ==
 #> Trend Specific Parameters:
 #>                       Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS
-#> sigma_trend[flynn]        0.61      0.17     0.23     0.90 1.01      119
-#> sigma_trend[myrmidon]     0.59      0.15     0.30     0.89 1.01       97
-#> sigma_trend[pixie]        0.33      0.13     0.10     0.58 1.03       74
-#> ar1_trend[flynn]          0.29      0.20     0.02     0.77 1.00      471
-#> ar1_trend[myrmidon]       0.82      0.10     0.58     0.97 1.01      238
-#> ar1_trend[pixie]          0.59      0.22     0.13     0.95 1.00      327
+#> sigma_trend[flynn]        0.59      0.17     0.16     0.88 1.01      124
+#> sigma_trend[myrmidon]     0.57      0.15     0.26     0.88 1.00      127
+#> sigma_trend[pixie]        0.32      0.12     0.10     0.55 1.00      126
+#> ar1_trend[flynn]          0.27      0.19     0.02     0.74 1.01      498
+#> ar1_trend[myrmidon]       0.83      0.10     0.60     0.97 1.00      212
+#> ar1_trend[pixie]          0.59      0.22     0.11     0.94 1.01      348
 #>                       Tail_ESS
-#> sigma_trend[flynn]         213
-#> sigma_trend[myrmidon]      452
-#> sigma_trend[pixie]         166
-#> ar1_trend[flynn]           317
-#> ar1_trend[myrmidon]        468
-#> ar1_trend[pixie]           571
+#> sigma_trend[flynn]         283
+#> sigma_trend[myrmidon]      451
+#> sigma_trend[pixie]         562
+#> ar1_trend[flynn]           609
+#> ar1_trend[myrmidon]        708
+#> ar1_trend[pixie]          1032
 #> 
 #> Draws were sampled using sampling(NUTS). For each parameter, Bulk_ESS
 #> and Tail_ESS are effective sample size measures, and Rhat is the potential

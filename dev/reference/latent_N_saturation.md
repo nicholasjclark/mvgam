@@ -31,7 +31,8 @@ latent_N_saturation(
 
 - newdata:
 
-  Optional `data.frame` of visits. `NULL` takes the training data.
+  Optional `data.frame` of visits. `NULL` takes the training data, whose
+  units take their fitted latent trend.
 
 - threshold:
 
@@ -88,18 +89,19 @@ mod <- mvgam(bf(y ~ env, p ~ tod_c), data = dat, family = nmix(),
 saturation <- latent_N_saturation(mod)
 saturation[saturation$saturated, ]
 #>    unit   label K_max p_saturated saturated
+#> 2     2  sp_1_2     3      0.0555      TRUE
 #> 3     3  sp_1_3     3      1.0000      TRUE
-#> 7     7  sp_1_7     3      0.1270      TRUE
+#> 7     7  sp_1_7     3      0.1350      TRUE
 #> 11   11 sp_1_11     3      1.0000      TRUE
 #> 15   15 sp_1_15     3      1.0000      TRUE
-#> 21   21 sp_1_21     3      0.1640      TRUE
+#> 21   21 sp_1_21     3      0.1650      TRUE
 #> 22   22 sp_1_22     4      1.0000      TRUE
-#> 23   23 sp_1_23     3      0.0660      TRUE
-#> 36   36 sp_1_36     3      0.3615      TRUE
+#> 23   23 sp_1_23     3      0.0725      TRUE
+#> 36   36 sp_1_36     3      0.3590      TRUE
 #> 41   41 sp_1_41     4      1.0000      TRUE
-#> 45   45 sp_1_45     3      0.1400      TRUE
+#> 45   45 sp_1_45     3      0.1520      TRUE
 #> 49   49 sp_1_49     4      1.0000      TRUE
-#> 50   50 sp_1_50     3      0.0910      TRUE
+#> 50   50 sp_1_50     3      0.0980      TRUE
 
 # Next, raise 'cap' for the saturated units and refit
 # }

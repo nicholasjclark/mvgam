@@ -134,10 +134,10 @@ Other model fitting:
 [`jsdgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/jsdgam.md),
 [`mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam.md),
 [`mvgam_data()`](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam_data.md),
-[`mvgam_formula()`](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam_formula.md),
 [`mvgam_multiple()`](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam_multiple.md),
 [`pivot_detection_array()`](https://nicholasjclark.github.io/mvgam/dev/reference/pivot_detection_array.md),
 [`pivot_species_matrix()`](https://nicholasjclark.github.io/mvgam/dev/reference/pivot_species_matrix.md),
+[`print.mvgam_formula()`](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam_formula.md),
 [`series_to_mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/series_to_mvgam.md),
 [`stancode.mvgam_formula()`](https://nicholasjclark.github.io/mvgam/dev/reference/stancode.mvgam_formula.md)
 
@@ -156,14 +156,14 @@ simdat <- sim_mvgam(family = poisson(), n_series = 1L,
                     n_timepoints = 120L, trend_model = "None")
 mod <- mvgam(y ~ s(x), data = simdat$data_train,
              family = poisson(), chains = 2, silent = 2)
-#> Warning: 3 of 2000 (0.0%) transitions ended with a divergence.
+#> Warning: 11 of 2000 (1.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 # }
 # \dontrun{
 # Swap the family for a negative binomial. The formula, priors, data
 # and sampler settings carry over
 upd <- update(mod, family = negbinomial())
-#> Warning: 17 of 2000 (1.0%) transitions ended with a divergence.
+#> Warning: 5 of 2000 (0.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 
 # Compare the two fits by approximate leave-one-out cross-validation.
@@ -171,10 +171,9 @@ upd <- update(mod, family = negbinomial())
 # smaller than 4 in size means the two predict about equally well.
 # p_worse is the probability that a model predicts worse than the best
 loo_compare(mod, upd)
-#> Warning: Some Pareto k diagnostic values are too high. See help('pareto-k-diagnostic') for details.
-#>  model elpd_diff se_diff p_worse diag_diff      diag_elpd
-#>    mod       0.0     0.0      NA                         
-#>    upd      -0.7     0.7    0.82   N < 100 1 k_psis > 0.7
+#>  model elpd_diff se_diff p_worse diag_diff diag_elpd
+#>    mod       0.0     0.0      NA                    
+#>    upd      -0.5     0.8    0.73   N < 100          
 #> 
 #> Diagnostic flags present.
 #> See ?`loo-glossary` (sections `diag_diff` and `diag_elpd`)
@@ -182,7 +181,7 @@ loo_compare(mod, upd)
 
 # A change of sampler settings alone reuses the compiled model
 longer <- update(mod, iter = 3000, recompile = FALSE)
-#> Warning: 50 of 3000 (2.0%) transitions ended with a divergence.
+#> Warning: 12 of 3000 (0.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 # }
 ```

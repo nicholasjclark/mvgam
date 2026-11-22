@@ -42,6 +42,7 @@ residual_cor(
   summary = TRUE,
   robust = FALSE,
   probs = c(0.025, 0.975),
+  prob_threshold = 0.95,
   ndraws = NULL,
   draw_ids = NULL,
   ...
@@ -105,6 +106,16 @@ residual_cor(
   Two probabilities for the lower and upper bounds of the credible
   interval. Default `c(0.025, 0.975)`, a 95% interval.
 
+- prob_threshold:
+
+  The posterior probability of its sign a correlation needs to count as
+  supported, at least 0.5 and below 1. Defaults to 0.95. It sets
+  `sig_cor`, the `sig` column of
+  [`summary.mvgam_residcor()`](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam_residcor-class.md)
+  and the pairs
+  [`plot.mvgam_residcor()`](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam_residcor-class.md)
+  outlines.
+
 - ndraws:
 
   Positive integer specifying number of posterior draws to use. NULL
@@ -122,7 +133,7 @@ An
 object. Under `by_group = TRUE` on a hierarchical trend, an
 `mvgam_residcor_list` of them: the population matrix as `"_global"` and
 one per group.
-[`plot.mvgam_residcor_list()`](https://nicholasjclark.github.io/mvgam/dev/reference/plot.mvgam_residcor_list.md)
+[`plot.mvgam_residcor_list()`](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam_residcor-class.md)
 draws them as faceted heatmaps.
 
 ## Details
@@ -145,8 +156,12 @@ innovation covariance. A warning gives the count once per session.
 [`ZMVN()`](https://nicholasjclark.github.io/mvgam/dev/reference/ZMVN.md)
 keeps no memory between times and
 [`RW()`](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md)
-has no stationary distribution. Both report their innovation covariance.
-A hierarchical
+and
+[`LLT()`](https://nicholasjclark.github.io/mvgam/dev/reference/LLT.md)
+have no stationary distribution. Each reports its innovation covariance.
+The level, slope and seasonal shocks of
+[`LLT()`](https://nicholasjclark.github.io/mvgam/dev/reference/LLT.md)
+share its correlation. A hierarchical
 [`AR()`](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md)
 converts each group's scales to stationary scales in the same way,
 before its global and group correlations are mixed.
@@ -166,8 +181,7 @@ many series. A computation that factorises the matrix, such as
 whose per-draw matrices are valid correlation matrices. `prob_positive`
 and `prob_negative` are posterior sign probabilities. `prob_nonzero` is
 the larger of the two. `sig_cor` keeps the correlations whose
-`prob_nonzero` exceeds `prob_threshold`, fixed at 0.95. Its other
-entries are zero.
+`prob_nonzero` exceeds `prob_threshold`. Its other entries are zero.
 
 [`jsdgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/jsdgam.md)
 fits the same factor model. Its species covariance follows the factor
@@ -182,9 +196,13 @@ Evolution*, 7(6), 744-750.
 
 ## See also
 
-[`plot.mvgam_residcor()`](https://nicholasjclark.github.io/mvgam/dev/reference/plot.mvgam_residcor.md)
+[`plot.mvgam_residcor()`](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam_residcor-class.md)
 draws the matrix as a heatmap.
-[`summary.mvgam_residcor()`](https://nicholasjclark.github.io/mvgam/dev/reference/summary.mvgam_residcor.md)
+[`community()`](https://nicholasjclark.github.io/mvgam/dev/reference/community.md)
+gives the same associations as excess co-occurrence.
+[`species_effects()`](https://nicholasjclark.github.io/mvgam/dev/reference/species_effects.md)
+gives the responses to the covariates these correlations are net of.
+[`summary.mvgam_residcor()`](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam_residcor-class.md)
 lists the pairs.
 [`ordinate()`](https://nicholasjclark.github.io/mvgam/dev/reference/ordinate.md)
 draws the loadings as a biplot. The example of
@@ -216,21 +234,21 @@ mod <- jsdgam(formula = bf(y ~ series * env, p ~ series + tod_c),
               factor_formula = ~ -1,
               data = simdat$data_train, family = occ(),
               n_lv = 2L, chains = 2, silent = 2)
-#> Warning: 1051 of 2000 (53.0%) transitions ended with a divergence.
+#> Warning: 1018 of 2000 (51.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
-#> Warning: 1 of 2000 (0.0%) transitions hit the maximum treedepth limit of 10.
+#> Warning: 3 of 2000 (0.0%) transitions hit the maximum treedepth limit of 10.
 #> See https://mc-stan.org/misc/warnings for details.
 
 # Species correlations after the fixed effects
 rc <- residual_cor(mod)
 round(rc$cor, 2)
-#>      sp_1  sp_2  sp_3 sp_4  sp_5  sp_6
-#> sp_1 1.00  0.27  0.33 0.65  0.42  0.65
-#> sp_2 0.27  1.00  0.85 0.62 -0.74 -0.21
-#> sp_3 0.33  0.85  1.00 0.82 -0.53 -0.07
-#> sp_4 0.65  0.62  0.82 1.00  0.06  0.35
-#> sp_5 0.42 -0.74 -0.53 0.06  1.00  0.77
-#> sp_6 0.65 -0.21 -0.07 0.35  0.77  1.00
+#>       sp_1  sp_2  sp_3  sp_4  sp_5  sp_6
+#> sp_1  1.00  0.18 -0.34 -0.35  0.62  0.87
+#> sp_2  0.18  1.00  0.69  0.47 -0.69 -0.13
+#> sp_3 -0.34  0.69  1.00  0.87 -0.86 -0.54
+#> sp_4 -0.35  0.47  0.87  1.00 -0.90 -0.51
+#> sp_5  0.62 -0.69 -0.86 -0.90  1.00  0.83
+#> sp_6  0.87 -0.13 -0.54 -0.51  0.83  1.00
 plot(rc)
 
 

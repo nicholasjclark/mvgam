@@ -26,6 +26,12 @@ pp_check(
   series = NULL,
   ...
 )
+
+# S3 method for class 'mvgam_ppc_fit_stat'
+print(x, ...)
+
+# S3 method for class 'mvgam_ppc_fit_stat'
+plot(x, ...)
 ```
 
 ## Arguments
@@ -68,8 +74,7 @@ pp_check(
 
 - x:
 
-  Optional name of a variable in the model. Only used for ppc types
-  having an `x` argument and ignored otherwise.
+  An `mvgam_ppc_fit_stat` object.
 
 - newdata:
 
@@ -101,7 +106,7 @@ pp_check(
   default is the first series. Its residuals are taken in time order.
   `resid_acf` keeps missing responses in place. Its lags count time
   steps. `resid_pacf` drops them. Its lags count observations. A fit
-  with several series names its series in the subtitle.
+  with several series names its series in the title.
 
 - ...:
 
@@ -115,7 +120,12 @@ pp_check(
 
 A ggplot object. A multivariate model given no `resp` returns one figure
 with a panel per response. `type = "fit_stat"` returns an
-`mvgam_ppc_fit_stat` object with print and plot methods.
+`mvgam_ppc_fit_stat` object.
+[`print()`](https://rdrr.io/r/base/print.html) gives its discrepancy and
+Bayesian p-value.
+[`plot()`](https://rdrr.io/r/graphics/plot.default.html) draws the
+discrepancy of each draw's replicates against that of the observations,
+with the 1:1 line and the p-value.
 
 ## Details
 
@@ -228,7 +238,7 @@ simdat <- sim_mvgam(family = poisson(), n_series = 1L,
 mod <- mvgam(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1),
              data = simdat$data_train, family = poisson(),
              chains = 2, silent = 2)
-#> Warning: 5 of 2000 (0.0%) transitions ended with a divergence.
+#> Warning: 9 of 2000 (0.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 
 # A hanging rootogram, on the square-root scale. Each bar shows how

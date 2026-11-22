@@ -107,13 +107,13 @@ mod <- mvgam(y ~ s(x, k = 5) + (1 | series),
              trend_formula = ~ AR(p = 1),
              data = simdat$data_train, family = poisson(),
              chains = 2, silent = 2)
-#> Warning: 24 of 2000 (1.0%) transitions ended with a divergence.
+#> Warning: 53 of 2000 (3.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 
 # The standard deviation of the series intercepts
 VarCorr(mod)$series$sd
 #>            Estimate Est.Error        Q2.5     Q97.5
-#> Intercept 0.2001548  0.212956 0.006089667 0.8145818
+#> Intercept 0.1821798 0.1770998 0.007407799 0.6700817
 
 # Next: ranef() gives each series' own deviation
 # }

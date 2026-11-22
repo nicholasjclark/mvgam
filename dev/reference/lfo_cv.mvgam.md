@@ -33,6 +33,15 @@ lfo_cv(
   ...,
   data = NULL
 )
+
+# S3 method for class 'mvgam_lfo'
+plot(x, ...)
+
+# S3 method for class 'mvgam_lfo'
+summary(object, ...)
+
+# S3 method for class 'mvgam_lfo'
+print(x, ...)
 ```
 
 ## Arguments
@@ -41,7 +50,8 @@ lfo_cv(
 
   A fitted
   [mvgam](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam.md)
-  object.
+  object, or for [`summary()`](https://rdrr.io/r/base/summary.html) an
+  `mvgam_lfo` object.
 
 - ...:
 
@@ -101,6 +111,10 @@ lfo_cv(
 
   Deprecated alias for `newdata`.
 
+- x:
+
+  An `mvgam_lfo` object.
+
 ## Value
 
 A list of class `mvgam_lfo`, with one element per origin in each vector.
@@ -128,6 +142,18 @@ A list of class `mvgam_lfo`, with one element per origin in each vector.
 
 - `log_lik`: the held-out log densities when `save_log_lik = TRUE`,
   otherwise `NULL`.
+
+[`print()`](https://rdrr.io/r/base/print.html) shows the horizon, the
+Pareto k threshold and the counts of evaluations and refits, with each
+score's sum and mean over the origins.
+[`summary()`](https://rdrr.io/r/base/summary.html) returns a tibble with
+one row per origin: `eval_time`, `refit_here`, `pareto_k` (`NA` at a
+refit), `n_obs` and one column per score.
+[`plot()`](https://rdrr.io/r/graphics/plot.default.html) draws the
+Pareto k of each origin and each score. The dashed line marks the
+threshold above which points are highlighted: the Pareto k threshold,
+the 15% quantile of the ELPD (lower values highlighted) or the 85%
+quantile of any other score.
 
 ## References
 
@@ -158,8 +184,9 @@ Other forecasting:
 [`compare_scores()`](https://nicholasjclark.github.io/mvgam/dev/reference/compare_scores.md),
 [`ensemble.mvgam_forecast()`](https://nicholasjclark.github.io/mvgam/dev/reference/ensemble.mvgam_forecast.md),
 [`forecast.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/forecast.mvgam.md),
-[`hindcast.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/hindcast.mvgam.md),
-[`score.mvgam_forecast()`](https://nicholasjclark.github.io/mvgam/dev/reference/score.mvgam_forecast.md)
+[`forecast_uncertainty()`](https://nicholasjclark.github.io/mvgam/dev/reference/forecast_uncertainty.md),
+[`hindcast()`](https://nicholasjclark.github.io/mvgam/dev/reference/hindcast.mvgam.md),
+[`score()`](https://nicholasjclark.github.io/mvgam/dev/reference/score.mvgam_forecast.md)
 
 Other model comparison:
 [`bridge_sampler.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/bridge_sampler.mvgam.md),
@@ -191,21 +218,21 @@ mod <- mvgam(
   family  = poisson(),
   chains  = 2, silent = 2
 )
-#> Warning: 36 of 2000 (2.0%) transitions ended with a divergence.
+#> Warning: 25 of 2000 (1.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 
 # Forecasts one time step after each origin from t = 60, scored by
 # ELPD and CRPS. The model is refitted only where the Pareto k is high.
 lfo <- lfo_cv(mod, min_t = 60L, score = c("elpd", "crps"))
-#> Warning: 38 of 2000 (2.0%) transitions ended with a divergence.
+#> Warning: 90 of 2000 (4.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
-#> Warning: 54 of 2000 (3.0%) transitions ended with a divergence.
+#> Warning: 28 of 2000 (1.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
-#> Warning: 22 of 2000 (1.0%) transitions ended with a divergence.
+#> Warning: 34 of 2000 (2.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
-#> Warning: 19 of 2000 (1.0%) transitions ended with a divergence.
+#> Warning: 18 of 2000 (1.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
-#> Warning: 6 of 2000 (0.0%) transitions ended with a divergence.
+#> Warning: 12 of 2000 (1.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 lfo
 #> Approximate leave-future-out cross-validation
@@ -213,8 +240,8 @@ lfo
 #>   pareto_k_threshold : 0.697 (adaptive)
 #>   evaluation points  : 30
 #>   refits             : 5
-#>   ELPD               : sum = -78.96, mean = -2.63
-#>   crps               : sum = 57.91, mean = 1.93
+#>   ELPD               : sum = -79.42, mean = -2.65
+#>   crps               : sum = 61.24, mean = 2.04
 
 # Pareto k, ELPD and CRPS at each origin. Points past the dashed
 # line are highlighted
@@ -226,16 +253,16 @@ summary(lfo)
 #> # A tibble: 30 × 6
 #>    eval_time refit_here pareto_k n_obs  elpd  crps
 #>        <int> <lgl>         <dbl> <int> <dbl> <dbl>
-#>  1        61 TRUE        NA          1 -2.55 1.57 
-#>  2        62 FALSE       -1.63       1 -1.74 0.677
-#>  3        63 FALSE       -0.793      1 -2.52 1.50 
-#>  4        64 FALSE       -0.464      1 -2.46 1.05 
-#>  5        65 FALSE       -0.227      1 -1.66 0.877
-#>  6        66 FALSE       -0.123      1 -2.39 1.51 
-#>  7        67 FALSE       -0.0401     1 -2.78 3.21 
-#>  8        68 FALSE        0.563      1 -3.01 2.00 
-#>  9        69 TRUE         0.816      1 -2.45 2.09 
-#> 10        70 FALSE       -1.47       1 -2.89 2.79 
+#>  1        61 TRUE         NA         1 -2.55 1.60 
+#>  2        62 FALSE        -1.57      1 -1.71 0.617
+#>  3        63 FALSE        -0.752     1 -2.47 1.34 
+#>  4        64 FALSE        -0.419     1 -2.48 1.02 
+#>  5        65 FALSE        -0.420     1 -1.65 1.02 
+#>  6        66 FALSE        -0.128     1 -2.44 1.60 
+#>  7        67 FALSE         0.176     1 -3.03 3.81 
+#>  8        68 FALSE         0.383     1 -2.78 1.63 
+#>  9        69 FALSE         0.609     1 -2.68 3.28 
+#> 10        70 FALSE         0.630     1 -2.87 2.87 
 #> # ℹ 20 more rows
 
 # Next, rank models by their forecasts with loo_compare()

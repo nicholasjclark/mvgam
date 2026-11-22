@@ -130,10 +130,10 @@ compares a piecewise trend with other trends out of sample.
 
 Other trend models:
 [`LLT()`](https://nicholasjclark.github.io/mvgam/dev/reference/LLT.md),
-[`RW()`](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md),
 [`ZMVN()`](https://nicholasjclark.github.io/mvgam/dev/reference/ZMVN.md),
 [`list_trend_types()`](https://nicholasjclark.github.io/mvgam/dev/reference/list_trend_types.md),
-[`lv_axis()`](https://nicholasjclark.github.io/mvgam/dev/reference/lv_axis.md)
+[`lv_axis()`](https://nicholasjclark.github.io/mvgam/dev/reference/lv_axis.md),
+[`print.mvgam_trend()`](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md)
 
 ## Author
 
@@ -166,34 +166,34 @@ summary(mod)
 #> == Observation Model ==
 #> Regression Coefficients:
 #>           Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> Intercept     0.64      0.18     0.29     0.98 1.00     1105     1161
+#> Intercept     0.65      0.17     0.30     0.98 1.00      799     1243
 #> 
 #> == Trend Model ==
 #> Trend Specific Parameters:
 #>                          Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS
-#> k_trend[series_1]            0.03      0.01     0.01     0.04 1.00      792
-#> delta_trend[1,series_1]      0.00      0.01    -0.01     0.01 1.00     1075
-#> delta_trend[2,series_1]      0.00      0.01    -0.01     0.02 1.00     1739
-#> delta_trend[3,series_1]      0.00      0.00    -0.01     0.01 1.00     1663
-#> delta_trend[4,series_1]     -0.00      0.00    -0.01     0.01 1.00     1762
-#> delta_trend[5,series_1]     -0.00      0.00    -0.01     0.01 1.00     1693
-#> delta_trend[6,series_1]     -0.01      0.01    -0.02     0.00 1.01     1086
-#> delta_trend[7,series_1]     -0.01      0.01    -0.04     0.00 1.00     1139
-#> delta_trend[8,series_1]     -0.03      0.01    -0.05    -0.00 1.00     1040
-#> delta_trend[9,series_1]     -0.00      0.01    -0.02     0.00 1.00     1172
-#> delta_trend[10,series_1]    -0.00      0.00    -0.01     0.01 1.00     1628
+#> k_trend[series_1]            0.03      0.01     0.01     0.04 1.01      575
+#> delta_trend[1,series_1]      0.00      0.01    -0.01     0.01 1.00     1289
+#> delta_trend[2,series_1]      0.00      0.01    -0.01     0.02 1.00     1263
+#> delta_trend[3,series_1]      0.00      0.00    -0.01     0.01 1.00     1283
+#> delta_trend[4,series_1]     -0.00      0.00    -0.01     0.01 1.00     1547
+#> delta_trend[5,series_1]     -0.00      0.00    -0.01     0.01 1.00     1586
+#> delta_trend[6,series_1]     -0.01      0.01    -0.02     0.00 1.00      976
+#> delta_trend[7,series_1]     -0.01      0.01    -0.04     0.00 1.00      754
+#> delta_trend[8,series_1]     -0.03      0.01    -0.05    -0.00 1.00      675
+#> delta_trend[9,series_1]     -0.00      0.01    -0.02     0.00 1.00      875
+#> delta_trend[10,series_1]    -0.00      0.00    -0.01     0.01 1.01     1907
 #>                          Tail_ESS
-#> k_trend[series_1]             948
-#> delta_trend[1,series_1]       680
-#> delta_trend[2,series_1]      1044
-#> delta_trend[3,series_1]      1008
-#> delta_trend[4,series_1]       988
-#> delta_trend[5,series_1]       806
-#> delta_trend[6,series_1]       778
-#> delta_trend[7,series_1]      1022
-#> delta_trend[8,series_1]      1471
-#> delta_trend[9,series_1]       791
-#> delta_trend[10,series_1]      680
+#> k_trend[series_1]             523
+#> delta_trend[1,series_1]       548
+#> delta_trend[2,series_1]       862
+#> delta_trend[3,series_1]       624
+#> delta_trend[4,series_1]       968
+#> delta_trend[5,series_1]      1022
+#> delta_trend[6,series_1]       966
+#> delta_trend[7,series_1]       964
+#> delta_trend[8,series_1]      1195
+#> delta_trend[9,series_1]       868
+#> delta_trend[10,series_1]      936
 #> 
 #> Draws were sampled using sampling(NUTS). For each parameter, Bulk_ESS
 #> and Tail_ESS are effective sample size measures, and Rhat is the potential

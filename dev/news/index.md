@@ -13,9 +13,11 @@ and the package website for worked examples.
 - Trend constructors now go inside `trend_formula`,
   e.g. `trend_formula = ~ AR(p = 1)`. The `trend_model` argument has
   been removed
-- `n_lv` moved onto the trend constructors. Removed arguments: `use_lv`,
-  `noncentred`, `prior_simulation`, `return_model_data`,
+- `n_lv` and `trend_map` moved onto the trend constructors. Removed
+  arguments: `use_lv`, `prior_simulation`, `return_model_data`,
   `save_all_pars`, `parallel`
+- The trend constructors take `centred` in place of `noncentred`. Latent
+  states are sampled non-centred by default
 - Data for a model with a trend need a factor series column, even for
   one series
 - Renamed families: `nb()` is now
@@ -68,6 +70,10 @@ and the package website for worked examples.
   ([`pp_check()`](https://nicholasjclark.github.io/mvgam/dev/reference/pp_check.mvgam.md)).
   `summary(include_states = )` has been removed
 - mvgam no longer re-exports `te()` and `ti()`
+- [`coef()`](https://rdrr.io/r/stats/coef.html) follows ‘brms’: each
+  level’s coefficients per grouping factor.
+  [`fixef()`](https://rdrr.io/pkg/nlme/man/fixed.effects.html) gives the
+  population-level effects
 - `mvgam_forecast` objects store `train_times` and `test_times` as
   per-series lists
 - Parameter names and [`summary()`](https://rdrr.io/r/base/summary.html)
@@ -97,6 +103,15 @@ and the package website for worked examples.
   [`com_binomial()`](https://nicholasjclark.github.io/mvgam/dev/reference/com_binomial.md)
   mathematics and tested the bounded count families
 - Multivariate responses through `mvbind()` and `mvbf()`
+- [`forecast_uncertainty()`](https://nicholasjclark.github.io/mvgam/dev/reference/forecast_uncertainty.md)
+  splits a forecast’s variance by source and horizon. It also compares
+  covariate scenarios.
+  [`variance_partition()`](https://nicholasjclark.github.io/mvgam/dev/reference/variance_partition.md)
+  splits the fitted predictor’s variance by source
+- [`community()`](https://nicholasjclark.github.io/mvgam/dev/reference/community.md)
+  gives richness, Hill numbers, community-weighted mean traits and
+  excess co-occurrence, along gradients, at the fitted sites or over a
+  forecast
 - Checks of a model and its data before fitting or prediction:
   [`mvgam_formula()`](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam_formula.md),
   [`mvgam_data()`](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam_data.md),
@@ -115,7 +130,7 @@ and the package website for worked examples.
   adds a local linear trend: a level with a time-varying slope that can
   be damped, plus an optional trigonometric season whose shape drifts
   (`season`, `harmonics`). Its level, slope and season come back from
-  [`hindcast()`](https://nicholasjclark.github.io/mvgam/dev/reference/hindcast.md)
+  [`hindcast()`](https://nicholasjclark.github.io/mvgam/dev/reference/hindcast.mvgam.md)
   and [`forecast()`](https://generics.r-lib.org/reference/forecast.html)
   with `component`
 - `loadings_prior` for structured factor loadings. Helpers for the
@@ -139,6 +154,22 @@ and the package website for worked examples.
   [`update()`](https://rdrr.io/r/stats/update.html),
   [`hypothesis()`](https://paulbuerkner.com/brms/reference/hypothesis.brmsfit.html),
   `as_draws_*()`
+- Exact `gp()` terms (no `k`) under any ‘brms’ kernel, with predictions
+  and forecasts at new covariate values
+- [`species_effects()`](https://nicholasjclark.github.io/mvgam/dev/reference/species_effects.md)
+  gives each species’ response to named covariates with the posterior
+  probability of its sign, plus the trait effects of a `trait_slopes`
+  fit
+- `bayes_R2(by_series = TRUE)` scores each series, adding Tjur’s R^2 and
+  the AUC for binary responses
+- Four functions take `prob_threshold`, the sign probability a supported
+  entry exceeds:
+  [`residual_cor()`](https://nicholasjclark.github.io/mvgam/dev/reference/residual_cor.md),
+  [`posterior_transition_matrix()`](https://nicholasjclark.github.io/mvgam/dev/reference/posterior_transition_matrix.md),
+  [`community()`](https://nicholasjclark.github.io/mvgam/dev/reference/community.md),
+  [`species_effects()`](https://nicholasjclark.github.io/mvgam/dev/reference/species_effects.md).
+  Their heatmaps outline the entries whose sign probability exceeds it
+  and can hide the rest
 - Model comparison:
   [`bridge_sampler()`](https://rdrr.io/pkg/bridgesampling/man/bridge_sampler.html),
   [`bayes_factor()`](https://rdrr.io/pkg/bridgesampling/man/bf.html),
@@ -228,7 +259,7 @@ and the package website for worked examples.
   models accept missing responses
 - [`ensemble()`](https://nicholasjclark.github.io/mvgam/dev/reference/ensemble.mvgam_forecast.md)
   combines
-  [`hindcast()`](https://nicholasjclark.github.io/mvgam/dev/reference/hindcast.md)
+  [`hindcast()`](https://nicholasjclark.github.io/mvgam/dev/reference/hindcast.mvgam.md)
   results
 - [`CAR()`](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md)
   process variance scales with the time lag
@@ -268,7 +299,7 @@ CRAN release: 2025-03-14
   function to allow more targeted investigations of randomized quantile
   residual distributions
 - Added a
-  [`plot.mvgam_residcor()`](https://nicholasjclark.github.io/mvgam/dev/reference/plot.mvgam_residcor.md)
+  [`plot.mvgam_residcor()`](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam_residcor-class.md)
   function for nicer plotting of estimated residual correlations from
   `jsdgam` objects
 - Added [`summary()`](https://rdrr.io/r/base/summary.html) functions to

@@ -68,6 +68,12 @@ needs every model it compares scored at that grain.
 subtraction. `posterior_epred()` gives the expected shares, which sum to
 one within each unit.
 
+[`species_effects()`](https://nicholasjclark.github.io/mvgam/dev/reference/species_effects.md),
+[`variance_partition()`](https://nicholasjclark.github.io/mvgam/dev/reference/variance_partition.md)
+and `forecast_uncertainty(scale = "link")` report the predictor centred
+across each unit's components, the centred log-ratio scale. A shift
+shared by every component then drops out.
+
 ## References
 
 Warton, D. I., Blanchet, F. G., O'Hara, R. B., Ovaskainen, O., Taskinen,

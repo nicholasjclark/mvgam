@@ -214,7 +214,7 @@ simdat <- sim_mvgam(family = poisson(), n_series = 1L,
                     n_timepoints = 120L, trend_model = "None")
 mod <- mvgam(y ~ s(x), data = simdat$data_train,
              family = poisson(), chains = 2, silent = 2)
-#> Warning: 3 of 2000 (0.0%) transitions ended with a divergence.
+#> Warning: 11 of 2000 (1.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 # }
 # \dontrun{
@@ -227,12 +227,12 @@ loo(mod)
 #> Computed from 2000 posterior draws and 90 log-likelihood terms.
 #> 
 #>          Estimate   SE
-#> elpd_loo   -208.9  8.5
-#> p_loo         8.0  1.6
-#> looic       417.7 16.9
+#> elpd_loo   -208.9  8.4
+#> p_loo         8.1  1.5
+#> looic       417.7 16.8
 #> ------
 #> MCSE of elpd_loo is 0.1.
-#> MCSE and ESS estimates assume MCMC draws (r_eff in [0.6, 1.2]).
+#> MCSE and ESS estimates assume MCMC draws (r_eff in [0.5, 1.2]).
 #> 
 #> All Pareto k estimates are good (k < 0.7).
 #> See help('pareto-k-diagnostic') for details.
@@ -242,7 +242,7 @@ loo(mod)
 loo_compare(mod, mod_lin)
 #>    model elpd_diff se_diff p_worse diag_diff diag_elpd
 #>      mod       0.0     0.0      NA                    
-#>  mod_lin     -26.1     9.7    1.00   N < 100          
+#>  mod_lin     -26.0     9.6    1.00   N < 100          
 #> 
 #> Diagnostic flags present.
 #> See ?`loo-glossary` (sections `diag_diff` and `diag_elpd`)

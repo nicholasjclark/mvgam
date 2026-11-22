@@ -43,6 +43,9 @@ across series unless `cor = TRUE`.
 ## Usage
 
 ``` r
+# S3 method for class 'mvgam_trend'
+print(x, ...)
+
 RW(
   time = NA,
   series = NA,
@@ -52,7 +55,8 @@ RW(
   subgr = NA,
   n_lv = NULL,
   trend_map = NULL,
-  df = Inf
+  df = Inf,
+  centred = FALSE
 )
 
 AR(
@@ -66,7 +70,8 @@ AR(
   n_lv = NULL,
   trend_map = NULL,
   coef_sharing = c("none", "shared", "hierarchical"),
-  df = Inf
+  df = Inf,
+  centred = FALSE
 )
 
 CAR(
@@ -75,7 +80,8 @@ CAR(
   cor = FALSE,
   n_lv = NULL,
   trend_map = NULL,
-  df = Inf
+  df = Inf,
+  centred = FALSE
 )
 
 VAR(
@@ -92,6 +98,14 @@ VAR(
 ```
 
 ## Arguments
+
+- x:
+
+  An `mvgam_trend` object.
+
+- ...:
+
+  Unused.
 
 - time:
 
@@ -119,6 +133,16 @@ VAR(
   [`ZMVN()`](https://nicholasjclark.github.io/mvgam/dev/reference/ZMVN.md)
   and grouped `AR()` and `RW()` trends always estimate correlations.
   They refuse `cor = FALSE`. `CAR()` defaults to `FALSE`.
+
+  In a factor model with every loading sampled, the factors take
+  independent shocks. The loadings carry the correlation among series,
+  which
+  [`residual_cor()`](https://nicholasjclark.github.io/mvgam/dev/reference/residual_cor.md)
+  reports. A correlation among the factors would trade off against the
+  loadings. `AR()`, `RW()` and
+  [`LLT()`](https://nicholasjclark.github.io/mvgam/dev/reference/LLT.md)
+  refuse `cor = TRUE` there. A `trend_map` that fixes the loadings keeps
+  the factors apart. `cor = TRUE` then estimates their correlation.
 
 - gr:
 
@@ -185,10 +209,25 @@ VAR(
 
 - trend_map:
 
-  Optional specification of which latent process each series maps onto.
-  It fixes the loadings of a dynamic factor model. See
-  [`mvgam`](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam.md)
-  for the accepted formats. Defaults to `NULL`.
+  Optional map of the series onto the latent processes, which fixes some
+  or all loadings of a dynamic factor model. One of three forms:
+
+  - a numeric `n_series x n_lv` matrix of loadings. `NA` entries are
+    sampled and finite entries stay fixed. An all-`NA` matrix, such as
+    `matrix(NA, n_series, 2)`, fixes nothing and sets two factors.
+
+  - a `data.frame(series, trend)` placing each series on one process,
+    with a loading of one.
+
+  - `"identity"`, one process per series, or `"shared"`, one process for
+    every series.
+
+  Its columns set the number of factors, which an `n_lv` given too must
+  match. Without a `trend_map` every loading is sampled and identified
+  after sampling by a thin QR rotation (Heaps and Jermyn 2024). A map
+  that fixes any loading takes no rotation. The `loadings_prior` of
+  [`mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam.md)
+  accepts a map with no fixed entries. Defaults to `NULL`.
 
 - df:
 
@@ -233,6 +272,12 @@ VAR(
   [`PW()`](https://nicholasjclark.github.io/mvgam/dev/reference/piecewise_trends.md)
   has no innovations. Neither takes `df`.
 
+- centred:
+
+  Logical. Sample the latent states directly rather than their
+  innovations? Default `FALSE`. The model and its posterior are the
+  same. See *Centred states* below.
+
 - p:
 
   The autoregressive lags. The accepted form depends on the trend type:
@@ -265,7 +310,9 @@ VAR(
 
 An object of class `mvgam_trend` holding the constructor's arguments.
 [`mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam.md)
-builds the trend from it.
+builds the trend from it. [`print()`](https://rdrr.io/r/base/print.html)
+shows the label a fit would print, such as `AR({1, 12})`, with the
+columns and the settings that differ from their defaults.
 
 ## Details
 
@@ -279,6 +326,19 @@ constructor express richer dynamics:
   monthly lags
 
 - For cross-series dynamics: `VAR(p = 2)`
+
+**Centred states**: by default the sampler draws standard innovations
+and builds the states from them. This suits data that say little about
+each state, such as small counts, presence-absence or short series. When
+the data pin the states down, as large counts do, every innovation
+constrains every later state. The sampler then takes long trajectories
+and can hit the maximum tree depth. `centred = TRUE` samples each state
+as its distance from the first and recovers the innovations from them.
+On large counts it ran two to five times faster per effective draw. On
+small counts it ran ten to a hundred times slower.
+[`ZMVN()`](https://nicholasjclark.github.io/mvgam/dev/reference/ZMVN.md)
+factors with sampled loadings draw their states directly either way.
+`VAR()` always does.
 
 **Stationarity of `AR(p)`**: a consecutive lag set with `p >= 2` is
 sampled as partial autocorrelations, `ar1_pacf_trend` through
@@ -553,8 +613,6 @@ mod <- mvgam(
   chains        = 2,
   silent        = 2
 )
-#> Warning: 296 of 2000 (15.0%) transitions ended with a divergence.
-#> See https://mc-stan.org/misc/warnings for details.
 summary(mod)
 #>  Family: poisson 
 #>   Links: mu = log 
@@ -568,28 +626,28 @@ summary(mod)
 #> == Observation Model ==
 #> Smoothing Spline Hyperparameters:
 #>                Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> sds(sseason_1)     2.26      1.92     0.72     7.28 1.06       23       28
+#> sds(sseason_1)     1.54      0.69     0.71     3.41 1.00      935     1354
 #> 
 #> Regression Coefficients:
 #>           Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> Intercept     1.59      0.09     1.41     1.75 1.00      221     1198
+#> Intercept     1.58      0.09     1.40     1.75 1.00     1405     1524
 #> 
 #> == Trend Model ==
 #> Trend Specific Parameters:
 #>                       Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS
-#> sigma_trend[series_1]     0.32      0.09     0.15     0.52 1.02      273
-#> sigma_trend[series_2]     0.49      0.12     0.27     0.76 1.02      738
-#> sigma_trend[series_3]     0.61      0.12     0.40     0.85 1.03       67
-#> ar1_trend[series_1]       0.52      0.28     0.03     0.93 1.06       25
-#> ar1_trend[series_2]       0.45      0.22     0.04     0.82 1.02      153
-#> ar1_trend[series_3]       0.15      0.14     0.01     0.50 1.02       54
+#> sigma_trend[series_1]     0.32      0.10     0.15     0.53 1.00      866
+#> sigma_trend[series_2]     0.49      0.13     0.27     0.76 1.00      946
+#> sigma_trend[series_3]     0.59      0.12     0.39     0.86 1.00     1155
+#> ar1_trend[series_1]       0.60      0.22     0.09     0.92 1.00      654
+#> ar1_trend[series_2]       0.42      0.22     0.04     0.81 1.00      757
+#> ar1_trend[series_3]       0.18      0.14     0.01     0.53 1.00     1014
 #>                       Tail_ESS
-#> sigma_trend[series_1]      768
-#> sigma_trend[series_2]     1311
-#> sigma_trend[series_3]     1400
-#> ar1_trend[series_1]         41
-#> ar1_trend[series_2]        872
-#> ar1_trend[series_3]       1161
+#> sigma_trend[series_1]     1262
+#> sigma_trend[series_2]     1417
+#> sigma_trend[series_3]     1551
+#> ar1_trend[series_1]       1007
+#> ar1_trend[series_2]       1205
+#> ar1_trend[series_3]       1083
 #> 
 #> Draws were sampled using sampling(NUTS). For each parameter, Bulk_ESS
 #> and Tail_ESS are effective sample size measures, and Rhat is the potential
@@ -597,7 +655,7 @@ summary(mod)
 #> 
 #> Next steps:
 #>   - `pp_check(fit)`: posterior predictive checks
-#>   - `residual_cor(fit)`: implied cross-series correlations
+#>   - `residual_cor(fit)`: implied correlations among series
 #>   - `forecast(fit, newdata = ...)`: out-of-sample forecasts
 #>   - `lfo_cv(fit)`: leave-future-out model comparison
 #>   - `conditional_effects(fit)`: covariate effects
@@ -609,7 +667,7 @@ residual_cor(mod)
 #>   Source     : correlated innovations
 #>   Covariance : stationary
 #>   Series     : 3
-#>   Mean |r_ij| (i != j): 0.19 [0.07, 0.38]
+#>   Mean |r_ij| (i != j): 0.21 [0.06, 0.41]
 #>   Pairs with prob_nonzero > 0.95: 0 / 3
 
 # Residual checks. Each series has gaps of differing length. A
@@ -621,6 +679,48 @@ plot(mod, type = "residuals", series = 2)
 plot(forecast(mod, newdata = keep_some(simdat$data_test)),
      series = 2)
 
+
+# Counts near 150 pin each latent state down. Sampled centred, this
+# random walk ran about five times faster per effective draw
+n_t <- 60
+big <- data.frame(time = 1:n_t, series = factor("s1"),
+                  y = rpois(n_t, exp(5 + cumsum(rnorm(n_t, 0, 0.1)))))
+mod_big <- mvgam(
+  y ~ 1,
+  trend_formula = ~ RW(centred = TRUE),
+  data          = big,
+  family        = poisson(),
+  chains        = 2,
+  silent        = 2
+)
+summary(mod_big)
+#>  Family: poisson 
+#>   Links: mu = log 
+#> Formula: y ~ 1 
+#>    Data: big (Number of observations: 60) 
+#>  Trends: RW 
+#>   Draws: 2 chains, each with iter = 2000; warmup = 1000; thin = 1; 
+#>          total post-warmup draws = 2000
+#> 
+#> == Observation Model ==
+#> Regression Coefficients:
+#>           Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
+#> Intercept     4.94      0.09     4.77     5.12 1.02      202      343
+#> 
+#> == Trend Model ==
+#> Trend Specific Parameters:
+#>                 Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
+#> sigma_trend[s1]     0.07      0.02     0.04     0.11 1.02      262      574
+#> 
+#> Draws were sampled using sampling(NUTS). For each parameter, Bulk_ESS
+#> and Tail_ESS are effective sample size measures, and Rhat is the potential
+#> scale reduction factor on split chains (at convergence, Rhat = 1).
+#> 
+#> Next steps:
+#>   - `pp_check(fit)`: posterior predictive checks
+#>   - `forecast(fit, newdata = ...)`: out-of-sample forecasts
+#>   - `lfo_cv(fit)`: leave-future-out model comparison
+#> Use `how_to_cite(fit)` for a methods paragraph and `methods_md(fit)` for its equations.
 
 # Next: hindcast() returns the fitted latent trends. The articles
 # under 'See Also' fit VAR, hierarchical and factor trends

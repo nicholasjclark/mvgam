@@ -27,6 +27,12 @@ sim_closure_unit_data(
   K_max = 30L,
   seed = NULL
 )
+
+# S3 method for class 'mvgam_sim_closure_unit'
+summary(object, ...)
+
+# S3 method for class 'mvgam_sim_closure_unit_summary'
+print(x, digits = 3L, ...)
 ```
 
 ## Arguments
@@ -72,6 +78,22 @@ sim_closure_unit_data(
 
   Optional integer seed. The session's random state is restored when the
   call returns.
+
+- object:
+
+  A `mvgam_sim_closure_unit` object.
+
+- ...:
+
+  Unused. Anything passed here is refused.
+
+- x:
+
+  A `mvgam_sim_closure_unit_summary` object.
+
+- digits:
+
+  Integer number of significant digits. Defaults to 3.
 
 ## Value
 
@@ -189,6 +211,12 @@ estimates and
 - `loadings`, `lv`:
 
   `Z` and the factor scores, when `n_lv > 0L`.
+
+[`summary()`](https://rdrr.io/r/base/summary.html) returns an
+`mvgam_sim_closure_unit_summary` list: the dimensions, the recipe, the
+ranges of the true state and detection parameters and the share of
+non-zero observations. A share of 0 or 1 marks data with no information
+on detection. [`print()`](https://rdrr.io/r/base/print.html) shows it.
 
 ## See also
 

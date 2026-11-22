@@ -85,7 +85,7 @@ comparison. *Bayesian Analysis*.
 [`lfo_cv()`](https://nicholasjclark.github.io/mvgam/dev/reference/lfo_cv.mvgam.md),
 [`loo_model_weights.mvgam_lfo()`](https://nicholasjclark.github.io/mvgam/dev/reference/loo_model_weights.mvgam_lfo.md),
 [`compare_elpds()`](https://nicholasjclark.github.io/mvgam/dev/reference/compare_elpds.md),
-[`plot.mvgam_compare_elpds()`](https://nicholasjclark.github.io/mvgam/dev/reference/plot.mvgam_compare_elpds.md)
+[`plot.mvgam_compare_elpds()`](https://nicholasjclark.github.io/mvgam/dev/reference/compare_elpds.md)
 
 Other model comparison:
 [`bridge_sampler.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/bridge_sampler.mvgam.md),
@@ -111,36 +111,40 @@ simdat <- sim_mvgam(family = poisson(), n_series = 1L,
 # lfo_cv() refits it to shorter stretches of the series
 mod_gam <- mvgam(y ~ s(x, k = 5), data = simdat$data_train,
                  family = poisson(), chains = 2, silent = 2)
-#> Warning: 209 of 2000 (10.0%) transitions ended with a divergence.
+#> Warning: 12 of 2000 (1.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 mod_ar <- mvgam(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1),
                 data = simdat$data_train, family = poisson(),
                 chains = 2, silent = 2,
                 control = list(adapt_delta = 0.95))
-#> Warning: 3 of 2000 (0.0%) transitions ended with a divergence.
+#> Warning: 2 of 2000 (0.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 # }
 # \dontrun{
 # Each origin after t = 70 forecasts the next time step. The
 # pointwise log densities feed stacking weights
 lfo_gam <- lfo_cv(mod_gam, min_t = 70L, save_log_lik = TRUE)
-#> Warning: 31 of 2000 (2.0%) transitions ended with a divergence.
-#> See https://mc-stan.org/misc/warnings for details.
-#> Warning: 14 of 2000 (1.0%) transitions ended with a divergence.
+#> Warning: 21 of 2000 (1.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 #> Warning: 6 of 2000 (0.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
-lfo_ar <- lfo_cv(mod_ar, min_t = 70L, save_log_lik = TRUE)
-#> Warning: 3 of 2000 (0.0%) transitions ended with a divergence.
+#> Warning: 7 of 2000 (0.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
+lfo_ar <- lfo_cv(mod_ar, min_t = 70L, save_log_lik = TRUE)
 #> Warning: 2 of 2000 (0.0%) transitions ended with a divergence.
+#> See https://mc-stan.org/misc/warnings for details.
+#> Warning: 11 of 2000 (1.0%) transitions ended with a divergence.
+#> See https://mc-stan.org/misc/warnings for details.
+#> Warning: 9 of 2000 (0.0%) transitions ended with a divergence.
+#> See https://mc-stan.org/misc/warnings for details.
+#> Warning: 3 of 2000 (0.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 
 # The model with the higher summed ELPD comes first
 loo_compare(lfo_gam, lfo_ar, model_names = c("GAM", "AR"))
 #>  model elpd_diff se_diff p_worse diag_diff diag_elpd
 #>     AR       0.0     0.0      NA                    
-#>    GAM     -36.5    12.3    1.00   N < 100          
+#>    GAM     -35.9    12.1    1.00   N < 100          
 #> 
 #> Diagnostic flags present.
 #> See ?`loo-glossary` (sections `diag_diff` and `diag_elpd`)

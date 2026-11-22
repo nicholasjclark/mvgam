@@ -20,6 +20,25 @@ stability(
   future = FALSE,
   ...
 )
+
+# S3 method for class 'mvgam_stability'
+summary(object, probs = c(0.025, 0.975), robust = TRUE, bins = 30L, ...)
+
+# S3 method for class 'mvgam_stability_summary'
+plot(
+  x,
+  variables = c("reactivity", "mean_return_rate", "var_return_rate"),
+  intervals = FALSE,
+  ...
+)
+
+# S3 method for class 'mvgam_stability'
+plot(
+  x,
+  variables = c("reactivity", "mean_return_rate", "var_return_rate"),
+  bins = 30L,
+  ...
+)
 ```
 
 ## Arguments
@@ -27,7 +46,8 @@ stability(
 - object:
 
   An object of class `mvgam` fitted with a `VAR(p = 1)` latent process
-  model
+  model. For [`summary()`](https://rdrr.io/r/base/summary.html), an
+  `mvgam_stability` object from `stability(summary = FALSE)`.
 
 - ...:
 
@@ -71,11 +91,46 @@ stability(
   processes. Without the future package the draws run in turn, with a
   message.
 
+- robust:
+
+  Logical, for [`summary()`](https://rdrr.io/r/base/summary.html).
+  `TRUE` (the default) reports the median and median absolute deviation.
+  `FALSE` reports the mean and standard deviation.
+
+- bins:
+
+  Number of histogram bins, which
+  [`summary()`](https://rdrr.io/r/base/summary.html) records for
+  [`plot()`](https://rdrr.io/r/graphics/plot.default.html).
+
+- x:
+
+  An `mvgam_stability` object or its summary.
+
+- variables:
+
+  Character vector of the metrics to draw. Defaults to reactivity and
+  the mean and variance return rates. Any column of `x` can be named.
+
+- intervals:
+
+  Logical, for a summary. `TRUE` draws each metric as a median and
+  interval. `FALSE` (the default) draws its binned posterior.
+
 ## Value
 
 A `data.frame` with the posterior median and interval of each stability
 metric, or under `summary = FALSE` an object of class `mvgam_stability`
 holding one row of metrics per posterior draw.
+[`summary()`](https://rdrr.io/r/base/summary.html) turns the draws into
+the summary, one row per metric, or per panel and metric on a
+hierarchical VAR.
+[`plot()`](https://rdrr.io/r/graphics/plot.default.html) draws a
+histogram of each metric, with a dashed line at zero on the reactivity
+panel, above which the system amplifies a shock before it decays. A
+hierarchical VAR draws a median and interval for each panel. A summary
+plots the histograms from the bins it recorded, or under
+`intervals = TRUE` a median and interval.
 
 ## Details
 
@@ -182,17 +237,13 @@ simdat <- sim_mvgam(family = gaussian(), n_series = 3L,
 var_mod <- mvgam(y ~ 1, trend_formula = ~ VAR(p = 1),
                  data = simdat$data_train, family = gaussian(),
                  chains = 2, silent = 2)
-#> Warning: 44 of 2000 (2.0%) transitions ended with a divergence.
-#> See https://mc-stan.org/misc/warnings for details.
-#> Warning: 1 of 2 chains had an E-BFMI less than 0.3.
-#> See https://mc-stan.org/misc/warnings for details.
 
 # Posterior medians and intervals of the stability metrics
 stab <- stability(var_mod)
 stab[stab$metric %in% c("reactivity", "mean_return_rate"), ]
-#>             metric    Estimate Est.Error       Q2.5     Q97.5
-#> 7       reactivity -0.06752746 0.1284961 -0.2841517 0.7699353
-#> 8 mean_return_rate  0.82382811 0.0735674  0.6710897 0.9331748
+#>             metric    Estimate  Est.Error       Q2.5     Q97.5
+#> 7       reactivity -0.04448516 0.12303374 -0.2453294 0.4283587
+#> 8 mean_return_rate  0.83647291 0.06804875  0.6936867 0.9512065
 
 # The full posterior of each metric
 plot(stability(var_mod, summary = FALSE))

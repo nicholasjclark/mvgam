@@ -70,7 +70,7 @@ mod <- mvgam(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1),
               data    = simdat$data_train,
               family  = poisson(),
               chains  = 2, silent = 2)
-#> Warning: 5 of 2000 (0.0%) transitions ended with a divergence.
+#> Warning: 9 of 2000 (0.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 
 # A methods paragraph naming the Poisson family, the smooth and
@@ -83,7 +83,7 @@ cite
 #>   state-space models that combine flexible predictor effects in both the
 #>   process and observation components, using functionality from the brms
 #>   (Burkner 2017) and mgcv (Wood 2017) packages. Observations followed the
-#>   poisson family with a log link. The latent process followed AR(1)
+#>   poisson family with the log link. The latent process followed AR(1)
 #>   dynamics. The mvgam-constructed model and data were passed to Stan
 #>   (Carpenter et al. 2017) via the cmdstanr interface (Gabry et al. 2024).
 #>   We ran 2 Hamiltonian Monte Carlo chains for 1000 warmup iterations and

@@ -133,13 +133,13 @@ summary(mod)
 #> == Observation Model ==
 #> Regression Coefficients:
 #>           Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> Intercept     0.92      0.09     0.75     1.10 1.00     1379     1207
-#> x             0.58      0.08     0.43     0.74 1.00     1552     1204
+#> Intercept     0.92      0.09     0.75     1.12 1.00     1630     1262
+#> x             0.58      0.08     0.43     0.74 1.00     1562     1441
 #> 
 #> Further Distributional Parameters:
 #>       Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> shape     3.09      1.36     1.36     6.48 1.00     1175     1050
-#> mtail     2.77      0.69     1.71     4.26 1.00     1156     1295
+#> shape     3.12      1.40     1.30     6.78 1.00      859     1011
+#> mtail     2.78      0.72     1.62     4.49 1.00     1400     1243
 #> 
 #> Draws were sampled using sampling(NUTS). For each parameter, Bulk_ESS
 #> and Tail_ESS are effective sample size measures, and Rhat is the potential

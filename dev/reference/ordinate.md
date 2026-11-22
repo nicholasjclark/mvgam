@@ -96,10 +96,11 @@ ordinate(
 - traits:
 
   `NULL`, `"auto"`, or a data frame or matrix of series traits. `"auto"`
-  takes the traits a `jsdgam(traits = ...)` fit stores. Each numeric
-  trait is regressed on the plotted loadings. Its arrow points the way
-  the trait increases. Rows match the series by `rownames(traits)` when
-  those name every series and by position otherwise. Drawn only with
+  takes the traits the fit was built with, those of `jsdgam(traits = )`
+  or else of `jsdgam(trait_slopes = )`. Each numeric trait is regressed
+  on the plotted loadings. Its arrow points the way the trait increases.
+  Rows match the series by a `series` column, else by `rownames(traits)`
+  when those name every series, else by position. Drawn only with
   `biplot = TRUE`.
 
 - trait_arrow_scale:
@@ -151,7 +152,9 @@ Computing*, 34, 143.
 [`plot.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/plot.mvgam.md)
 with `type = "factors"` plots each factor's path.
 [`residual_cor()`](https://nicholasjclark.github.io/mvgam/dev/reference/residual_cor.md)
-gives the correlations among series the factors imply. The [JSDM
+gives the correlations among series the factors imply.
+[`community()`](https://nicholasjclark.github.io/mvgam/dev/reference/community.md)
+gives how often species occur together. The [JSDM
 article](https://nicholasjclark.github.io/mvgam/dev/articles/jsdgam.html)
 interprets a biplot of species loadings.
 
@@ -190,16 +193,16 @@ p
 
 attr(p, "rotation")$loadings
 #>              [,1]       [,2]
-#> sp_1   0.60745650 -0.2202705
-#> sp_2   0.67935731  0.3021084
-#> sp_3   0.12943708  0.1450690
-#> sp_4  -0.02370251 -0.7202976
-#> sp_5  -0.51760860  0.1211760
-#> sp_6  -0.11628356 -0.1486426
-#> sp_7   0.46559233  0.3600778
-#> sp_8  -0.09247473  0.8351259
-#> sp_9  -0.39936142 -1.1601838
-#> sp_10 -0.73241241  0.4858374
+#> sp_1   0.59076725 -0.2212657
+#> sp_2   0.67228928  0.2902723
+#> sp_3   0.13084150  0.1494216
+#> sp_4  -0.02140184 -0.7274418
+#> sp_5  -0.51492706  0.1203047
+#> sp_6  -0.11366818 -0.1493459
+#> sp_7   0.46865211  0.3503851
+#> sp_8  -0.07778082  0.8382159
+#> sp_9  -0.40643491 -1.1498611
+#> sp_10 -0.72833734  0.4993149
 
 # Next, residual_cor(mod) gives the species correlations the
 # factors imply

@@ -1,4 +1,4 @@
-# Specify local linear trends in mvgam models
+# Local linear trends, with optional damping and seasons
 
 A latent level that moves with a latent growth rate, the local linear
 trend of Harvey (1989). Each latent process carries a level and a slope:
@@ -29,7 +29,8 @@ LLT(
   trend_map = NULL,
   df = Inf,
   season = NULL,
-  harmonics = NULL
+  harmonics = NULL,
+  centred = FALSE
 )
 ```
 
@@ -70,6 +71,18 @@ LLT(
   trends always estimate correlations. They refuse `cor = FALSE`.
   [`CAR()`](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md)
   defaults to `FALSE`.
+
+  In a factor model with every loading sampled, the factors take
+  independent shocks. The loadings carry the correlation among series,
+  which
+  [`residual_cor()`](https://nicholasjclark.github.io/mvgam/dev/reference/residual_cor.md)
+  reports. A correlation among the factors would trade off against the
+  loadings.
+  [`AR()`](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md),
+  [`RW()`](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md)
+  and `LLT()` refuse `cor = TRUE` there. A `trend_map` that fixes the
+  loadings keeps the factors apart. `cor = TRUE` then estimates their
+  correlation.
 
 - gr:
 
@@ -137,10 +150,25 @@ LLT(
 
 - trend_map:
 
-  Optional specification of which latent process each series maps onto.
-  It fixes the loadings of a dynamic factor model. See
-  [`mvgam`](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam.md)
-  for the accepted formats. Defaults to `NULL`.
+  Optional map of the series onto the latent processes, which fixes some
+  or all loadings of a dynamic factor model. One of three forms:
+
+  - a numeric `n_series x n_lv` matrix of loadings. `NA` entries are
+    sampled and finite entries stay fixed. An all-`NA` matrix, such as
+    `matrix(NA, n_series, 2)`, fixes nothing and sets two factors.
+
+  - a `data.frame(series, trend)` placing each series on one process,
+    with a loading of one.
+
+  - `"identity"`, one process per series, or `"shared"`, one process for
+    every series.
+
+  Its columns set the number of factors, which an `n_lv` given too must
+  match. Without a `trend_map` every loading is sampled and identified
+  after sampling by a thin QR rotation (Heaps and Jermyn 2024). A map
+  that fixes any loading takes no rotation. The `loadings_prior` of
+  [`mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam.md)
+  accepts a map with no fixed entries. Defaults to `NULL`.
 
 - df:
 
@@ -199,6 +227,12 @@ LLT(
   smoother seasonal shape. Defaults to the most each period allows, up
   to 10.
 
+- centred:
+
+  Logical. Sample the latent states directly rather than their
+  innovations? Default `FALSE`. The model and its posterior are the
+  same. See *Centred states* below.
+
 ## Value
 
 An object of class `mvgam_trend`.
@@ -209,8 +243,10 @@ The level shocks take the innovation structure of
 [`RW()`](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md):
 `cor` correlates them across series, `gr` and `subgr` pool their
 correlations hierarchically and `df` gives them a multivariate t. The
-slope shocks are Gaussian and take the level's correlation matrix with
-scales of their own.
+slope and seasonal shocks are Gaussian and take the level's correlation
+matrix with scales of their own.
+[`residual_cor()`](https://nicholasjclark.github.io/mvgam/dev/reference/residual_cor.md)
+reports that one matrix.
 
 The slope starts at a free value, `init_slope_trend`, damped or not, as
 in the damped trends of exponential smoothing. Damping serves a series
@@ -262,7 +298,8 @@ keeps its level noise. The factors share one `sigma_slope_trend` and one
 unchanged. The QR rotation of
 [`RW()`](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md)
 factors identifies the loadings. A `trend_map` that fixes loadings keeps
-one slope scale per factor.
+one slope scale per factor. The factors' shocks are independent, as
+`cor` describes.
 
 *Seasonality*: `season` adds a stochastic season \\\gamma_t\\ to the
 level, the trigonometric form of Harvey (1989) with the non-integer and
@@ -292,9 +329,10 @@ a harmonic, such as 6 and 12 with three or more harmonics, are refused.
 A period longer than the data overlaps the slope and draws a warning.
 The starting pairs `init_season_trend` are estimated under one prior for
 both states of every harmonic. That prior treats every phase at the
-first time point alike. Seasonal shocks are independent across series.
-In a factor model each factor has its own season, mapped to the series
-through the loadings.
+first time point alike. Under `cor` or `gr` each harmonic's shocks are
+correlated across series, as the level shocks are. Series correlated in
+their shocks shift their seasons together. In a factor model each factor
+has its own season, mapped to the series through the loadings.
 
 `sigma_season_trend` takes a `gamma(2, .)` prior whose median puts the
 season's drift over the series at \\s / 4\\. A season that drifts by its
@@ -315,6 +353,9 @@ of the trend formula's covariates. Several names add their components:
 effects it moves with. Level, season and predictor sum to the trend. A
 factor model reports each component at the series grain, through its
 loadings. A rotation of the factors leaves them unchanged.
+[`seasonality()`](https://nicholasjclark.github.io/mvgam/dev/reference/seasonality.md)
+summarises the swing and peak of the season in each cycle. It also
+reports how both changed over the series.
 
 ## References
 
@@ -339,15 +380,17 @@ for the scale of the default priors,
 and
 [`forecast.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/forecast.mvgam.md)
 for the level, the slope and the season,
+[`seasonality()`](https://nicholasjclark.github.io/mvgam/dev/reference/seasonality.md)
+for the swing and peak of each seasonal cycle,
 [`series_to_mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/series_to_mvgam.md)
 for the periods a `ts`, `msts` or `tsibble` carries
 
 Other trend models:
 [`PW()`](https://nicholasjclark.github.io/mvgam/dev/reference/piecewise_trends.md),
-[`RW()`](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md),
 [`ZMVN()`](https://nicholasjclark.github.io/mvgam/dev/reference/ZMVN.md),
 [`list_trend_types()`](https://nicholasjclark.github.io/mvgam/dev/reference/list_trend_types.md),
-[`lv_axis()`](https://nicholasjclark.github.io/mvgam/dev/reference/lv_axis.md)
+[`lv_axis()`](https://nicholasjclark.github.io/mvgam/dev/reference/lv_axis.md),
+[`print.mvgam_trend()`](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md)
 
 ## Examples
 
@@ -373,7 +416,7 @@ mod <- mvgam(
   chains = 2,
   silent = 2
 )
-#> Warning: 13 of 2000 (1.0%) transitions ended with a divergence.
+#> Warning: 47 of 2000 (2.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 
 # The posterior for `ar1_slope_trend` covers the simulated 0.93
@@ -389,20 +432,20 @@ summary(mod)
 #> == Observation Model ==
 #> Regression Coefficients:
 #>           Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> Intercept     1.46      0.27     0.90     1.98 1.00     1580     1338
+#> Intercept     1.46      0.28     0.90     1.99 1.00     1274      845
 #> 
 #> == Trend Model ==
 #> Trend Specific Parameters:
 #>                       Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS
-#> sigma_trend[s1]           0.08      0.03     0.02     0.14 1.00      589
-#> ar1_slope_trend[s1]       0.93      0.03     0.85     0.98 1.00     1251
-#> init_slope_trend[s1]      0.20      0.07     0.07     0.35 1.00     1209
-#> sigma_slope_trend[s1]     0.01      0.01     0.00     0.03 1.00      960
+#> sigma_trend[s1]           0.08      0.03     0.02     0.14 1.00      594
+#> ar1_slope_trend[s1]       0.93      0.03     0.85     0.98 1.00     1004
+#> init_slope_trend[s1]      0.21      0.07     0.08     0.35 1.00      926
+#> sigma_slope_trend[s1]     0.01      0.01     0.00     0.03 1.00      796
 #>                       Tail_ESS
-#> sigma_trend[s1]            735
-#> ar1_slope_trend[s1]       1094
-#> init_slope_trend[s1]      1223
-#> sigma_slope_trend[s1]     1232
+#> sigma_trend[s1]            703
+#> ar1_slope_trend[s1]        632
+#> init_slope_trend[s1]       812
+#> sigma_slope_trend[s1]      778
 #> 
 #> Draws were sampled using sampling(NUTS). For each parameter, Bulk_ESS
 #> and Tail_ESS are effective sample size measures, and Rhat is the potential
@@ -424,7 +467,7 @@ plot(forecast(mod, newdata = dat[46:85, ], type = "trend",
 plot(forecast(mod, newdata = dat[46:85, ], type = "link"))
 
 mod_undamped <- update(mod, trend_formula = ~ LLT())
-#> Warning: 15 of 2000 (1.0%) transitions ended with a divergence.
+#> Warning: 37 of 2000 (2.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 plot(forecast(mod_undamped, newdata = dat[46:85, ], type = "link"))
 
@@ -449,7 +492,7 @@ mod_s <- mvgam(
   chains = 2,
   silent = 2
 )
-#> Warning: 51 of 2000 (3.0%) transitions ended with a divergence.
+#> Warning: 26 of 2000 (1.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 
 # A small `sigma_season_trend` lets the seasonal shape drift slowly
@@ -465,32 +508,32 @@ summary(mod_s)
 #> == Observation Model ==
 #> Regression Coefficients:
 #>           Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> Intercept     2.42      0.11     2.18     2.62 1.00      861      821
+#> Intercept     2.42      0.11     2.19     2.63 1.00      864      983
 #> 
 #> == Trend Model ==
 #> Regression Coefficients:
 #>      Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> rain     0.29      0.03     0.23     0.35 1.00     2676     1666
+#> rain     0.29      0.03     0.24     0.35 1.00     1771     1240
 #> 
 #> Trend Specific Parameters:
 #>                         Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS
-#> sigma_trend[s1]             0.02      0.01     0.00     0.06 1.00      724
-#> init_slope_trend[s1]        0.01      0.01    -0.00     0.02 1.00      736
-#> init_season_trend[1,s1]     0.08      0.10    -0.14     0.26 1.00     1212
-#> init_season_trend[2,s1]    -0.03      0.10    -0.23     0.15 1.00     1080
-#> init_season_trend[3,s1]     0.26      0.11     0.03     0.47 1.00      946
-#> init_season_trend[4,s1]     0.03      0.10    -0.17     0.22 1.00     1383
-#> sigma_slope_trend[s1]       0.00      0.00     0.00     0.00 1.00      736
-#> sigma_season_trend[s1]      0.02      0.01     0.01     0.04 1.00      633
+#> sigma_trend[s1]             0.02      0.01     0.00     0.05 1.00      785
+#> init_slope_trend[s1]        0.01      0.01     0.00     0.02 1.00      728
+#> init_season_trend[1,s1]     0.07      0.10    -0.17     0.26 1.00     1031
+#> init_season_trend[2,s1]    -0.03      0.10    -0.23     0.14 1.00      910
+#> init_season_trend[3,s1]     0.26      0.11     0.02     0.46 1.00      640
+#> init_season_trend[4,s1]     0.03      0.09    -0.16     0.22 1.01     1042
+#> sigma_slope_trend[s1]       0.00      0.00     0.00     0.00 1.00      880
+#> sigma_season_trend[s1]      0.02      0.01     0.01     0.04 1.00      566
 #>                         Tail_ESS
-#> sigma_trend[s1]              867
+#> sigma_trend[s1]             1087
 #> init_slope_trend[s1]         760
-#> init_season_trend[1,s1]     1265
-#> init_season_trend[2,s1]     1204
-#> init_season_trend[3,s1]     1178
-#> init_season_trend[4,s1]     1114
-#> sigma_slope_trend[s1]        268
-#> sigma_season_trend[s1]      1027
+#> init_season_trend[1,s1]     1283
+#> init_season_trend[2,s1]      994
+#> init_season_trend[3,s1]      893
+#> init_season_trend[4,s1]     1372
+#> sigma_slope_trend[s1]       1010
+#> sigma_season_trend[s1]      1041
 #> 
 #> Draws were sampled using sampling(NUTS). For each parameter, Bulk_ESS
 #> and Tail_ESS are effective sample size measures, and Rhat is the potential
@@ -498,6 +541,7 @@ summary(mod_s)
 #> 
 #> Next steps:
 #>   - `pp_check(fit)`: posterior predictive checks
+#>   - `seasonality(fit)`: the season's swing and peak, cycle by cycle
 #>   - `forecast(fit, newdata = ...)`: out-of-sample forecasts
 #>   - `lfo_cv(fit)`: leave-future-out model comparison
 #>   - `conditional_effects(fit)`: covariate effects
@@ -518,14 +562,70 @@ fc_s <- forecast(mod_s, newdata = dat_s[109:120, ], type = "trend",
 plot(fc_s)
 
 
+# The swing of each year's season and its peak month. Comparing the
+# first and last years gives the widening and its probability
+s <- seasonality(mod_s, newdata = dat_s[109:120, ])
+s
+#> Seasonal pattern of the latent trend (link scale), 2000 draws
+#> First and last complete cycles. summary() gives every cycle.
+#> 
+#> Period 12 (season)
+#>   s1
+#>     amplitude 0.35 -> 0.73, P(larger) = 1.00
+#>     peak 3 (0.45) -> 3 (0.78), P(earlier) = 0.38, P(later) = 0.20
+#>     strength 0.46 -> 0.82
+plot(s)
+
+summary(s)$change
+#> # A tibble: 1 × 13
+#>   series period from_cycle to_cycle ratio_Q50 ratio_Q2.5 ratio_Q97.5 prob_larger
+#>   <chr>  <chr>       <int>    <int>     <dbl>      <dbl>       <dbl>       <dbl>
+#> 1 s1     season          1       10      2.13       1.30        4.36       0.998
+#> # ℹ 5 more variables: shift_Q50 <dbl>, shift_Q2.5 <dbl>, shift_Q97.5 <dbl>,
+#> #   prob_earlier <dbl>, prob_later <dbl>
+
 # Draws of the seasonal shock scale
 head(as.data.frame(mod_s, variable = "sigma_season_trend"))
 #>   sigma_season_trend[s1] .chain .iteration .draw
-#> 1             0.01900741      1          1     1
-#> 2             0.01821561      1          2     2
-#> 3             0.01860650      1          3     3
-#> 4             0.01700378      1          4     4
-#> 5             0.01894810      1          5     5
-#> 6             0.01629572      1          6     6
+#> 1             0.02414748      1          1     1
+#> 2             0.02664308      1          2     2
+#> 3             0.02803200      1          3     3
+#> 4             0.02484199      1          4     4
+#> 5             0.03152859      1          5     5
+#> 6             0.02168667      1          6     6
+
+# Two regions whose levels move together, with shocks correlated at
+# 0.7. Counts near 20 pin the states down, which the centred form
+# samples fastest
+set.seed(4)
+n_t <- 60
+z <- rnorm(n_t)
+shock <- 0.25 * cbind(z, 0.7 * z + sqrt(1 - 0.7^2) * rnorm(n_t))
+dat_r <- data.frame(
+  time = rep(1:n_t, 2),
+  series = factor(rep(c("north", "south"), each = n_t))
+)
+dat_r$y <- rpois(2 * n_t, exp(3 + c(apply(shock, 2, cumsum)) +
+                                0.5 * sin(2 * pi * dat_r$time / 12)))
+
+# `cor = TRUE` correlates the level, slope and seasonal shocks
+mod_r <- mvgam(
+  y ~ 1,
+  trend_formula = ~ LLT(season = 12, harmonics = 1, cor = TRUE,
+                        centred = TRUE),
+  data = dat_r,
+  family = poisson(),
+  chains = 2,
+  silent = 2
+)
+
+# The one correlation matrix the three kinds of shock share
+residual_cor(mod_r)
+#> Residual correlations from an mvgam fit
+#>   Source     : correlated innovations
+#>   Covariance : stationary
+#>   Series     : 2
+#>   Mean |r_ij| (i != j): 0.65 [0.41, 0.82]
+#>   Pairs with prob_nonzero > 0.95: 1 / 1
 # }
 ```

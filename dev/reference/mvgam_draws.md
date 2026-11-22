@@ -66,7 +66,7 @@ as_draws_rvars(x, variable = NULL, regex = FALSE, inc_warmup = FALSE, ...)
 
   - `"betas"`: population-level coefficients, the set
     [`brms::fixef()`](https://paulbuerkner.com/brms/reference/fixef.brmsfit.html)
-    reports (`b_*`, `bs_*` and `bsp_*`).
+    reports (`b_*`, `bs_*`, `bsp_*` and `bcs_*`).
 
   - `"obs_params"`: observation-family distributional parameters
     (`sigma`, `phi`, `shape`, ...).
@@ -162,18 +162,18 @@ mod <- mvgam(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1),
               data    = simdat$data_train,
               family  = poisson(),
               chains  = 2, silent = 2)
-#> Warning: 5 of 2000 (0.0%) transitions ended with a divergence.
+#> Warning: 9 of 2000 (0.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 
 # Trend-dynamics parameters as a data frame of draws
 head(as.data.frame(mod, variable = "trend_params"))
 #>   sigma_trend[series_1] ar1_trend[series_1] .chain .iteration .draw
-#> 1             0.4747979           0.6952397      1          1     1
-#> 2             0.4098684           0.7876823      1          2     2
-#> 3             0.4974144           0.6125546      1          3     3
-#> 4             0.4301547           0.6917517      1          4     4
-#> 5             0.4835361           0.3383189      1          5     5
-#> 6             0.4086803           0.5631561      1          6     6
+#> 1             0.4315629           0.7200850      1          1     1
+#> 2             0.4278023           0.6767122      1          2     2
+#> 3             0.5405623           0.5245332      1          3     3
+#> 4             0.4925876           0.6759856      1          4     4
+#> 5             0.4726482           0.5196237      1          5     5
+#> 6             0.4369597           0.4553947      1          6     6
 
 # Regular expressions select by pattern, here the smooth's basis
 # coefficients and its smoothing SD
@@ -185,11 +185,11 @@ as_draws_rvars(mod, variable = "trend_params")
 #> # A draws_rvars: 1000 iterations, 2 chains, and 2 variables
 #> $sigma_trend: rvar<1000,2>[1] mean ± sd:
 #>      series_1 
-#> 0.47 ± 0.072  
+#> 0.47 ± 0.073  
 #> 
 #> $ar1_trend: rvar<1000,2>[1] mean ± sd:
 #>     series_1 
-#> 0.56 ± 0.14  
+#> 0.58 ± 0.15  
 #> 
 
 # Next, mcmc_plot(mod) plots the same draws

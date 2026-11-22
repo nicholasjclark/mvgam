@@ -215,10 +215,10 @@ summary(mod)
 #> == Observation Model ==
 #> Regression Coefficients:
 #>             Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> Intercept       0.25      0.14    -0.02     0.52 1.00     1685     1600
-#> p_Intercept     0.48      0.19     0.09     0.83 1.00     1443      918
-#> env             0.09      0.12    -0.15     0.33 1.00     2110     1673
-#> p_tod_c         0.06      0.04    -0.02     0.14 1.00     1808     1686
+#> Intercept       0.25      0.14    -0.04     0.50 1.00     1702     1416
+#> p_Intercept     0.49      0.19     0.11     0.84 1.00     1913     1426
+#> env             0.09      0.13    -0.14     0.33 1.00     2318     1579
+#> p_tod_c         0.06      0.04    -0.02     0.14 1.00     2211     1171
 #> 
 #> Draws were sampled using sampling(NUTS). For each parameter, Bulk_ESS
 #> and Tail_ESS are effective sample size measures, and Rhat is the potential
@@ -235,20 +235,20 @@ summary(mod)
 # Abundance and detection, separated by the model
 head(predict(mod, type = "latent_state"))
 #>      Estimate Est.Error Q2.5 Q97.5
-#> [1,]   1.0560 0.2385214    1     2
-#> [2,]   2.0805 0.2775937    2     3
-#> [3,]   3.1135 0.3415788    3     4
-#> [4,]   1.1105 0.3321821    1     2
-#> [5,]   1.0500 0.2179995    1     2
-#> [6,]   0.0330 0.1786812    0     1
+#> [1,]    1.058 0.2463054    1     2
+#> [2,]    2.082 0.2851608    2     3
+#> [3,]    3.113 0.3410119    3     4
+#> [4,]    1.103 0.3169246    1     2
+#> [5,]    1.053 0.2263109    1     2
+#> [6,]    0.035 0.1891901    0     1
 head(predict(mod, type = "detection"))
 #>       Estimate  Est.Error      Q2.5     Q97.5
-#> [1,] 0.6815371 0.05912045 0.5660061 0.7897099
-#> [2,] 0.6069331 0.04494594 0.5091557 0.6904690
-#> [3,] 0.5373793 0.07305650 0.3918252 0.6766916
-#> [4,] 0.6350496 0.04462901 0.5402543 0.7164926
-#> [5,] 0.6514227 0.04807929 0.5541580 0.7396605
-#> [6,] 0.6346711 0.04457818 0.5399661 0.7159861
+#> [1,] 0.6835477 0.05853578 0.5645003 0.7917664
+#> [2,] 0.6093988 0.04479674 0.5146355 0.6910107
+#> [3,] 0.5401252 0.07348125 0.4016005 0.6746515
+#> [4,] 0.6373573 0.04418979 0.5471676 0.7194944
+#> [5,] 0.6536301 0.04753058 0.5598352 0.7426829
+#> [6,] 0.6369810 0.04414219 0.5466622 0.7189806
 plot(hindcast(mod, type = "latent_state"))
 
 
@@ -261,6 +261,6 @@ pp_check(mod, type = "fit_stat", stat = "freeman_tukey",
 #>   Statistic:        Freeman-Tukey
 #>   Aggregation:      closure unit
 #>   Posterior draws:  200
-#>   Bayesian p-value: 0.235
+#>   Bayesian p-value: 0.190
 # }
 ```

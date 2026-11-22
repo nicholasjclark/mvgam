@@ -10,6 +10,8 @@ are better.
 ## Usage
 
 ``` r
+score(object, ...)
+
 # S3 method for class 'mvgam_forecast'
 score(
   object,
@@ -22,6 +24,9 @@ score(
   weights = NULL,
   ...
 )
+
+# S3 method for class 'mvgam_score'
+print(x, digits = 2L, ...)
 ```
 
 ## Arguments
@@ -31,6 +36,10 @@ score(
   An `mvgam_forecast` object whose `type` is `"response"` or
   `"expected"`. The held-out observations are then on the scale of the
   forecasts.
+
+- ...:
+
+  Unused. Anything passed here is refused.
 
 - score:
 
@@ -66,17 +75,24 @@ score(
   Optional numeric vector of non-negative weights, one per series, for
   `"variogram"`.
 
-- ...:
+- x:
 
-  Unused. Anything passed here is refused.
+  An `mvgam_score` object returned by `score()`.
+
+- digits:
+
+  Integer number of significant digits. Defaults to 2.
 
 ## Value
 
-A named `list` with one data frame per series plus a trailing
-`all_series` summary. Each series' data frame has columns `score`,
-`in_interval`, `interval_width`, `eval_horizon` and `score_type`, the
-requested `score`. A joint score leaves the per-series `score` column
-`NA`.
+An object of class `mvgam_score`: a named list with one data frame per
+series plus a trailing `all_series` summary. Its
+[`print()`](https://rdrr.io/r/base/print.html) method shows the mean
+score and interval coverage of each series. A multivariate model gives
+one such object per response. Each series' data frame has columns
+`score`, `in_interval`, `interval_width`, `eval_horizon` and
+`score_type`, which names the requested `score`. A joint score leaves
+the per-series `score` column `NA`.
 
 For a univariate score, `all_series` sums the scores over the series at
 each forecast time, with `score_type` prefixed `"sum_"`. Series forecast
@@ -168,7 +184,8 @@ Other forecasting:
 [`compare_scores()`](https://nicholasjclark.github.io/mvgam/dev/reference/compare_scores.md),
 [`ensemble.mvgam_forecast()`](https://nicholasjclark.github.io/mvgam/dev/reference/ensemble.mvgam_forecast.md),
 [`forecast.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/forecast.mvgam.md),
-[`hindcast.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/hindcast.mvgam.md),
+[`forecast_uncertainty()`](https://nicholasjclark.github.io/mvgam/dev/reference/forecast_uncertainty.md),
+[`hindcast()`](https://nicholasjclark.github.io/mvgam/dev/reference/hindcast.mvgam.md),
 [`lfo_cv.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/lfo_cv.mvgam.md)
 
 ## Examples
@@ -183,7 +200,7 @@ mod <- mvgam(y ~ s(x, k = 5),
              data = simdat$data_train,
              family = poisson(),
              chains = 2, silent = 2)
-#> Warning: 491 of 2000 (25.0%) transitions ended with a divergence.
+#> Warning: 80 of 2000 (4.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 
 # Forecast the held-out times, then score each series
@@ -191,12 +208,12 @@ fc <- forecast(mod, newdata = simdat$data_test)
 sc <- score(fc, score = "drps")
 head(sc$series_1)
 #>       score in_interval interval_width eval_horizon score_type
-#> 1 12.018737           0            0.9            1       drps
-#> 2  6.756861           1            0.9            2       drps
-#> 3  5.054312           0            0.9            3       drps
-#> 4  5.029708           1            0.9            4       drps
-#> 5 32.373675           0            0.9            5       drps
-#> 6  3.049877           1            0.9            6       drps
+#> 1 11.857747           0            0.9            1       drps
+#> 2  6.849953           1            0.9            2       drps
+#> 3  4.919379           0            0.9            3       drps
+#> 4  4.983058           1            0.9            4       drps
+#> 5 33.789870           0            0.9            5       drps
+#> 6  3.026148           1            0.9            6       drps
 
 # The DRPS summed over series at each forecast horizon
 library(ggplot2)
@@ -210,12 +227,12 @@ ggplot(sc$all_series, aes(eval_horizon, score)) +
 # A joint score of both series at each horizon
 head(score(fc, score = "energy")$all_series)
 #>       score eval_horizon score_type
-#> 1 11.037514            1     energy
-#> 2 10.566751            2     energy
-#> 3  5.058591            3     energy
-#> 4  5.834418            4     energy
-#> 5 32.058046            5     energy
-#> 6  3.370899            6     energy
+#> 1 10.989229            1     energy
+#> 2 10.409559            2     energy
+#> 3  5.155156            3     energy
+#> 4  5.758533            4     energy
+#> 5 33.459529            5     energy
+#> 6  3.353609            6     energy
 
 # Next: compare_scores() ranks several models by one rule
 # }

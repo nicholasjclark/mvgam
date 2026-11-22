@@ -16,16 +16,17 @@ mvgam_multiple(formula, trend_formula = NULL, data_list, combine = TRUE, ...)
 
 - formula:
 
-  Main observation model formula (supports brms syntax). Smooth specials
-  `s()`, `t2()`, `gp()`, varying intercepts and slopes, monotonic
-  `mo()`, measurement-error `me()`, distributional `dpar` sub-formulas
-  and [`offset()`](https://rdrr.io/r/stats/offset.html) are all
-  available. `gp()` accepts both the approximate Hilbert-space form
-  (`gp(x, k = 20)`) and the exact full-covariance form (`gp(x)`, no
-  `k`). Prediction at `newdata` requires the approximate form. An exact
-  `gp()` term fits and scores in-sample.
-  [`mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam.md)
-  says so once per session.
+  The observation model formula, in brms syntax: smooths `s()` and
+  `t2()`, `gp()`, varying intercepts and slopes, `mm()`, `mo()`, `me()`,
+  `mi()`, distributional and non-linear sub-formulas and
+  [`offset()`](https://rdrr.io/r/stats/offset.html). A response leaves
+  rows out by holding `NA` there.
+  [`mvgam_formula()`](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam_formula.md)
+  lists the terms each formula refuses. `gp()` takes the approximate
+  Hilbert-space form (`gp(x, k = 20)`) or the exact form (`gp(x)`, no
+  `k`), under any brms kernel. An exact term predicts at new covariate
+  values by conditioning on its fitted values, as brms does. Its cost
+  grows with the cube of the number of unique values.
 
 - trend_formula:
 
@@ -35,9 +36,7 @@ mvgam_multiple(formula, trend_formula = NULL, data_list, combine = TRUE, ...)
   with any predictors of the latent state. Write
   [`lv_axis()`](https://nicholasjclark.github.io/mvgam/dev/reference/lv_axis.md)
   in a term to vary its effect by latent factor, or by series in a model
-  without factors, as in `~ x:lv_axis() + AR()`. The series column
-  itself is not supported in a term of this formula. Forecasting
-  requires the approximate form of any `gp()` term here.
+  without factors, as in `~ x:lv_axis() + AR()`.
 
 - data_list:
 
@@ -90,9 +89,9 @@ Other model fitting:
 [`jsdgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/jsdgam.md),
 [`mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam.md),
 [`mvgam_data()`](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam_data.md),
-[`mvgam_formula()`](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam_formula.md),
 [`pivot_detection_array()`](https://nicholasjclark.github.io/mvgam/dev/reference/pivot_detection_array.md),
 [`pivot_species_matrix()`](https://nicholasjclark.github.io/mvgam/dev/reference/pivot_species_matrix.md),
+[`print.mvgam_formula()`](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam_formula.md),
 [`series_to_mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/series_to_mvgam.md),
 [`stancode.mvgam_formula()`](https://nicholasjclark.github.io/mvgam/dev/reference/stancode.mvgam_formula.md),
 [`update.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/update.mvgam.md)
@@ -125,13 +124,11 @@ fit_pooled <- mvgam_multiple(
   chains = 2,
   silent = 2
 )
-#> Warning: 38 of 2000 (2.0%) transitions ended with a divergence.
+#> Warning: 36 of 2000 (2.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
-#> Warning: 407 of 2000 (20.0%) transitions ended with a divergence.
+#> Warning: 54 of 2000 (3.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
-#> Warning: 697 of 2000 (35.0%) transitions ended with a divergence.
-#> See https://mc-stan.org/misc/warnings for details.
-#> Warning: 1 of 2 chains had an E-BFMI less than 0.3.
+#> Warning: 87 of 2000 (4.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 
 # The summary adds the convergence of each imputation fit
@@ -147,21 +144,21 @@ summary(fit_pooled)
 #> == Observation Model ==
 #> Regression Coefficients:
 #>           Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> Intercept     0.09      0.19    -0.27     0.44 1.15     1264     1718
-#> x             0.44      0.16     0.14     0.78 1.06     1550     2286
+#> Intercept     0.08      0.20    -0.32     0.47 1.01     2231     2304
+#> x             0.45      0.17     0.11     0.79 1.00     3404     3052
 #> 
 #> Further Distributional Parameters:
 #>       Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> sigma     0.98      0.30     0.41     1.45 1.55      167       93
+#> sigma     1.09      0.20     0.64     1.45 1.03      475      279
 #> 
 #> == Trend Model ==
 #> Trend Specific Parameters:
 #>                       Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS
-#> sigma_trend[series_1]     0.52      0.41     0.01     1.44 1.47      172
-#> ar1_trend[series_1]       0.13      0.35    -0.61     0.75 1.15      764
+#> sigma_trend[series_1]     0.38      0.29     0.02     1.02 1.03      450
+#> ar1_trend[series_1]       0.11      0.37    -0.67     0.75 1.00     2979
 #>                       Tail_ESS
-#> sigma_trend[series_1]      436
-#> ar1_trend[series_1]       1961
+#> sigma_trend[series_1]      587
+#> ar1_trend[series_1]       3385
 #> 
 #> Draws were sampled using sampling(NUTS). For each parameter, Bulk_ESS
 #> and Tail_ESS are effective sample size measures, and Rhat is the potential
@@ -177,9 +174,9 @@ summary(fit_pooled)
 #> Multiple imputation: 3 fits of 2000 draws each, pooled.
 #> Rhat is each parameter's largest and each ESS its sum over the fits.
 #>    Imputation Max_Rhat Min_Bulk_ESS Min_Tail_ESS
-#>             1    1.018          130           54
-#>             2    1.110           13           13
-#>             3    1.622            3           11
+#>             1    1.024          142           87
+#>             2    1.012          233          168
+#>             3    1.044           69           24
 
 # Next, `combine = FALSE` returns the three fits as a list
 # }

@@ -23,6 +23,12 @@ sim_jsdgam(
   family_pars = list(),
   seed = NULL
 )
+
+# S3 method for class 'mvgam_sim_jsdgam'
+summary(object, ...)
+
+# S3 method for class 'mvgam_sim_jsdgam_summary'
+print(x, digits = 3L, ...)
 ```
 
 ## Arguments
@@ -72,6 +78,22 @@ sim_jsdgam(
   Optional integer seed. The session's random state is restored when the
   call returns.
 
+- object:
+
+  A `mvgam_sim_jsdgam` object.
+
+- ...:
+
+  Unused. Anything passed here is refused.
+
+- x:
+
+  A `mvgam_sim_jsdgam_summary` object.
+
+- digits:
+
+  Integer number of significant digits. Defaults to 3.
+
 ## Value
 
 An object of class `mvgam_sim_jsdgam`, inheriting `mvgam_sim`, with
@@ -112,6 +134,12 @@ elements:
   [`multi()`](https://nicholasjclark.github.io/mvgam/dev/reference/multi.md)
   these include the defaults `Psi = 0.5`, `nu = 5`, `phi = 30` and
   `unit_total = 30`.
+
+[`summary()`](https://rdrr.io/r/base/summary.html) returns an
+`mvgam_sim_jsdgam_summary` list: the design, the per-species generative
+parameters and the range of the residual correlations the loadings
+imply, which a fit of these data is asked to recover.
+[`print()`](https://rdrr.io/r/base/print.html) shows it.
 
 ## Details
 

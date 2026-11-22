@@ -124,10 +124,10 @@ Other model fitting:
 [`jsdgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/jsdgam.md),
 [`mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam.md),
 [`mvgam_data()`](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam_data.md),
-[`mvgam_formula()`](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam_formula.md),
 [`mvgam_multiple()`](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam_multiple.md),
 [`pivot_detection_array()`](https://nicholasjclark.github.io/mvgam/dev/reference/pivot_detection_array.md),
 [`pivot_species_matrix()`](https://nicholasjclark.github.io/mvgam/dev/reference/pivot_species_matrix.md),
+[`print.mvgam_formula()`](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam_formula.md),
 [`stancode.mvgam_formula()`](https://nicholasjclark.github.io/mvgam/dev/reference/stancode.mvgam_formula.md),
 [`update.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/update.mvgam.md)
 
@@ -162,12 +162,12 @@ wide <- data.frame(
 )
 head(series_to_mvgam(wide))
 #>   series time  y       date season
-#> 1 site_a    1  8 2024-01-01      5
-#> 2 site_b    1  8 2024-01-01      5
-#> 3 site_a    2 10 2024-01-02      6
-#> 4 site_b    2 11 2024-01-02      6
-#> 5 site_a    3  4 2024-01-03      7
-#> 6 site_b    3 12 2024-01-03      7
+#> 1 site_a    1  2 2024-01-01      5
+#> 2 site_b    1  9 2024-01-01      5
+#> 3 site_a    2  7 2024-01-02      6
+#> 4 site_b    2 14 2024-01-02      6
+#> 5 site_a    3  5 2024-01-03      7
+#> 6 site_b    3  9 2024-01-03      7
 
 # Next: fit the training data, for example with
 # mvgam(y ~ s(season, bs = "cc"), trend_formula = ~ AR(),

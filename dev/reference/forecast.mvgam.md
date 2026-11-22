@@ -20,7 +20,10 @@ forecast(
   coef_uncertainty = TRUE,
   trend_uncertainty = TRUE,
   obs_uncertainty = TRUE,
-  resp = NULL
+  resp = NULL,
+  re_formula = NULL,
+  allow_new_levels = FALSE,
+  sample_new_levels = "uncertainty"
 )
 ```
 
@@ -113,9 +116,10 @@ forecast(
   Logical, `TRUE` by default. `FALSE` holds the coefficients of the
   observation and trend formulas at one posterior draw, the first that
   `ndraws` or `draw_ids` selects. That includes smooth, random-effect
-  and Hilbert-space `gp(x, k)` coefficients. The forecast then leaves
-  out their uncertainty. Turning off one source of uncertainty at a time
-  shows how much each contributes to a forecast.
+  and `gp()` coefficients. An exact `gp()` term's draw at new values is
+  held too. The forecast then leaves out their uncertainty. Turning off
+  one source of uncertainty at a time shows how much each contributes to
+  a forecast.
 
 - trend_uncertainty:
 
@@ -133,6 +137,12 @@ forecast(
 
   Character specifying which response variable for multivariate models.
   NULL (default) returns predictions for all responses.
+
+- re_formula, allow_new_levels, sample_new_levels:
+
+  As in
+  [`posterior_epred.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/posterior_epred.mvgam.md).
+  A formula applies to the observation and the trend formulas alike.
 
 ## Value
 
@@ -153,7 +163,9 @@ predict from the covariate part of the model.
 [`forecast()`](https://generics.r-lib.org/reference/forecast.html)
 extrapolates the fitted latent state.
 [`score.mvgam_forecast()`](https://nicholasjclark.github.io/mvgam/dev/reference/score.mvgam_forecast.md)
-scores a forecast against held-out data. The [forecast evaluation
+scores a forecast against held-out data.
+[`forecast_uncertainty()`](https://nicholasjclark.github.io/mvgam/dev/reference/forecast_uncertainty.md)
+splits its variance by source. The [forecast evaluation
 article](https://nicholasjclark.github.io/mvgam/dev/articles/forecast_evaluation.html)
 scores, compares and combines the forecasts of three models of rodent
 counts.
@@ -161,9 +173,10 @@ counts.
 Other forecasting:
 [`compare_scores()`](https://nicholasjclark.github.io/mvgam/dev/reference/compare_scores.md),
 [`ensemble.mvgam_forecast()`](https://nicholasjclark.github.io/mvgam/dev/reference/ensemble.mvgam_forecast.md),
-[`hindcast.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/hindcast.mvgam.md),
+[`forecast_uncertainty()`](https://nicholasjclark.github.io/mvgam/dev/reference/forecast_uncertainty.md),
+[`hindcast()`](https://nicholasjclark.github.io/mvgam/dev/reference/hindcast.mvgam.md),
 [`lfo_cv.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/lfo_cv.mvgam.md),
-[`score.mvgam_forecast()`](https://nicholasjclark.github.io/mvgam/dev/reference/score.mvgam_forecast.md)
+[`score()`](https://nicholasjclark.github.io/mvgam/dev/reference/score.mvgam_forecast.md)
 
 ## Examples
 
@@ -182,7 +195,7 @@ mod <- mvgam(
   family  = poisson(),
   chains  = 2, silent = 2
 )
-#> Warning: 36 of 2000 (2.0%) transitions ended with a divergence.
+#> Warning: 25 of 2000 (1.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 
 # The held-out data given to mvgam() set the forecast horizon
@@ -200,12 +213,25 @@ plot(forecast(mod, type = "expected"))
 
 # Next, score the forecast against the held-out counts
 head(score(fc, score = "crps")[[1]])
-#>       score in_interval interval_width eval_horizon score_type
-#> 1 1.7075098           1            0.9            1       crps
-#> 2 2.2048900           1            0.9            2       crps
-#> 3 2.2784688           1            0.9            3       crps
-#> 4 1.4094038           1            0.9            4       crps
-#> 5 0.6126763           1            0.9            5       crps
-#> 6 4.3284377           1            0.9            6       crps
+#>      score in_interval interval_width eval_horizon score_type
+#> 1 1.742354           1            0.9            1       crps
+#> 2 2.140199           1            0.9            2       crps
+#> 3 2.320223           1            0.9            3       crps
+#> 4 1.344777           1            0.9            4       crps
+#> 5 0.591562           1            0.9            5       crps
+#> 6 4.738040           1            0.9            6       crps
+
+# The sources of the forecast's variance at each horizon
+plot(forecast_uncertainty(mod, ndraws = 200))
+
+
+# How a future with higher `x` would change the forecast
+higher <- simdat$data_test
+higher$x <- higher$x + 1
+plot(forecast_uncertainty(
+  mod, newdata = list(observed = simdat$data_test, higher = higher),
+  ndraws = 200
+))
+
 # }
 ```

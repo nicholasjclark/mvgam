@@ -10,8 +10,9 @@ scores are better.
 
 This article compares three models of monthly rodent captures, each with
 a different trend. We score their forecasts of a twelve-month holdout,
-repeat the comparison over rolling forecast origins and combine the
-models into a weighted ensemble.
+ask where the forecast uncertainty comes from, repeat the comparison
+over rolling forecast origins and combine the models into a weighted
+ensemble.
 
 ## The data
 
@@ -122,7 +123,7 @@ captures. The dashed line marks the end of the training data.
 
 Each smooth of time extrapolates the slope at the end of its series. For
 DO, whose captures rose over the final training months, the median
-forecast reaches 126 captures by month 12. The held-out months recorded
+forecast reaches 125 captures by month 12. The held-out months recorded
 at most 14. The AR forecast carries its latent state forward instead:
 
 ``` r
@@ -134,6 +135,92 @@ plot(fc_ar)
 captures.](forecast_evaluation_files/figure-html/plot-ar-1.png)
 
 AR hindcasts and forecasts of each species’ captures.
+
+## Where the uncertainty comes from
+
+The width of a forecast does not say what causes it. To find what limits
+the AR model’s forecasts,
+[`forecast_uncertainty()`](https://nicholasjclark.github.io/mvgam/dev/reference/forecast_uncertainty.md)
+splits the variance of the forecast at each horizon by source. Each
+posterior draw is propagated many times, which separates what the
+posterior leaves unknown from what the future adds. The split uses the
+link scale, where the parts of the model add:
+
+``` r
+
+set.seed(2026)
+unc_ar <- forecast_uncertainty(mod_ar, ndraws = 500)
+unc_ar
+#> Forecast uncertainty by source, predictor, 500 draws, 20 replicates
+#> 
+#>  series sd_first sd_last dominant      support changes_at
+#>  DM     0.24     0.40    process error 1                 
+#>  DO     0.57     0.89    process error 1                 
+#>  PB     0.64     1.40    process error 1                 
+#>  PP     0.86     1.20    process error 1                 
+#> 
+#> summary() gives every source at every horizon.
+plot(unc_ar)
+```
+
+![Variance of the AR model's forecast predictor at each horizon, split
+by kind of
+source.](forecast_evaluation_files/figure-html/uncertainty-1.png)
+
+Variance of the AR model’s forecast predictor at each horizon, split by
+kind of source.
+
+Process error, the variance the state’s innovations add, leads for every
+species by month 12. Because this variance belongs to the process, more
+data will not shrink it. For DO it grows from 59% of the variance at
+month 1 to 78% at month 12. Because an AR(1) state loses its memory of
+the last training month, the latent dynamics fade from 23% to 3% over
+the same months.
+
+The bars jump at month 8. With `by = "source"` and `type = "share"`, the
+plot names the term responsible:
+
+``` r
+
+plot(unc_ar, type = "share", by = "source", series = "DO")
+```
+
+![Share of the variance of the DO forecast held by each
+term.](forecast_evaluation_files/figure-html/uncertainty-terms-1.png)
+
+Share of the variance of the DO forecast held by each term.
+
+The temperature smooth peaks at month 8. Minimum temperature that month
+was -2.1, below the coldest training month at -1.93. The smooth
+extrapolates there, which widens the forecast.
+
+A forecast also depends on the future of its covariates.
+[`forecast_uncertainty()`](https://nicholasjclark.github.io/mvgam/dev/reference/forecast_uncertainty.md)
+takes a named list of possible futures. Because every future takes the
+same draws and the same innovations, their difference isolates what the
+covariates change:
+
+``` r
+
+warmer <- test
+warmer$mintemp <- warmer$mintemp + 1
+sc <- forecast_uncertainty(mod_ar, newdata = list(observed = test,
+                                                  warmer = warmer),
+                           ndraws = 500)
+plot(sc, series = "DO")
+```
+
+![Difference in the DO forecast's predictor between a future one
+standard deviation warmer and the observed one, with nested 20%, 40%,
+60% and 80% credible
+intervals.](forecast_evaluation_files/figure-html/scenarios-1.png)
+
+Difference in the DO forecast’s predictor between a future one standard
+deviation warmer and the observed one, with nested 20%, 40%, 60% and 80%
+credible intervals.
+
+The median difference at month 12 is -0.13, with a 95% interval from
+-0.57 to 0.29. The largest median difference, -0.21, falls at month 8.
 
 ## Scoring the holdout
 
@@ -160,9 +247,9 @@ Negative values favour the AR or PW model. No species was observed at
 horizon 3.
 
 Between AR and the GAM, the lower mean CRPS goes to AR on DM, AR on DO,
-the GAM on PB and the GAM on PP. On DO the mean CRPS is 3.32 for AR and
-33.70 for the GAM. PB and PP recorded few or no captures over long
-stretches. Averaged over the species, AR scores 3.94 against 3.87 for
+the GAM on PB and the GAM on PP. On DO the mean CRPS is 3.31 for AR and
+33.51 for the GAM. PB and PP recorded few or no captures over long
+stretches. Averaged over the species, AR scores 3.97 against 3.86 for
 PW.
 
 The energy score grades the four forecasts at each horizon as one
@@ -185,7 +272,7 @@ Energy score of the joint forecast of the four species at each horizon.
 
 The GAM’s energy score runs from 7 to 93 over the twelve months. AR and
 PW stay below 13.
-[`score()`](https://nicholasjclark.github.io/mvgam/dev/reference/score.md)
+[`score()`](https://nicholasjclark.github.io/mvgam/dev/reference/score.mvgam_forecast.md)
 offers nine more rules, among them the variogram score for the
 dependence between series and threshold-weighted scores for a range of
 the response.
@@ -223,11 +310,11 @@ lfo_pw <- run_lfo(mod_pw)
 loo_compare(lfo_gam, lfo_ar, lfo_pw, model_names = c("GAM", "AR", "PW"))
 #>  model elpd_diff se_diff p_worse diag_diff diag_elpd
 #>     AR       0.0     0.0      NA                    
-#>     PW     -41.4    10.4    1.00   N < 100          
-#>    GAM     -75.2    12.7    1.00   N < 100
+#>     PW     -43.2    12.1    1.00   N < 100          
+#>    GAM     -80.3    15.7    1.00   N < 100
 ```
 
-AR leads. PW trails it by 41 (SE 10) and GAM by 75 (SE 13). The log
+AR leads. PW trails it by 43 (SE 12) and GAM by 80 (SE 16). The log
 score penalises an observation in the tail of a forecast far more
 heavily than the CRPS does.
 [`compare_elpds()`](https://nicholasjclark.github.io/mvgam/dev/reference/compare_elpds.md)
@@ -268,30 +355,30 @@ weights
 #> ------
 #>     weight
 #> GAM 0.000 
-#> AR  0.694 
-#> PW  0.306
-fc_ens <- ensemble(fc_gam, fc_ar, fc_pw, weights = as.numeric(weights),
+#> AR  0.672 
+#> PW  0.328
+fc_ens <- ensemble(fc_gam, fc_ar, fc_pw, weights = weights,
                    seed = 2026)
 crps_ens <- compare_scores(fc_gam, fc_ar, fc_pw, fc_ens, score = "crps",
                            model_names = c("GAM", "AR", "PW", "Ensemble"))
 aggregate(score ~ model, FUN = mean,
           data = subset(crps_ens, series != "all_series"))
 #>      model     score
-#> 1      GAM 11.372691
-#> 2       AR  3.939303
-#> 3       PW  3.868367
-#> 4 Ensemble  3.791555
+#> 1      GAM 11.346268
+#> 2       AR  3.972558
+#> 3       PW  3.862509
+#> 4 Ensemble  3.805176
 ```
 
-Stacking gives 0 to the GAM, 0.69 to AR and 0.31 to PW. The ensemble’s
-mean CRPS on the holdout is 3.79, the lowest of the four.
+Stacking gives 0 to the GAM, 0.67 to AR and 0.33 to PW. The ensemble’s
+mean CRPS on the holdout is 3.81, the lowest of the four.
 
 ## Summary
 
 The CRPS and the energy score compared the three forecasts on the
 holdout. Under leave-future-out cross-validation AR led in ELPD. The
 GAM’s smooths of time extrapolated the end of each series. Stacking
-combined the three forecasts into an ensemble with a mean CRPS of 3.79.
+combined the three forecasts into an ensemble with a mean CRPS of 3.81.
 Each step took one or two function calls on the fitted models. The CRPS
 and the log score can rank models differently. Choose the scoring rule
 before scoring any forecast.
@@ -299,7 +386,7 @@ before scoring any forecast.
 ## Where to next
 
 Each function used here has a help page, such as
-[`?score`](https://nicholasjclark.github.io/mvgam/dev/reference/score.md)
+[`?score`](https://nicholasjclark.github.io/mvgam/dev/reference/score.mvgam_forecast.md)
 or
 [`?lfo_cv`](https://nicholasjclark.github.io/mvgam/dev/reference/lfo_cv.mvgam.md),
 with its arguments and output.

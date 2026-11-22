@@ -17,7 +17,8 @@ ZMVN(
   n_lv = NULL,
   cor = TRUE,
   trend_map = NULL,
-  df = Inf
+  df = Inf,
+  centred = FALSE
 )
 ```
 
@@ -85,12 +86,40 @@ ZMVN(
   [`CAR()`](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md)
   defaults to `FALSE`.
 
+  In a factor model with every loading sampled, the factors take
+  independent shocks. The loadings carry the correlation among series,
+  which
+  [`residual_cor()`](https://nicholasjclark.github.io/mvgam/dev/reference/residual_cor.md)
+  reports. A correlation among the factors would trade off against the
+  loadings.
+  [`AR()`](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md),
+  [`RW()`](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md)
+  and
+  [`LLT()`](https://nicholasjclark.github.io/mvgam/dev/reference/LLT.md)
+  refuse `cor = TRUE` there. A `trend_map` that fixes the loadings keeps
+  the factors apart. `cor = TRUE` then estimates their correlation.
+
 - trend_map:
 
-  Optional specification of which latent process each series maps onto.
-  It fixes the loadings of a dynamic factor model. See
-  [`mvgam`](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam.md)
-  for the accepted formats. Defaults to `NULL`.
+  Optional map of the series onto the latent processes, which fixes some
+  or all loadings of a dynamic factor model. One of three forms:
+
+  - a numeric `n_series x n_lv` matrix of loadings. `NA` entries are
+    sampled and finite entries stay fixed. An all-`NA` matrix, such as
+    `matrix(NA, n_series, 2)`, fixes nothing and sets two factors.
+
+  - a `data.frame(series, trend)` placing each series on one process,
+    with a loading of one.
+
+  - `"identity"`, one process per series, or `"shared"`, one process for
+    every series.
+
+  Its columns set the number of factors, which an `n_lv` given too must
+  match. Without a `trend_map` every loading is sampled and identified
+  after sampling by a thin QR rotation (Heaps and Jermyn 2024). A map
+  that fixes any loading takes no rotation. The `loadings_prior` of
+  [`mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam.md)
+  accepts a map with no fixed entries. Defaults to `NULL`.
 
 - df:
 
@@ -135,6 +164,12 @@ ZMVN(
   samples its states directly and
   [`PW()`](https://nicholasjclark.github.io/mvgam/dev/reference/piecewise_trends.md)
   has no innovations. Neither takes `df`.
+
+- centred:
+
+  Logical. Sample the latent states directly rather than their
+  innovations? Default `FALSE`. The model and its posterior are the
+  same. See *Centred states* below.
 
 ## Value
 
@@ -220,9 +255,9 @@ shares one latent process across several observation families.
 Other trend models:
 [`LLT()`](https://nicholasjclark.github.io/mvgam/dev/reference/LLT.md),
 [`PW()`](https://nicholasjclark.github.io/mvgam/dev/reference/piecewise_trends.md),
-[`RW()`](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md),
 [`list_trend_types()`](https://nicholasjclark.github.io/mvgam/dev/reference/list_trend_types.md),
-[`lv_axis()`](https://nicholasjclark.github.io/mvgam/dev/reference/lv_axis.md)
+[`lv_axis()`](https://nicholasjclark.github.io/mvgam/dev/reference/lv_axis.md),
+[`print.mvgam_trend()`](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md)
 
 ## Examples
 
@@ -260,20 +295,20 @@ summary(mod)
 #> == Observation Model ==
 #> Regression Coefficients:
 #>           Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> Intercept     1.68      0.06     1.55     1.81 1.00     1300     1263
+#> Intercept     1.68      0.06     1.56     1.80 1.00     1041     1298
 #> 
 #> == Trend Model ==
 #> Trend Specific Parameters:
 #>                       Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS
-#> sigma_trend[series_1]     0.75      0.08     0.60     0.92 1.00      928
-#> sigma_trend[series_2]     0.69      0.07     0.55     0.84 1.00      960
-#> sigma_trend[series_3]     0.82      0.09     0.68     1.02 1.00     1063
-#> sigma_trend[series_4]     0.76      0.08     0.62     0.93 1.00     1000
+#> sigma_trend[series_1]     0.75      0.09     0.60     0.93 1.01      688
+#> sigma_trend[series_2]     0.69      0.07     0.56     0.84 1.00      702
+#> sigma_trend[series_3]     0.82      0.09     0.67     1.01 1.00      976
+#> sigma_trend[series_4]     0.76      0.08     0.62     0.92 1.00      967
 #>                       Tail_ESS
-#> sigma_trend[series_1]     1355
-#> sigma_trend[series_2]     1336
-#> sigma_trend[series_3]     1396
-#> sigma_trend[series_4]     1435
+#> sigma_trend[series_1]     1065
+#> sigma_trend[series_2]     1091
+#> sigma_trend[series_3]     1180
+#> sigma_trend[series_4]     1326
 #> 
 #> Draws were sampled using sampling(NUTS). For each parameter, Bulk_ESS
 #> and Tail_ESS are effective sample size measures, and Rhat is the potential
@@ -281,7 +316,7 @@ summary(mod)
 #> 
 #> Next steps:
 #>   - `pp_check(fit)`: posterior predictive checks
-#>   - `residual_cor(fit)`: implied cross-series correlations
+#>   - `residual_cor(fit)`: implied correlations among series
 #>   - `loo(fit)` / `loo_compare(...)`: model fit + comparison
 #> Use `how_to_cite(fit)` for a methods paragraph and `methods_md(fit)` for its equations.
 

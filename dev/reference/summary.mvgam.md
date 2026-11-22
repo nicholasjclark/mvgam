@@ -9,6 +9,9 @@ trend parameters and factor loadings).
 ``` r
 # S3 method for class 'mvgam'
 summary(object, probs = c(0.025, 0.975), robust = FALSE, matrices = FALSE, ...)
+
+# S3 method for class 'mvgam_summary'
+print(x, digits = 2, ...)
 ```
 
 ## Arguments
@@ -44,6 +47,14 @@ summary(object, probs = c(0.025, 0.975), robust = FALSE, matrices = FALSE, ...)
 - ...:
 
   Unused. Anything passed here is refused.
+
+- x:
+
+  An `mvgam_summary` object.
+
+- digits:
+
+  Integer number of decimal places. Defaults to 2.
 
 ## Value
 
@@ -88,7 +99,9 @@ The trend model's blocks take the same names with the prefix `trend_`,
 joined by `trend_spec` for the trend's dynamics, `loadings` for the
 factor loadings and `loadings_prior` for the hyperparameters of their
 prior. The formula, family, draw counts and data dimensions are stored
-with them.
+with them. [`print()`](https://rdrr.io/r/base/print.html) sets the
+blocks out under their headings, followed by the sampler diagnostics and
+suggested next steps.
 
 ## Details
 
@@ -165,7 +178,7 @@ mod <- mvgam(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1),
               data = simdat$data_train,
               family = poisson(),
               chains = 2, silent = 2)
-#> Warning: 5 of 2000 (0.0%) transitions ended with a divergence.
+#> Warning: 9 of 2000 (0.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 
 summary(mod)
@@ -180,21 +193,21 @@ summary(mod)
 #> == Observation Model ==
 #> Smoothing Spline Hyperparameters:
 #>           Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> sds(sx_1)     5.14      1.98     2.37     9.97 1.00      876      977
+#> sds(sx_1)     5.02      1.92     2.38     9.79 1.00     1482     1506
 #> 
 #> Regression Coefficients:
 #>           Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> Intercept     1.63      0.14     1.34     1.91 1.00     1075      887
-#> sx_1          8.48      2.34     3.68    13.01 1.00      831     1119
+#> Intercept     1.63      0.15     1.33     1.93 1.00      935      874
+#> sx_1          8.38      2.23     3.96    12.79 1.00     1577     1190
 #> 
 #> == Trend Model ==
 #> Trend Specific Parameters:
 #>                       Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS
-#> sigma_trend[series_1]     0.47      0.07     0.34     0.62 1.00      791
-#> ar1_trend[series_1]       0.56      0.14     0.25     0.81 1.00      381
+#> sigma_trend[series_1]     0.47      0.07     0.34     0.62 1.00      844
+#> ar1_trend[series_1]       0.58      0.15     0.27     0.85 1.00      505
 #>                       Tail_ESS
-#> sigma_trend[series_1]     1196
-#> ar1_trend[series_1]        961
+#> sigma_trend[series_1]     1250
+#> ar1_trend[series_1]        716
 #> 
 #> Draws were sampled using sampling(NUTS). For each parameter, Bulk_ESS
 #> and Tail_ESS are effective sample size measures, and Rhat is the potential
@@ -210,11 +223,11 @@ summary(mod)
 # Each block is a data frame, such as the trend's dynamics
 round(summary(mod)$trend_spec, 2)
 #>                       Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS
-#> sigma_trend[series_1]     0.47      0.07     0.34     0.62    1   790.69
-#> ar1_trend[series_1]       0.56      0.14     0.25     0.81    1   381.25
+#> sigma_trend[series_1]     0.47      0.07     0.34     0.62    1   843.73
+#> ar1_trend[series_1]       0.58      0.15     0.27     0.85    1   504.87
 #>                       Tail_ESS
-#> sigma_trend[series_1]  1196.07
-#> ar1_trend[series_1]     960.50
+#> sigma_trend[series_1]  1250.04
+#> ar1_trend[series_1]     715.57
 
 # Next: pp_check(mod) compares draws from the model with the data
 # }
