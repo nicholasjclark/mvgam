@@ -51,10 +51,12 @@ fits. \code{grep()} narrows it, as in
 \examples{
 \dontrun{
 set.seed(13)
-simdat <- sim_mvgam(n_series = 2L, trend_model = AR())
+simdat <- sim_mvgam(family = poisson(), n_series = 2L,
+                    trend_model = AR())
 mod <- mvgam(y ~ x,
              trend_formula = ~ AR(),
              data = simdat$data_train,
+             family = poisson(),
              chains = 2, silent = 2)
 
 # The trend dynamics, indexed by series
