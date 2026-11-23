@@ -93,15 +93,13 @@ Nicholas J Clark
 ``` r
 # \dontrun{
 set.seed(13)
-simdat <- sim_mvgam(n_series = 2L, trend_model = AR())
+simdat <- sim_mvgam(family = poisson(), n_series = 2L,
+                    trend_model = AR())
 mod <- mvgam(y ~ x,
              trend_formula = ~ AR(),
              data = simdat$data_train,
+             family = poisson(),
              chains = 2, silent = 2)
-#> Warning: 9 of 2000 (0.0%) transitions ended with a divergence.
-#> See https://mc-stan.org/misc/warnings for details.
-#> Warning: 1 of 2 chains had an E-BFMI less than 0.3.
-#> See https://mc-stan.org/misc/warnings for details.
 
 # The trend dynamics, indexed by series
 grep("^(sigma|ar1)_trend", variables(mod), value = TRUE)
@@ -112,16 +110,16 @@ grep("^(sigma|ar1)_trend", variables(mod), value = TRUE)
 as_draws_df(mod, variable = "sigma_trend")
 #> # A draws_df: 1000 iterations, 2 chains, and 2 variables
 #>    sigma_trend[series_1] sigma_trend[series_2]
-#> 1                   0.43                  0.53
-#> 2                   0.38                  0.59
-#> 3                   0.44                  0.72
-#> 4                   0.40                  0.70
-#> 5                   0.29                  0.66
-#> 6                   0.19                  0.39
-#> 7                   0.39                  0.63
-#> 8                   0.25                  0.45
-#> 9                   0.25                  0.60
-#> 10                  0.26                  0.75
+#> 1                   0.45                  0.40
+#> 2                   0.52                  0.40
+#> 3                   0.49                  0.37
+#> 4                   0.41                  0.50
+#> 5                   0.45                  0.51
+#> 6                   0.47                  0.58
+#> 7                   0.52                  0.58
+#> 8                   0.48                  0.47
+#> 9                   0.38                  0.32
+#> 10                  0.60                  0.47
 #> # ... with 1990 more draws
 #> # ... hidden reserved variables {'.chain', '.iteration', '.draw'}
 
@@ -130,9 +128,9 @@ hypothesis(mod, "ar1_trend[series_1] > ar1_trend[series_2]",
            class = NULL)
 #> Hypothesis Tests for class :
 #>                 Hypothesis Estimate Est.Error CI.Lower CI.Upper Evid.Ratio
-#> 1 (ar1_trend[series... > 0    -0.23      0.45     -1.1     0.36       0.54
+#> 1 (ar1_trend[series... > 0        0      0.25    -0.41     0.42       0.98
 #>   Post.Prob Star
-#> 1      0.35     
+#> 1       0.5     
 #> ---
 #> 'CI': 90%-CI for one-sided and 95%-CI for two-sided hypotheses.
 #> '*': For one-sided hypotheses, the posterior probability exceeds 95%;

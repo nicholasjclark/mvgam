@@ -145,7 +145,7 @@ fit <- jsdgam(
   chains         = 2L,
   silent         = 2
 )
-#> Warning: 2 of 2 chains had an E-BFMI less than 0.3.
+#> Warning: 1 of 2 chains had an E-BFMI less than 0.3.
 #> See https://mc-stan.org/misc/warnings for details.
 
 # The species terms are contrasts with the first species. `Intercept`
@@ -164,25 +164,25 @@ summary(fit)
 #> == Observation Model ==
 #> Regression Coefficients:
 #>                Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> Intercept         -1.17      4.48    -9.41     8.26 1.00     1430      540
-#> env                0.15      4.15    -7.65     8.35 1.00     1963      882
-#> seriessp_2         1.77      0.19     1.41     2.15 1.00      924     1016
-#> seriessp_3         2.43      0.28     1.91     2.98 1.00      849     1075
-#> env:seriessp_2    -0.04      0.15    -0.34     0.26 1.00      795     1067
-#> env:seriessp_3     1.25      0.23     0.81     1.71 1.00      744     1087
+#> Intercept         -1.39      3.93    -9.67     6.84 1.01     1585      854
+#> env               -0.45      7.34    -8.08     7.92 1.00     1199      373
+#> seriessp_2         1.76      0.18     1.39     2.12 1.00      918     1256
+#> seriessp_3         2.43      0.28     1.87     2.96 1.00      851     1161
+#> env:seriessp_2    -0.04      0.15    -0.33     0.25 1.00     1131     1234
+#> env:seriessp_3     1.24      0.23     0.79     1.70 1.00      912      976
 #> 
 #> Further Distributional Parameters:
 #>     Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> phi    36.27     15.83    17.87    75.55 1.01      154      212
+#> phi    33.33     13.64    16.40    67.37 1.02      141      367
 #> 
 #> == Trend Model ==
 #> Factor Loadings:
 #>                 Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> Z_tilde[sp_1,1]     1.00      0.13     0.78     1.28 1.00      333      930
-#> Z_tilde[sp_2,1]    -0.07      0.07    -0.22     0.06 1.00      381      696
-#> Z_tilde[sp_3,1]    -0.93      0.12    -1.18    -0.72 1.00      605     1498
-#> Z_tilde[sp_2,2]     0.21      0.10     0.01     0.39 1.01      157      503
-#> Z_tilde[sp_3,2]    -0.21      0.10    -0.39    -0.01 1.01      157      503
+#> Z_tilde[sp_1,1]     0.98      0.13     0.76     1.28 1.01      340      864
+#> Z_tilde[sp_2,1]    -0.06      0.07    -0.21     0.06 1.01      581     1044
+#> Z_tilde[sp_3,1]    -0.92      0.12    -1.17    -0.72 1.00      600     1160
+#> Z_tilde[sp_2,2]     0.19      0.10     0.01     0.37 1.02      254      577
+#> Z_tilde[sp_3,2]    -0.19      0.10    -0.37    -0.01 1.02      254      577
 #> 
 #> Draws were sampled using sampling(NUTS). For each parameter, Bulk_ESS
 #> and Tail_ESS are effective sample size measures, and Rhat is the potential

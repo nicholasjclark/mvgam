@@ -89,28 +89,40 @@ for the predictions these methods take.
 # \dontrun{
 library(marginaleffects)
 set.seed(1)
-simdat <- sim_mvgam(n_series = 1L, n_timepoints = 60L,
-                    trend_model = AR())
+simdat <- sim_mvgam(family = poisson(), n_series = 1L,
+                    n_timepoints = 60L, trend_model = AR())
 mod <- mvgam(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1),
              data = simdat$data_train, family = poisson(),
              chains = 2, silent = 2)
-#> Error: 'y' has values outside the support of family 'poisson'.
-#>   Requires: 0 <= 'y' (integers only).
-#>   Observed range: [-2.504, 2.943]. 23 of 45 values fall outside, the first
-#>   at row 1.
-#>   Check the column for missing-data sentinels such as -1 or -999.
+#> Warning: 111 of 2000 (6.0%) transitions ended with a divergence.
+#> See https://mc-stan.org/misc/warnings for details.
 
 # Average change in the expected count per unit of x
 avg_slopes(mod, variables = "x", type = "expected")
-#> Error: object 'mod' not found
+#> 
+#>  Estimate 2.5 % 97.5 %
+#>      3.96     2   8.45
+#> 
+#> Term: x
+#> Type: expected
+#> Comparison: dY/dX
+#> 
 
 # The same slope with the trend's innovations averaged in
 avg_slopes(mod, variables = "x", type = "expected",
            process_error = TRUE)
-#> Error: object 'mod' not found
+#> Warning: These arguments are not known to be supported for models of class `mvgam`: process_error. All arguments are still passed to the model-specific prediction function, but users are encouraged to check if the argument is indeed supported by their modeling package. Please file a request on Github if you believe that an unknown argument should be added to the `marginaleffects` white list of known arguments, in order to avoid raising this warning: https://github.com/vincentarelbundock/marginaleffects/issues
+#> 
+#>  Estimate 2.5 % 97.5 %
+#>      4.55  2.21   10.8
+#> 
+#> Term: x
+#> Type: expected
+#> Comparison: dY/dX
+#> 
 
 # Expected counts across the range of x
 plot_predictions(mod, condition = "x", type = "expected")
-#> Error: object 'mod' not found
+
 # }
 ```
