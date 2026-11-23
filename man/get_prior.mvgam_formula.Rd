@@ -94,9 +94,13 @@ widest over several responses and \eqn{s = 1} under any other
 link:
 \itemize{
 \item \code{sigma_trend} and \code{sigma_group_trend} take
-\code{exponential(2 / s)}, with mean \eqn{s / 2}.
+\code{inv_gamma(3, 1.07 s)}, with median \eqn{0.40 s}. It
+has no mass at zero. The process noise then stays separate from
+an observation noise that competes for the same variance.
 \item The factor loadings \code{Z} take
-\code{student_t(3, 0, 0.5 s)}.
+\code{student_t(3, 0, 0.5 s)}. The static factors of
+\code{\link{ZMVN}()}, which \code{\link{jsdgam}()} builds, take
+\code{normal(0, s)}.
 \item \code{\link{LLT}()} is the exception. Its shock scales
 (\code{sigma_trend} among them) and its starting states also
 scale with the number of time points. So do the growth priors of

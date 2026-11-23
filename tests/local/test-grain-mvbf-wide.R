@@ -736,12 +736,18 @@ test_that("each trend panel draws its own response's latent state", {
       dd <- b$data[[i]]
       dd[as.integer(dd$PANEL) == k, c("x", "y")]
     }))
-    # The median line tracks the sampler's own column more closely
-    # than any other column
+    # The median line tracks the median of the sampler's own column
+    # more closely than any other column. A binary response skews its
+    # state's posterior. The posterior mean then lies nearer a
+    # neighbour's column than the median does.
     rows <- match(panel$x, time_vals)
-    gap <- vapply(responses, function(r) {
-      mean(abs(panel$y - sampler_state[rows, r]))
+    gap <- vapply(seq_len(n_resp), function(j) {
+      column_median <- vapply(rows, function(t) {
+        stats::median(sampler_draws[, paste0("trend[", t, ",", j, "]")])
+      }, numeric(1L))
+      mean(abs(panel$y - column_median))
     }, numeric(1L))
+    names(gap) <- responses
     expect_identical(names(which.min(gap)), responses[k])
   }
 })

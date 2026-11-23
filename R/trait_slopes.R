@@ -890,8 +890,9 @@ trait_slopes_response_scale <- function(formula, family, data) {
 #' takes `std_normal()`. Every covariate then has one prior scale on
 #' the link, whatever its units or the basis `poly()` gives it. A
 #' constant column has no SD. Its coefficient takes the class default,
-#' `normal(0, r)`, which is set only when such a column exists. `student_t(3, 0, 2.5 r)` goes on the SDs of the
-#' correlated species deviations, the `|sp|` block. The rules follow
+#' `normal(0, r)`, which is set only when such a column exists.
+#' `student_t(3, 0, 2.5 r)` goes on the SDs of the correlated species
+#' deviations, the `|sp|` block. The rules follow
 #' rstanarm's autoscaled priors.
 #'
 #' A user prior on one coefficient replaces its default. A user prior

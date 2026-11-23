@@ -27,6 +27,13 @@
 #' their posterior median. For a right-skewed predictive distribution
 #' the median falls below the mean.
 #'
+#' An [occ()] or [nmix()] fit takes two more types. `"detection"` gives
+#' the detection probability of each visit. `"latent_N"` gives the
+#' latent state that mvgam's own methods call `"latent_state"`.
+#' marginaleffects checks `type` against its own list, which records
+#' that state as `"latent_N"`. Each row of a grid from
+#' [marginaleffects::datagrid()] becomes its own closure unit.
+#'
 #' @section The latent trend:
 #' By default (`process_error = FALSE`) each prediction takes the
 #' covariate part of the trend: the effects in its formula, without

@@ -312,6 +312,13 @@ dist_cdf <- function(spec, linpred, q, lower.tail = TRUE,
 #' onto a bound. A discrete family opens the interval at `F(lb - 1)`,
 #' keeping `lb` attainable.
 #'
+#' The uniform is drawn on the log scale of whichever tail holds the
+#' interval. A distribution centred far below `lb` has `F(lb)` within
+#' rounding of 1. There a uniform on the lower tail loses its
+#' precision and maps to draws outside the bounds. At `F(lb) = 1` it
+#' maps to an infinite draw. The upper tail `1 - F` keeps both
+#' bounds of the interval distinct.
+#'
 #' @param spec Distribution spec from `family_dist_spec()`
 #' @param cells Logical matrix marking the `[ndraws, nobs]` cells to
 #'   redraw
@@ -347,10 +354,28 @@ truncated_dist_draws <- function(spec, cells, lb, ub, discrete) {
       if (is.null(shift)) x else (x - shift[rows]) / scale[rows]
     }
     lo <- if (discrete) lb[j] - 1 else lb[j]
-    p_lo <- do.call(pfun, c(list(bound(lo)), args))
-    p_hi <- do.call(pfun, c(list(bound(ub[j])), args))
-    u <- stats::runif(length(rows), pmin(p_lo, p_hi), pmax(p_lo, p_hi))
-    z <- do.call(qfun, c(list(u), args))
+    log_p <- function(x, lower) {
+      do.call(pfun, c(list(bound(x)), args,
+                      list(lower.tail = lower, log.p = TRUE)))
+    }
+    # The upper tail is the precise one where the lower bound exceeds
+    # the median
+    upper <- log_p(lo, TRUE) > log(0.5)
+    # On the chosen tail, the interval runs from `near` to `far` in
+    # probability, with `far` the larger. Its log is `far` plus the log
+    # of a uniform on `[exp(near - far), 1]`.
+    near <- ifelse(upper, log_p(ub[j], FALSE), log_p(lo, TRUE))
+    far <- ifelse(upper, log_p(lo, FALSE), log_p(ub[j], TRUE))
+    v <- stats::runif(length(rows))
+    log_u <- far + log(v + (1 - v) * exp(near - far))
+    z <- numeric(length(rows))
+    for (tail in c(TRUE, FALSE)) {
+      sel <- upper == tail
+      if (!any(sel)) next
+      sel_args <- lapply(args, function(a) if (length(a) <= 1L) a else a[sel])
+      z[sel] <- do.call(qfun, c(list(log_u[sel]), sel_args,
+                                list(lower.tail = !tail, log.p = TRUE)))
+    }
     out[rows, j] <- if (is.null(shift)) {
       z
     } else {

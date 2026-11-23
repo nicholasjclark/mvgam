@@ -536,7 +536,7 @@ test_that("a grouped ZMVN program blends each group's correlations", {
     "L_deviation_group_trend\\[g_idx\\] \\| 6\\); \\}"
   ), code_with_trend))
   expect_true(line(
-    "exponential_lpdf(to_vector(sigma_group_trend[g_idx]) | 2);"
+    "inv_gamma_lpdf(to_vector(sigma_group_trend[g_idx]) | 3, 1.07);"
   ))
 
   # The trend's group-level effect and its fixed effects both reach
@@ -610,8 +610,8 @@ test_that("a grouped VAR places each group's blocks at its member series", {
   # The default priors of the grouped correlations and scales
   expect_true(stan_pattern("alpha_cor_trend ~ beta\\(3, 2\\);", code))
   expect_true(stan_pattern(paste0(
-    "exponential_lpdf\\(to_vector\\(sigma_group_trend",
-    "\\[g_idx\\]\\) \\| 2\\);"
+    "inv_gamma_lpdf\\(to_vector\\(sigma_group_trend",
+    "\\[g_idx\\]\\) \\| 3, 1.07\\);"
   ), code))
 
   # A grouped VARMA maps each group's MA matrix against the group's
@@ -1396,7 +1396,7 @@ test_that("a CAR trend with nested RE and mo() steps over its gaps", {
   # Each CAR parameter carries its default prior
   expect_equal(stan_prior_on(code_with_trend, "ar1_trend"), "normal(0, 0.5)")
   expect_equal(stan_prior_on(code_with_trend, "sigma_trend"),
-               "exponential(2)")
+               "inv_gamma(3, 1.07)")
   expect_true(stan_pattern(
     stan_prior_line("to_vector(innovations_trend)", "std_normal()"),
     code_with_trend, fixed = TRUE
@@ -1637,7 +1637,8 @@ test_that("a shared correlated RW enters every response with its offset", {
   ))
 
   # Trend priors
-  expect_equal(stan_prior_on(code_shared, "sigma_trend"), "exponential(2)")
+  expect_equal(stan_prior_on(code_shared, "sigma_trend"),
+               "inv_gamma(3, 1.07)")
   expect_true(stan_pattern("lkj_corr_cholesky_lpdf(L_Omega_trend",
                            code_shared, fixed = TRUE))
   expect_true(stan_pattern(
@@ -1671,7 +1672,7 @@ test_that("stancode integrates custom priors correctly", {
   expect_equal(stan_prior_on(code_default, "ar1_trend"),
                  "normal(0, 0.5)")
   expect_equal(stan_prior_on(code_default, "sigma_trend"),
-                 "exponential(2)")
+                 "inv_gamma(3, 1.07)")
 })
 
 test_that("stancode validates input parameters", {

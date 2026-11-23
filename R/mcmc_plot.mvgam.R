@@ -122,6 +122,14 @@ mcmc_plot.mvgam <- function(
   if ("np" %in% mcmc_arg_names) {
     mcmc_args$np <- np
   }
+  # bayesplot marks a divergent transition with a red cross. Over the
+  # dark red points of the mvgam scheme the cross cannot be seen. A
+  # blue cross keeps it visible. A caller's own `np_style` is kept.
+  if ("np_style" %in% mcmc_arg_names && is.null(mcmc_args$np_style)) {
+    mcmc_args$np_style <- bayesplot::pairs_style_np(
+      div_color = "#1E88E5", div_size = 2
+    )
+  }
   if ("lp" %in% mcmc_arg_names) {
     mcmc_args$lp <- log_posterior(object)
   }

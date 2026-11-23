@@ -772,10 +772,10 @@ test_that("trend scale priors take the response's spread, as brms does", {
   dat$y <- 100 + 40 * sin(seq_len(nrow(dat)))
   s <- round(stats::mad(dat$y), 1) / 2.5
   expect_identical(sigma_prior(dat, gaussian()),
-                   paste0("exponential(", signif(2 / s, 4), ")"))
+                   paste0("inv_gamma(3, ", signif(1.07 * s, 4), ")"))
   # Counts on the log link spread by less than one
   dat$y <- rpois(nrow(dat), 5)
-  expect_identical(sigma_prior(dat, poisson()), "exponential(2)")
+  expect_identical(sigma_prior(dat, poisson()), "inv_gamma(3, 1.07)")
 
   # A missing response is dropped. As in brms, a log link takes 0.1
   # for a zero and spread 0 from a negative value. A simplex share and
@@ -1076,6 +1076,12 @@ test_that("the reported Z prior is the one the model samples", {
   expect_true(agrees(loadings_prior = list(features = traits)))
   expect_true(agrees(loadings_prior = list(features = traits,
                                             column_shrinkage = "mgp")))
+  # Static factors take light-tailed loadings. Dynamic ones keep the
+  # Student-t.
+  mf <- mvgam_formula(y ~ 1, trend_formula = ~ ZMVN(n_lv = 2))
+  expect_true(agrees())
+  tab <- get_prior(mf, data = d, family = poisson())
+  expect_match(tab$prior[tab$class == "Z"], "^normal\\(0, ")
 })
 
 test_that("the branch classifier names each loadings path once", {

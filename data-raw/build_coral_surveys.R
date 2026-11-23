@@ -1,36 +1,36 @@
 # Build script for data/coral_surveys.rda.
 #
 # Generative structure: 3 reefs surveyed at a shared irregular
-# monthly schedule (gaps ~ Uniform(1, 6) months) for a continuous
-# bleaching index (Gaussian, scaled). All three reefs are sampled
-# at the SAME irregular times so the long-format input satisfies
-# mvgam's "each series shares the time grid" requirement; CAR
-# still recovers the irregular-gap dynamics within each series.
-# The dataset is state-space:
+# monthly schedule (gaps ~ Uniform(1, 6) months). Each survey counts
+# the bleached colonies among the colonies inspected, a binomial
+# response on the logit scale. All three reefs are sampled at the
+# SAME irregular times. The long-format input then satisfies mvgam's
+# "each series shares the time grid" requirement. CAR still recovers
+# the irregular-gap dynamics within each series.
 #
 #   latent[t, reef] = phi^dt * latent[t-1, reef]
 #                   + N(0, sigma * sqrt((1 - phi^(2*dt))/(1 - phi^2)))
-#   y[t, reef] = mu0 + reef_int[reef]
-#              + f(sst[t, reef])
-#              + latent[t, reef]
-#              + N(0, sigma_obs)
+#   logit(p[t, reef]) = mu0 + reef_int[reef]
+#                       + f(sst[t, reef])
+#                       + latent[t, reef]
+#   bleached[t, reef] ~ Binomial(colonies[t, reef], p[t, reef])
 #
-# SST is an observed driver on the observation equation; the
-# latent CAR(1) state captures reef-specific persistence in
-# continuous time. phi = 0.7, sigma = 0.5.
+# SST is an observed driver on the observation equation. The latent
+# CAR(1) state carries reef-specific persistence in continuous time:
+# phi = 0.9, sigma = 0.3. With a median gap of three months the
+# state keeps 0.9^3 = 0.73 of itself between surveys.
 #
-# Naive AR(1) (which treats every consecutive obs as gap = 1)
-# biases phi downward toward phi^mean(dt) ~ 0.29, and the SST
-# smooth absorbs trend structure that belongs to the AR.
+# A naive AR(1) treats every consecutive survey as one step. It
+# gives a one-month gap and a six-month gap the same persistence.
+# CAR decays the state by the length of each gap.
 #
 # Recommended fit (state-space):
 #   mvgam(
-#     formula = y ~ s(sst, k = 8),
+#     formula = y | trials(colonies) ~ series + s(sst, k = 8),
 #     trend_formula = ~ CAR(),
 #     data = coral_surveys,
-#     family = gaussian()
+#     family = binomial()
 #   )
-# This recovers true phi ~ 0.7 and a recognisable SST smooth.
 
 devtools::load_all()
 
@@ -45,8 +45,8 @@ reef_int <- stats::rnorm(n_reefs, mean = 0, sd = 0.4)
 reef_int <- reef_int - mean(reef_int)
 names(reef_int) <- reef_labels
 
-phi <- 0.7
-sigma <- 0.5
+phi <- 0.9
+sigma <- 0.3
 
 # Sample one irregular time schedule shared across all three reefs
 # so the dataset satisfies mvgam's "each series shares the time
@@ -89,19 +89,21 @@ df$sst <- 26 + 1.5 * sin(2 * pi * df$time / 12) +
 # Smooth nonlinear obs-side effect of SST, shared across reefs.
 sst_grid <- seq(min(df$sst) - 0.5, max(df$sst) + 0.5,
                  length.out = 100L)
-sst_sm <- sim_smooth(x = sst_grid, k = 8L, bs = "tp", scale = 0.4)
+sst_sm <- sim_smooth(x = sst_grid, k = 8L, bs = "tp", scale = 0.5)
 sst_effect <- stats::approxfun(
   x = sst_grid, y = sst_sm$f - mean(sst_sm$f), rule = 2
 )
 
-sigma_obs <- 0.3
-df$bleaching <- stats::rnorm(
-  nrow(df),
-  mean = reef_int[as.integer(df$reef)] +
-    df$trend_true +
-    sst_effect(df$sst),
-  sd = sigma_obs
+# Colonies inspected per survey. Each survey records how many of them
+# had bleached. The
+# intercept puts a typical survey near 30% bleached.
+df$colonies <- sample(seq.int(20L, 40L), nrow(df), replace = TRUE)
+p_bleached <- stats::plogis(
+  -0.85 + reef_int[as.integer(df$reef)] + df$trend_true +
+    sst_effect(df$sst)
 )
+df$bleaching <- stats::rbinom(nrow(df), size = df$colonies,
+                              prob = p_bleached)
 
 coral_surveys <- data.frame(
   series = df$reef,
@@ -109,7 +111,8 @@ coral_surveys <- data.frame(
   y = df$bleaching,
   reef = df$reef,
   sst = df$sst,
-  bleaching = df$bleaching
+  bleaching = df$bleaching,
+  colonies = df$colonies
 )
 rownames(coral_surveys) <- NULL
 

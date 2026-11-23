@@ -336,6 +336,12 @@ test_that("a family with no quantile function samples by rejection", {
   expect_null(
     mvgam:::truncated_dist_draws(spec, matrix(TRUE, 2L, 2L), 0, 10, TRUE)
   )
+  # A mean 40 SDs below the bound puts F(0) within rounding of 1. The
+  # draws still land above the bound.
+  normal <- list(dist = "norm", args = function(j) list(mean = -40, sd = 1))
+  far <- mvgam:::truncated_dist_draws(normal, matrix(TRUE, 50L, 1L), 0,
+                                      Inf, FALSE)
+  expect_true(all(is.finite(far) & far > 0))
 })
 
 

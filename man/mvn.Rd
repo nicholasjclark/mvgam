@@ -23,8 +23,9 @@ and standard deviation \code{Psi}.
 \code{\link[=jsdgam]{jsdgam()}} fits the family, taking the unit and component columns
 and the number of factors \code{n_lv}. \code{\link[=residual_cor]{residual_cor()}} summarises the
 residual correlations and \code{\link[=shared_variation]{shared_variation()}} the part the factors
-share. \code{Psi} takes the prior \code{exponential(1)}, which suits responses
-near unit scale. \code{prior(..., class = Psi)} sets another.
+share. \code{Psi} takes the prior \code{inv_gamma(3, 1.07)}, with median
+0.40 and no mass at zero, which suits responses near unit scale.
+\code{prior(..., class = Psi)} sets another.
 
 With \code{K} components the data separate the factor part from the
 residual part only when \code{(K - n_lv)^2 >= K + n_lv}. Fewer factors or

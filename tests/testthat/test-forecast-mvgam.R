@@ -720,22 +720,23 @@ test_that("slice_per_series picks the right cells per raw time", {
 
 
 test_that("slice_per_series handles per-series horizon differences", {
-  # Series 'a' has 3 forecast times, 'b' has 2.
+  # Series 'a' has 3 forecast times, 'b' has 2 and 'c' none
   obs_struct <- make_obs_struct_for_grid(
     times = c(41, 41, 42, 42, 43),
     series_int = c(1, 2, 1, 2, 1),
-    series_levels = c("a", "b")
+    series_levels = c("a", "b", "c")
   )
   mat <- matrix(c(411, 412, 421, 422, 431), nrow = 1L)
   fc_grid <- make_fc_grid_for_slice(
     times = c(41, 41, 42, 42, 43),
-    fc_times = list(a = c(41, 42, 43), b = c(41, 42))
+    fc_times = list(a = c(41, 42, 43), b = c(41, 42), c = numeric())
   )
   out <- slice_per_series(mat, fc_grid, obs_struct,
                             ndraws_use = 1L,
-                            series_levels = c("a", "b"))
+                            series_levels = c("a", "b", "c"))
   expect_equal(as.numeric(out[["a"]]), c(411, 421, 431))
   expect_equal(as.numeric(out[["b"]]), c(412, 422))
+  expect_identical(dim(out[["c"]]), c(1L, 0L))
 })
 
 

@@ -101,14 +101,21 @@ species. Defaults to \code{series}, as in other mvgam models.}
 \code{\link[brms:set_prior]{brms::prior()}}. \code{prior}, the brms spelling, is accepted in \code{...}.
 \code{get_prior()} of a model built with \code{run_model = FALSE} lists every
 class and coefficient with its default, the \code{trait_slopes} terms
-among them. See \emph{Trait-mediated responses} for their scales.}
+among them. See \emph{Trait-mediated responses} for their scales. Each
+loading in \code{Z} takes \code{normal(0, s)} by default. \code{s} is 1, widened
+as 'brms' widens its default scale priors for responses that
+spread far on their link scale. A binary response says little
+about the size of a
+loading. The light tails keep chains from stalling at extreme
+values. \code{prior(student_t(3, 0, 1), class = "Z")} gives heavier
+tails.}
 
 \item{n_lv}{Integer number of latent factors, from 1 to the number
 of species. Defaults to 2. The residual covariance
 \verb{Z Z' + diag(Psi^2)} has rank at most the number of species.
 Further columns of \code{Z} add nothing.
 
-Under the default Student-t prior on \code{Z}, or a structured prior
+Under the default normal prior on \code{Z}, or a structured prior
 built from \code{traits}, \code{phylo} or \code{loadings_prior$distances}, \code{n_lv}
 is the number of factors in the likelihood. Under the
 multiplicative gamma process prior (\code{loadings_prior = "mgp"} or

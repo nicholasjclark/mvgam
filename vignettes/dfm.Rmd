@@ -194,7 +194,8 @@ fit_known <- mvgam(
   iter = 2000L,
   warmup = 1000L,
   seed = 1L,
-  silent = 2L
+  silent = 2L,
+  seed = 1L
 )
 ```
 
@@ -249,7 +250,8 @@ fit_free <- mvgam(
   iter = 2000L,
   warmup = 1000L,
   seed = 1L,
-  silent = 2L
+  silent = 2L,
+  seed = 1L
 )
 ```
 
@@ -364,7 +366,8 @@ fit_pooled <- mvgam(
   iter = 2000L,
   warmup = 1000L,
   seed = 1L,
-  silent = 2L
+  silent = 2L,
+  seed = 1L
 )
 ```
 

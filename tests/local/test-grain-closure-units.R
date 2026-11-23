@@ -481,6 +481,12 @@ test_that("a frame carrying no responses can still be predicted at", {
 
   ep <- posterior_epred(fit, newdata = future, draw_ids = 1:20)
   expect_identical(ncol(ep), nrow(future))
+  # A unit holds one state. A frame giving one unit two elevations, as
+  # a grid at one site would, is refused.
+  mixed <- future
+  mixed$elev[1L] <- mixed$elev[1L] + 1
+  expect_error(posterior_epred(fit, newdata = mixed, draw_ids = 1:5),
+               "'elev' varies within a closure unit")
   expect_true(all(is.finite(ep)))
   expect_true(all(ep > 0 & ep < 1))
 

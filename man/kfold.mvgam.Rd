@@ -125,13 +125,13 @@ row of one combination stays in the same fold.
 \examples{
 \dontrun{
 set.seed(13)
-simdat <- sim_mvgam(family = gaussian(), n_series = 1L,
+simdat <- sim_mvgam(family = negbinomial(), n_series = 1L,
                      n_timepoints = 120L, type = 6L)
 
-mod <- mvgam(y ~ s(season, bs = "cc"),
+mod <- mvgam(y ~ s(season, bs = "cc", k = 6),
               trend_formula = ~ CAR(),
               data    = simdat$data_train,
-              family  = gaussian(),
+              family  = negbinomial(),
               chains  = 2, silent = 2)
 
 # Neighbouring times share information through the trend. Folds of

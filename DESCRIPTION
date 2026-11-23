@@ -48,6 +48,7 @@ Imports:
     tibble (>= 3.0.0),
     patchwork (>= 1.2.0)
 Encoding: UTF-8
+Language: en-GB
 LazyData: true
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.3

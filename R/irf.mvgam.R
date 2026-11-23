@@ -50,16 +50,9 @@
 #'   `r mvgam_article("hierarchical_var", "hierarchical VAR article")`
 #'   runs it on each group of a hierarchical VAR.
 #'
+#' @template ex-var-model
 #' @examples
 #' \dontrun{
-#' set.seed(0)
-#' simdat <- sim_mvgam(family = gaussian(), n_series = 3L,
-#'                     n_timepoints = 120L, trend_model = VAR(),
-#'                     prop_trend = 0.95)
-#' var_mod <- mvgam(y ~ 1, trend_formula = ~ VAR(p = 1),
-#'                  data = simdat$data_train, family = gaussian(),
-#'                  chains = 2, silent = 2)
-#'
 #' # Generalised responses of every series to a shock in each
 #' irf_obj <- irf(var_mod, h = 8L)
 #' plot(irf_obj, series = 1)

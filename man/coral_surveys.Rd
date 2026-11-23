@@ -3,7 +3,7 @@
 \docType{data}
 \name{coral_surveys}
 \alias{coral_surveys}
-\title{Simulated coral bleaching index with irregular CAR(1) state}
+\title{Simulated coral bleaching surveys with an irregular CAR(1) state}
 \format{
 A \code{data.frame} with 150 rows and the following fields:
 \describe{
@@ -11,12 +11,15 @@ A \code{data.frame} with 150 rows and the following fields:
 \code{myrmidon}, \code{pixie}); duplicated as \code{reef}.}
 \item{time}{integer month index (irregularly spaced within
 each reef).}
-\item{y}{numeric bleaching index (Gaussian, scaled);
-duplicated as \code{bleaching}.}
+\item{y}{integer count of bleached colonies; duplicated as
+\code{bleaching}.}
 \item{reef}{factor, alias of \code{series}.}
 \item{sst}{numeric observed sea-surface temperature in
 degrees Celsius.}
-\item{bleaching}{numeric bleaching index, alias of \code{y}.}
+\item{bleaching}{integer count of bleached colonies, alias of
+\code{y}.}
+\item{colonies}{integer number of colonies inspected, the
+binomial trials.}
 }
 }
 \usage{
@@ -25,45 +28,45 @@ coral_surveys
 \description{
 A state-space dataset for three coral reefs surveyed at
 irregular monthly intervals (gap distribution
-\code{Uniform(1, 6)} months, mean approximately 3.5). The latent
-state is a continuous-time AR(1) (CAR(1)) trend per reef with
-\code{phi = 0.7} and \code{sigma = 0.5}. The observation equation adds
-an observed sea-surface temperature (SST) driver via a smooth
-nonlinear effect.
+\code{Uniform(1, 6)} months, mean approximately 3.5). Each survey
+inspects between 20 and 40 colonies and counts those that have
+bleached. The latent state is a continuous-time AR(1) (CAR(1))
+trend per reef with \code{phi = 0.9} and \code{sigma = 0.3} on the logit
+scale. The observation equation adds an observed sea-surface
+temperature (SST) driver through a smooth nonlinear effect.
 }
 \details{
-Naive AR(1) treats every consecutive observation as a unit gap
-and biases \code{phi} downward toward \code{phi^mean(dt)} (roughly 0.29
-for this dataset), leaving the SST smooth to absorb persistence
-that belongs to the latent state. \code{trend_formula = ~ CAR()}
-with the supplied \code{time} column measures the damping over the
-median gap between surveys, three months here. Its \code{ar1_trend}
-is then near \code{0.7^3 = 0.34}, the monthly \code{phi} of \code{0.7} cubed.
-With persistence assigned to the latent state, the SST smooth is
-identifiable.
+A naive AR(1) treats every consecutive survey as one step. It
+gives a one-month gap and a six-month gap the same persistence.
+\code{trend_formula = ~ CAR()} with the supplied \code{time} column decays
+the state by the length of each gap. Its \code{ar1_trend} measures the
+persistence over the median gap between surveys, three months
+here. The simulated value is \code{0.9^3 = 0.73}.
 
-True generative components:
+True generative components, on the logit scale:
 \itemize{
-\item Per-reef intercepts (centred).
-\item Latent CAR(1) state per reef with \code{phi = 0.7} and
-\code{sigma = 0.5}, propagated through
+\item An intercept of -0.85, which puts a typical survey near 30\%
+bleached. Each reef adds its own centred intercept.
+\item Latent CAR(1) state per reef with \code{phi = 0.9} and
+\code{sigma = 0.3}, propagated through
 \code{trend[t] = phi^dt * trend[t-1] + N(0, sigma * sqrt((1 - phi^(2*dt)) / (1 - phi^2)))}.
-\item Shared smooth nonlinear obs-side effect of SST, evaluated via
-a thin-plate basis.
-\item Observation noise \code{sigma_obs = 0.3}.
+\item Shared smooth nonlinear effect of SST, evaluated through a
+thin-plate basis.
+\item Binomial observations: \code{bleaching ~ Binomial(colonies, p)}.
 }
 }
 \examples{
 data(coral_surveys)
-mvgam_data(coral_surveys, family = gaussian())
+mvgam_data(coral_surveys, formula = y | trials(colonies) ~ s(sst),
+           family = binomial())
 
 \dontrun{
 # A model with the structure the data were simulated from
 mod <- mvgam(
-  formula = y ~ s(sst, k = 8),
+  formula = y | trials(colonies) ~ series + s(sst, k = 8),
   trend_formula = ~ CAR(),
   data = coral_surveys,
-  family = gaussian(),
+  family = binomial(),
   chains = 2, silent = 2
 )
 summary(mod)

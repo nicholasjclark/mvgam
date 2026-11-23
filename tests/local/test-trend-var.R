@@ -944,6 +944,14 @@ test_that("the plotting methods render for a VAR fit", {
     "bayesplot_grid"
   )
   expect_drawn(plot(conditional_effects(fit))[[1L]])
+  # A divergence is marked in blue, visible over the dark red points
+  seen <- NULL
+  spy <- bayesplot::mcmc_pairs
+  body(spy) <- quote(seen <<- np_style)
+  environment(spy) <- environment()
+  local_mocked_bindings(mcmc_pairs = spy, .package = "bayesplot")
+  pairs(fit, variable = c("sigma", sigma_1))
+  expect_identical(seen$color[["div"]], "#1E88E5")
 
   # Each plot type this fit lacks the structure for refuses it by
   # naming that structure

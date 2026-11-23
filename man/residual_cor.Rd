@@ -111,9 +111,9 @@ autoregression is explosive has no stationary covariance and keeps
 its innovation covariance. A warning gives the count once per session.
 \code{ZMVN()} keeps no memory between times and \code{RW()} and \code{LLT()} have no
 stationary distribution. Each reports its innovation covariance. The
-level, slope and seasonal shocks of \code{LLT()} share its correlation. A hierarchical
-\code{AR()} converts each group's scales to stationary scales in the same
-way, before its global and group correlations are mixed.
+level, slope and seasonal shocks of \code{LLT()} share its correlation. A
+hierarchical \code{AR()} converts each group's scales to stationary scales
+in the same way, before its global and group correlations are mixed.
 
 Under \code{covariance = "innovation"} a \code{VAR()} fit reports the
 contemporaneous shocks. Its transition matrix spreads each shock

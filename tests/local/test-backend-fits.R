@@ -6,8 +6,13 @@
 
 
 set.seed(2L)
+# Counts from an AR(1) state, the structure `fit_ar()` estimates. The
+# default trend scale prior holds `sigma_trend` away from zero. Counts
+# with no latent state would place its posterior against that bound.
+latent <- c(stats::arima.sim(list(ar = 0.7), n = 40L, sd = 0.4),
+            stats::arima.sim(list(ar = 0.7), n = 40L, sd = 0.4))
 dat <- data.frame(
-  y = rpois(80L, 4), time = rep(1:40, 2L),
+  y = rpois(80L, exp(1.4 + latent)), time = rep(1:40, 2L),
   series = factor(rep(c("a", "b"), each = 40L))
 )
 newdata <- data.frame(
@@ -34,14 +39,16 @@ test_that("sampler arguments reach cmdstanr", {
 
 
 test_that("sampler arguments reach rstan", {
-  # rstan's own convergence checks warn on this model below 2000
-  # iterations.
+  # rstan raises its convergence checks and divergences as R warnings.
+  # 2000 iterations and smaller steps keep this model clear of both.
   out <- capture.output(
     fit <- suppressMessages(fit_ar(backend = "rstan", iter = 2000L,
-                                   refresh = 0, save_warmup = TRUE))
+                                   refresh = 0, save_warmup = TRUE,
+                                   control = list(adapt_delta = 0.95)))
   )
   expect_false(any(grepl("Iteration", out)))
   expect_identical(as.integer(fit$fit@sim$warmup2), c(1000L, 1000L))
+  expect_identical(fit$fit@stan_args[[1L]]$control$adapt_delta, 0.95)
 })
 
 

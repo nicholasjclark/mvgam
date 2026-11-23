@@ -1315,15 +1315,12 @@ test_that("a grouped AR(1) settles at the joint stationary covariance", {
 })
 
 
-test_that("the two grouped spellings are one model", {
+test_that("a grouped AR() is correlated in its spec and post-fit", {
   # `gr` and `subgr` declare correlations among the subgroups within
-  # each group, and the generated program declares those parameters
-  # whenever `gr` is named. Both spellings resolve to one spec.
-  bare <- AR(gr = region, subgr = species)
-  stated <- AR(gr = region, subgr = species,
-                                cor = TRUE)
-  expect_true(bare$cor)
-  expect_identical(bare, stated)
+  # each group. Because the generated program declares those
+  # parameters whenever `gr` is named, a grouped spec is correlated
+  # by default.
+  expect_true(AR(gr = region, subgr = species)$cor)
 
   # The marginal prediction path draws correlated innovations here. A
   # grouped fit treated as independent discarded the within-group

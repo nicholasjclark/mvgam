@@ -1,17 +1,25 @@
 ## Version 2.0.0
 
 ## Summary of changes
-This is a major release that builds the package on 'brms'. Observation models now use the full 'brms' formula syntax. A separate `trend_formula` specifies the latent process model. Estimation is still performed in 'Stan'. Because the modelling interface has changed, this release contains breaking changes, which are described in NEWS.md. The `trend_model` argument is replaced by `trend_formula`. Priors are now inspected with the `get_prior()` and `default_prior()` methods in place of `get_mvgam_priors()`.
+This is a major release that rebuilds the package on 'brms'. Observation models now use the full 'brms' formula syntax. A separate `trend_formula` specifies the latent process model. Estimation is still performed in 'Stan'. Because the modelling interface has changed, this release contains breaking changes, all of which are listed in NEWS.md. The `trend_model` argument is replaced by `trend_formula`. Priors are inspected with the `get_prior()` and `default_prior()` methods in place of `get_mvgam_priors()`. Several deprecated functions have been removed in favour of S3 methods.
 
 ## Test environments
+* Local: Ubuntu 24.04, R 4.6.2
 * win-builder: R-devel
 * win-builder: R-release
-* ubuntu-latest: R-release
-* ubuntu-latest: R-devel
-* macOS-latest: R-release
+* GitHub Actions: ubuntu-latest, R-release
+* GitHub Actions: ubuntu-latest, R-devel
+* GitHub Actions: macOS-latest, R-release
+* GitHub Actions: windows-latest, R-release
+* GitHub Actions: windows-latest, R-oldrel-4
 
 ## R CMD check results
-* There were no ERRORs or WARNINGs. There is a NOTE from listing 'cmdstanr' in Suggests. 'cmdstanr' is an optional dependency that provides an additional 'Stan' backend users may select when fitting models. 'brms' follows the same convention. The DESCRIPTION includes the `Additional_repositories` field to tell users where to obtain the package.
+* There were no ERRORs or WARNINGs.
+* There is one NOTE from listing 'cmdstanr' in Suggests. 'cmdstanr' provides an optional 'Stan' backend that users may select when fitting models. 'brms' follows the same convention. The DESCRIPTION includes the `Additional_repositories` field to tell users where to obtain the package.
+* The CRAN check system has previously reported a compilation WARNING about the RcppArmadillo fallback compilation. It originates in the RcppArmadillo system headers (suggesting to define -DARMA_USE_CURRENT) and is unrelated to code in mvgam.
+
+## Reverse dependencies
+* There is one reverse dependency, 'marginaleffects', which lists mvgam among the model classes it supports. We checked mvgam 2.0.0 against the current CRAN release of 'marginaleffects' (1.0.0). The prediction types that 'marginaleffects' records for mvgam are all still accepted.
 
 ## `valgrind` memory check results
 * We ran all examples with `--run-donttest` and all package tests, including those skipped on CRAN, under `R -d "valgrind --tool=memcheck --leak-check=full"`. The runs produced no WARNINGs or ERRORs.

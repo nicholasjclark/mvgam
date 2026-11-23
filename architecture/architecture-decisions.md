@@ -378,7 +378,11 @@ allows `n_lv <= n_series`.
 
 - Sampled, the default factor model: `Z` is a parameter with the
   prior `to_vector(Z) ~ student_t(3, 0, 0.5)`, identified after
-  sampling by the QR step below.
+  sampling by the QR step below. The static factors of `ZMVN()`,
+  which `jsdgam()` builds, take `normal(0, 1)`. A binary or
+  compositional response weakly informs a loading's size. Chains
+  under the Student-t stalled in its tails. Both scales widen by
+  `trend_prior_unit()`.
 - Sampled under a structured prior: a `loadings_prior` replaces the
   iid prior with the per-column matrix-normal
   `Z[, i] ~ multi_normal_cholesky(0, L_Phi * sqrt(Psi_diag[i]))`.

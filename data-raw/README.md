@@ -18,5 +18,5 @@ explicitly so the truth is auditable.
 | Script | Output | Generative structure |
 |---|---|---|
 | `build_birdsong.R` | `data/birdsong.rda` | 4 species x 80 weeks, Poisson, shared cyclic seasonal smooth + species-specific AR(1) trends (2 declining, 2 increasing) + species random intercept |
-| `build_lake_chemistry.R` | `data/lake_chemistry.rda` | 5 lakes x 60 months, Gaussian, per-lake random-walk trends + binary treatment with random slope (2 lakes positive, 3 lakes negative) |
-| `build_coral_surveys.R` | `data/coral_surveys.rda` | 3 reefs x ~50 obs at irregular times (gap ~ Uniform(1, 6) months), Gaussian, per-reef CAR(1) (phi = 0.7, sigma = 0.5) + smooth SST effect |
+| `build_lake_chemistry.R` | `data/lake_chemistry.rda` | 5 lakes x 60 months, Gamma total phosphorus (log link), per-lake random-walk trends + binary treatment with random slope (2 lakes positive, 3 lakes negative) |
+| `build_coral_surveys.R` | `data/coral_surveys.rda` | 3 reefs x ~50 obs at irregular times (gap ~ Uniform(1, 6) months), binomial bleached colonies of those inspected, per-reef CAR(1) (phi = 0.9, sigma = 0.3) + smooth SST effect |

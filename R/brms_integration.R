@@ -988,7 +988,7 @@ brms_declared_params <- function(stancode) {
 #'   - loadings_prior distance kernels (one `theta_dist_<NAME>` per
 #'     supplied distance matrix)
 #'   - MGP column shrinkage (`varrho_inv[1]` + `varrho_inv[2:]`)
-#'   - closure-unit family scale (`Psi ~ exponential(1)` for mvn /
+#'   - closure-unit family scale (`Psi ~ inv_gamma(3, 1.07)` for mvn /
 #'     mvt families)
 #'
 #' This helper scans the fully assembled Stan model for mvgam prior

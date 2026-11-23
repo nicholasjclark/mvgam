@@ -47,3 +47,6 @@ docs/
 
 # knitr cache of the README fits
 README_cache/
+cran_checks/
+**/_problems/
+**/testthat-problems.rds

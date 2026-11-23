@@ -43,3 +43,7 @@
 ^architecture$
 ^scratchpad_figs$
 ^man-roxygen$
+^\.playwright-mcp$
+^cran_checks\.R$
+^cran_checks$
+^tests/testthat/_problems$

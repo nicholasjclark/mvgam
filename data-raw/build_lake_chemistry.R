@@ -1,33 +1,31 @@
 # Build script for data/lake_chemistry.rda.
 #
-# Generative structure: 5 lakes x 60 monthly observations of a
-# Gaussian chemistry measurement (notionally dissolved oxygen,
-# centred and scaled). The dataset is state-space: a latent
-# correlated random-walk drives the slow trend, the observation
-# equation adds a binary treatment effect.
+# Generative structure: 5 lakes x 60 monthly measurements of total
+# phosphorus (ug/L), drawn from a Gamma distribution with a log link.
+# The dataset is state-space. A latent correlated random walk drives
+# the slow drift. The observation equation adds a treatment effect.
 #
 #   latent[t, lake] = latent[t-1, lake] + innov[t, lake]
 #   innov[t, ] ~ MVN(0, Sigma)            # correlated across lakes
-#   y[t, lake] = mu0 + lake_int[lake]
-#              + latent[t, lake]
-#              + treat_slope[lake] * treated[t]
-#              + N(0, sigma_obs)
+#   log(mu[t, lake]) = log(20) + lake_int[lake]
+#                      + latent[t, lake]
+#                      + treat_slope[lake] * treated[t]
+#   y[t, lake] ~ Gamma(shape, shape / mu[t, lake])
 #
 # Sigma encodes regional structure: two pairs of nearby lakes share
-# positive innovation correlation, a fifth lake is independent.
-# Treatment effect is heterogeneous (2 lakes positive, 3 negative).
+# positive innovation correlation. A fifth lake is independent. The
+# treatment effect is heterogeneous: 2 lakes rise and 3 fall.
 #
 # Recommended fit (state-space):
 #   mvgam(
-#     formula = y ~ treated,
-#     trend_formula = ~ 1,
-#     trend_model = RW(cor = TRUE),
+#     formula = y ~ treated + (treated || lake),
+#     trend_formula = ~ RW(cor = TRUE),
 #     data = lake_chemistry,
-#     family = gaussian()
+#     family = Gamma(link = "log")
 #   )
-# A no-trend or no-correlation fit reports a near-zero aggregate
-# treatment effect with wide CIs; the state-space fit recovers
-# heterogeneous slopes alongside the correlated latent drift.
+# A pooled treatment slope reports an effect near zero with a wide
+# interval. The state-space fit with a slope per lake recovers each
+# lake's response.
 
 devtools::load_all()
 
@@ -51,7 +49,7 @@ Sigma_corr <- matrix(0, nrow = n_lakes, ncol = n_lakes)
 diag(Sigma_corr) <- 1
 Sigma_corr[1, 2] <- Sigma_corr[2, 1] <- rho_regional
 Sigma_corr[3, 4] <- Sigma_corr[4, 3] <- rho_regional
-sigma_rw <- 0.25
+sigma_rw <- 0.1
 Sigma_innov <- (sigma_rw^2) * Sigma_corr
 
 innov <- rmvn(
@@ -79,17 +77,18 @@ grid <- expand.grid(
 grid <- grid[order(grid$lake, grid$month), ]
 grid$treated <- as.integer(grid$month >= 31L)
 
-sigma_obs <- 0.4
+gamma_shape <- 10
 eta <- numeric(nrow(grid))
 lake_codes <- as.integer(grid$lake)
 for (i in seq_len(nrow(grid))) {
   l <- lake_codes[i]
-  eta[i] <- 0.0 +
+  eta[i] <- log(20) +
     lake_int[l] +
     rw_trends[grid$month[i], l] +
     treat_slopes[l] * grid$treated[i]
 }
-y <- stats::rnorm(length(eta), mean = eta, sd = sigma_obs)
+y <- stats::rgamma(length(eta), shape = gamma_shape,
+                   rate = gamma_shape / exp(eta))
 
 lake_chemistry <- data.frame(
   series = grid$lake,

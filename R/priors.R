@@ -22,6 +22,29 @@
 # =============================================================================
 # Common trend prior specifications
 # =============================================================================
+
+#' The default prior of a standard deviation
+#'
+#' `inv_gamma(3, 1.07)` holds 98% of its mass between 0.13 and 2.45,
+#' with median 0.40. Unlike an exponential, it has no mass at zero. A
+#' trend's process noise then stays separate from the observation
+#' noise, which competes for the same variance. A shape of 3 keeps the
+#' right tail as light as that of `exponential(2)`. A binary or
+#' otherwise weakly informative response leaves the scale to its prior.
+#' Under a shape near 1.4, the heavier tail left such a scale several
+#' times its true value.
+#' The scale widens by `unit`, the factor `trend_prior_unit()`
+#' measures: an inverse gamma times `c` is an inverse gamma with its
+#' scale times `c`.
+#'
+#' @param unit The factor the default scale widens by
+#' @return A Stan distribution string
+#' @noRd
+scale_inv_gamma <- function(unit) {
+  checkmate::assert_number(unit, lower = 1)
+  paste0("inv_gamma(3, ", signif(1.07 * unit, 4), ")")
+}
+
 # Prior specifications shared by parameters that appear in more than one
 # trend type (sigma_trend is used by RW, AR and CAR). One definition
 # keeps every trend on the same default.
@@ -36,7 +59,7 @@
 #' @format Named list with one element per parameter, a list holding
 #' \describe{
 #'   \item{default}{Character string of a Stan distribution, such as
-#'     `"exponential(2)"`, or a function of the data's spread on the
+#'     `"normal(0, 0.5)"`, or a function of the data's spread on the
 #'     link scale returning one}
 #'   \item{bounds}{Numeric vector `c(lower, upper)`, `NA` where
 #'     unbounded}
@@ -46,7 +69,7 @@
 common_trend_priors <- list(
   # Innovation standard deviation
   sigma_trend = list(
-    default = function(unit) paste0("exponential(", signif(2 / unit, 4), ")"),
+    default = scale_inv_gamma,
     bounds = c(0, NA)
   ),
 
@@ -54,7 +77,7 @@ common_trend_priors <- list(
   # parameter is named after the quantity and has no `_trend` suffix.
   # It resolves through the same chain as every entry here.
   Psi = list(
-    default = "exponential(1)",
+    default = scale_inv_gamma,
     bounds = c(0, NA)
   ),
 
@@ -86,7 +109,7 @@ common_trend_priors <- list(
 
   # Per-group innovation standard deviation
   sigma_group_trend = list(
-    default = function(unit) paste0("exponential(", signif(2 / unit, 4), ")"),
+    default = scale_inv_gamma,
     bounds = c(0, NA)
   ),
 
@@ -359,7 +382,6 @@ get_default_trend_parameter_prior <- function(param_name,
 #' square-root and inverse-square links (`brms:::def_scale_prior()`),
 #' which widens its base scale of 2.5 by `max(1, mad(link(y)) / 2.5)`.
 #' The trend's scale priors are calibrated in link units and widen by
-#' The trend's scale priors are calibrated in link units and widen by
 #' the same factor. A count model on the log link rarely spreads past
 #' 2.5 and keeps its link-unit defaults. Zeros take 0.1 before a log or
 #' inverse link. A family on the log scale, such as `lognormal()`,
@@ -533,6 +555,32 @@ get_car_parameter_prior <- function(param_name, trend_obj) {
     return(list(prior = "", lb = "0.001", ub = "0.999"))
   }
   NULL
+}
+
+#' ZMVN loadings prior with light tails
+#'
+#' A `ZMVN()` factor is a static score per unit, as in a joint species
+#' distribution model. With no time structure, each series' loadings
+#' are informed by its responses at each unit alone. A binary or
+#' compositional response says little about how far a species' link
+#' moves with the factors. The shared `student_t(3, 0, 0.5)` then lets
+#' a chain stall far out in its tails, a mode the other chains never
+#' visit. `normal(0, unit)` keeps the loadings within the link range
+#' the data can inform. `unit` is the factor `trend_prior_unit()`
+#' widens every trend scale prior by.
+#'
+#' @param param_name Character string parameter name
+#' @param trend_obj mvgam_trend object
+#' @return List with prior, lb, ub elements, or NULL for default handling
+#' @noRd
+get_zmvn_parameter_prior <- function(param_name, trend_obj) {
+  checkmate::assert_string(param_name)
+  checkmate::assert_class(trend_obj, "mvgam_trend")
+  if (!identical(param_name, "Z")) {
+    return(NULL)
+  }
+  unit <- trend_prior_unit_of(trend_obj)
+  list(prior = paste0("normal(0, ", signif(unit, 4), ")"), lb = "", ub = "")
 }
 
 #' LLT priors scaled to the number of time points
@@ -1857,9 +1905,13 @@ default_prior.mvgam <- function(object, ...) {
 #' link:
 #' \itemize{
 #'   \item \code{sigma_trend} and \code{sigma_group_trend} take
-#'     \code{exponential(2 / s)}, with mean \eqn{s / 2}.
+#'     \code{inv_gamma(3, 1.07 s)}, with median \eqn{0.40 s}. It
+#'     has no mass at zero. The process noise then stays separate from
+#'     an observation noise that competes for the same variance.
 #'   \item The factor loadings \code{Z} take
-#'     \code{student_t(3, 0, 0.5 s)}.
+#'     \code{student_t(3, 0, 0.5 s)}. The static factors of
+#'     \code{\link{ZMVN}()}, which \code{\link{jsdgam}()} builds, take
+#'     \code{normal(0, s)}.
 #'   \item \code{\link{LLT}()} is the exception. Its shock scales
 #'     (\code{sigma_trend} among them) and its starting states also
 #'     scale with the number of time points. So do the growth priors of

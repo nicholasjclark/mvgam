@@ -111,16 +111,9 @@
 #'   `r mvgam_article("hierarchical_var", "hierarchical VAR article")`
 #'   reports the metrics for each group of a hierarchical VAR.
 #'
+#' @template ex-var-model
 #' @examples
 #' \dontrun{
-#' set.seed(0)
-#' simdat <- sim_mvgam(family = gaussian(), n_series = 3L,
-#'                     n_timepoints = 120L, trend_model = VAR(),
-#'                     prop_trend = 0.95)
-#' var_mod <- mvgam(y ~ 1, trend_formula = ~ VAR(p = 1),
-#'                  data = simdat$data_train, family = gaussian(),
-#'                  chains = 2, silent = 2)
-#'
 #' # Posterior medians and intervals of the stability metrics
 #' stab <- stability(var_mod)
 #' stab[stab$metric %in% c("reactivity", "mean_return_rate"), ]

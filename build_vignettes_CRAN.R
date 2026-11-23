@@ -1,61 +1,40 @@
-# Vignette names
-vignettes <- list.files('./vignettes', pattern = '.Rmd')
+# Pre-build the vignettes for a CRAN release. Run from the package root.
+#
+# Each vignette fits models only when NOT_CRAN is "true". This script
+# sets it, knits every vignette with its code evaluated and writes the
+# .Rmd, the evaluated .html and the purled .R into inst/doc. The package
+# is then built and checked with `vignettes = FALSE`. CRAN serves the
+# pre-built html and rebuilds the vignettes without fitting anything.
 
-# Generate R script versions of vignettes
-purl_vignettes <- function(x) {
-  # Generate the R script version
-  knitr::purl(
-    input = paste0('vignettes/', x),
-    output = paste0('doc/', sub('.Rmd', '.R', x))
-  )
+Sys.setenv(NOT_CRAN = "true")
+vignettes <- list.files("vignettes", pattern = "\\.Rmd$")
+dir.create("inst/doc", recursive = TRUE, showWarnings = FALSE)
 
-  # Copy this version to inst/doc
-  file.copy(
-    from = paste0('doc/', sub('.Rmd', '.R', x)),
-    to = paste0('inst/doc/', sub('.Rmd', '.R', x)),
-    overwrite = TRUE
-  )
+# Clear outputs whose vignette is absent from vignettes/
+stale <- setdiff(
+  list.files("inst/doc", pattern = "\\.(Rmd|R|html)$"),
+  c(vignettes, sub("\\.Rmd$", ".R", vignettes),
+    sub("\\.Rmd$", ".html", vignettes))
+)
+file.remove(file.path("inst/doc", stale))
+
+build_vignette <- function(x) {
+  rmd <- file.path("vignettes", x)
+  html <- sub("\\.Rmd$", ".html", rmd)
+  knitr::purl(rmd, output = file.path("inst/doc", sub("\\.Rmd$", ".R", x)),
+              quiet = TRUE)
+  devtools::build_rmd(rmd, quiet = TRUE)
+  file.copy(rmd, "inst/doc", overwrite = TRUE)
+  file.copy(html, "inst/doc", overwrite = TRUE)
+  file.remove(html)
 }
 
-# Build vignette htmls
-build_vignettes = function(x) {
-  # Build the vignette html file
-  devtools::build_rmd(
-    paste0('vignettes/', x)
-  )
-
-  # Copy the .Rmd to doc
-  file.copy(
-    from = paste0('vignettes/', x),
-    to = paste0('doc/', x),
-    overwrite = TRUE
-  )
-
-  # Copy the .Rmd to inst/doc
-  file.copy(
-    from = paste0('vignettes/', x),
-    to = paste0('inst/doc/', x),
-    overwrite = TRUE
-  )
-
-  # Copy the .html to inst/doc
-  file.copy(
-    from = sub('.Rmd', '.html', paste0('vignettes/', x)),
-    to = paste0('inst/doc/', sub('.Rmd', '.html', x)),
-    overwrite = TRUE
-  )
-
-  # Copy the .html to doc
-  file.copy(
-    from = sub('.Rmd', '.html', paste0('vignettes/', x)),
-    to = paste0('doc/', sub('.Rmd', '.html', x)),
-    overwrite = TRUE
-  )
-
-  # Remove the .html
-  file.remove(sub('.Rmd', '.html', paste0('vignettes/', x)))
+# Two vignettes knit at once. Each knit installs the package into a
+# library of its own. Each fit samples its chains in parallel.
+built <- parallel::mclapply(vignettes, build_vignette, mc.cores = 2L)
+failed <- vapply(built, inherits, logical(1L), "try-error")
+if (any(failed)) {
+  stop("Vignettes failed to build: ",
+       paste(vignettes[failed], collapse = ", "), "\n",
+       paste(unlist(built[failed]), collapse = "\n"), call. = FALSE)
 }
-
-# Apply these functions to all vignette .Rmds
-lapply(vignettes, purl_vignettes)
-lapply(vignettes, build_vignettes)

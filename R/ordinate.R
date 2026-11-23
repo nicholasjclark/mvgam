@@ -93,12 +93,12 @@
 #'
 #' @examples
 #' \dontrun{
-#' # Gaussian responses of 10 species at 60 sites, driven by two
+#' # Presence and absence of 10 species at 60 sites, driven by two
 #' # latent factors
-#' simdat <- sim_jsdgam(family = gaussian(), n_species = 10L,
+#' simdat <- sim_jsdgam(family = bernoulli(), n_species = 10L,
 #'                      n_sites = 60L, n_lv = 2L, seed = 3L)
 #' mod <- jsdgam(y ~ env * series, data = simdat$data_train,
-#'               family = gaussian(), n_lv = 2L, chains = 2, silent = 2)
+#'               family = bernoulli(), n_lv = 2L, chains = 2, silent = 2)
 #'
 #' # Sites as points and species loadings as arrows
 #' ordinate(mod)

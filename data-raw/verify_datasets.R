@@ -157,7 +157,7 @@ fit_lc <- mvgam(
   formula = y ~ treated + (treated || lake),
   trend_formula = ~ RW(cor = TRUE),
   data = lake_chemistry,
-  family = gaussian(),
+  family = Gamma(link = "log"),
   chains = 1L,
   iter = 800L,
   warmup = 400L,
@@ -196,13 +196,13 @@ save_plot(pred_lc,
 
 save_traces(
   fit_lc,
-  pars = c("b_treated", "sd_lake", "sigma_trend", "sigma_obs"),
+  pars = c("b_treated", "sd_lake", "sigma_trend", "shape"),
   path = file.path(out_dir, "lake_chemistry_traces.png")
 )
 check_diagnostics(
   fit_lc,
   pars = c("b_treated", "sd_lake", "r_lake",
-            "sigma_trend", "sigma_obs"),
+            "sigma_trend", "shape"),
   path = file.path(out_dir, "lake_chemistry_diagnostics.txt")
 )
 
@@ -247,10 +247,10 @@ write_block(
 message("\n=== coral_surveys fit ===")
 data("coral_surveys")
 fit_cs <- mvgam(
-  formula = y ~ s(sst, k = 8),
+  formula = y | trials(colonies) ~ series + s(sst, k = 8),
   trend_formula = ~ CAR(),
   data = coral_surveys,
-  family = gaussian(),
+  family = binomial(),
   chains = 1L,
   iter = 800L,
   warmup = 400L,
@@ -287,22 +287,23 @@ save_plot(pred_cs,
 
 save_traces(
   fit_cs,
-  pars = c("ar1", "sigma_trend", "sigma_obs", "bs_sst"),
+  pars = c("ar1", "sigma_trend", "bs_sst"),
   path = file.path(out_dir, "coral_surveys_traces.png")
 )
 check_diagnostics(
   fit_cs,
-  pars = c("ar1", "sigma_trend", "sigma_obs", "bs_sst"),
+  pars = c("ar1", "sigma_trend", "bs_sst"),
   path = file.path(out_dir, "coral_surveys_diagnostics.txt")
 )
 
-# Recovery: true phi = 0.7. The CAR fit estimates a per-reef
+# Recovery: monthly phi = 0.9, or 0.73 over the median gap of three
+# months. The CAR fit estimates a per-reef
 # `ar1` parameter; report the posterior for each.
 write_block(
   file.path(out_dir, "coral_surveys_recovery.txt"),
   "coral_surveys: CAR(1) phi recovery",
   c(
-    "Truth: phi = 0.7, sigma = 0.5 (shared across reefs).",
+    "Truth: monthly phi = 0.9 (0.73 over the median gap), sigma = 0.3.",
     "",
     "Posterior summary of ar1 (per-reef):",
     capture.output(print(

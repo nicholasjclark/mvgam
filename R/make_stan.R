@@ -120,12 +120,8 @@ build_stan_components <- function(formula, data, family = gaussian(),
   # closure-unit family models its response alone, which
   # `resolve_observation_family()` has established.
   if (uses_closure_unit_layout(family)) {
-    main_formula <- obs_arm_main_formula(obs_formula)
-    dpar_forms <- if (inherits(obs_formula, "brmsformula")) {
-      obs_formula$pforms %||% list()
-    } else {
-      list()
-    }
+    dpar_forms <- observation_dpar_forms(obs_formula, family)
+    main_formula <- dpar_forms$mu
     response_var <- unname(response_columns(obs_formula)[1L])
     has_obs_covs <- length(
       attr(stats::terms(main_formula), "term.labels")

@@ -174,12 +174,16 @@ centre_within_groups <- function(m, group) {
 #' @param m Numeric matrix, one row per draw.
 #' @param group Integer group of each column, every value from 1 to the
 #'   number of groups present.
-#' @return `[nrow(m) x n_group]` matrix, group `g` in column `g`.
+#' @return `[nrow(m) x n_group]` matrix, group `g` in column `g`. A
+#'   matrix without columns gives one without groups.
 #' @noRd
 group_column_means <- function(m, group) {
   checkmate::assert_matrix(m, mode = "numeric")
   checkmate::assert_integerish(group, lower = 1L, len = ncol(m),
                                any.missing = FALSE)
+  if (!length(group)) {
+    return(matrix(numeric(), nrow(m), 0L))
+  }
   counts <- tabulate(group)
   if (any(counts == 0L)) {
     stop_mvgam_fault(

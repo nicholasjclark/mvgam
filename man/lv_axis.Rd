@@ -72,19 +72,21 @@ per-factor coefficients in the basis of the identified loadings
 lv_axis()
 
 \dontrun{
-# Three series whose seasonal effect differs: 1, 0.5 and -1
+# Proportions in three series whose seasonal effect on the logit
+# scale differs: 1, 0.5 and -1
 set.seed(1)
-dat <- sim_mvgam(family = gaussian(), n_series = 3L,
+dat <- sim_mvgam(family = Beta(), n_series = 3L,
                  n_timepoints = 60L)$data_train
 dat$season <- sin(2 * pi * dat$time / 12)
-dat$y <- dat$y + c(1, 0.5, -1)[as.integer(dat$series)] * dat$season
+dat$y <- plogis(qlogis(dat$y) +
+                  c(1, 0.5, -1)[as.integer(dat$series)] * dat$season)
 
 # One seasonal slope per series
 mod <- mvgam(
   formula       = y ~ 1,
   trend_formula = ~ season:lv_axis() + AR(p = 1),
   data          = dat,
-  family        = gaussian(),
+  family        = Beta(),
   chains        = 2,
   silent        = 2
 )
@@ -99,7 +101,7 @@ get_prior(
   mvgam_formula(y ~ 1,
                 trend_formula = ~ season:lv_axis() + AR(p = 1, n_lv = 2)),
   data   = dat,
-  family = gaussian()
+  family = Beta()
 )
 }
 

@@ -1069,8 +1069,9 @@ gp_kernels <- function(gp_form) {
 #' its marginal standard deviation `sdgp`, its length scales `lscale` and
 #' its basis coefficients `zgp`, all under `<sfx>_<i>`. An exact term
 #' holds the frame's covariate values in `Xgp`, the fitted ones in
-#' `Xgp<sfx>_<i>_old` and its standard normal latent values in `zgp`. A term with a
-#' factor `by` holds one of each per level, suffixed by the level. `Igp`
+#' `Xgp<sfx>_<i>_old` and its standard normal latent values in `zgp`. A
+#' term with a factor `by` holds one of each per level, suffixed by the
+#' level. `Igp`
 #' places that level's rows. `Jgp` maps rows onto the unique covariate
 #' values the basis was computed from. `Cgp` scales a term by a
 #' continuous `by`.

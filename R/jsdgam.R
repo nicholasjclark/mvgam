@@ -76,7 +76,7 @@
 #'   `Z Z' + diag(Psi^2)` has rank at most the number of species.
 #'   Further columns of `Z` add nothing.
 #'
-#'   Under the default Student-t prior on `Z`, or a structured prior
+#'   Under the default normal prior on `Z`, or a structured prior
 #'   built from `traits`, `phylo` or `loadings_prior$distances`, `n_lv`
 #'   is the number of factors in the likelihood. Under the
 #'   multiplicative gamma process prior (`loadings_prior = "mgp"` or
@@ -88,7 +88,14 @@
 #'   [brms::prior()]. `prior`, the brms spelling, is accepted in `...`.
 #'   `get_prior()` of a model built with `run_model = FALSE` lists every
 #'   class and coefficient with its default, the `trait_slopes` terms
-#'   among them. See *Trait-mediated responses* for their scales.
+#'   among them. See *Trait-mediated responses* for their scales. Each
+#'   loading in `Z` takes `normal(0, s)` by default. `s` is 1, widened
+#'   as 'brms' widens its default scale priors for responses that
+#'   spread far on their link scale. A binary response says little
+#'   about the size of a
+#'   loading. The light tails keep chains from stalling at extreme
+#'   values. `prior(student_t(3, 0, 1), class = "Z")` gives heavier
+#'   tails.
 #' @param traits Optional species traits for a structured loadings
 #'   prior: a `data.frame` or matrix with one row per species, or the
 #'   name of an element of `data2`. Rows are matched to

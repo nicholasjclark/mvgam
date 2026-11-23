@@ -116,6 +116,15 @@ test_that("refuse_unit_varying() refuses only a per-visit covariate", {
   expect_silent(
     refuse_unit_varying(d$elev, arrays, "elev", PP_CHECK_UNIT_REASON)
   )
+  # The state belongs to the unit. Detection may vary by visit.
+  expect_error(
+    refuse_unit_varying_predictors(d, arrays, occ(), list(mu = y ~ tod)),
+    "'tod' varies within a closure unit"
+  )
+  expect_silent(
+    refuse_unit_varying_predictors(d, arrays, occ(),
+                                   list(mu = y ~ elev, p = p ~ tod))
+  )
 })
 
 # ------------------------------------------------------------
@@ -296,8 +305,16 @@ test_that("complete_closure_unit_newdata stamps occ defaults", {
   expect_identical(out$visit, rep(1L, 5L))
   expect_identical(out$time, 1:5)
   expect_identical(out$series, factor(rep("1", 5L), levels = c("1", "2")))
-  # Response overridden to satisfy binary_y_check.
-  expect_identical(out$y, rep(0L, 5L))
+  # A synthetic unit records no visit
+  expect_identical(out$y, rep(NA_real_, 5L))
+
+  # A fit of one series places a frame that names none on that series
+  one <- stub_with_family(occ())
+  one$trend_metadata <- list(axes = list(series = list(levels = "sp")))
+  expect_identical(
+    mvgam:::closure_unit_frame(one, data.frame(env = 1:2))$series,
+    factor(c("sp", "sp"))
+  )
 
   # A multi-season fit also keys its units on `site`, which no formula
   # names. The grid takes the template's site.

@@ -120,7 +120,9 @@ test_that("loo() on a trend fit points to lfo_cv()", {
   }
   # The registry is mocked first. It then restores the real method.
   local_mocked_s3_method("log_lik", "mvgam", ll)
-  local_mocked_bindings(log_lik.mvgam = ll)
+  # `TESTTHAT = ""` hides the test run from testthat, which then cannot
+  # find the package to mock under R CMD check
+  local_mocked_bindings(log_lik.mvgam = ll, .package = "mvgam")
   stub <- make_loo_extras_stub()
   expect_no_message(loo(stub))
   stub$trend_metadata <- list(trend_type = "AR")

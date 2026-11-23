@@ -1865,17 +1865,26 @@ refuse_partial_compositions <- function(object, newdata) {
 #' Resolve the frame a closure-unit prediction is made for
 #'
 #' A frame to predict for may leave the response out. Its rows are
-#' then unobserved visits, as rows with a missing response are.
+#' then unobserved visits, as rows with a missing response are. A fit
+#' of one series may also leave the series out, as `datagrid()` does.
+#' Every row then belongs to that series, as on the other prediction
+#' paths.
 #'
 #' @param object A fitted `mvgam` object
 #' @param newdata Frame to predict for, or `NULL` for the training data
-#' @return A data frame carrying the response column
+#' @return A data frame carrying the response and series columns
 #' @noRd
 closure_unit_frame <- function(object, newdata = NULL) {
   newdata <- prediction_frame(object, newdata)
   response_var <- response_column(object)
   if (!response_var %in% names(newdata)) {
     newdata[[response_var]] <- NA_real_
+  }
+  series_var <- axis_vars(object)$series_var
+  levs <- mvgam_axes(object)$series$levels
+  if (!series_var %in% names(newdata) && length(levs) == 1L) {
+    newdata[[series_var]] <- factor(rep(levs, nrow(newdata)),
+                                    levels = levs)
   }
   refuse_partial_compositions(object, newdata)
   newdata
@@ -1980,10 +1989,10 @@ complete_simplex_grid <- function(object, newdata,
 #'   Per-row variation in a state-level covariate gives per-row state
 #'   predictions.
 #' - `visit` to `1L`.
-#' - the response column to `0L`. A synthetic unit has no observation
-#'   attached. The value `0L` also satisfies the integer and binary
-#'   checks in `validate_closure_unit_data()`. `posterior_epred()` and
-#'   `posterior_predict()` never use the response for these families.
+#' - the response column to `NA`. A synthetic unit has no observation
+#'   attached. A `multi()` unit without counts takes the training
+#'   design's trial total. The predictions of every other family ignore
+#'   the response.
 #'
 #' `cap` and the response are filled on any frame that omits them,
 #' grid or not. The pipeline uses both whatever the frame's shape.
@@ -2023,17 +2032,17 @@ complete_closure_unit_newdata <- function(object, newdata,
   # broken object. No fallback applies.
   resp <- response_column(object)
   # A column the frame does not carry is filled whichever kind of frame
-  # this is. `cap` is the upper truncation the unit arrays need. The
-  # response is checked by the binary or non-negative integer validator,
-  # not used for any prediction. A frame that omits either is completed,
-  # not refused.
+  # this is. `cap` is the upper truncation the unit arrays need. A
+  # missing response marks a visit that did not happen, as it does in
+  # `closure_unit_frame()`. A `multi()` unit without counts then takes
+  # the training design's trial total in `multinomial_unit_totals()`.
   if (!"cap" %in% names(newdata)) {
     cap_val <- closure_unit_default_cap(object$family) %||%
                  template$cap %||% 1L
     newdata$cap <- as.integer(rep(cap_val, nrow(newdata)))
   }
   if (!resp %in% names(newdata)) {
-    newdata[[resp]] <- rep(0L, nrow(newdata))
+    newdata[[resp]] <- rep(NA_real_, nrow(newdata))
   }
   # What remains is the unit structure itself. Only a synthetic grid
   # needs it built. Real long-format newdata keeps the labels it arrived
@@ -2061,10 +2070,9 @@ complete_closure_unit_newdata <- function(object, newdata,
     newdata[[key]] <- rep(template[[key]], nrow(newdata))
   }
   newdata$visit <- 1L
-  # A grid's response takes whatever value `datagrid()` assigned. A
-  # synthetic unit has no observation attached. The safe default
-  # overwrites that value here.
-  newdata[[resp]] <- rep(0L, nrow(newdata))
+  # A synthetic unit has no observation attached. Whatever value
+  # `datagrid()` gave the response is replaced by a missing one.
+  newdata[[resp]] <- rep(NA_real_, nrow(newdata))
   newdata
 }
 
@@ -3495,8 +3503,9 @@ categ_stan_funs <- function() {
 #' [jsdgam()] fits the family, taking the unit and component columns
 #' and the number of factors `n_lv`. [residual_cor()] summarises the
 #' residual correlations and [shared_variation()] the part the factors
-#' share. `Psi` takes the prior `exponential(1)`, which suits responses
-#' near unit scale. `prior(..., class = Psi)` sets another.
+#' share. `Psi` takes the prior `inv_gamma(3, 1.07)`, with median
+#' 0.40 and no mass at zero, which suits responses near unit scale.
+#' `prior(..., class = Psi)` sets another.
 #'
 #' With `K` components the data separate the factor part from the
 #' residual part only when `(K - n_lv)^2 >= K + n_lv`. Fewer factors or
@@ -4249,8 +4258,8 @@ make_nmix_poisson_poisson_stanvars <- function(arrays) {
 #'   prior through to them.
 #' @param series_var,time_var The series and time columns the trend
 #'   names, which key a closure unit.
-#' @param dpar_forms The distributional formulas of the observation
-#'   model, named by parameter
+#' @param dpar_forms The observation model's formulas, named by
+#'   parameter, as `observation_dpar_forms()` returns them
 #' @return The family with `mvgam_stanvars` attribute populated
 #'   and `vars` set.
 #' @noRd
@@ -4278,21 +4287,11 @@ prepare_closure_unit_family <- function(family, data, response_var,
     data, response_var = response_var,
     series_var = series_var, time_var = time_var, family = family
   )
-  # A multi-response density takes one value of each parameter other
-  # than `mu` per unit, from the unit's first row
   if (multi_response) {
     refuse_off_simplex_response(data[[response_var]], arrays, family_name,
                                 response_var)
-    for (dpar in setdiff(names(dpar_forms), "mu")) {
-      for (v in intersect(all.vars(dpar_forms[[dpar]]), names(data))) {
-        refuse_unit_varying(
-          data[[v]], arrays, v,
-          paste0("'", dpar, "' takes one value per unit, from covariates ",
-                 "constant within it.")
-        )
-      }
-    }
   }
+  refuse_unit_varying_predictors(data, arrays, family, dpar_forms)
   family_stanvars <- switch(
     family_name,
     nmix                 = make_nmix_stanvars(arrays),
@@ -4871,7 +4870,10 @@ extract_p_for_closure_unit <- function(object, newdata, draw_ids,
 #' count would then be wrong.
 #'
 #' The family sets the cap declarations and whether the units carry a
-#' truncation.
+#' truncation. A supplied frame is refused where a unit-level
+#' parameter's covariates vary within a unit, as the training data are
+#' at fit time. A grid holding several covariate values in one unit
+#' would otherwise predict from the first row alone.
 #'
 #' @param object A fitted `mvgam` with a closure-unit family.
 #' @param newdata Frame to build over; defaults to the fit's data.
@@ -4879,11 +4881,14 @@ extract_p_for_closure_unit <- function(object, newdata, draw_ids,
 #' @noRd
 closure_unit_arrays_for <- function(object, newdata = NULL) {
   checkmate::assert_class(object, "mvgam")
+  # A frame the caller supplied is checked as the training data were at
+  # fit time
+  supplied <- !is.null(newdata)
   # The frame the model was fitted on, through the accessor that
   # owns that question. Neither of the two spellings is used.
   newdata <- prediction_frame(object, newdata)
   vars <- axis_vars(object)
-  build_closure_unit_arrays(
+  arrays <- build_closure_unit_arrays(
     newdata,
     response_var = response_column(object),
     series_var = vars$series_var,
@@ -4895,6 +4900,13 @@ closure_unit_arrays_for <- function(object, newdata = NULL) {
     series_levels = fitted_series_levels(object),
     drop_unobserved_units = FALSE
   )
+  if (supplied) {
+    refuse_unit_varying_predictors(
+      newdata, arrays, object$family,
+      observation_dpar_forms(object$formula, object$family)
+    )
+  }
+  arrays
 }
 
 
@@ -5428,6 +5440,66 @@ refuse_unit_varying <- function(values, arrays, var_name, reason) {
                  " units hold more than one value."),
       i = reason
     )), call. = FALSE)
+  }
+  invisible(NULL)
+}
+
+
+#' The observation model's formulas, named by distributional parameter
+#'
+#' The main formula describes `mu`. A `brmsformula` adds a sub-formula
+#' for each parameter `modelled_dpars()` names, such as `p`.
+#'
+#' @param formula One response's observation formula
+#' @param family That response's family object
+#' @return Named list of formulas, `mu` first
+#' @noRd
+observation_dpar_forms <- function(formula, family) {
+  pforms <- if (inherits(formula, "brmsformula")) {
+    formula$pforms[modelled_dpars(formula, family)]
+  }
+  c(list(mu = obs_arm_main_formula(formula)), pforms)
+}
+
+
+#' Refuse a unit-level parameter whose covariates vary within a unit
+#'
+#' The Stan program and the R methods both take one value of each
+#' unit-level parameter from a single row of the unit. The state `mu`
+#' of `occ()` and `nmix()` belongs to the unit. Detection varies by
+#' visit. A composition family spreads `mu` over its components. Each
+#' of its other parameters belongs to the unit. Without this check, a
+#' covariate that varies within a unit would enter the model from one
+#' row alone.
+#'
+#' @param data Frame the arrays were built over
+#' @param arrays Closure-unit arrays carrying `row_unit` and `N_unit`
+#' @param family The closure-unit family
+#' @param dpar_forms Formulas named by parameter, as
+#'   `observation_dpar_forms()` returns them
+#' @return `NULL`, invisibly, or an error
+#' @noRd
+refuse_unit_varying_predictors <- function(data, arrays, family,
+                                           dpar_forms) {
+  checkmate::assert_data_frame(data)
+  checkmate::assert_list(dpar_forms, names = "named")
+  unit_dpars <- if (is_multi_response_family(family)) {
+    setdiff(names(dpar_forms), "mu")
+  } else {
+    intersect(names(dpar_forms), "mu")
+  }
+  for (dpar in unit_dpars) {
+    # The right-hand side alone. The main formula's response varies
+    # within a unit by design.
+    rhs <- dpar_forms[[dpar]][[length(dpar_forms[[dpar]])]]
+    target <- if (dpar == "mu") "The state" else paste0("'", dpar, "'")
+    for (v in intersect(all.vars(rhs), names(data))) {
+      refuse_unit_varying(
+        data[[v]], arrays, v,
+        paste0(target, " takes one value per unit, from covariates ",
+               "constant within it.")
+      )
+    }
   }
   invisible(NULL)
 }

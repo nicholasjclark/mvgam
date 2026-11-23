@@ -427,7 +427,10 @@ mvgam_imputation_forwarded <- c(
 #' @section Structured loadings priors:
 #' A factor trend loads each series on a few latent factors through the
 #' matrix `Z`. By default each entry of `Z` takes an independent
-#' `student_t(3, 0, 0.5)` prior. `loadings_prior` replaces it with the
+#' `student_t(3, 0, 0.5)` prior. The static factors of `ZMVN()` take
+#' `normal(0, 1)`, as [jsdgam()] describes. Both scales widen with the
+#' responses' spread on their link scale. `loadings_prior` replaces the
+#' default with the
 #' structured prior of Heaps and Jermyn (2024). Each column of `Z`
 #' then follows a multivariate normal whose covariance `Phi` makes
 #' similar series load alike. `Phi` is the product of a kernel over
@@ -1498,7 +1501,7 @@ create_mvgam_stub_from_stan_components <- function(
 #' # imputation model would draw the fills. This example draws them
 #' # from a normal distribution.
 #' set.seed(1)
-#' dat <- sim_mvgam(family = gaussian(), n_series = 1L,
+#' dat <- sim_mvgam(family = poisson(), n_series = 1L,
 #'                  n_timepoints = 60L, trend_model = AR())$data_train
 #' missing_x <- sample(nrow(dat), 10L)
 #' dat$x[missing_x] <- NA
@@ -1514,7 +1517,7 @@ create_mvgam_stub_from_stan_components <- function(
 #'   formula = y ~ x,
 #'   trend_formula = ~ AR(p = 1),
 #'   data_list = imputed_list,
-#'   family = gaussian(),
+#'   family = poisson(),
 #'   chains = 2,
 #'   silent = 2
 #' )

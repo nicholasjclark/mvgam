@@ -56,6 +56,8 @@ with the post-processing tools of four packages: `brms`,
 [cheatsheet](https://nicholasjclark.github.io/mvgam/dev/cheatsheets/mvgam_cheatsheet.pdf)
 summarises the main functions on one page.
 
+![A state-space model. The latent process $X$ (written $\eta$ below) evolves from one time to the next. Each observation $Y$ depends on the process at its own time. Where an observation is missing, as at time 2, the process is still estimated.](SS_model.svg){width=85%}
+
 For an observation $y_{i,t}$ on series $i$ at time $t$, with link
 function $g$ and a response distribution $\mathcal{F}$:
 
@@ -167,7 +169,8 @@ fit_gam <- mvgam(
   family  = poisson(),
   data    = pp_train,
   newdata = pp_test,
-  silent  = 2
+  silent  = 2,
+  seed    = 1
 )
 ```
 
@@ -190,13 +193,29 @@ fit_ar <- mvgam(
   family        = poisson(),
   data          = pp_train,
   newdata       = pp_test,
-  silent        = 2
+  silent        = 2,
+  seed          = 1
 )
 ```
 
 ```{r ar-summary}
 summary(fit_ar)
 ```
+
+An Rhat above 1.01 or a small effective sample size marks a
+parameter the chains disagree on. A pairs plot shows the cause.
+Each panel scatters the posterior draws of two parameters. A
+narrow ridge or a funnel means the data separate the pair poorly.
+Blue crosses mark divergent transitions:
+
+```{r ar-pairs, fig.asp = 1, out.width = "80%"}
+pairs(fit_ar, variable = c("trend_params", "trend_smooth_params"))
+```
+
+A Gaussian response adds white noise to the latent state. There,
+`variable = c("obs_params", "trend_params")` sets the observation
+noise `sigma` against the process noise `sigma_trend`. The two
+compete for the same variance and often form a ridge.
 
 The latent state absorbs the persistence from one month to the
 next. The residuals of this fit show no autocorrelation left:
@@ -283,7 +302,8 @@ fit_cor <- mvgam(
   family        = poisson(),
   data          = train,
   newdata       = test,
-  silent        = 2
+  silent        = 2,
+  seed          = 1
 )
 ```
 

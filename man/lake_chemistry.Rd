@@ -3,7 +3,7 @@
 \docType{data}
 \name{lake_chemistry}
 \alias{lake_chemistry}
-\title{Simulated lake chemistry with correlated random-walk state}
+\title{Simulated lake phosphorus with correlated random-walk state}
 \format{
 A \code{data.frame} with 300 rows and the following fields:
 \describe{
@@ -11,26 +11,27 @@ A \code{data.frame} with 300 rows and the following fields:
 \code{boreal}, \code{coastal}, \code{delta}, \code{estuary}); duplicated as
 \code{lake}.}
 \item{time}{integer month index from 1 to 60.}
-\item{y}{numeric chemistry measurement (Gaussian); duplicated
-as \code{chemistry}.}
+\item{y}{positive total phosphorus in micrograms per litre;
+duplicated as \code{chemistry}.}
 \item{lake}{factor, alias of \code{series}.}
 \item{month}{integer month index, alias of \code{time}.}
 \item{treated}{integer (0/1) treatment indicator; switches on
 from month 31 onwards in all lakes.}
-\item{chemistry}{numeric chemistry measurement, alias of \code{y}.}
+\item{chemistry}{positive total phosphorus, alias of \code{y}.}
 }
 }
 \usage{
 lake_chemistry
 }
 \description{
-A state-space dataset for five lakes observed monthly across
-60 months. The latent process is a correlated random walk
-across lakes (two regional clusters share positive innovation
-correlation, a fifth lake is independent). The observation
-equation adds a binary treatment indicator that switches on at
-month 31, with heterogeneous slopes across lakes: two lakes
-respond positively and three respond negatively.
+A state-space dataset for five lakes sampled monthly across
+60 months. Each sample records total phosphorus in micrograms per
+litre, drawn from a Gamma distribution with a log link. The latent
+process is a correlated random walk across lakes. Two regional
+clusters share positive innovation correlation. A fifth lake is
+independent. The observation equation adds a binary treatment
+indicator that switches on at month 31, with heterogeneous slopes
+across lakes. Phosphorus rises in two lakes and falls in three.
 }
 \details{
 A pooled fit with one treatment slope for all lakes reports an
@@ -39,21 +40,23 @@ negative responses cancel. A state-space fit
 (\code{trend_formula = ~ RW(cor = TRUE)}) with a treatment slope for each
 lake recovers the response of every lake.
 
-True generative components:
+True generative components, on the log scale:
 \itemize{
-\item Per-lake intercepts (centred).
+\item An intercept of \code{log(20)}, a typical 20 micrograms per litre.
+Each lake adds its own centred intercept.
 \item Latent random walk with cross-lake innovation correlation
 \code{0.6} between \verb{(alpine, boreal)} and \verb{(coastal, delta)},
 independent for \code{estuary}. Innovation standard deviation
-\code{0.25}.
+\code{0.1}.
 \item Heterogeneous treatment slopes:
 \verb{(alpine = +0.8, boreal = +0.6, coastal = -0.5, delta = -0.7, estuary = -0.6)}.
-\item Observation noise \code{sigma = 0.4}.
+\item Gamma observations with shape \code{10}, a coefficient of variation
+near 0.32.
 }
 }
 \examples{
 data(lake_chemistry)
-mvgam_data(lake_chemistry, family = gaussian())
+mvgam_data(lake_chemistry, family = Gamma(link = "log"))
 
 \dontrun{
 # A model with the structure the data were simulated from
@@ -61,7 +64,7 @@ mod <- mvgam(
   formula = y ~ treated + (treated || lake),
   trend_formula = ~ RW(cor = TRUE),
   data = lake_chemistry,
-  family = gaussian(),
+  family = Gamma(link = "log"),
   chains = 2, silent = 2
 )
 summary(mod)

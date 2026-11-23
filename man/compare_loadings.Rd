@@ -87,10 +87,11 @@ different species sets, subset before fitting.
 }
 \examples{
 \dontrun{
-simdat <- sim_jsdgam(family = gaussian(), n_species = 10L,
+# Counts of 10 species at 60 sites, driven by two latent factors
+simdat <- sim_jsdgam(family = poisson(), n_species = 10L,
                      n_sites = 60L, n_lv = 2L, seed = 3L)
 mod <- jsdgam(y ~ env * series, data = simdat$data_train,
-              family = gaussian(), n_lv = 2L, chains = 2, silent = 2)
+              family = poisson(), n_lv = 2L, chains = 2, silent = 2)
 
 # A trait that tracks each species' true loading on the first factor
 set.seed(3)
@@ -99,7 +100,7 @@ traits <- data.frame(
   row.names = levels(simdat$data_train$series)
 )
 mod_traits <- jsdgam(y ~ env * series, data = simdat$data_train,
-                     family = gaussian(), n_lv = 2L, traits = traits,
+                     family = poisson(), n_lv = 2L, traits = traits,
                      chains = 2, silent = 2)
 
 # Grey segments join each species' loadings under the two priors

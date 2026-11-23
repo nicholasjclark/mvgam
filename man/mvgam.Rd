@@ -208,7 +208,10 @@ a full analysis.
 
 A factor trend loads each series on a few latent factors through the
 matrix \code{Z}. By default each entry of \code{Z} takes an independent
-\code{student_t(3, 0, 0.5)} prior. \code{loadings_prior} replaces it with the
+\code{student_t(3, 0, 0.5)} prior. The static factors of \code{ZMVN()} take
+\code{normal(0, 1)}, as \code{\link[=jsdgam]{jsdgam()}} describes. Both scales widen with the
+responses' spread on their link scale. \code{loadings_prior} replaces the
+default with the
 structured prior of Heaps and Jermyn (2024). Each column of \code{Z}
 then follows a multivariate normal whose covariance \code{Phi} makes
 similar series load alike. \code{Phi} is the product of a kernel over

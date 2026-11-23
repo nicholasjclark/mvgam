@@ -251,7 +251,7 @@ test_that("mvn() and mvt() declare their residual parameters and priors", {
     # `K` (max_rep on the closure-unit arrays) is a literal. The trend's
     # `N_series_trend` is out of scope where the family declares `Psi`.
     expect_match(param_sc, "vector<lower=0>[4] Psi;", fixed = TRUE)
-    expect_match(model_sc, "Psi ~ exponential(1);", fixed = TRUE)
+    expect_match(model_sc, "Psi ~ inv_gamma(3, 1.07);", fixed = TRUE)
   }
   # The bound keeps the residual variance of mvt() finite
   expect_match(param_sc, "real<lower=2> nu;", fixed = TRUE)

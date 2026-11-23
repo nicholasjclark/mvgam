@@ -166,8 +166,8 @@ species_effects.mvgam <- function(object, variables, ...,
 #' Refuse a name that is no covariate of the model
 #'
 #' The covariates are the columns a formula of the model uses, less the
-#' axis columns that place each row and the traits of `trait_slopes`. An empty `variables` is refused
-#' with the list of covariates.
+#' axis columns that place each row and the traits of `trait_slopes`. An
+#' empty `variables` is refused with the list of covariates.
 #'
 #' @param object A fitted `mvgam` object
 #' @param variables The names the caller gave

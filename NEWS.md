@@ -1,81 +1,50 @@
 # mvgam 2.0.0
 
-mvgam now uses 'brms' to build its models. The observation model takes the full 'brms' formula syntax and a separate `trend_formula` specifies the latent process. Most 1.1.x calls need rewriting: see `vignette("mvgam_overview")` and the package website for worked examples.
+mvgam now builds its models through 'brms'. The observation model takes the full 'brms' formula syntax. `trend_formula` specifies the latent process. Most 1.1.x code needs rewriting. Start with `vignette("mvgam_overview")` and `vignette("data")`. The [articles](https://nicholasjclark.github.io/mvgam/articles/) work through each model class.
 
 ## Breaking changes
-* Trend constructors now go inside `trend_formula`, e.g. `trend_formula = ~ AR(p = 1)`. The `trend_model` argument has been removed
-* `n_lv` and `trend_map` moved onto the trend constructors. Removed arguments: `use_lv`, `prior_simulation`, `return_model_data`, `save_all_pars`, `parallel`
-* The trend constructors take `centred` in place of `noncentred`. Latent states are sampled non-centred by default
+* Trend constructors go inside `trend_formula`, as in `trend_formula = ~ AR(p = 1)`. `n_lv` and `trend_map` are arguments of the trend constructors
+* Removed arguments: `trend_model`, `use_lv`, `prior_simulation`, `return_model_data`, `save_all_pars`, `parallel`
 * Data for a model with a trend need a factor series column, even for one series
-* Renamed families: `nb()` is now `negbinomial()`, `student_t()` is now `student()`, `betar()` is now `Beta()`
-* Default family is now `gaussian()` in `mvgam()` and `sim_mvgam()`. `jsdgam()` defaults to `binomial()`
-* `sim_mvgam()` has a new signature built around named scenarios
-* Removed `GP()`, `dynamic()`, `s(bs = "moi")`, `s(bs = "mod")`. Use `gp()` and `mo()`
-* `incl_autocor` now chooses the prediction surface, replacing `trend_state`. `hindcast(resample_innovations = )` is now `process_error`
-* Renamed arguments: `residual_cor(by_group = )`, `score(quantile_level = )`, `forecast(coef_uncertainty = )`, `posterior_transition_matrix(groups = )`
-* `score(score = "drps")` no longer takes `log = TRUE`. Use `"crps"` on the log scale
+* Renamed families: `nb()` is `negbinomial()`, `student_t()` is `student()`, `betar()` is `Beta()`
+* The default family is `gaussian()`. `jsdgam()` defaults to `binomial()`
+* Removed functions, with their replacements: `get_mvgam_priors()` (`get_prior()`), `plot_mvgam_*()` (`plot()`), `compare_mvgams()` (`loo_compare()`), `eval_mvgam()` and `roll_eval_mvgam()` (`lfo_cv()`), `lv_correlations()` (`residual_cor()`), `add_residuals()` (`augment()`), `code()` (`stancode()`), `ppc()` (`pp_check()`)
+* `gp()` and `mo()` replace `GP()`, `dynamic()`, `s(bs = "moi")`, `s(bs = "mod")`
+* Renamed arguments: `incl_autocor` (was `trend_state`), `process_error` (was `resample_innovations`), `centred` (was `noncentred`)
+* Parameter names follow 'brms', as do `summary()`, `coef()`, `fixef()`. Trend parameters are indexed by series name, as in `sigma_trend[DM]`
 * Posterior summaries by default from `irf()`, `fevd()`, `stability()`. Pass `summary = FALSE` for draws
-* Removed functions, with their replacements: `get_mvgam_priors()` (`get_prior()`), the `plot_mvgam_*()` functions (`plot()`), `compare_mvgams()` (`loo_compare()`), `eval_mvgam()` (`lfo_cv()`), `roll_eval_mvgam()` (`lfo_cv()`), `lv_correlations()` (`residual_cor()`), `add_residuals()` (`augment()`), `code()` (`stancode()`), `ppc()` (`pp_check()`). `summary(include_states = )` has been removed
-* mvgam no longer re-exports `te()` and `ti()`
-* `coef()` follows 'brms': each level's coefficients per grouping factor. `fixef()` gives the population-level effects
 * `mvgam_forecast` objects store `train_times` and `test_times` as per-series lists
-* Parameter names and `summary()` blocks follow 'brms', with smooths, Gaussian processes and monotonic effects named by term and trend parameters indexed by series name, as in `sigma_trend[DM]`
-* `series_to_mvgam()` takes a `tsibble`, `ts`, `mts`, `msts` or wide data frame, fills gaps and returns one data frame unless `h` or `train_prop` is given. `xts` input has been removed
+* mvgam no longer re-exports `te()` and `ti()`. `series_to_mvgam()` no longer takes `xts` input
+* `sim_mvgam()` is built around named scenarios. `series_to_mvgam()` returns one data frame unless `h` or `train_prop` is given
 
 ## New features
-* Families: `tweedie()`, `beta_nb()`, `com_binomial()`, `occ()`, `diri()`, `multi()`, `categ()`, `mvn()`, `mvt()`. `nmix()` gained Royle-Nichols, Poisson-Poisson and multi-season variants
-* `forecast(type = "latent_state")` forecasts the occupancy or abundance of an `occ()` or `nmix()` fit. A multi-season fit reports the mean over the sites of each season
-* @jbogomolovas2 contributed the `com_binomial()` mathematics and tested the bounded count families
-* Multivariate responses through `mvbind()` and `mvbf()`. Each response keeps the rows where it was observed. `summary()` reports each response's count
-* `forecast_uncertainty()` splits a forecast's variance by source and horizon. It also compares covariate scenarios. `variance_partition()` splits the fitted predictor's variance by source
-* `community()` gives richness, Hill numbers, community-weighted mean traits and excess co-occurrence, along gradients, at the fitted sites or over a forecast
+* `mvbind()` and `mvbf()` responses share one latent process. See the [multivariate](https://nicholasjclark.github.io/mvgam/articles/mvbf.html) and [integrated distribution model](https://nicholasjclark.github.io/mvgam/articles/idm.html) articles
+* Imperfect detection through `occ()` and `nmix()`, each with a multi-season variant. `forecast(type = "latent_state")` forecasts occupancy or abundance. See the [occupancy](https://nicholasjclark.github.io/mvgam/articles/occupancy.html) and [N-mixture](https://nicholasjclark.github.io/mvgam/articles/nmix.html) articles
+* `jsdgam()` takes traits, trait slopes, a phylogeny and the composition families (`diri()`, `multi()`, `categ()`). Summaries of the fit: `species_effects()`, `community()`, `residual_cor()`. See the [JSDM article](https://nicholasjclark.github.io/mvgam/articles/jsdgam.html)
+* New dynamics: moving average terms and coefficient pooling in `AR()` and `VAR()`, hierarchical VARs, the local linear trend `LLT()`, an extended `CAR()`. See the [VAR](https://nicholasjclark.github.io/mvgam/articles/var.html) and [hierarchical VAR](https://nicholasjclark.github.io/mvgam/articles/hierarchical_var.html) articles
+* Structured factor loadings through `loadings_prior`. Tools to interpret the loadings: `active_factors()`, `shared_variation()`, `compare_loadings()`, `ordinate()`. See `vignette("dfm")`
+* New families: `tweedie()`, `beta_nb()`, `com_binomial()` (mathematics by @jbogomolovas2), `mvn()`, `mvt()`
+* The 'brms' post-processing methods work on mvgam fits. Examples: `posterior_predict()`, `log_lik()`, `update()`, `hypothesis()`, `bridge_sampler()`
+* `forecast_uncertainty()` splits forecast variance by source and horizon. `compare_scores()` and `compare_elpds()` compare models. See the [forecast evaluation article](https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html)
 * Checks of a model and its data before fitting or prediction: `mvgam_formula()`, `mvgam_data()`, `check_newdata()`
-* Moving average terms in `AR()` and `VAR()`, coefficient pooling in `AR()` and partially fixed `trend_map`
-* `CAR()` gained `cor = TRUE`, takes series observed at their own times and takes `trend_formula` covariates on several series
-* `LLT()` adds a local linear trend: a level with a time-varying slope that can be damped, plus an optional trigonometric season whose shape drifts (`season`, `harmonics`). Its level, slope and season come back from `hindcast()` and `forecast()` with `component`
-* `loadings_prior` for structured factor loadings. Helpers for the fitted loadings: `active_factors()`, `shared_variation()`, `compare_loadings()`, `ordinate()`
-* AR factor models with estimated loadings give every draw one factor order and orientation. `summary()` reports their loadings as `Z` and their AR coefficients per factor
-* `jsdgam()` gained three arguments: `traits`, `trait_slopes`, `phylo`. `lv_axis()` in a `trend_formula` term gives each latent factor, or each series of a model without factors, its own effect
-* The 'brms' post-processing methods work on mvgam fits. Examples: `posterior_predict()`, `log_lik()`, `update()`, `hypothesis()`, `as_draws_*()`
-* Exact `gp()` terms (no `k`) under any 'brms' kernel, with predictions and forecasts at new covariate values
-* `species_effects()` gives each species' response to named covariates with the posterior probability of its sign, plus the trait effects of a `trait_slopes` fit
-* `bayes_R2(by_series = TRUE)` scores each series, adding Tjur's R^2 and the AUC for binary responses
-* Four functions take `prob_threshold`, the sign probability a supported entry exceeds: `residual_cor()`, `posterior_transition_matrix()`, `community()`, `species_effects()`. Their heatmaps outline the entries whose sign probability exceeds it and can hide the rest
-* Model comparison: `bridge_sampler()`, `bayes_factor()`, `waic()`, `loo_model_weights()`, `pp_average()`, `compare_scores()`, `compare_elpds()`
-* `threads`, `init = "pathfinder"`, `mvgam_multiple()` for imputed data, and helpers to pivot wide occupancy and species data
 * `methods_md()` writes a model description. `bibtex()` extracts the citation
-* `pp_check(type = "resid_variogram")` checks residuals by time lag. `plot(type = "residuals")` draws it for unevenly spaced series
-* On a hierarchical VAR, `stability()` reports each group and `posterior_transition_matrix()` averages the group matrices. Plots of `irf()` and `fevd()` select processes by name
 
 ## Changed defaults
-* The `posterior_*()` prediction methods and `fitted()` default to `process_error = FALSE`, matching `predict()`
-* `fitted()` includes the fitted trend state for the training data, as `residuals()` does
-* Predictions with `incl_autocor = TRUE` and `log_lik()` refuse times outside the fitted times. Use `forecast()`
-* `ZMVN()` and `PW()` forecasts require every series to share one set of forecast times
+* The `posterior_*()` methods and `fitted()` default to `process_error = FALSE`, matching `predict()`
 * `conditional_effects()` defaults to `type = "expected"`
-* Quantile residuals of families without a distribution function place each observation by its rank among the posterior predictive draws. An observation beyond every draw keeps a finite residual
-* `pp_check()` draws bars for a bernoulli or ordinal response and a rootogram for counts
-* Trend scale priors take the response's spread on the link scale as 'brms' defaults do. `LLT()` and `PW()` growth priors also scale with the series length
-* `PW()` `changepoint_scale` (default `0.3`) is a change in growth over the whole series
-* `CAR()` keeps its autoregressive parameter inside `(0, 1)` and measures time in median observation gaps
-* The `com_binomial()` prior on `nu` is now `normal(1, 1)`
-* A distributional regression on a `tweedie()`, `beta_nb()` or other custom family's parameter gives its intercept a `student_t(3, 0, 2.5)` prior, as 'brms' does for its own families
+* Predictions with `incl_autocor = TRUE` refuse times outside the fitted times. Use `forecast()`
+* Trend scale priors follow the response's spread on the link scale, as 'brms' defaults do
 
 ## Deprecations
-* `samples` and `burnin` (use `iter` and `warmup`), `lfo_cv(data = )` (use `newdata`), `incl_dynamics` (use `incl_autocor`) and `by = trend` (use `by = lv_axis()`)
+* `samples` and `burnin` (use `iter` and `warmup`), `lfo_cv(data = )` (use `newdata`), `incl_dynamics` (use `incl_autocor`), `by = trend` (use `by = lv_axis()`)
 
 ## Bug fixes
 * Binomial predictions with varying trial counts stay within each observation's total (thanks to @jbogomolovas2)
-* `update()` works when a trend constructor argument came from a variable
-* `prior_summary()` reports the priors in the compiled Stan model
-* `nmix()` models accept missing responses
-* `ensemble()` combines `hindcast()` results
 * `CAR()` process variance scales with the time lag (#107)
-* `score(score = "brier")` scores the forecast probability, the mean of the draws
-* `score(score = "variogram")` follows Scheuerer and Hamill (2015) through `scoringRules::vs_sample()`
-* Variational, Laplace and Pathfinder fits name their algorithm in `summary()` and `glance()`
-* `algorithm = "laplace"` honours `silent = 2`
-* Fixes to forecast scores with one test observation, offsets with `gp()` terms, piecewise trend predictions, by-factor Gaussian Process predictions, the `max_treedepth` check in `summary()` and plots of residuals with missing values (thanks to @StefanoMezzini)
+* `ensemble()` combines `hindcast()` results
+* `update()` works when a trend argument came from a variable
+* Fixes to the Brier and variogram scores and to scores of forecasts with one test observation
+* Fixes to offsets with `gp()` terms, piecewise trend predictions, by-factor Gaussian Process predictions and residual plots with missing values (thanks to @StefanoMezzini)
 
 # mvgam 1.1.51
 

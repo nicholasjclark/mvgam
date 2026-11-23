@@ -1233,7 +1233,8 @@ generate_shared_innovation_stanvars <- function(cor = FALSE,
   } else if (is_hierarchical) {
     paste0(
       if (!centred) {
-        "\n    // Innovations scaled by each group's Cholesky factor, filled below"
+        paste0("\n    // Innovations scaled by each group's Cholesky ",
+               "factor, filled below")
       } else if (scale) {
         "\n    // Start rows scaled by each group's Cholesky factor below"
       },
@@ -2487,7 +2488,7 @@ mgp_psi_diag_scode <- function(dim = "N_lv_trend") {
 
 #' The structured prior of Heaps and Jermyn on the loadings matrix
 #'
-#' Replaces the default `to_vector(Z) ~ student_t(3, 0, 0.5)` with the
+#' Replaces the default independent prior on `to_vector(Z)` with the
 #' per-column matrix-normal prior
 #' `Z[, i] ~ multi_normal_cholesky(zero_vec, L_Phi)`. The kernel is
 #' `Phi = exp(-d_1 / theta_dist_1) * ... * exp(-d_K / theta_dist_K) *
@@ -2903,7 +2904,8 @@ generate_hierarchical_correlation_parameters <- function(
           "\n// Scale each group's innovations by its Cholesky factor,\n",
           "// every occasion in one product\n",
           "for (g_idx in 1:N_groups_trend) {\n",
-          "  scaled_innovations_trend[", rows, ", group_members_trend[g_idx]]\n",
+          "  scaled_innovations_trend[", rows,
+          ", group_members_trend[g_idx]]\n",
           "    = innovations_trend[", rows, ", group_members_trend[g_idx]]\n",
           "      * L_group_trend[g_idx]';\n",
           "}"
@@ -3205,11 +3207,13 @@ generate_llt_trend_stanvars <- function(trend_specs, data_info,
       },
       if (is.null(start)) {
         paste0(
-          "      // The level adds the last slope and its shock. Each state is a\n",
+          "      // The level adds the last slope and its shock. ",
+          "Each state is a\n",
           "      // cumulative sum down its process.\n",
           "      for (k in 1:N_lv_trend) {\n",
           if (!damped) {
-            "        slope_trend[ : , k] = cumulative_sum(slope_trend[ : , k]);\n"
+            paste0("        slope_trend[ : , k] = ",
+                   "cumulative_sum(slope_trend[ : , k]);\n")
           },
           "        lv_trend[ : , k] = cumulative_sum(append_row(\n",
           "          scaled_innovations_trend[1, k],\n",
@@ -3222,7 +3226,8 @@ generate_llt_trend_stanvars <- function(trend_specs, data_info,
           if (!damped) {
             paste0(
               "      for (k in 1:N_lv_trend) {\n",
-              "        slope_trend[ : , k] = cumulative_sum(slope_trend[ : , k]);\n",
+              "        slope_trend[ : , k] = ",
+              "cumulative_sum(slope_trend[ : , k]);\n",
               "      }\n"
             )
           },

@@ -31,6 +31,13 @@ keeps the label \code{"response"}. \code{predictions()} on \code{"response"} kee
 the observation noise. marginaleffects summarises the draws by
 their posterior median. For a right-skewed predictive distribution
 the median falls below the mean.
+
+An \code{\link[=occ]{occ()}} or \code{\link[=nmix]{nmix()}} fit takes two more types. \code{"detection"} gives
+the detection probability of each visit. \code{"latent_N"} gives the
+latent state that mvgam's own methods call \code{"latent_state"}.
+marginaleffects checks \code{type} against its own list, which records
+that state as \code{"latent_N"}. Each row of a grid from
+\code{\link[marginaleffects:datagrid]{marginaleffects::datagrid()}} becomes its own closure unit.
 }
 
 \section{The latent trend}{
