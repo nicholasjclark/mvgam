@@ -16,7 +16,7 @@ stale <- setdiff(
   c(vignettes, sub("\\.Rmd$", ".R", vignettes),
     sub("\\.Rmd$", ".html", vignettes))
 )
-file.remove(file.path("inst/doc", stale))
+invisible(file.remove(file.path("inst/doc", stale)))
 
 build_vignette <- function(x) {
   rmd <- file.path("vignettes", x)
@@ -29,9 +29,15 @@ build_vignette <- function(x) {
   file.remove(html)
 }
 
-# Two vignettes knit at once. Each knit installs the package into a
-# library of its own. Each fit samples its chains in parallel.
-built <- parallel::mclapply(vignettes, build_vignette, mc.cores = 2L)
+# Two vignettes knit at once, each in a fresh R process. build_rmd()
+# installs the package under tempdir() for every knit. Forked workers
+# share one tempdir() and draw the same file names in it. Each worker
+# inherits NOT_CRAN and the working directory.
+cl <- parallel::makePSOCKcluster(2L)
+built <- parallel::parLapplyLB(cl, vignettes, function(x, build) {
+  try(build(x), silent = TRUE)
+}, build = build_vignette)
+parallel::stopCluster(cl)
 failed <- vapply(built, inherits, logical(1L), "try-error")
 if (any(failed)) {
   stop("Vignettes failed to build: ",

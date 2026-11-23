@@ -360,11 +360,12 @@ truncated_dist_draws <- function(spec, cells, lb, ub, discrete) {
     }
     # The upper tail is the precise one where the lower bound exceeds
     # the median
-    upper <- log_p(lo, TRUE) > log(0.5)
+    lower_lo <- log_p(lo, TRUE)
+    upper <- lower_lo > log(0.5)
     # On the chosen tail, the interval runs from `near` to `far` in
     # probability, with `far` the larger. Its log is `far` plus the log
     # of a uniform on `[exp(near - far), 1]`.
-    near <- ifelse(upper, log_p(ub[j], FALSE), log_p(lo, TRUE))
+    near <- ifelse(upper, log_p(ub[j], FALSE), lower_lo)
     far <- ifelse(upper, log_p(lo, FALSE), log_p(ub[j], TRUE))
     v <- stats::runif(length(rows))
     log_u <- far + log(v + (1 - v) * exp(near - far))

@@ -338,7 +338,6 @@ test_that("the lag coefficients recover the simulated weights", {
     }, numeric(1)))
   }, numeric(1))
   names(est) <- paste0("lag", lags)
-  expect_true(all(is.finite(est)))
   # Positive dependence at every lag the simulation used.
   expect_true(all(est > 0))
   expect_lt(max(abs(est - phi_true)), 0.3)

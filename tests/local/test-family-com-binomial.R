@@ -228,7 +228,6 @@ test_that("quantile residuals use the surface conditioned on the trend", {
   # A missing response has no residual. One missing response once
   # stopped the distribution function and every residual with it.
   expect_identical(which(is.na(est)), na_rows)
-  expect_true(all(is.finite(est[observed])))
   # A clamped cell lands near -8
   expect_lt(max(abs(est[observed])), 6)
 

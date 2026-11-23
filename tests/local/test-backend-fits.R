@@ -19,9 +19,9 @@ newdata <- data.frame(
   time = rep(41:43, 2L), series = factor(rep(c("a", "b"), each = 3L))
 )
 
-fit_ar <- function(..., iter = 300L) {
-  mvgam(y ~ 1, trend_formula = ~ AR(), data = dat, family = poisson(),
-        chains = 2L, iter = iter, seed = 1L, ...)
+fit_ar <- function(..., iter = 300L, trend_formula = ~ AR()) {
+  mvgam(y ~ 1, trend_formula = trend_formula, data = dat,
+        family = poisson(), chains = 2L, iter = iter, seed = 1L, ...)
 }
 
 
@@ -43,11 +43,10 @@ test_that("sampler arguments reach rstan", {
   # A model with no latent state has no funnel to diverge in. 2000
   # iterations keep it clear of the convergence checks.
   out <- capture.output(
-    fit <- suppressMessages(mvgam(y ~ 1, data = dat, family = poisson(),
-                                  chains = 2L, iter = 2000L, seed = 1L,
-                                  backend = "rstan", refresh = 0,
-                                  save_warmup = TRUE,
-                                  control = list(adapt_delta = 0.95)))
+    fit <- suppressMessages(fit_ar(trend_formula = NULL, iter = 2000L,
+                                   backend = "rstan", refresh = 0,
+                                   save_warmup = TRUE,
+                                   control = list(adapt_delta = 0.95)))
   )
   expect_false(any(grepl("Iteration", out)))
   expect_identical(as.integer(fit$fit@sim$warmup2), c(1000L, 1000L))

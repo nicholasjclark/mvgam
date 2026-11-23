@@ -1,5 +1,5 @@
-# Pre-submission steps for a CRAN release, in the order of the release
-# checklist (GitHub issue 55). Run from the package root. Output goes to
+# Pre-submission steps for a CRAN release, in the order they run. Run
+# from the package root. Output goes to
 # cran_checks/. The win-builder and CRAN steps upload the package. They
 # run only when called explicitly.
 

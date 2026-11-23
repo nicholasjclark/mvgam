@@ -1881,7 +1881,7 @@ closure_unit_frame <- function(object, newdata = NULL) {
     newdata[[response_var]] <- NA_real_
   }
   series_var <- axis_vars(object)$series_var
-  levs <- mvgam_axes(object)$series$levels
+  levs <- fitted_series_levels(object)
   if (!series_var %in% names(newdata) && length(levs) == 1L) {
     newdata[[series_var]] <- factor(rep(levs, nrow(newdata)),
                                     levels = levs)

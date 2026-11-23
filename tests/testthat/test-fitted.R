@@ -80,7 +80,6 @@ test_that("fitted.mvgam summary handles multivariate list correctly", {
     .package = "mvgam"
   )
   out <- fitted(stub_object(), summary = TRUE)
-  expect_type(out, "list")
   expect_equal(names(out), c("y1", "y2"))
   expect_true(all(sapply(out, is.matrix)))
   expect_equal(unname(out$y1[, "Estimate"]), rep(1, 4))
@@ -94,7 +93,6 @@ test_that("fitted.mvgam returns raw list when summary = FALSE for mv", {
     .package = "mvgam"
   )
   out <- fitted(stub_object(), summary = FALSE)
-  expect_type(out, "list")
   expect_equal(dim(out$y1), c(5L, 4L))
   expect_equal(dim(out$y2), c(5L, 4L))
 })
