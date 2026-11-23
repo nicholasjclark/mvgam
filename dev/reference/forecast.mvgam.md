@@ -13,7 +13,7 @@ forecast(
   object,
   newdata = NULL,
   ...,
-  type = c("response", "link", "expected", "trend"),
+  type = c("response", "link", "expected", "trend", "latent_state"),
   component = NULL,
   ndraws = NULL,
   draw_ids = NULL,
@@ -86,6 +86,19 @@ forecast(
   - `"link"` returns the linear predictor on the link scale.
 
   - `"trend"` returns the latent trend on the link scale.
+
+  - `"latent_state"` returns the latent state of an
+    [`occ()`](https://nicholasjclark.github.io/mvgam/dev/reference/occ.md)
+    or
+    [`nmix()`](https://nicholasjclark.github.io/mvgam/dev/reference/nmix.md)
+    fit: the occupancy probability, or the abundance `N`. The hindcast
+    conditions each closure unit on its own visits, as
+    `hindcast(type = "latent_state")` does. The forecast takes the state
+    from the covariates and the propagated trend. A multi-season fit
+    holds one unit per site in each season and returns the mean over
+    those sites, which for
+    [`occ()`](https://nicholasjclark.github.io/mvgam/dev/reference/occ.md)
+    is the expected share of sites occupied.
 
 - component:
 
@@ -195,7 +208,7 @@ mod <- mvgam(
   family  = poisson(),
   chains  = 2, silent = 2
 )
-#> Warning: 25 of 2000 (1.0%) transitions ended with a divergence.
+#> Warning: 59 of 2000 (3.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 
 # The held-out data given to mvgam() set the forecast horizon
@@ -213,13 +226,13 @@ plot(forecast(mod, type = "expected"))
 
 # Next, score the forecast against the held-out counts
 head(score(fc, score = "crps")[[1]])
-#>      score in_interval interval_width eval_horizon score_type
-#> 1 1.742354           1            0.9            1       crps
-#> 2 2.140199           1            0.9            2       crps
-#> 3 2.320223           1            0.9            3       crps
-#> 4 1.344777           1            0.9            4       crps
-#> 5 0.591562           1            0.9            5       crps
-#> 6 4.738040           1            0.9            6       crps
+#>       score in_interval interval_width eval_horizon score_type
+#> 1 1.8363660           1            0.9            1       crps
+#> 2 2.1702190           1            0.9            2       crps
+#> 3 2.2556043           1            0.9            3       crps
+#> 4 1.3527555           1            0.9            4       crps
+#> 5 0.6259065           1            0.9            5       crps
+#> 6 4.4490207           1            0.9            6       crps
 
 # The sources of the forecast's variance at each horizon
 plot(forecast_uncertainty(mod, ndraws = 200))

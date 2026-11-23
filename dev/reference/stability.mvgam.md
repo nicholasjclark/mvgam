@@ -237,13 +237,17 @@ simdat <- sim_mvgam(family = gaussian(), n_series = 3L,
 var_mod <- mvgam(y ~ 1, trend_formula = ~ VAR(p = 1),
                  data = simdat$data_train, family = gaussian(),
                  chains = 2, silent = 2)
+#> Warning: 25 of 2000 (1.0%) transitions ended with a divergence.
+#> See https://mc-stan.org/misc/warnings for details.
+#> Warning: 2 of 2 chains had an E-BFMI less than 0.3.
+#> See https://mc-stan.org/misc/warnings for details.
 
 # Posterior medians and intervals of the stability metrics
 stab <- stability(var_mod)
 stab[stab$metric %in% c("reactivity", "mean_return_rate"), ]
 #>             metric    Estimate  Est.Error       Q2.5     Q97.5
-#> 7       reactivity -0.04448516 0.12303374 -0.2453294 0.4283587
-#> 8 mean_return_rate  0.83647291 0.06804875  0.6936867 0.9512065
+#> 7       reactivity -0.08714044 0.09822209 -0.2672851 0.2413728
+#> 8 mean_return_rate  0.83372784 0.06963219  0.6824315 0.9422311
 
 # The full posterior of each metric
 plot(stability(var_mod, summary = FALSE))

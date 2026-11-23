@@ -209,7 +209,7 @@ simdat <- sim_mvgam(family = poisson(), n_series = 1L,
 mod <- mvgam(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1),
              data = simdat$data_train, family = poisson(),
              chains = 2, silent = 2)
-#> Warning: 9 of 2000 (0.0%) transitions ended with a divergence.
+#> Warning: 5 of 2000 (0.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 
 # One row per draw, one column per observation
@@ -235,7 +235,7 @@ ggplot(simdat$data_train, aes(time, y)) +
 c(fixed = mean(ep),
   innovations = mean(posterior_epred(mod, process_error = TRUE)))
 #>       fixed innovations 
-#>    6.116209    7.366952 
+#>    6.116486    7.344443 
 
 # A site the fit never saw takes the spread of the fitted sites
 train <- simdat$data_train

@@ -198,6 +198,10 @@ simdat <- sim_mvgam(family = gaussian(), n_series = 3L,
 var_mod <- mvgam(y ~ 1, trend_formula = ~ VAR(p = 1),
                  data = simdat$data_train, family = gaussian(),
                  chains = 2, silent = 2)
+#> Warning: 25 of 2000 (1.0%) transitions ended with a divergence.
+#> See https://mc-stan.org/misc/warnings for details.
+#> Warning: 2 of 2 chains had an E-BFMI less than 0.3.
+#> See https://mc-stan.org/misc/warnings for details.
 
 # Each series' persistence and its effects on the others
 A <- posterior_transition_matrix(var_mod)
@@ -205,12 +209,12 @@ A
 #> Lag-1 VAR transition matrix from an mvgam fit
 #>   Group      : single-panel
 #>   Dimension  : 3 x 3
-#>   Mean |A_ij| (i != j): 0.11
+#>   Mean |A_ij| (i != j): 0.12
 #>   Point estimate:
 #>          series_1 series_2 series_3
-#> series_1     0.73     0.03     0.10
-#> series_2     0.09     0.56     0.18
-#> series_3     0.19     0.08     0.54
+#> series_1     0.66     0.04     0.15
+#> series_2     0.06     0.53     0.23
+#> series_3     0.17     0.10     0.56
 #>   95% CI on each cell available in `A_lower` / `A_upper`.
 plot(A)
 

@@ -61,10 +61,14 @@ plot(x, series = NULL, ...)
   [`print()`](https://rdrr.io/r/base/print.html) gives the range of the
   unit medians. [`summary()`](https://rdrr.io/r/base/summary.html) and
   [`as.data.frame()`](https://rdrr.io/r/base/as.data.frame.html) return
-  one row per unit with the median and the 50% and 95% interval bounds.
-  [`plot()`](https://rdrr.io/r/graphics/plot.default.html) draws them
-  per series, as a line with ribbons over time or as points with
-  interval bars over units without an order.
+  one row per unit, with its key columns (`series`, `time` and the
+  `site` of a multi-season fit), the median and the 50% and 95% interval
+  bounds. [`plot()`](https://rdrr.io/r/graphics/plot.default.html) draws
+  them per series, as a line with ribbons over time or as points with
+  interval bars over units without an order. A multi-season fit holds
+  several sites in each season. Its plot draws the mean over those sites
+  in each draw: the expected share of sites occupied, or the mean
+  abundance per site.
 
 - component:
 
@@ -185,7 +189,7 @@ mod <- mvgam(
   family  = poisson(),
   chains  = 2, silent = 2
 )
-#> Warning: 25 of 2000 (1.0%) transitions ended with a divergence.
+#> Warning: 59 of 2000 (3.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 
 # The fitted states track the training counts
@@ -204,8 +208,6 @@ plot(hindcast(mod, process_error = TRUE))
 
 # A local linear trend's slope, the level's growth per step
 mod_llt <- update(mod, trend_formula = ~ LLT())
-#> Warning: 1 of 2000 (0.0%) transitions ended with a divergence.
-#> See https://mc-stan.org/misc/warnings for details.
 plot(hindcast(mod_llt, type = "trend", component = "slope"))
 
 

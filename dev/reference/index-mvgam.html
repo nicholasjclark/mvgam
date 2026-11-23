@@ -133,7 +133,7 @@ fits. <code><a href="https://rdrr.io/r/base/grep.html" class="external-link">gre
 <span class="r-in"><span>             trend_formula <span class="op">=</span> <span class="op">~</span> <span class="fu"><a href="trend_constructors.html">AR</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>             data <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span>,</span></span>
 <span class="r-in"><span>             chains <span class="op">=</span> <span class="fl">2</span>, silent <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 62 of 2000 (3.0%) transitions ended with a divergence.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 20 of 2000 (1.0%) transitions ended with a divergence.</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> See https://mc-stan.org/misc/warnings for details.</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 2 of 2 chains had an E-BFMI less than 0.3.</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> See https://mc-stan.org/misc/warnings for details.</span>
@@ -147,16 +147,16 @@ fits. <code><a href="https://rdrr.io/r/base/grep.html" class="external-link">gre
 <span class="r-in"><span><span class="fu"><a href="https://mc-stan.org/posterior/reference/draws_df.html" class="external-link">as_draws_df</a></span><span class="op">(</span><span class="va">mod</span>, variable <span class="op">=</span> <span class="st">"sigma_trend"</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> # A draws_df: 1000 iterations, 2 chains, and 2 variables</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>    sigma_trend[series_1] sigma_trend[series_2]</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1                  0.495                  0.81</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2                  0.441                  0.57</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3                  0.013                  0.58</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4                  0.223                  0.47</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 5                  0.099                  0.62</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 6                  0.238                  0.65</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 7                  0.560                  0.45</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 8                  0.558                  0.51</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 9                  0.315                  0.70</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 10                 0.274                  0.66</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1                  0.226                  0.44</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2                  0.281                  0.69</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3                  0.236                  0.57</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4                  0.126                  0.37</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5                  0.087                  0.32</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6                  0.243                  0.83</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 7                  0.634                  0.71</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 8                  0.355                  0.74</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 9                  0.294                  0.76</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 10                 0.368                  1.06</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> # ... with 1990 more draws</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> # ... hidden reserved variables {'.chain', '.iteration', '.draw'}</span>
 <span class="r-in"><span></span></span>
@@ -165,9 +165,9 @@ fits. <code><a href="https://rdrr.io/r/base/grep.html" class="external-link">gre
 <span class="r-in"><span>           class <span class="op">=</span> <span class="cn">NULL</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Hypothesis Tests for class :</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>                 Hypothesis Estimate Est.Error CI.Lower CI.Upper Evid.Ratio</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1 (ar1_trend[series... &gt; 0    -0.24      0.44    -1.11     0.35       0.46</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1 (ar1_trend[series... &gt; 0    -0.25      0.44    -1.09     0.38       0.44</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   Post.Prob Star</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1      0.32     </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1       0.3     </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ---</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 'CI': 90%-CI for one-sided and 95%-CI for two-sided hypotheses.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> '*': For one-sided hypotheses, the posterior probability exceeds 95%;</span>

@@ -178,7 +178,7 @@ mod <- mvgam(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1),
               data = simdat$data_train,
               family = poisson(),
               chains = 2, silent = 2)
-#> Warning: 9 of 2000 (0.0%) transitions ended with a divergence.
+#> Warning: 5 of 2000 (0.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 
 summary(mod)
@@ -193,21 +193,21 @@ summary(mod)
 #> == Observation Model ==
 #> Smoothing Spline Hyperparameters:
 #>           Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> sds(sx_1)     5.02      1.92     2.38     9.79 1.00     1482     1506
+#> sds(sx_1)     5.10      2.11     2.40    10.91 1.00     1362     1086
 #> 
 #> Regression Coefficients:
 #>           Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> Intercept     1.63      0.15     1.33     1.93 1.00      935      874
-#> sx_1          8.38      2.23     3.96    12.79 1.00     1577     1190
+#> Intercept     1.63      0.14     1.36     1.91 1.00     1613     1395
+#> sx_1          8.46      2.20     4.23    12.84 1.00     1690     1392
 #> 
 #> == Trend Model ==
 #> Trend Specific Parameters:
 #>                       Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS
-#> sigma_trend[series_1]     0.47      0.07     0.34     0.62 1.00      844
-#> ar1_trend[series_1]       0.58      0.15     0.27     0.85 1.00      505
+#> sigma_trend[series_1]     0.48      0.07     0.34     0.64 1.00      714
+#> ar1_trend[series_1]       0.56      0.14     0.25     0.80 1.00      632
 #>                       Tail_ESS
-#> sigma_trend[series_1]     1250
-#> ar1_trend[series_1]        716
+#> sigma_trend[series_1]     1012
+#> ar1_trend[series_1]        744
 #> 
 #> Draws were sampled using sampling(NUTS). For each parameter, Bulk_ESS
 #> and Tail_ESS are effective sample size measures, and Rhat is the potential
@@ -223,11 +223,11 @@ summary(mod)
 # Each block is a data frame, such as the trend's dynamics
 round(summary(mod)$trend_spec, 2)
 #>                       Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS
-#> sigma_trend[series_1]     0.47      0.07     0.34     0.62    1   843.73
-#> ar1_trend[series_1]       0.58      0.15     0.27     0.85    1   504.87
+#> sigma_trend[series_1]     0.48      0.07     0.34     0.64    1   713.62
+#> ar1_trend[series_1]       0.56      0.14     0.25     0.80    1   632.39
 #>                       Tail_ESS
-#> sigma_trend[series_1]  1250.04
-#> ar1_trend[series_1]     715.57
+#> sigma_trend[series_1]  1011.60
+#> ar1_trend[series_1]     744.49
 
 # Next: pp_check(mod) compares draws from the model with the data
 # }

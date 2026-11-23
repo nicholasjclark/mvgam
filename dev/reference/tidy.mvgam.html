@@ -169,7 +169,7 @@ the coefficient once, as <code>Intercept</code>.</p>
 <span class="r-in"><span>              data    <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span>,</span></span>
 <span class="r-in"><span>              family  <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>              chains  <span class="op">=</span> <span class="fl">2</span>, silent <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 9 of 2000 (0.0%) transitions ended with a divergence.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 5 of 2000 (0.0%) transitions ended with a divergence.</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> See https://mc-stan.org/misc/warnings for details.</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># One row per parameter, with broom's column names</span></span></span>
@@ -178,14 +178,14 @@ the coefficient once, as <code>Intercept</code>.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #949494;"># A tibble: 8 × 6</span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   term                  type               estimate std.error conf.low conf.high</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>                 <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>                 <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>     <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>    <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>     <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">1</span> Intercept             observation_beta      1.63     0.153     1.33      1.93 </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">2</span> sx_1                  observation_beta      8.38     2.23      3.96     12.8  </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">3</span> sds_sx_1              observation_smoot…    5.02     1.92      2.38      9.79 </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">4</span> s_sx_1[1]             observation_smoot…    1.35     1.75     -<span style="color: #BB0000;">2.10</span>      4.82 </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">5</span> s_sx_1[2]             observation_smoot…   -<span style="color: #BB0000;">0.132</span>    1.99     -<span style="color: #BB0000;">4.09</span>      3.76 </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">6</span> s_sx_1[3]             observation_smoot…   -<span style="color: #BB0000;">8.35</span>     1.62    -<span style="color: #BB0000;">11.4</span>      -<span style="color: #BB0000;">5.05</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">7</span> sigma_trend[series_1] trend_model_param     0.470    0.073<span style="text-decoration: underline;">1</span>    0.338     0.624</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">8</span> ar1_trend[series_1]   trend_model_param     0.576    0.147     0.272     0.845</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">1</span> Intercept             observation_beta      1.63     0.139     1.36      1.91 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">2</span> sx_1                  observation_beta      8.46     2.20      4.23     12.8  </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">3</span> sds_sx_1              observation_smoot…    5.10     2.11      2.40     10.9  </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">4</span> s_sx_1[1]             observation_smoot…    1.32     1.79     -<span style="color: #BB0000;">2.15</span>      4.88 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">5</span> s_sx_1[2]             observation_smoot…   -<span style="color: #BB0000;">0.171</span>    1.98     -<span style="color: #BB0000;">4.21</span>      3.82 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">6</span> s_sx_1[3]             observation_smoot…   -<span style="color: #BB0000;">8.41</span>     1.61    -<span style="color: #BB0000;">11.6</span>      -<span style="color: #BB0000;">5.36</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">7</span> sigma_trend[series_1] trend_model_param     0.479    0.073<span style="text-decoration: underline;">9</span>    0.343     0.636</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">8</span> ar1_trend[series_1]   trend_model_param     0.557    0.140     0.252     0.800</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># The `type` column separates the trend's parameters from the</span></span></span>
 <span class="r-in"><span><span class="co"># observation model's</span></span></span>
@@ -193,16 +193,16 @@ the coefficient once, as <code>Intercept</code>.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #949494;"># A tibble: 2 × 6</span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   term                  type              estimate std.error conf.low conf.high</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>                 <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>                <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>     <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>    <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>     <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">1</span> sigma_trend[series_1] trend_model_param    0.470    0.073<span style="text-decoration: underline;">1</span>    0.338     0.624</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">2</span> ar1_trend[series_1]   trend_model_param    0.576    0.147     0.272     0.845</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">1</span> sigma_trend[series_1] trend_model_param    0.479    0.073<span style="text-decoration: underline;">9</span>    0.343     0.636</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">2</span> ar1_trend[series_1]   trend_model_param    0.557    0.140     0.252     0.800</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># The fixed effects alone, with convergence diagnostics</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://generics.r-lib.org/reference/tidy.html" class="external-link">tidy</a></span><span class="op">(</span><span class="va">mod</span>, effects <span class="op">=</span> <span class="st">"fixed"</span>, rhat <span class="op">=</span> <span class="cn">TRUE</span>, ess <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #949494;"># A tibble: 2 × 8</span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   term      type            estimate std.error conf.low conf.high  rhat ess_bulk</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>     <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>              <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>     <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>    <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>     <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>    <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">1</span> Intercept observation_be…     1.63     0.153     1.33      1.93  1.00     935.</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">2</span> sx_1      observation_be…     8.38     2.23      3.96     12.8   1.00    <span style="text-decoration: underline;">1</span>577.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">1</span> Intercept observation_be…     1.63     0.139     1.36      1.91  1.00    <span style="text-decoration: underline;">1</span>613.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">2</span> sx_1      observation_be…     8.46     2.20      4.23     12.8   1.00    <span style="text-decoration: underline;">1</span>690.</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Next, augment() adds fitted values and residuals to the data</span></span></span>
 <span class="r-in"><span><span class="co"># }</span></span></span>

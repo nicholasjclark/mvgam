@@ -233,7 +233,7 @@ the calendar positions, <code><a href="forecast.mvgam.html">forecast.mvgam()</a>
 <span class="r-in"><span>  chains <span class="op">=</span> <span class="fl">2</span>,</span></span>
 <span class="r-in"><span>  silent <span class="op">=</span> <span class="fl">2</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 522 of 2000 (26.0%) transitions ended with a divergence.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 131 of 2000 (7.0%) transitions ended with a divergence.</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> See https://mc-stan.org/misc/warnings for details.</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Amplitude and peak month, first and last complete year</span></span></span>
@@ -244,9 +244,9 @@ the calendar positions, <code><a href="forecast.mvgam.html">forecast.mvgam()</a>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Period 12 (season)</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   series_1</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>     amplitude 0.19 -&gt; 0.21, P(larger) = 0.87</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>     peak Aug (0.68) -&gt; Jul (0.57), P(earlier) = 0.39, P(later) = 0.14</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>     strength 0.92 -&gt; 0.91</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>     amplitude 0.19 -&gt; 0.21, P(larger) = 0.83</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>     peak Aug (0.61) -&gt; Aug (0.53), P(earlier) = 0.27, P(later) = 0.19</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>     strength 0.93 -&gt; 0.92</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># The season by month in the first, last and forecast years</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">s</span><span class="op">)</span></span></span>
@@ -261,7 +261,7 @@ the calendar positions, <code><a href="forecast.mvgam.html">forecast.mvgam()</a>
 <span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #949494;"># A tibble: 1 × 13</span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   series period from_cycle to_cycle ratio_Q50 ratio_Q2.5 ratio_Q97.5 prob_larger</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>  <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>       <span style="color: #949494; font-style: italic;">&lt;int&gt;</span>    <span style="color: #949494; font-style: italic;">&lt;int&gt;</span>     <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>      <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>       <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>       <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">1</span> serie… season          1       12      1.07      0.918        1.47       0.868</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">1</span> serie… season          1       12      1.11      0.893        1.47       0.832</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #949494;"># ℹ 5 more variables: shift_Q50 &lt;dbl&gt;, shift_Q2.5 &lt;dbl&gt;, shift_Q97.5 &lt;dbl&gt;,</span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #949494;">#   prob_earlier &lt;dbl&gt;, prob_later &lt;dbl&gt;</span></span>
 <span class="r-in"><span></span></span>

@@ -1,33 +1,41 @@
 # Integrated distribution models with mvgam
 
-Species are often monitored by several protocols at once. A structured
-count route, an occupancy survey and opportunistic sightings each
-observe the same underlying intensity of individuals, filtered through a
-different sampling process. Integrated distribution models fit one
-likelihood per protocol and tie every likelihood to that shared
-intensity (Fithian et al.
+Species are often monitored in several ways at once. A count route, an
+occupancy survey and opportunistic sightings all record the same
+population, each through its own sampling process. Integrated
+distribution models give each data source its own likelihood and link
+all of them to one shared model of abundance (Fithian et al.
 [2015](https://doi.org/10.1111/2041-210X.12242); Isaac et al.
 [2020](https://doi.org/10.1016/j.tree.2019.08.006); Miller et al.
-[2019](https://doi.org/10.1111/2041-210X.13110)). Each protocol then
-informs the environmental response that drives the intensity.
+[2019](https://doi.org/10.1111/2041-210X.13110)).
 
-mvgam fits such a model as a multivariate formula. Each protocol gets
-its own
-[`bf()`](https://paulbuerkner.com/brms/reference/brmsformula.html) with
-the family and link that describe its sampling process. One
-`trend_formula` describes the log-intensity they share. This article
-simulates three protocols observing one species, then compares how well
-the joint model and each protocol alone recover the species’ response to
-an environmental gradient. The article on [one latent process with
-several observation
+mvgam fits these models with one call. Each data source gets its own
+[`bf()`](https://paulbuerkner.com/brms/reference/brmsformula.html)
+formula, with the family and link that match how it samples the
+population. A single `trend_formula` describes the abundance that all
+data sources share. Modelled as a state-space process, this shared trend
+can include smooth covariate effects and temporal autocorrelation
+together. The data sources also need not cover the same months. Each
+contributes only the months in which it was collected, while the shared
+trend is estimated for every month. All of mvgam’s post-fitting tools,
+from posterior predictive checks to forecasts, work on the joint model.
+
+In this article we simulate three kinds of data on one species. The
+count route, the most informative data source, runs for only the first
+two years of an eight-year record. We show how the joint model estimates
+the constants that separate the data sources, how it estimates the
+species’ response to an environmental gradient and how it estimates
+counts for the six years in which the route was not surveyed. The
+article on [one latent process with several observation
 models](https://nicholasjclark.github.io/mvgam/dev/articles/mvbf.md)
-covers the same machinery from the angle of the latent state.
+focuses on the latent process that such models share.
 
 ## The data
 
-We simulate one species observed monthly for eight years. Its
-log-intensity combines a bell-shaped response $`f`$ to an environmental
-index with an autoregression at lags 1 and 12:
+We simulate one species observed monthly for eight years. Its intensity
+$`\lambda_t`$ is the expected number of individuals per unit of sampling
+effort. On the log scale, it combines a bell-shaped response $`f`$ to an
+environmental index with an autoregression at lags 1 and 12:
 
 ``` math
 \log \lambda_t = \alpha + f(\text{env}_t) + z_t, \qquad
@@ -37,21 +45,22 @@ z_t \sim \mathrm{Normal}(\phi_1 z_{t-1} + \phi_{12} z_{t-12},\ \sigma),
 with $`\phi_1 = 0.55`$, $`\phi_{12} = 0.30`$ and $`\sigma = 0.35`$. The
 response $`f`$ peaks at env $`= 0.4`$.
 
-Each protocol links to $`\lambda_t`$ through its own sampling process.
-Counts along a route surveyed with effort $`E_t`$ are Poisson with mean
-$`\lambda_t E_t`$. The term `offset(log_effort)` carries the effort. An
-occupancy survey of a plot of area $`A`$ detects the species when at
-least one individual is present. With a Poisson number of individuals in
-the plot, the detection probability is $`p_t = 1 - \exp(-\lambda_t
-A)`$. This is the inverse complementary log-log link, under which
+Each data source links to $`\lambda_t`$ through its own sampling
+process. Counts along a route surveyed with effort $`E_t`$ are Poisson
+with mean $`\lambda_t E_t`$, with the effort entering through the term
+`offset(log_effort)`. An occupancy survey of a plot of area $`A`$
+detects the species when at least one individual is present. With a
+Poisson number of individuals in the plot, the detection probability is
+$`p_t = 1 - \exp(-\lambda_t A)`$. This is the inverse complementary
+log-log link, under which
 $`\text{cloglog}(p_t) = \log \lambda_t + \log A`$ (McCullagh and Nelder
 [1989](https://doi.org/10.1201/9780203753736)). With
 `bernoulli(link = "cloglog")`, the occupancy record shares the
 log-intensity of the counts, offset by $`\log A`$. Opportunistic
 sightings arrive at rate $`\lambda_t`$ thinned by an unknown, constant
-observer effort. Treated as a thinned Poisson process, they take a free
-intercept that absorbs the log thinning and leaves the shape of $`f`$
-identified (Fithian et al.
+observer effort. We treat them as a thinned Poisson process, whose own
+intercept absorbs the unknown thinning. The shape of $`f`$ can then
+still be estimated from the sightings (Fithian et al.
 [2015](https://doi.org/10.1111/2041-210X.12242); Renner et al.
 [2015](https://doi.org/10.1111/2041-210X.12352)).
 
@@ -83,14 +92,23 @@ idm_data <- data.frame(
   pa = rbinom(n_t, 1, 1 - exp(-lambda * area)),
   po = rpois(n_t, lambda * exp(log_thinning))
 )
+
+# The count route ran for the first two years only. Later months carry
+# unit effort, which makes their hindcasts expected counts per unit
+# effort
+unsurveyed <- idm_data$time > 24
+idm_data$count[unsurveyed] <- NA
+idm_data$log_effort[unsurveyed] <- 0
 ```
 
 ## The joint model
 
 The three
 [`bf()`](https://paulbuerkner.com/brms/reference/brmsformula.html) calls
-share the trend formula, which holds a smooth of env and the
-autoregression at lags 1 and 12:
+share one trend formula, which holds a smooth of env and the
+autoregression at lags 1 and 12. The missing counts need no special
+handling. The counts use their 24 surveyed months, while the occupancy
+and sightings records use all 96.
 
 ``` r
 
@@ -109,8 +127,9 @@ mod_joint <- mvgam(
 )
 ```
 
-`plot(type = "series")` draws each protocol’s record, its distribution
-and its autocorrelation:
+`plot(type = "series")` draws each data source’s record, its
+distribution and its autocorrelation. The count record stops after month
+24:
 
 ``` r
 
@@ -124,7 +143,8 @@ The three simulated records: counts, occupancy detections and
 opportunistic sightings.
 
 [`summary()`](https://rdrr.io/r/base/summary.html) reports one intercept
-per protocol and the trend parameters they share:
+per data source and the trend parameters they share. Its data line gives
+the number of observations of each data source:
 
 ``` r
 
@@ -138,7 +158,7 @@ summary(mod_joint)
 #> Formula: count ~ 1 + offset(log_effort) 
 #>          pa ~ 1 
 #>          po ~ 1 
-#>    Data: idm_data (Number of observations: 96) 
+#>    Data: idm_data (Number of observations: 96; observed count: 24, pa: 96, po: 96) 
 #>  Trends: AR({1, 12}); formula: ~s(env, k = 8) 
 #>   Draws: 4 chains, each with iter = 2000; warmup = 1000; thin = 1; 
 #>          total post-warmup draws = 4000
@@ -146,28 +166,28 @@ summary(mod_joint)
 #> == Observation Model ==
 #> Regression Coefficients:
 #>                 Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> count_Intercept     1.14      0.12     0.89     1.35 1.00     1257     2000
-#> pa_Intercept       -0.31      0.18    -0.66     0.03 1.00     1904     2571
-#> po_Intercept        0.24      0.14    -0.06     0.48 1.00     1365     2024
+#> count_Intercept     1.03      0.14     0.75     1.30 1.00     5335     3249
+#> pa_Intercept       -0.23      0.15    -0.52     0.05 1.00     5818     3077
+#> po_Intercept        0.34      0.10     0.13     0.52 1.00     3355     2826
 #> 
 #> == Trend Model ==
 #> Smoothing Spline Hyperparameters:
 #>             Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> sds(senv_1)     2.00      1.05     0.67     4.63 1.00     1999     2330
+#> sds(senv_1)     2.00      1.16     0.48     4.67 1.00     1745     2056
 #> 
 #> Regression Coefficients:
 #>        Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> senv_1    -0.54      3.31    -8.07     5.13 1.00     2104     2119
+#> senv_1    -0.84      3.49    -9.05     5.08 1.00     2022     2195
 #> 
 #> Trend Specific Parameters:
 #>                       Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS
-#> sigma_trend[species1]     0.32      0.06     0.20     0.45 1.00     1405
-#> ar1_trend[species1]       0.52      0.15     0.18     0.77 1.00     1370
-#> ar12_trend[species1]      0.18      0.17    -0.17     0.48 1.00     1116
+#> sigma_trend[species1]     0.32      0.11     0.08     0.54 1.01      946
+#> ar1_trend[species1]       0.12      0.26    -0.42     0.63 1.00     1806
+#> ar12_trend[species1]     -0.10      0.30    -0.68     0.48 1.00     2227
 #>                       Tail_ESS
-#> sigma_trend[species1]     2150
-#> ar1_trend[species1]       1899
-#> ar12_trend[species1]      1836
+#> sigma_trend[species1]      973
+#> ar1_trend[species1]       1735
+#> ar12_trend[species1]      2726
 #> 
 #> Draws were sampled using sampling(NUTS). For each parameter, Bulk_ESS
 #> and Tail_ESS are effective sample size measures, and Rhat is the potential
@@ -181,17 +201,18 @@ summary(mod_joint)
 #> Use `how_to_cite(fit)` for a methods paragraph and `methods_md(fit)` for its equations.
 ```
 
-The autoregressive coefficients and the innovation SD each cover the
-values used to simulate the data. Because only eight annual cycles
-inform it, the lag-12 coefficient (0.18 \[-0.17, 0.48\]) is the least
-certain of these.
+The 95% intervals of the two AR coefficients and the innovation SD all
+contain the values used to simulate the data. These intervals are wide,
+because eight years of data on one species say little about its
+dynamics.
 
-The intercepts carry what the shared trend leaves to each protocol.
-Because the linear predictor of every protocol holds the same
-$`\log \lambda_t`$, the trend cancels from the difference between two
-intercepts. The difference between the occupancy and count intercepts
-estimates $`\log A`$. The difference between the sightings and count
-intercepts estimates the log thinning:
+Each data source has its own intercept. Every data source’s linear
+predictor contains the same $`\log \lambda_t`$, which cancels when we
+subtract one intercept from another. The occupancy intercept minus the
+count intercept leaves $`\log A`$. The sightings intercept minus the
+count intercept leaves the log thinning.
+[`hypothesis()`](https://paulbuerkner.com/brms/reference/hypothesis.brmsfit.html)
+computes both differences with their intervals:
 
 ``` r
 
@@ -202,8 +223,8 @@ constants <- hypothesis(mod_joint, c(
 constants
 #> Hypothesis Tests for class :
 #>     Hypothesis Estimate Est.Error CI.Lower CI.Upper Evid.Ratio Post.Prob Star
-#> 1     log area    -1.45      0.15    -1.75    -1.16         NA        NA    *
-#> 2 log thinning    -0.90      0.10    -1.10    -0.71         NA        NA    *
+#> 1     log area    -1.26      0.20    -1.64    -0.88         NA        NA    *
+#> 2 log thinning    -0.69      0.16    -1.00    -0.38         NA        NA    *
 #> ---
 #> 'CI': 90%-CI for one-sided and 95%-CI for two-sided hypotheses.
 #> '*': For one-sided hypotheses, the posterior probability exceeds 95%;
@@ -212,11 +233,13 @@ constants
 ```
 
 The simulated constants are $`\log 0.25 = -1.39`$ and $`-0.8`$. Both
-intervals cover them. Neither constant was given to the model.
+intervals contain them. We never gave the model either constant. It
+estimates them from the two years in which all three data sources
+overlap.
 
 [`pp_check()`](https://nicholasjclark.github.io/mvgam/dev/reference/pp_check.mvgam.md)
-draws one panel per protocol. Rootograms compare the frequency of each
-count. Bars give the share of each outcome of the binary occupancy
+draws one panel per data source. Rootograms compare the frequency of
+each count. Bars give the share of each outcome of the binary occupancy
 record:
 
 ``` r
@@ -224,10 +247,10 @@ record:
 pp_check(mod_joint, ndraws = 50)
 ```
 
-![Posterior predictive checks for each
-protocol.](idm_files/figure-html/ppc-1.png)
+![Posterior predictive checks for each data
+source.](idm_files/figure-html/ppc-1.png)
 
-Posterior predictive checks for each protocol.
+Posterior predictive checks for each data source.
 
 ## The environmental response
 
@@ -245,8 +268,10 @@ interval.](idm_files/figure-html/smooth-1.png)
 The smooth of env from the joint model, with its 95% credible interval.
 
 [`conditional_effects()`](https://paulbuerkner.com/brms/reference/conditional_effects.brmsfit.html)
-carries that smooth through each protocol’s observation model, with the
-trend state held out and effort set to one:
+translates the smooth to the scale of each data source: the expected
+count, the detection probability and the expected number of sightings
+along env. It leaves out the autoregressive part of the trend and sets
+effort to one:
 
 ``` r
 
@@ -261,27 +286,71 @@ intervals.](idm_files/figure-html/effects-1.png)
 Expected count, detection probability and sighting rate along env from
 the joint model, with 95% credible intervals.
 
-To ask what the integration gains, we fit each protocol alone with the
-same trend formula:
+## Filling the gaps between surveys
+
+To see what the occupancy and sightings records add, we also fit the
+counts alone with the same trend formula:
 
 ``` r
 
-fit_one <- function(formula) {
-  mvgam(formula, trend_formula = trend_formula, data = idm_data,
-        control = list(adapt_delta = 0.95),
-        chains = 4, seed = 2026, silent = 2)
-}
-mod_count <- fit_one(
-  bf(count ~ 1 + offset(log_effort), family = poisson())
+mod_count <- mvgam(
+  bf(count ~ 1 + offset(log_effort), family = poisson()),
+  trend_formula = trend_formula,
+  data = idm_data,
+  control = list(adapt_delta = 0.95),
+  chains = 4, seed = 2026, silent = 2
 )
-mod_pa <- fit_one(bf(pa ~ 1, family = bernoulli(link = "cloglog")))
-mod_po <- fit_one(bf(po ~ 1, family = poisson()))
 ```
 
-Each model’s linear predictor over a grid of env values shares the shape
-of $`f`$. Subtracting its value at the median of the grid removes the
-protocol’s intercept and the trend state. The joint model’s predictor is
-taken from the count response:
+[`hindcast()`](https://nicholasjclark.github.io/mvgam/dev/reference/hindcast.mvgam.md)
+estimates the expected count in every month of the data, including the
+72 months in which the route was not surveyed. For the joint model,
+`resp = "count"` selects the counts:
+
+``` r
+
+hc_joint <- hindcast(mod_joint, type = "expected", resp = "count")
+hc_count <- hindcast(mod_count, type = "expected")
+```
+
+``` r
+
+plot(hc_joint)
+```
+
+![Expected counts per unit effort from the joint model. Points are the
+counts of the first two
+years.](idm_files/figure-html/hindcast-joint-1.png)
+
+Expected counts per unit effort from the joint model. Points are the
+counts of the first two years.
+
+``` r
+
+plot(hc_count)
+```
+
+![Expected counts per unit effort from the model fitted to the counts
+alone. Its y-axis extends ten times further than that of the joint
+model.](idm_files/figure-html/hindcast-count-1.png)
+
+Expected counts per unit effort from the model fitted to the counts
+alone. Its y-axis extends ten times further than that of the joint
+model.
+
+After month 24, the counts-alone model has no data on abundance. Its
+estimates come only from the autoregression and the environmental index.
+Its intervals grow wider over time. Across the 72 unsurveyed months, its
+95% intervals have a median width of 10.6 individuals. The joint model
+still has sightings and occupancy records in those months. Its intervals
+have a median width of 4.8 individuals.
+
+The extra data also sharpen the estimated response to env. To compare
+the two estimates of $`f`$, we predict each model’s linear predictor
+across a grid of env values. We then subtract its value at the middle of
+the grid. The subtraction removes the intercept and the autoregressive
+part of the trend, which differ between the models. Only the response to
+env remains:
 
 ``` r
 
@@ -297,9 +366,7 @@ response_draws <- function(fit, resp = NULL) {
 }
 fits <- list(
   "Joint" = response_draws(mod_joint, resp = "count"),
-  "Counts alone" = response_draws(mod_count),
-  "Occupancy alone" = response_draws(mod_pa),
-  "Sightings alone" = response_draws(mod_po)
+  "Counts alone" = response_draws(mod_count)
 )
 truth <- data.frame(env = grid, f = f_env(grid) - f_env(grid[ref]))
 curves <- do.call(rbind, lapply(names(fits), function(nm) {
@@ -321,48 +388,25 @@ ggplot(curves, aes(env)) +
 ```
 
 ![Posterior medians and 95% credible intervals of the response to env
-from the joint model and from each protocol alone. The black line is the
+from the joint model and from the counts alone. The black line is the
 simulated response.](idm_files/figure-html/response-plot-1.png)
 
 Posterior medians and 95% credible intervals of the response to env from
-the joint model and from each protocol alone. The black line is the
+the joint model and from the counts alone. The black line is the
 simulated response.
 
-Three summaries compare the four curves: the root mean squared error of
-the posterior median against the simulated response, the mean width of
-the 95% credible interval and the posterior median of the env value at
-which each curve peaks.
-
-``` r
-
-recovery <- t(vapply(fits, function(draws) {
-  q <- apply(draws, 2, quantile, c(0.025, 0.5, 0.975))
-  peak <- grid[apply(draws, 1, which.max)]
-  c(RMSE = sqrt(mean((q[2, ] - truth$f)^2)),
-    `Interval width` = mean(q[3, ] - q[1, ]),
-    `Peak env` = median(peak))
-}, numeric(3)))
-round(recovery, 2)
-#>                 RMSE Interval width Peak env
-#> Joint           0.18           0.67     0.38
-#> Counts alone    0.17           0.74     0.32
-#> Occupancy alone 0.62           1.23     2.02
-#> Sightings alone 0.42           0.86     1.14
-```
-
-The joint model and the counts alone track the response with root mean
-squared errors of 0.18 and 0.17. Intervals are narrowest in the joint
-fit. Against the simulated optimum of 0.4, the sightings alone put the
-peak at env 1.14 and the occupancy record alone at env 2.02. One binary
-outcome per month constrains the intensity weakly.
+The 95% intervals of both models contain the simulated response across
+the whole range of env. With six more years of sightings and occupancy
+records, the joint model’s 95% interval is on average 41% narrower.
 
 ## Forecasts
 
 [`forecast()`](https://generics.r-lib.org/reference/forecast.html)
-extends the shared state past the last month and passes it through each
-protocol’s observation model. The new data hold unit effort and env at
-its final observed value. `type = "expected"` returns the expected
-count, the detection probability and the expected sightings:
+projects the shared trend 12 months beyond the data and converts it to
+each data source’s scale. For the new months we set effort to one and
+hold env at its last observed value. With `type = "expected"`, the
+forecasts are the expected count, the detection probability and the
+expected number of sightings:
 
 ``` r
 
@@ -377,47 +421,54 @@ fc <- forecast(mod_joint, newdata = future, type = "expected")
 plot(fc)
 ```
 
-![Expected values for each protocol over the training months and a
+![Expected values for each data source over the training months and a
 12-month forecast. Points are the
 observations.](idm_files/figure-html/forecast-1.png)
 
-Expected values for each protocol over the training months and a
+Expected values for each data source over the training months and a
 12-month forecast. Points are the observations.
 
-The three forecasts share one future for the state. Once the held-out
-records arrive,
+All three forecasts come from the same projected trend. The count route
+was last surveyed six years before the forecast starts. The model can
+still forecast counts because the sightings and occupancy records
+tracked abundance through those six years. When new data arrive,
 [`score()`](https://nicholasjclark.github.io/mvgam/dev/reference/score.mvgam_forecast.md)
-evaluates them protocol by protocol.
+evaluates the forecast of each data source.
 
-## When protocols disagree
+## A separate response for each data source
 
-We fit the joint model on the premise that every protocol observes one
-intensity through one response to env. Two violations are common. The
-first is a mismatch of species. An opportunistic record that mixes the
-target with an easily confused congener observes a different intensity
-(Fithian et al. [2015](https://doi.org/10.1111/2041-210X.12242) analyse
-this case). The second is a mismatch of habitat. If the occupancy plots
-sample habitat the count route never visits, the two protocols see
-different responses to env. A joint smooth then averages them.
+The joint model above gives every data source the same response to env.
+If one data source might record a different response, for example
+because its plots sample a different habitat, it can take its own smooth
+of env in its observation formula. The smooth in the trend formula then
+describes the shared response, while each extra smooth describes how
+that data source departs from it:
 
-The single-protocol fits diagnose both mismatches. A protocol whose
-response disagrees with the others, beyond what its interval allows, is
-a candidate for a response of its own. That response moves to the
-protocol’s observation formula, for example
-`bf(pa ~ 1 + s(env, k = 5), family = bernoulli(link = "cloglog"))`,
-while the shared response stays in the trend formula. Koshkina et al.
-([2017](https://doi.org/10.1111/2041-210X.12738)) develop this
-combination of presence-background and occupancy data with imperfect
-detection.
+``` r
+
+diff_formula <-
+  bf(count ~ 1 + offset(log_effort), family = poisson()) +
+  bf(pa ~ 1 + s(env, k = 5), family = bernoulli(link = "cloglog")) +
+  bf(po ~ 1 + s(env, k = 5), family = poisson())
+
+mod_diff <- mvgam(
+  diff_formula,
+  trend_formula = trend_formula,
+  data = idm_data,
+  control = list(adapt_delta = 0.95),
+  chains = 4, seed = 2026, silent = 2
+)
+```
 
 ## Summary
 
-An integrated distribution model in mvgam is one call. Each protocol’s
-family and link express its sampling process. The shared trend pools
-what every protocol says about the intensity. In this simulation,
-intervals on the environmental response were narrowest in the joint fit.
-Fitted alone, the occupancy record put the optimum at env 2.02, against
-the simulated 0.4.
+An integrated distribution model in mvgam is one call. Each data source
+has the family and link that match its sampling process. Each is
+surveyed on its own schedule. A shared state-space trend combines the
+information from all data sources. Covariate effects, autocorrelation
+and forecasts all come from that one model. In this simulation, the
+joint model recovers both constants that separate the data sources and
+estimates counts through six years without a count survey.
 
 ## Where to next
 
@@ -438,7 +489,7 @@ Related articles:
   compares the latent state recovered by joint and separate fits.
 - [N-mixture
   models](https://nicholasjclark.github.io/mvgam/dev/articles/nmix.md)
-  estimate detection from repeated visits within one protocol.
+  estimate detection from repeated visits in a single survey.
 - [Joint species distribution
   models](https://nicholasjclark.github.io/mvgam/dev/articles/jsdgam.md)
   share latent factors among many species.
@@ -459,12 +510,6 @@ Lahoz-Monfort J, Pagel J, Pescott OL, Schmucki R, Simmonds EG and O’Hara
 RB (2020). Data integration for large-scale models of species
 distributions. *Trends in Ecology & Evolution* 35(1), 56-67.
 [doi:10.1016/j.tree.2019.08.006](https://doi.org/10.1016/j.tree.2019.08.006)
-
-Koshkina V, Wang Y, Gordon A, Dorazio RM, White M and Stone L (2017).
-Integrated species distribution models: combining presence-background
-data and site-occupancy data with imperfect detection. *Methods in
-Ecology and Evolution* 8(4), 420-430.
-[doi:10.1111/2041-210X.12738](https://doi.org/10.1111/2041-210X.12738)
 
 McCullagh P and Nelder JA (1989). *Generalized Linear Models* (2nd
 edition). Chapman and Hall/CRC.

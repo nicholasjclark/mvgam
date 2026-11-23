@@ -55,12 +55,14 @@ simdat <- sim_mvgam(family = tweedie(), n_series = 1L,
 mod <- mvgam(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1),
              data = simdat$data_train, family = tweedie(),
              chains = 2, silent = 2)
-#> Warning: 25 of 2000 (1.0%) transitions ended with a divergence.
+#> Warning: 21 of 2000 (1.0%) transitions ended with a divergence.
+#> See https://mc-stan.org/misc/warnings for details.
+#> Warning: 2 of 2 chains had an E-BFMI less than 0.3.
 #> See https://mc-stan.org/misc/warnings for details.
 
 # The largest Poisson rate the fit implies, against the default M = 30
 check_tweedie_truncation(mod)
-#> Tweedie truncation diagnostic. M = 30, max(lambda) at posterior mean = 4.99 (ratio = 0.166).
+#> Tweedie truncation diagnostic. M = 30, max(lambda) at posterior mean = 4.97 (ratio = 0.166).
 
 # A warning here would call for a refit with a longer series, such
 # as family = tweedie(M = 60)

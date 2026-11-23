@@ -516,7 +516,7 @@ functions on one page.</p>
 <span class="r-in"><span>  chains        <span class="op">=</span> <span class="fl">2</span>,</span></span>
 <span class="r-in"><span>  silent        <span class="op">=</span> <span class="fl">2</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 17 of 2000 (1.0%) transitions ended with a divergence.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 13 of 2000 (1.0%) transitions ended with a divergence.</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> See https://mc-stan.org/misc/warnings for details.</span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  Family: poisson </span>
@@ -530,21 +530,21 @@ functions on one page.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> == Observation Model ==</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Smoothing Spline Hyperparameters:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>           Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> sds(sx_1)     4.37      1.94     1.77     9.51 1.00      878     1293</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sds(sx_1)     4.28      1.88     1.72     8.90 1.00      741      993</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Regression Coefficients:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>           Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Intercept     1.56      0.15     1.25     1.84 1.00     1004     1231</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> sx_1          7.20      2.77     1.95    12.81 1.00      900      985</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Intercept     1.55      0.16     1.25     1.87 1.00      720      772</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sx_1          7.17      2.82     1.84    12.61 1.01      632      976</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> == Trend Model ==</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Trend Specific Parameters:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>                       Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> sigma_trend[series_1]     0.54      0.09     0.38     0.72 1.00      639</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> ar1_trend[series_1]       0.48      0.17     0.11     0.78 1.00      458</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sigma_trend[series_1]     0.54      0.09     0.39     0.71 1.00      732</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ar1_trend[series_1]       0.48      0.17     0.12     0.79 1.00      431</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>                       Tail_ESS</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> sigma_trend[series_1]      920</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> ar1_trend[series_1]        732</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sigma_trend[series_1]     1172</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ar1_trend[series_1]        899</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Draws were sampled using sampling(NUTS). For each parameter, Bulk_ESS</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> and Tail_ESS are effective sample size measures, and Rhat is the potential</span>

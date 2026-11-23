@@ -73,6 +73,6 @@ fit <- jsdgam(
 # The degrees of freedom, against 5 in the simulation
 posterior_summary(fit, variable = "nu")
 #>    Estimate Est.Error     Q2.5    Q97.5
-#> nu  7.20739   3.95142 3.346873 18.22881
+#> nu 7.605257  4.274855 3.181974 17.67648
 # }
 ```

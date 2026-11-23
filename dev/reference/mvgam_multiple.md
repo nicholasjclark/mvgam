@@ -124,11 +124,13 @@ fit_pooled <- mvgam_multiple(
   chains = 2,
   silent = 2
 )
-#> Warning: 36 of 2000 (2.0%) transitions ended with a divergence.
+#> Warning: 143 of 2000 (7.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
-#> Warning: 54 of 2000 (3.0%) transitions ended with a divergence.
+#> Warning: 1 of 2 chains had an E-BFMI less than 0.3.
 #> See https://mc-stan.org/misc/warnings for details.
-#> Warning: 87 of 2000 (4.0%) transitions ended with a divergence.
+#> Warning: 45 of 2000 (2.0%) transitions ended with a divergence.
+#> See https://mc-stan.org/misc/warnings for details.
+#> Warning: 10 of 2000 (0.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 
 # The summary adds the convergence of each imputation fit
@@ -144,21 +146,21 @@ summary(fit_pooled)
 #> == Observation Model ==
 #> Regression Coefficients:
 #>           Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> Intercept     0.08      0.20    -0.32     0.47 1.01     2231     2304
-#> x             0.45      0.17     0.11     0.79 1.00     3404     3052
+#> Intercept     0.09      0.19    -0.29     0.45 1.01     2335     2515
+#> x             0.45      0.18     0.12     0.80 1.02     3551     2961
 #> 
 #> Further Distributional Parameters:
 #>       Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> sigma     1.09      0.20     0.64     1.45 1.03      475      279
+#> sigma     1.12      0.19     0.68     1.47 1.13      583      444
 #> 
 #> == Trend Model ==
 #> Trend Specific Parameters:
 #>                       Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS
-#> sigma_trend[series_1]     0.38      0.29     0.02     1.02 1.03      450
-#> ar1_trend[series_1]       0.11      0.37    -0.67     0.75 1.00     2979
+#> sigma_trend[series_1]     0.36      0.29     0.01     1.05 1.12      448
+#> ar1_trend[series_1]       0.07      0.37    -0.69     0.75 1.03     3286
 #>                       Tail_ESS
-#> sigma_trend[series_1]      587
-#> ar1_trend[series_1]       3385
+#> sigma_trend[series_1]      582
+#> ar1_trend[series_1]       3229
 #> 
 #> Draws were sampled using sampling(NUTS). For each parameter, Bulk_ESS
 #> and Tail_ESS are effective sample size measures, and Rhat is the potential
@@ -174,9 +176,9 @@ summary(fit_pooled)
 #> Multiple imputation: 3 fits of 2000 draws each, pooled.
 #> Rhat is each parameter's largest and each ESS its sum over the fits.
 #>    Imputation Max_Rhat Min_Bulk_ESS Min_Tail_ESS
-#>             1    1.024          142           87
-#>             2    1.012          233          168
-#>             3    1.044           69           24
+#>             1    1.126           11           12
+#>             2    1.022          275          263
+#>             3    1.014          160          118
 
 # Next, `combine = FALSE` returns the three fits as a list
 # }

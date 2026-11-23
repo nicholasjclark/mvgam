@@ -197,7 +197,7 @@ simdat <- sim_mvgam(family = poisson(), n_series = 1L,
 mod <- mvgam(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1),
              data = simdat$data_train, family = poisson(),
              chains = 2, silent = 2)
-#> Warning: 9 of 2000 (0.0%) transitions ended with a divergence.
+#> Warning: 5 of 2000 (0.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 
 # Simulated counts, one row per draw and one column per observation
@@ -210,7 +210,7 @@ dim(pp)
 bounds <- apply(pp, 2, quantile, probs = c(0.05, 0.95))
 y <- simdat$data_train$y
 mean(y >= bounds[1, ] & y <= bounds[2, ])
-#> [1] 0.7888889
+#> [1] 0.7777778
 
 # Next: pp_check() plots the draws against the observed counts
 # }

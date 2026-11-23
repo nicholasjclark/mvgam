@@ -98,7 +98,7 @@ mod <- mvgam(y ~ x,
              trend_formula = ~ AR(),
              data = simdat$data_train,
              chains = 2, silent = 2)
-#> Warning: 62 of 2000 (3.0%) transitions ended with a divergence.
+#> Warning: 20 of 2000 (1.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 #> Warning: 2 of 2 chains had an E-BFMI less than 0.3.
 #> See https://mc-stan.org/misc/warnings for details.
@@ -112,16 +112,16 @@ grep("^(sigma|ar1)_trend", variables(mod), value = TRUE)
 as_draws_df(mod, variable = "sigma_trend")
 #> # A draws_df: 1000 iterations, 2 chains, and 2 variables
 #>    sigma_trend[series_1] sigma_trend[series_2]
-#> 1                  0.495                  0.81
-#> 2                  0.441                  0.57
-#> 3                  0.013                  0.58
-#> 4                  0.223                  0.47
-#> 5                  0.099                  0.62
-#> 6                  0.238                  0.65
-#> 7                  0.560                  0.45
-#> 8                  0.558                  0.51
-#> 9                  0.315                  0.70
-#> 10                 0.274                  0.66
+#> 1                  0.226                  0.44
+#> 2                  0.281                  0.69
+#> 3                  0.236                  0.57
+#> 4                  0.126                  0.37
+#> 5                  0.087                  0.32
+#> 6                  0.243                  0.83
+#> 7                  0.634                  0.71
+#> 8                  0.355                  0.74
+#> 9                  0.294                  0.76
+#> 10                 0.368                  1.06
 #> # ... with 1990 more draws
 #> # ... hidden reserved variables {'.chain', '.iteration', '.draw'}
 
@@ -130,9 +130,9 @@ hypothesis(mod, "ar1_trend[series_1] > ar1_trend[series_2]",
            class = NULL)
 #> Hypothesis Tests for class :
 #>                 Hypothesis Estimate Est.Error CI.Lower CI.Upper Evid.Ratio
-#> 1 (ar1_trend[series... > 0    -0.24      0.44    -1.11     0.35       0.46
+#> 1 (ar1_trend[series... > 0    -0.25      0.44    -1.09     0.38       0.44
 #>   Post.Prob Star
-#> 1      0.32     
+#> 1       0.3     
 #> ---
 #> 'CI': 90%-CI for one-sided and 95%-CI for two-sided hypotheses.
 #> '*': For one-sided hypotheses, the posterior probability exceeds 95%;

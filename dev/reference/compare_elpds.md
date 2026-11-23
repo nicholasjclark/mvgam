@@ -96,31 +96,29 @@ simdat <- sim_mvgam(family = poisson(), n_series = 1L,
 # lfo_cv() refits it to shorter stretches of the series
 mod_gam <- mvgam(y ~ s(x, k = 5), data = simdat$data_train,
                  family = poisson(), chains = 2, silent = 2)
-#> Warning: 12 of 2000 (1.0%) transitions ended with a divergence.
+#> Warning: 8 of 2000 (0.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 mod_ar <- mvgam(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1),
                 data = simdat$data_train, family = poisson(),
                 chains = 2, silent = 2,
                 control = list(adapt_delta = 0.95))
-#> Warning: 2 of 2000 (0.0%) transitions ended with a divergence.
+#> Warning: 3 of 2000 (0.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 # }
 # \dontrun{
 # Each origin after t = 70 forecasts the next time step. The
 # pointwise log densities feed stacking weights
 lfo_gam <- lfo_cv(mod_gam, min_t = 70L, save_log_lik = TRUE)
-#> Warning: 21 of 2000 (1.0%) transitions ended with a divergence.
+#> Warning: 5 of 2000 (0.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
-#> Warning: 6 of 2000 (0.0%) transitions ended with a divergence.
+#> Warning: 18 of 2000 (1.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
-#> Warning: 7 of 2000 (0.0%) transitions ended with a divergence.
+#> Warning: 32 of 2000 (2.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 lfo_ar <- lfo_cv(mod_ar, min_t = 70L, save_log_lik = TRUE)
 #> Warning: 2 of 2000 (0.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
-#> Warning: 11 of 2000 (1.0%) transitions ended with a divergence.
-#> See https://mc-stan.org/misc/warnings for details.
-#> Warning: 9 of 2000 (0.0%) transitions ended with a divergence.
+#> Warning: 1 of 2000 (0.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 #> Warning: 3 of 2000 (0.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
@@ -129,14 +127,14 @@ lfo_ar <- lfo_cv(mod_ar, min_t = 70L, save_log_lik = TRUE)
 elpds <- compare_elpds(lfo_gam, lfo_ar, model_names = c("GAM", "AR"))
 head(elpds)
 #> # A tibble: 6 × 5
-#>   model eval_time  elpd  pareto_k refit_here
-#>   <fct>     <int> <dbl>     <dbl> <lgl>     
-#> 1 GAM          71 -1.77 NA        TRUE      
-#> 2 GAM          72 -3.44 -0.0655   FALSE     
-#> 3 GAM          73 -4.09  0.0328   FALSE     
-#> 4 GAM          74 -1.52 -0.168    FALSE     
-#> 5 GAM          75 -2.07 -0.188    FALSE     
-#> 6 GAM          76 -3.94 -0.000701 FALSE     
+#>   model eval_time  elpd pareto_k refit_here
+#>   <fct>     <int> <dbl>    <dbl> <lgl>     
+#> 1 GAM          71 -1.76 NA       TRUE      
+#> 2 GAM          72 -3.42 -0.102   FALSE     
+#> 3 GAM          73 -4.12 -0.00690 FALSE     
+#> 4 GAM          74 -1.52  0.0229  FALSE     
+#> 5 GAM          75 -2.07  0.0546  FALSE     
+#> 6 GAM          76 -3.93 -0.242   FALSE     
 
 # The running sum of the AR model's ELPD minus the GAM's. Hollow
 # points mark the origins where the model was refitted

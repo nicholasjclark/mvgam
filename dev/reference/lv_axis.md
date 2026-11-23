@@ -112,7 +112,7 @@ mod <- mvgam(
   chains        = 2,
   silent        = 2
 )
-#> Warning: 19 of 2000 (1.0%) transitions ended with a divergence.
+#> Warning: 15 of 2000 (1.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 summary(mod)
 #>  Family: gaussian 
@@ -127,38 +127,38 @@ summary(mod)
 #> == Observation Model ==
 #> Regression Coefficients:
 #>           Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> Intercept     0.09      0.25    -0.42     0.51 1.01      258      498
+#> Intercept     0.06      0.26    -0.45     0.51 1.00      222      661
 #> 
 #> Further Distributional Parameters:
 #>       Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> sigma     0.89      0.11     0.70     1.11 1.01      210      521
+#> sigma     0.89      0.11     0.68     1.11 1.02      163      264
 #> 
 #> == Trend Model ==
 #> Regression Coefficients:
 #>                       Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS
-#> season:seriesseries_1     1.32      0.24     0.86     1.82 1.00     1055
-#> season:seriesseries_2     0.71      0.31     0.10     1.34 1.00     1065
-#> season:seriesseries_3    -1.05      0.26    -1.59    -0.51 1.00     1388
+#> season:seriesseries_1     1.32      0.23     0.88     1.76 1.00     1594
+#> season:seriesseries_2     0.72      0.31     0.06     1.33 1.00      965
+#> season:seriesseries_3    -1.04      0.27    -1.56    -0.45 1.00     1557
 #>                       Tail_ESS
-#> season:seriesseries_1      594
-#> season:seriesseries_2     1146
-#> season:seriesseries_3     1257
+#> season:seriesseries_1     1255
+#> season:seriesseries_2     1070
+#> season:seriesseries_3     1132
 #> 
 #> Trend Specific Parameters:
 #>                       Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS
-#> sigma_trend[series_1]     0.36      0.21     0.02     0.82 1.01      251
-#> sigma_trend[series_2]     0.72      0.25     0.15     1.19 1.01      251
-#> sigma_trend[series_3]     0.43      0.17     0.13     0.81 1.00      469
-#> ar1_trend[series_1]       0.38      0.50    -0.66     0.98 1.01      266
-#> ar1_trend[series_2]       0.50      0.30    -0.20     0.93 1.02      311
-#> ar1_trend[series_3]       0.77      0.22     0.17     0.98 1.00      419
+#> sigma_trend[series_1]     0.35      0.21     0.03     0.86 1.00      325
+#> sigma_trend[series_2]     0.71      0.26     0.13     1.20 1.02      210
+#> sigma_trend[series_3]     0.43      0.18     0.13     0.81 1.01      387
+#> ar1_trend[series_1]       0.43      0.49    -0.62     0.99 1.00      237
+#> ar1_trend[series_2]       0.46      0.30    -0.26     0.94 1.00      291
+#> ar1_trend[series_3]       0.76      0.24     0.02     0.98 1.00      424
 #>                       Tail_ESS
-#> sigma_trend[series_1]      449
-#> sigma_trend[series_2]      223
-#> sigma_trend[series_3]      543
-#> ar1_trend[series_1]        611
-#> ar1_trend[series_2]        494
-#> ar1_trend[series_3]        503
+#> sigma_trend[series_1]      397
+#> sigma_trend[series_2]      252
+#> sigma_trend[series_3]      565
+#> ar1_trend[series_1]        704
+#> ar1_trend[series_2]        310
+#> ar1_trend[series_3]        360
 #> 
 #> Draws were sampled using sampling(NUTS). For each parameter, Bulk_ESS
 #> and Tail_ESS are effective sample size measures, and Rhat is the potential

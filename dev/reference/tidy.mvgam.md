@@ -128,7 +128,7 @@ mod <- mvgam(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1),
               data    = simdat$data_train,
               family  = poisson(),
               chains  = 2, silent = 2)
-#> Warning: 9 of 2000 (0.0%) transitions ended with a divergence.
+#> Warning: 5 of 2000 (0.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 
 # One row per parameter, with broom's column names
@@ -137,14 +137,14 @@ td
 #> # A tibble: 8 × 6
 #>   term                  type               estimate std.error conf.low conf.high
 #>   <chr>                 <chr>                 <dbl>     <dbl>    <dbl>     <dbl>
-#> 1 Intercept             observation_beta      1.63     0.153     1.33      1.93 
-#> 2 sx_1                  observation_beta      8.38     2.23      3.96     12.8  
-#> 3 sds_sx_1              observation_smoot…    5.02     1.92      2.38      9.79 
-#> 4 s_sx_1[1]             observation_smoot…    1.35     1.75     -2.10      4.82 
-#> 5 s_sx_1[2]             observation_smoot…   -0.132    1.99     -4.09      3.76 
-#> 6 s_sx_1[3]             observation_smoot…   -8.35     1.62    -11.4      -5.05 
-#> 7 sigma_trend[series_1] trend_model_param     0.470    0.0731    0.338     0.624
-#> 8 ar1_trend[series_1]   trend_model_param     0.576    0.147     0.272     0.845
+#> 1 Intercept             observation_beta      1.63     0.139     1.36      1.91 
+#> 2 sx_1                  observation_beta      8.46     2.20      4.23     12.8  
+#> 3 sds_sx_1              observation_smoot…    5.10     2.11      2.40     10.9  
+#> 4 s_sx_1[1]             observation_smoot…    1.32     1.79     -2.15      4.88 
+#> 5 s_sx_1[2]             observation_smoot…   -0.171    1.98     -4.21      3.82 
+#> 6 s_sx_1[3]             observation_smoot…   -8.41     1.61    -11.6      -5.36 
+#> 7 sigma_trend[series_1] trend_model_param     0.479    0.0739    0.343     0.636
+#> 8 ar1_trend[series_1]   trend_model_param     0.557    0.140     0.252     0.800
 
 # The `type` column separates the trend's parameters from the
 # observation model's
@@ -152,16 +152,16 @@ td[td$type == "trend_model_param", ]
 #> # A tibble: 2 × 6
 #>   term                  type              estimate std.error conf.low conf.high
 #>   <chr>                 <chr>                <dbl>     <dbl>    <dbl>     <dbl>
-#> 1 sigma_trend[series_1] trend_model_param    0.470    0.0731    0.338     0.624
-#> 2 ar1_trend[series_1]   trend_model_param    0.576    0.147     0.272     0.845
+#> 1 sigma_trend[series_1] trend_model_param    0.479    0.0739    0.343     0.636
+#> 2 ar1_trend[series_1]   trend_model_param    0.557    0.140     0.252     0.800
 
 # The fixed effects alone, with convergence diagnostics
 tidy(mod, effects = "fixed", rhat = TRUE, ess = TRUE)
 #> # A tibble: 2 × 8
 #>   term      type            estimate std.error conf.low conf.high  rhat ess_bulk
 #>   <chr>     <chr>              <dbl>     <dbl>    <dbl>     <dbl> <dbl>    <dbl>
-#> 1 Intercept observation_be…     1.63     0.153     1.33      1.93  1.00     935.
-#> 2 sx_1      observation_be…     8.38     2.23      3.96     12.8   1.00    1577.
+#> 1 Intercept observation_be…     1.63     0.139     1.36      1.91  1.00    1613.
+#> 2 sx_1      observation_be…     8.46     2.20      4.23     12.8   1.00    1690.
 
 # Next, augment() adds fitted values and residuals to the data
 # }

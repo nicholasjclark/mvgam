@@ -135,7 +135,7 @@ a thin-plate basis.</p></li>
 <span class="r-in"><span>  family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">gaussian</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>  chains <span class="op">=</span> <span class="fl">2</span>, silent <span class="op">=</span> <span class="fl">2</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 22 of 2000 (1.0%) transitions ended with a divergence.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 335 of 2000 (17.0%) transitions ended with a divergence.</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> See https://mc-stan.org/misc/warnings for details.</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 2 of 2 chains had an E-BFMI less than 0.3.</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> See https://mc-stan.org/misc/warnings for details.</span>
@@ -152,33 +152,33 @@ a thin-plate basis.</p></li>
 <span class="r-out co"><span class="r-pr">#&gt;</span> == Observation Model ==</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Smoothing Spline Hyperparameters:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>             Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> sds(ssst_1)     1.80      1.05     0.37     4.42 1.00      511      342</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sds(ssst_1)     2.15      1.34     0.45     4.70 1.08       23       61</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Regression Coefficients:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>           Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Intercept     0.05      0.13    -0.20     0.31 1.01      449     1039</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> ssst_1       10.58      3.15     5.46    17.32 1.00      660      834</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Intercept     0.03      0.15    -0.32     0.27 1.08       19       18</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ssst_1       11.61      4.51     5.50    20.98 1.12       13       12</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Further Distributional Parameters:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>       Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> sigma     0.50      0.10     0.30     0.69 1.01       75      121</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sigma     0.48      0.10     0.31     0.68 1.09       18       73</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> == Trend Model ==</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Trend Specific Parameters:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>                       Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> sigma_trend[flynn]        0.59      0.17     0.16     0.88 1.01      124</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> sigma_trend[myrmidon]     0.57      0.15     0.26     0.88 1.00      127</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> sigma_trend[pixie]        0.32      0.12     0.10     0.55 1.00      126</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> ar1_trend[flynn]          0.27      0.19     0.02     0.74 1.01      498</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> ar1_trend[myrmidon]       0.83      0.10     0.60     0.97 1.00      212</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> ar1_trend[pixie]          0.59      0.22     0.11     0.94 1.01      348</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sigma_trend[flynn]        0.62      0.16     0.21     0.87 1.05       63</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sigma_trend[myrmidon]     0.61      0.16     0.30     0.90 1.07       23</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sigma_trend[pixie]        0.30      0.11     0.10     0.52 1.04       78</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ar1_trend[flynn]          0.27      0.19     0.02     0.72 1.02      128</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ar1_trend[myrmidon]       0.82      0.10     0.60     0.97 1.07      143</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ar1_trend[pixie]          0.65      0.21     0.15     0.93 1.01       96</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>                       Tail_ESS</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> sigma_trend[flynn]         283</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> sigma_trend[myrmidon]      451</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> sigma_trend[pixie]         562</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> ar1_trend[flynn]           609</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> ar1_trend[myrmidon]        708</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> ar1_trend[pixie]          1032</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sigma_trend[flynn]         179</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sigma_trend[myrmidon]       32</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sigma_trend[pixie]         429</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ar1_trend[flynn]           523</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ar1_trend[myrmidon]        440</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ar1_trend[pixie]           271</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Draws were sampled using sampling(NUTS). For each parameter, Bulk_ESS</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> and Tail_ESS are effective sample size measures, and Rhat is the potential</span>

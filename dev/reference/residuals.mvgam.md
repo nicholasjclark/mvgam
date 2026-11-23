@@ -96,12 +96,11 @@ residuals(
 
 ## Value
 
-With `summary = FALSE`, an `[ndraws, nobs]` matrix of residual draws. A
-continuous family on the empirical route has one interval per
-observation. Its rows are then identical. With `summary = TRUE`, an
-`[nobs, 2 + length(probs)]` matrix. Its columns are `Estimate` (the
-mean, or the median with `robust = TRUE`), `Est.Error` (the standard
-deviation, or the MAD) and one quantile per `probs`.
+With `summary = FALSE`, an `[ndraws, nobs]` matrix of residual draws.
+With `summary = TRUE`, an `[nobs, 2 + length(probs)]` matrix. Its
+columns are `Estimate` (the mean, or the median with `robust = TRUE`),
+`Est.Error` (the standard deviation, or the MAD) and one quantile per
+`probs`.
 
 ## Details
 
@@ -137,26 +136,26 @@ a Binomial against the site's own total for
 and a Bernoulli for
 [`categ()`](https://nicholasjclark.github.io/mvgam/dev/reference/categ.md).
 
-Every other family takes the empirical route of DHARMa (Hartig 2024),
-among them the zero-inflated, hurdle and mixture families,
+Every other family takes the empirical route, among them the
+zero-inflated, hurdle and mixture families,
 [`occ()`](https://nicholasjclark.github.io/mvgam/dev/reference/occ.md)
 and
 [`nmix()`](https://nicholasjclark.github.io/mvgam/dev/reference/nmix.md).
-The bounds are `mean(yrep < y)` and `mean(yrep <= y)` over the pooled
+Under the model the observation and the `n` pooled
 [`posterior_predict.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/posterior_predict.mvgam.md)
-draws. The pooled predictive carries the posterior uncertainty in the
-latent state. Its residuals are narrower than N(0, 1). A QQ-plot of them
-is conservative.
+draws are exchangeable. The rank of the observation among those `n + 1`
+values, with ties broken at random, is then uniform. The bounds are
+`sum(yrep < y) / (n + 1)` and `(sum(yrep <= y) + 1) / (n + 1)`. An
+observation beyond every draw takes the top interval,
+`[n / (n + 1), 1]`. The pooled predictive carries the posterior
+uncertainty in the latent state. Its residuals are narrower than N(0,
+1). A QQ-plot of them is conservative.
 
 The PIT value is clamped to `[eps, 1 - eps]`, with
 `eps = .Machine$double.eps`, to keep the residual finite. The clamp
 bounds a residual at about +/-8.13. On the analytic route one draw can
 place an observation beyond that bound. Such isolated values describe
-that draw. A misfit shifts the residual across most draws. The empirical
-route reaches the clamp whenever an observation lies outside every
-simulated value. With few draws that happens often. Use `ndraws >= 500`
-there, the default of the residual histograms and ribbons of
-[`pp_check.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/pp_check.mvgam.md).
+that draw. A misfit shifts the residual across most draws.
 
 ## Multivariate families ([`mvn()`](https://nicholasjclark.github.io/mvgam/dev/reference/mvn.md), [`mvt()`](https://nicholasjclark.github.io/mvgam/dev/reference/mvt.md), [`diri()`](https://nicholasjclark.github.io/mvgam/dev/reference/diri.md))
 
@@ -216,10 +215,6 @@ simulated from N(0, 1) in that case.
 Dunn, P. K. and Smyth, G. K. (1996). Randomized quantile residuals.
 *Journal of Computational and Graphical Statistics*, 5(3), 236-244.
 
-Hartig, F. (2024). DHARMa: Residual diagnostics for hierarchical
-(multi-level / mixed) regression models. R package.
-<https://CRAN.R-project.org/package=DHARMa>
-
 ## See also
 
 [`augment.mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/augment.mvgam.md),
@@ -245,19 +240,19 @@ simdat <- sim_mvgam(family = poisson(), n_series = 1L,
 mod <- mvgam(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1),
              data = simdat$data_train, family = poisson(),
              chains = 2, silent = 2)
-#> Warning: 9 of 2000 (0.0%) transitions ended with a divergence.
+#> Warning: 5 of 2000 (0.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 
 # Quantile residuals summarised per observation
 r <- residuals(mod)
 head(r)
-#>         Estimate Est.Error       Q2.5     Q97.5
-#> [1,]  0.05016616 0.6208878 -1.1719081  1.188260
-#> [2,]  0.45159475 0.8897410 -1.3401760  2.193156
-#> [3,]  0.10471057 0.7602559 -1.4953299  1.494811
-#> [4,] -1.66500562 0.6209982 -2.9033198 -0.466234
-#> [5,]  0.76544423 0.7676848 -0.8074881  2.189400
-#> [6,]  0.06840744 0.7353594 -1.4522850  1.456570
+#>         Estimate Est.Error       Q2.5      Q97.5
+#> [1,]  0.03684423 0.6389760 -1.2724068  1.2399135
+#> [2,]  0.43111193 0.8701563 -1.3330821  2.0592069
+#> [3,]  0.09283389 0.7704823 -1.4820832  1.5845291
+#> [4,] -1.65562215 0.6251131 -2.9469608 -0.4902613
+#> [5,]  0.71784188 0.7604671 -0.8468861  2.2008915
+#> [6,]  0.06500426 0.7676791 -1.4502478  1.4977233
 
 # One draw of the residuals should look like N(0, 1) draws
 r1 <- residuals(mod, summary = FALSE, draw_ids = 1)

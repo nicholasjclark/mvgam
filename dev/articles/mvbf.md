@@ -152,8 +152,8 @@ intervals.](mvbf_files/figure-html/effects-1.png)
 Expected biomass by month and camera detection probability by deployment
 days, with 95% credible intervals.
 
-The fitted biomass curve peaks in month 3. The deployment slope is 0.08
-\[-0.04, 0.21\] on the logit scale, against the 0.05 used to simulate
+The fitted biomass curve peaks in month 10. The deployment slope is 0.08
+\[-0.05, 0.20\] on the logit scale, against the 0.05 used to simulate
 the data.
 
 ## What the joint model gains
@@ -209,14 +209,14 @@ recovery <- t(vapply(fits, function(fit) {
 }, numeric(2)))
 round(recovery, 2)
 #>               RMSE Interval width
-#> Joint         0.26           1.26
+#> Joint         0.26           1.25
 #> Counts alone  0.33           1.39
-#> Biomass alone 0.44           1.78
+#> Biomass alone 0.47           1.74
 #> Camera alone  0.57           3.93
 ```
 
 Ordered by root mean squared error against the simulated state, the fits
-rank joint (0.26), counts alone (0.33), biomass alone (0.44), and camera
+rank joint (0.26), counts alone (0.33), biomass alone (0.47), and camera
 alone (0.57). Intervals are narrowest in the joint fit and widest in the
 camera alone fit. A single binary record per month constrains abundance
 weakly.
@@ -277,7 +277,7 @@ Related articles:
 
 - [Integrated distribution
   models](https://nicholasjclark.github.io/mvgam/dev/articles/idm.md)
-  combine survey protocols that share one log-intensity.
+  combine data sources that share one log-intensity.
 - [Joint species distribution
   models](https://nicholasjclark.github.io/mvgam/dev/articles/jsdgam.md)
   share latent factors among many species.

@@ -197,7 +197,7 @@ response.</p>
 <span class="r-in"><span>              data    <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span>,</span></span>
 <span class="r-in"><span>              family  <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>              chains  <span class="op">=</span> <span class="fl">2</span>, silent <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 9 of 2000 (0.0%) transitions ended with a divergence.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 5 of 2000 (0.0%) transitions ended with a divergence.</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> See https://mc-stan.org/misc/warnings for details.</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># The smooth with 30 of its draws</span></span></span>
@@ -205,13 +205,13 @@ response.</p>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">cs</span><span class="op">)</span></span></span>
 <span class="r-plt img"><img src="conditional_smooths.mvgam-1.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">cs</span><span class="op">[[</span><span class="fl">1</span><span class="op">]</span><span class="op">]</span><span class="op">)</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>           x effect1__ cond__ estimate__      se__       lower__   upper__</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1 -1.956267 -1.956267      1  0.2315575 0.2611709 -0.1295957312 0.7394862</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2 -1.916330 -1.916330      1  0.2624873 0.2467684 -0.0650309078 0.7480911</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3 -1.876393 -1.876393      1  0.2911005 0.2267610 -0.0005502739 0.7566807</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4 -1.836457 -1.836457      1  0.3235633 0.1996097  0.0637125782 0.7652294</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 5 -1.796520 -1.796520      1  0.3558936 0.1765597  0.1275696394 0.7736999</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 6 -1.756583 -1.756583      1  0.4003457 0.1774376  0.1907877791 0.7820435</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>           x effect1__ cond__ estimate__      se__      lower__   upper__</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1 -1.956267 -1.956267      1  0.2440470 0.1961446 -0.137613267 0.5152233</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2 -1.916330 -1.916330      1  0.2856478 0.1746204 -0.069948978 0.5380021</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3 -1.876393 -1.876393      1  0.3315930 0.1515665 -0.002373076 0.5607475</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4 -1.836457 -1.836457      1  0.3703454 0.1301997  0.064974312 0.5837890</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5 -1.796520 -1.796520      1  0.4014085 0.1142234  0.131896199 0.6097083</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6 -1.756583 -1.756583      1  0.4413908 0.0900604  0.198148593 0.6336300</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Next, plot(mod, type = "smooths") draws the same panels in one</span></span></span>
 <span class="r-in"><span><span class="co"># figure</span></span></span>

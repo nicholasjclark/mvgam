@@ -61,7 +61,7 @@ mod <- mvgam(y ~ s(x, k = 5) + s(time, k = 6),
              trend_formula = ~ AR(p = 1),
              data = simdat$data_train, family = poisson(),
              chains = 2, silent = 2)
-#> Warning: 27 of 2000 (1.0%) transitions ended with a divergence.
+#> Warning: 11 of 2000 (1.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 
 # The labels posterior_smooths() takes

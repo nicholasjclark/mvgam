@@ -200,18 +200,18 @@ these draws (<code>rhat</code>, <code>neff_ratio</code>, <code>fixef</code>, <co
 <span class="r-in"><span>              data    <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span>,</span></span>
 <span class="r-in"><span>              family  <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>              chains  <span class="op">=</span> <span class="fl">2</span>, silent <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 9 of 2000 (0.0%) transitions ended with a divergence.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 5 of 2000 (0.0%) transitions ended with a divergence.</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> See https://mc-stan.org/misc/warnings for details.</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Trend-dynamics parameters as a data frame of draws</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/as.data.frame.html" class="external-link">as.data.frame</a></span><span class="op">(</span><span class="va">mod</span>, variable <span class="op">=</span> <span class="st">"trend_params"</span><span class="op">)</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   sigma_trend[series_1] ar1_trend[series_1] .chain .iteration .draw</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1             0.4315629           0.7200850      1          1     1</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2             0.4278023           0.6767122      1          2     2</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3             0.5405623           0.5245332      1          3     3</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4             0.4925876           0.6759856      1          4     4</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 5             0.4726482           0.5196237      1          5     5</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 6             0.4369597           0.4553947      1          6     6</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1             0.5853249           0.6325096      1          1     1</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2             0.4898450           0.4920866      1          2     2</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3             0.5525819           0.5785087      1          3     3</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4             0.4746984           0.5983053      1          4     4</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5             0.5538147           0.5443347      1          5     5</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6             0.5449632           0.5427795      1          6     6</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Regular expressions select by pattern, here the smooth's basis</span></span></span>
 <span class="r-in"><span><span class="co"># coefficients and its smoothing SD</span></span></span>
@@ -223,11 +223,11 @@ these draws (<code>rhat</code>, <code>neff_ratio</code>, <code>fixef</code>, <co
 <span class="r-out co"><span class="r-pr">#&gt;</span> # A draws_rvars: 1000 iterations, 2 chains, and 2 variables</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> $sigma_trend: rvar&lt;1000,2&gt;[1] <span style="color: #949494;">mean ± sd:</span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>      series_1 </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 0.47 ± 0.073  </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 0.48 ± 0.074  </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> $ar1_trend: rvar&lt;1000,2&gt;[1] <span style="color: #949494;">mean ± sd:</span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>     series_1 </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 0.58 ± 0.15  </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 0.56 ± 0.14  </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Next, mcmc_plot(mod) plots the same draws</span></span></span>

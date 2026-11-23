@@ -79,9 +79,10 @@
 <div class="section level3">
 <h3 id="new-features-2-0-0">New features<a class="anchor" aria-label="anchor" href="#new-features-2-0-0"></a></h3>
 <ul><li>Families: <code><a href="../reference/tweedie.html">tweedie()</a></code>, <code><a href="../reference/beta_nb.html">beta_nb()</a></code>, <code><a href="../reference/com_binomial.html">com_binomial()</a></code>, <code><a href="../reference/occ.html">occ()</a></code>, <code><a href="../reference/diri.html">diri()</a></code>, <code><a href="../reference/multi.html">multi()</a></code>, <code><a href="../reference/categ.html">categ()</a></code>, <code><a href="../reference/mvn.html">mvn()</a></code>, <code><a href="../reference/mvt.html">mvt()</a></code>. <code><a href="../reference/nmix.html">nmix()</a></code> gained Royle-Nichols, Poisson-Poisson and multi-season variants</li>
+<li>
+<code>forecast(type = "latent_state")</code> forecasts the occupancy or abundance of an <code><a href="../reference/occ.html">occ()</a></code> or <code><a href="../reference/nmix.html">nmix()</a></code> fit. A multi-season fit reports the mean over the sites of each season</li>
 <li>@jbogomolovas2 contributed the <code><a href="../reference/com_binomial.html">com_binomial()</a></code> mathematics and tested the bounded count families</li>
-<li>Multivariate responses through <code>mvbind()</code> and <code>mvbf()</code>
-</li>
+<li>Multivariate responses through <code>mvbind()</code> and <code>mvbf()</code>. Each response keeps the rows where it was observed. <code><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary()</a></code> reports each response’s count</li>
 <li>
 <code><a href="../reference/forecast_uncertainty.html">forecast_uncertainty()</a></code> splits a forecast’s variance by source and horizon. It also compares covariate scenarios. <code><a href="../reference/variance_partition.html">variance_partition()</a></code> splits the fitted predictor’s variance by source</li>
 <li>
@@ -132,6 +133,7 @@
 <li>
 <code><a href="https://paulbuerkner.com/brms/reference/conditional_effects.brmsfit.html" class="external-link">conditional_effects()</a></code> defaults to <code>type = "expected"</code>
 </li>
+<li>Quantile residuals of families without a distribution function place each observation by its rank among the posterior predictive draws. An observation beyond every draw keeps a finite residual</li>
 <li>
 <code><a href="../reference/pp_check.mvgam.html">pp_check()</a></code> draws bars for a bernoulli or ordinal response and a rootogram for counts</li>
 <li>Trend scale priors take the response’s spread on the link scale as ‘brms’ defaults do. <code><a href="../reference/LLT.html">LLT()</a></code> and <code><a href="../reference/piecewise_trends.html">PW()</a></code> growth priors also scale with the series length</li>

@@ -67,7 +67,7 @@
                         <h4 data-toc-skip class="author">Nicholas J
 Clark</h4>
             
-            <h4 data-toc-skip class="date">2026-11-22</h4>
+            <h4 data-toc-skip class="date">2026-11-23</h4>
       
       <small class="dont-index">Source: <a href="https://github.com/nicholasjclark/mvgam/blob/feature/brms-integration/vignettes/mvgam_overview.Rmd" class="external-link"><code>vignettes/mvgam_overview.Rmd</code></a></small>
       <div class="d-none name"><code>mvgam_overview.Rmd</code></div>
@@ -319,23 +319,23 @@ observation formula keeps the intercept:</p>
 <span><span class="co">#&gt; == Observation Model ==</span></span>
 <span><span class="co">#&gt; Regression Coefficients:</span></span>
 <span><span class="co">#&gt;           Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS</span></span>
-<span><span class="co">#&gt; Intercept     0.82      0.58    -0.38     2.03 1.00     1234     1177</span></span>
+<span><span class="co">#&gt; Intercept     0.84      0.59    -0.26     2.03 1.00     1553     1549</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; == Trend Model ==</span></span>
 <span><span class="co">#&gt; Smoothing Spline Hyperparameters:</span></span>
 <span><span class="co">#&gt;                   Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS</span></span>
-<span><span class="co">#&gt; sds(smintemp_1)       1.12      1.04     0.03     3.73 1.00     1394     1603</span></span>
-<span><span class="co">#&gt; sds(sndvi_ma12_1)     2.33      1.53     0.15     5.81 1.00     1408     1629</span></span>
+<span><span class="co">#&gt; sds(smintemp_1)       1.08      0.96     0.04     3.52 1.00     1838     2256</span></span>
+<span><span class="co">#&gt; sds(sndvi_ma12_1)     2.44      1.60     0.21     6.40 1.00     1595     1727</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Regression Coefficients:</span></span>
 <span><span class="co">#&gt;              Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS</span></span>
-<span><span class="co">#&gt; smintemp_1       3.49      2.24    -1.11     8.35 1.00     1948     1911</span></span>
-<span><span class="co">#&gt; sndvi_ma12_1     2.89      4.15    -4.82    12.03 1.00      968      931</span></span>
+<span><span class="co">#&gt; smintemp_1       3.40      2.18    -0.84     8.24 1.00     1804     1851</span></span>
+<span><span class="co">#&gt; sndvi_ma12_1     3.06      4.17    -4.49    12.48 1.00     1764     1626</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Trend Specific Parameters:</span></span>
 <span><span class="co">#&gt;                 Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS</span></span>
-<span><span class="co">#&gt; sigma_trend[PP]     0.70      0.14     0.45     1.01 1.00     1305     1991</span></span>
-<span><span class="co">#&gt; ar1_trend[PP]       0.81      0.09     0.60     0.96 1.00      975      837</span></span>
+<span><span class="co">#&gt; sigma_trend[PP]     0.69      0.15     0.45     1.00 1.00     1383     2061</span></span>
+<span><span class="co">#&gt; ar1_trend[PP]       0.82      0.10     0.60     0.96 1.00     1146     1286</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Draws were sampled using sampling(NUTS). For each parameter, Bulk_ESS</span></span>
 <span><span class="co">#&gt; and Tail_ESS are effective sample size measures, and Rhat is the potential</span></span>
@@ -387,22 +387,22 @@ continuous ranked probability score (CRPS), where lower is better.
 <span><span class="co">#&gt; <span style="color: #949494;"># A tibble: 12 × 4</span></span></span>
 <span><span class="co">#&gt;    series eval_horizon    GAM     AR</span></span>
 <span><span class="co">#&gt;    <span style="color: #949494; font-style: italic;">&lt;fct&gt;</span>         <span style="color: #949494; font-style: italic;">&lt;int&gt;</span>  <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>  <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span></span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 1</span> PP                1  8.32   4.80 </span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 2</span> PP                2 14.4    9.54 </span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 1</span> PP                1  8.38   4.88 </span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 2</span> PP                2 14.3    9.85 </span></span>
 <span><span class="co">#&gt; <span style="color: #BCBCBC;"> 3</span> PP                3 <span style="color: #BB0000;">NA</span>     <span style="color: #BB0000;">NA</span>    </span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 4</span> PP                4  0.474  1.62 </span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 5</span> PP                5  6.06   4.11 </span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 6</span> PP                6  4.58   3.16 </span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 7</span> PP                7  2.00   1.88 </span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 8</span> PP                8  0.451  0.750</span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 9</span> PP                9  1.56   1.71 </span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">10</span> PP               10  4.55   3.45 </span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">11</span> PP               11  9.79   7.38 </span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">12</span> PP               12  9.01   6.83</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 4</span> PP                4  0.479  1.60 </span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 5</span> PP                5  6.15   4.01 </span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 6</span> PP                6  4.50   3.12 </span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 7</span> PP                7  2.08   1.84 </span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 8</span> PP                8  0.369  0.735</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 9</span> PP                9  1.51   1.69 </span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">10</span> PP               10  4.45   3.34 </span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">11</span> PP               11  9.81   7.01 </span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">12</span> PP               12  9.16   6.41</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">scores</span>, relative <span class="op">=</span> <span class="st">"GAM"</span><span class="op">)</span></span></code></pre></div>
 <p><img src="mvgam_overview_files/figure-html/scores-1.png" class="r-plt" alt="" width="70%" style="display: block; margin: auto;"></p>
 <p>The latent state improves the forecasts. The AR model has the lower
-CRPS in 8 of the 11 scored months. Its CRPS sums to 45.2 against 61.2
+CRPS in 8 of the 11 scored months. Its CRPS sums to 44.5 against 61.2
 for the smooth-only model. Its 90% intervals contain 11 of the 11
 held-out counts. Those of the model without a latent state contain
 4.</p>
@@ -466,7 +466,7 @@ instead:</p>
 <span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">rc</span><span class="op">)</span></span></code></pre></div>
 <p><img src="mvgam_overview_files/figure-html/cor-resid-1.png" class="r-plt" alt="" width="60%" style="display: block; margin: auto;"></p>
 <p>The two pocket mouse species, PB and PP, share the strongest
-correlation, 0.56 (95% interval 0.12 to 0.85). <code>n_lv</code> would
+correlation, 0.55 (95% interval 0.13 to 0.84). <code>n_lv</code> would
 instead estimate a few shared latent factors for many species.
 <code><a href="../reference/trend_constructors.html">VAR()</a></code> would estimate how each species’ state affects the
 others at the next time step.</p>

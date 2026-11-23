@@ -156,14 +156,14 @@ simdat <- sim_mvgam(family = poisson(), n_series = 1L,
                     n_timepoints = 120L, trend_model = "None")
 mod <- mvgam(y ~ s(x), data = simdat$data_train,
              family = poisson(), chains = 2, silent = 2)
-#> Warning: 11 of 2000 (1.0%) transitions ended with a divergence.
+#> Warning: 5 of 2000 (0.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 # }
 # \dontrun{
 # Swap the family for a negative binomial. The formula, priors, data
 # and sampler settings carry over
 upd <- update(mod, family = negbinomial())
-#> Warning: 5 of 2000 (0.0%) transitions ended with a divergence.
+#> Warning: 4 of 2000 (0.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 
 # Compare the two fits by approximate leave-one-out cross-validation.
@@ -173,7 +173,7 @@ upd <- update(mod, family = negbinomial())
 loo_compare(mod, upd)
 #>  model elpd_diff se_diff p_worse diag_diff diag_elpd
 #>    mod       0.0     0.0      NA                    
-#>    upd      -0.5     0.8    0.73   N < 100          
+#>    upd      -0.4     0.8    0.71   N < 100          
 #> 
 #> Diagnostic flags present.
 #> See ?`loo-glossary` (sections `diag_diff` and `diag_elpd`)
@@ -181,7 +181,7 @@ loo_compare(mod, upd)
 
 # A change of sampler settings alone reuses the compiled model
 longer <- update(mod, iter = 3000, recompile = FALSE)
-#> Warning: 12 of 3000 (0.0%) transitions ended with a divergence.
+#> Warning: 14 of 3000 (0.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 # }
 ```

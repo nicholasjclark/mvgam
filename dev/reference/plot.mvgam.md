@@ -76,9 +76,11 @@ plot(
       [`occ()`](https://nicholasjclark.github.io/mvgam/dev/reference/occ.md)
       or
       [`nmix()`](https://nicholasjclark.github.io/mvgam/dev/reference/nmix.md)
-      fit drawn from the covariates alone: occupancy `psi` or abundance
-      `N`, by series and time. A multi-season fit pools the sites of
-      each time.
+      fit drawn from the covariates and the fitted trend, unconditioned
+      on the visits: occupancy `psi` or abundance `N`, by series and
+      time. A multi-season fit draws the mean over the sites of each
+      season. `hindcast(type = "latent_state")` conditions each unit on
+      its visits as well.
 
 - series:
 
@@ -150,7 +152,7 @@ mod <- mvgam(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1),
               data    = simdat$data_train,
               family  = poisson(),
               chains  = 2, silent = 2)
-#> Warning: 9 of 2000 (0.0%) transitions ended with a divergence.
+#> Warning: 5 of 2000 (0.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 
 # Residual diagnostics, the default
@@ -165,7 +167,7 @@ plot(mod, type = "trend")
 
 # The slope of a local linear trend
 mod_llt <- update(mod, trend_formula = ~ LLT())
-#> Warning: 1 of 2000 (0.0%) transitions ended with a divergence.
+#> Warning: 3 of 2000 (0.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 plot(mod_llt, type = "trend", component = "slope")
 

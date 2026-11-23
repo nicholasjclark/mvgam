@@ -99,10 +99,19 @@ and the package website for worked examples.
   [`mvt()`](https://nicholasjclark.github.io/mvgam/dev/reference/mvt.md).
   [`nmix()`](https://nicholasjclark.github.io/mvgam/dev/reference/nmix.md)
   gained Royle-Nichols, Poisson-Poisson and multi-season variants
+- `forecast(type = "latent_state")` forecasts the occupancy or abundance
+  of an
+  [`occ()`](https://nicholasjclark.github.io/mvgam/dev/reference/occ.md)
+  or
+  [`nmix()`](https://nicholasjclark.github.io/mvgam/dev/reference/nmix.md)
+  fit. A multi-season fit reports the mean over the sites of each season
 - @jbogomolovas2 contributed the
   [`com_binomial()`](https://nicholasjclark.github.io/mvgam/dev/reference/com_binomial.md)
   mathematics and tested the bounded count families
-- Multivariate responses through `mvbind()` and `mvbf()`
+- Multivariate responses through `mvbind()` and `mvbf()`. Each response
+  keeps the rows where it was observed.
+  [`summary()`](https://rdrr.io/r/base/summary.html) reports each
+  response’s count
 - [`forecast_uncertainty()`](https://nicholasjclark.github.io/mvgam/dev/reference/forecast_uncertainty.md)
   splits a forecast’s variance by source and horizon. It also compares
   covariate scenarios.
@@ -216,6 +225,9 @@ and the package website for worked examples.
   forecasts require every series to share one set of forecast times
 - [`conditional_effects()`](https://paulbuerkner.com/brms/reference/conditional_effects.brmsfit.html)
   defaults to `type = "expected"`
+- Quantile residuals of families without a distribution function place
+  each observation by its rank among the posterior predictive draws. An
+  observation beyond every draw keeps a finite residual
 - [`pp_check()`](https://nicholasjclark.github.io/mvgam/dev/reference/pp_check.mvgam.md)
   draws bars for a bernoulli or ordinal response and a rootogram for
   counts

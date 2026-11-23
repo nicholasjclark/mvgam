@@ -108,36 +108,36 @@ summary(mod)
 #> == Observation Model ==
 #> Smoothing Spline Hyperparameters:
 #>                      Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS
-#> sds(sweek_in_year_1)     0.52      0.21     0.23     1.06 1.00      419
-#> sds(sspecies_1)          0.51      0.30     0.17     1.32 1.01      601
+#> sds(sweek_in_year_1)     0.52      0.23     0.24     1.13 1.00      255
+#> sds(sspecies_1)          0.56      0.37     0.18     1.56 1.00      454
 #>                      Tail_ESS
-#> sds(sweek_in_year_1)      539
-#> sds(sspecies_1)          1018
+#> sds(sweek_in_year_1)      330
+#> sds(sspecies_1)           542
 #> 
 #> Regression Coefficients:
 #>           Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> Intercept     1.43      0.28     0.82     1.98 1.00      598      672
+#> Intercept     1.45      0.31     0.85     2.13 1.01      353      389
 #> 
 #> == Trend Model ==
 #> Trend Specific Parameters:
 #>                      Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS
-#> sigma_trend[warbler]     0.32      0.06     0.22     0.45 1.00     1030
-#> sigma_trend[thrush]      0.44      0.10     0.25     0.63 1.00      738
-#> sigma_trend[wren]        0.38      0.07     0.26     0.52 1.00     1026
-#> sigma_trend[finch]       0.32      0.07     0.19     0.47 1.00      898
-#> ar1_trend[warbler]       0.60      0.12     0.34     0.80 1.00      665
-#> ar1_trend[thrush]        0.41      0.24    -0.11     0.81 1.00      434
-#> ar1_trend[wren]          0.49      0.15     0.18     0.75 1.00      761
-#> ar1_trend[finch]         0.47      0.21     0.00     0.83 1.00      691
+#> sigma_trend[warbler]     0.32      0.06     0.22     0.45 1.01      754
+#> sigma_trend[thrush]      0.44      0.10     0.26     0.64 1.01      801
+#> sigma_trend[wren]        0.38      0.07     0.26     0.52 1.00      655
+#> sigma_trend[finch]       0.32      0.07     0.19     0.46 1.00      933
+#> ar1_trend[warbler]       0.59      0.12     0.33     0.79 1.00      762
+#> ar1_trend[thrush]        0.38      0.23    -0.09     0.79 1.00      540
+#> ar1_trend[wren]          0.50      0.15     0.18     0.77 1.00      457
+#> ar1_trend[finch]         0.48      0.21     0.01     0.84 1.01      441
 #>                      Tail_ESS
-#> sigma_trend[warbler]     1402
-#> sigma_trend[thrush]       850
-#> sigma_trend[wren]        1217
-#> sigma_trend[finch]       1124
-#> ar1_trend[warbler]        931
-#> ar1_trend[thrush]         594
-#> ar1_trend[wren]          1090
-#> ar1_trend[finch]         1158
+#> sigma_trend[warbler]     1352
+#> sigma_trend[thrush]      1235
+#> sigma_trend[wren]         863
+#> sigma_trend[finch]        971
+#> ar1_trend[warbler]       1179
+#> ar1_trend[thrush]         950
+#> ar1_trend[wren]           514
+#> ar1_trend[finch]          583
 #> 
 #> Draws were sampled using sampling(NUTS). For each parameter, Bulk_ESS
 #> and Tail_ESS are effective sample size measures, and Rhat is the potential

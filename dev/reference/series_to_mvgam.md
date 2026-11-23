@@ -162,12 +162,12 @@ wide <- data.frame(
 )
 head(series_to_mvgam(wide))
 #>   series time  y       date season
-#> 1 site_a    1  2 2024-01-01      5
-#> 2 site_b    1  9 2024-01-01      5
-#> 3 site_a    2  7 2024-01-02      6
-#> 4 site_b    2 14 2024-01-02      6
-#> 5 site_a    3  5 2024-01-03      7
-#> 6 site_b    3  9 2024-01-03      7
+#> 1 site_a    1  5 2024-01-01      5
+#> 2 site_b    1 12 2024-01-01      5
+#> 3 site_a    2  3 2024-01-02      6
+#> 4 site_b    2  6 2024-01-02      6
+#> 5 site_a    3  6 2024-01-03      7
+#> 6 site_b    3 12 2024-01-03      7
 
 # Next: fit the training data, for example with
 # mvgam(y ~ s(season, bs = "cc"), trend_formula = ~ AR(),

@@ -142,13 +142,13 @@ coefficient axes under <code>summary = FALSE</code>.</p></li>
 <span class="r-in"><span>             trend_formula <span class="op">=</span> <span class="op">~</span> <span class="fu"><a href="trend_constructors.html">AR</a></span><span class="op">(</span>p <span class="op">=</span> <span class="fl">1</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>             data <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span>, family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>             chains <span class="op">=</span> <span class="fl">2</span>, silent <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 53 of 2000 (3.0%) transitions ended with a divergence.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 83 of 2000 (4.0%) transitions ended with a divergence.</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> See https://mc-stan.org/misc/warnings for details.</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># The standard deviation of the series intercepts</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/pkg/nlme/man/VarCorr.html" class="external-link">VarCorr</a></span><span class="op">(</span><span class="va">mod</span><span class="op">)</span><span class="op">$</span><span class="va">series</span><span class="op">$</span><span class="va">sd</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>            Estimate Est.Error        Q2.5     Q97.5</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Intercept 0.1821798 0.1770998 0.007407799 0.6700817</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>            Estimate Est.Error       Q2.5     Q97.5</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Intercept 0.2002483 0.2011213 0.00732884 0.8133977</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Next: ranef() gives each series' own deviation</span></span></span>
 <span class="r-in"><span><span class="co"># }</span></span></span>

@@ -277,28 +277,28 @@ mod <- mvgam(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1),
               data    = simdat$data_train,
               family  = poisson(),
               chains  = 2, silent = 2)
-#> Warning: 9 of 2000 (0.0%) transitions ended with a divergence.
+#> Warning: 5 of 2000 (0.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 
 # The population coefficients with 95% intervals
 fixef(mod)
 #>           Estimate Est.Error     Q2.5     Q97.5
-#> Intercept 1.626988 0.1529809 1.331672  1.929153
-#> sx_1      8.379396 2.2348174 3.962280 12.789509
+#> Intercept 1.627309 0.1392877 1.357749  1.907589
+#> sx_1      8.463115 2.2047236 4.234332 12.838702
 
 # Rhat below 1.01 and effective sample ratios above 0.1 suggest the
 # chains mixed
 rhat(mod, pars = c("ar1_trend", "sigma_trend"))
 #>   ar1_trend[series_1] sigma_trend[series_1] 
-#>              1.000707              1.000583 
+#>              1.000200              1.000722 
 neff_ratio(mod, pars = c("ar1_trend", "sigma_trend"))
 #>   ar1_trend[series_1] sigma_trend[series_1] 
-#>             0.2524331             0.4218664 
+#>             0.3161960             0.3568092 
 
 # The share of variance in the counts the model explains
 bayes_R2(mod)
-#>     Estimate  Est.Error      Q2.5     Q97.5
-#> R2 0.8321786 0.03770663 0.7452553 0.8924051
+#>     Estimate Est.Error      Q2.5     Q97.5
+#> R2 0.8346961 0.0385558 0.7483991 0.8979353
 
 # Next, mcmc_plot() draws the posterior of these parameters
 # }

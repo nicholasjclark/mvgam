@@ -142,7 +142,7 @@ repeats that residual. The <code>.unit</code> column names the unit.</p>
 <span class="r-in"><span>              data    <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span>,</span></span>
 <span class="r-in"><span>              family  <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>              chains  <span class="op">=</span> <span class="fl">2</span>, silent <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 9 of 2000 (0.0%) transitions ended with a divergence.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 5 of 2000 (0.0%) transitions ended with a divergence.</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> See https://mc-stan.org/misc/warnings for details.</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># The training data with fitted values and residuals appended</span></span></span>
@@ -151,12 +151,12 @@ repeats that residual. The <code>.unit</code> column names the unit.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #949494;"># A tibble: 6 × 13</span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>       y series    time      x .observed .fitted .se.fit .lower .upper  .resid</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   <span style="color: #949494; font-style: italic;">&lt;int&gt;</span> <span style="color: #949494; font-style: italic;">&lt;fct&gt;</span>    <span style="color: #949494; font-style: italic;">&lt;int&gt;</span>  <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>     <span style="color: #949494; font-style: italic;">&lt;int&gt;</span>   <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>   <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>  <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>  <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>   <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">1</span>     2 series_1     1  0.841         2    2.20   0.913  0.856   4.34  0.050<span style="text-decoration: underline;">2</span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">2</span>    14 series_1     2 -<span style="color: #BB0000;">1.02</span>         14   12.8    3.14   7.37   19.8   0.452 </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">3</span>     6 series_1     3 -<span style="color: #BB0000;">0.441</span>         6    6.08   1.90   3.15   10.5   0.105 </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">4</span>     1 series_1     4 -<span style="color: #BB0000;">1.63</span>          1    4.25   1.48   1.89    7.59 -<span style="color: #BB0000;">1.67</span>  </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">5</span>     5 series_1     5  1.85          5    3.77   1.44   1.65    7.20  0.765 </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">6</span>     5 series_1     6 -<span style="color: #BB0000;">1.96</span>          5    5.19   1.70   2.53    9.25  0.068<span style="text-decoration: underline;">4</span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">1</span>     2 series_1     1  0.841         2    2.23   0.947  0.824   4.47  0.036<span style="text-decoration: underline;">8</span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">2</span>    14 series_1     2 -<span style="color: #BB0000;">1.02</span>         14   12.8    3.12   7.84   19.8   0.431 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">3</span>     6 series_1     3 -<span style="color: #BB0000;">0.441</span>         6    6.12   1.92   3.02   10.5   0.092<span style="text-decoration: underline;">8</span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">4</span>     1 series_1     4 -<span style="color: #BB0000;">1.63</span>          1    4.22   1.47   1.93    7.57 -<span style="color: #BB0000;">1.66</span>  </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">5</span>     5 series_1     5  1.85          5    3.85   1.44   1.67    7.30  0.718 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">6</span>     5 series_1     6 -<span style="color: #BB0000;">1.96</span>          5    5.21   1.77   2.49    9.20  0.065<span style="text-decoration: underline;">0</span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #949494;"># ℹ 3 more variables: .resid.se &lt;dbl&gt;, .resid.lower &lt;dbl&gt;, .resid.upper &lt;dbl&gt;</span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Residuals against fitted values, from one tibble</span></span></span>

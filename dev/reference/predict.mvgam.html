@@ -289,40 +289,40 @@ against a covariate.</p>
 <span class="r-in"><span>              data    <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span>,</span></span>
 <span class="r-in"><span>              family  <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>              chains  <span class="op">=</span> <span class="fl">2</span>, silent <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 9 of 2000 (0.0%) transitions ended with a divergence.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 5 of 2000 (0.0%) transitions ended with a divergence.</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> See https://mc-stan.org/misc/warnings for details.</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Predicted counts with their 95% intervals</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict</a></span><span class="op">(</span><span class="va">mod</span><span class="op">)</span><span class="op">)</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>      Estimate Est.Error  Q2.5 Q97.5</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1,]   2.1990  1.548095 0.000     6</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [2,]  12.2930  4.300046 5.000    22</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [3,]   8.2280  3.120879 3.000    15</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [4,]   8.8850  3.509549 3.000    17</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [5,]   4.6105  2.399514 1.000    10</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [6,]   6.5915  3.159370 1.975    14</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>      Estimate Est.Error Q2.5 Q97.5</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1,]   2.1840  1.522926    0     6</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [2,]  12.3365  4.320255    5    22</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [3,]   8.2875  3.165731    3    15</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [4,]   8.9510  3.403879    3    16</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [5,]   4.6360  2.366285    1    10</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [6,]   6.5570  3.100574    2    13</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># The same fit on the link scale, as an expected count and as the</span></span></span>
 <span class="r-in"><span><span class="co"># variance of a count. A Poisson's variance equals its mean.</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict</a></span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">"link"</span><span class="op">)</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>      Estimate Est.Error      Q2.5    Q97.5</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1,] 0.749281 0.2279990 0.2666378 1.198096</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [2,] 2.491617 0.1969154 2.1045983 2.862579</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [3,] 2.090921 0.1743357 1.7310270 2.428086</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [4,] 2.168891 0.1964567 1.7868074 2.565988</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [5,] 1.490823 0.2435497 0.9877793 1.973285</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [6,] 1.846478 0.2786232 1.2904415 2.412849</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1,] 0.742674 0.2175503 0.3025291 1.153017</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [2,] 2.495459 0.1842660 2.1384613 2.855244</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [3,] 2.095707 0.1685675 1.7535905 2.416998</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [4,] 2.169469 0.1822348 1.8195718 2.514370</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [5,] 1.492947 0.2312347 1.0269223 1.949018</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [6,] 1.845557 0.2667415 1.3251658 2.364273</span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/cbind.html" class="external-link">cbind</a></span><span class="op">(</span></span></span>
 <span class="r-in"><span>  expected <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict</a></span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">"expected"</span><span class="op">)</span><span class="op">[</span>, <span class="st">"Estimate"</span><span class="op">]</span>,</span></span>
 <span class="r-in"><span>  variance <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict</a></span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">"variance"</span><span class="op">)</span><span class="op">[</span>, <span class="st">"Estimate"</span><span class="op">]</span></span></span>
 <span class="r-in"><span><span class="op">)</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>       expected  variance</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1,]  2.170475  2.170475</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [2,] 12.315698 12.315698</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [3,]  8.215015  8.215015</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [4,]  8.920217  8.920217</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [5,]  4.572829  4.572829</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [6,]  6.589161  6.589161</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1,]  2.151583  2.151583</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [2,] 12.336125 12.336125</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [3,]  8.247302  8.247302</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [4,]  8.901273  8.901273</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [5,]  4.569433  4.569433</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [6,]  6.559537  6.559537</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># `summary = FALSE` returns the draws, one row per draw</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/dim.html" class="external-link">dim</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict</a></span><span class="op">(</span><span class="va">mod</span>, summary <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span><span class="op">)</span></span></span>

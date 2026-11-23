@@ -626,28 +626,28 @@ summary(mod)
 #> == Observation Model ==
 #> Smoothing Spline Hyperparameters:
 #>                Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> sds(sseason_1)     1.54      0.69     0.71     3.41 1.00      935     1354
+#> sds(sseason_1)     1.52      0.65     0.72     3.33 1.00      730     1045
 #> 
 #> Regression Coefficients:
 #>           Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> Intercept     1.58      0.09     1.40     1.75 1.00     1405     1524
+#> Intercept     1.58      0.09     1.40     1.75 1.00     1166     1339
 #> 
 #> == Trend Model ==
 #> Trend Specific Parameters:
 #>                       Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS
-#> sigma_trend[series_1]     0.32      0.10     0.15     0.53 1.00      866
-#> sigma_trend[series_2]     0.49      0.13     0.27     0.76 1.00      946
-#> sigma_trend[series_3]     0.59      0.12     0.39     0.86 1.00     1155
-#> ar1_trend[series_1]       0.60      0.22     0.09     0.92 1.00      654
-#> ar1_trend[series_2]       0.42      0.22     0.04     0.81 1.00      757
-#> ar1_trend[series_3]       0.18      0.14     0.01     0.53 1.00     1014
+#> sigma_trend[series_1]     0.32      0.10     0.15     0.52 1.00      701
+#> sigma_trend[series_2]     0.49      0.13     0.26     0.78 1.00      816
+#> sigma_trend[series_3]     0.59      0.12     0.39     0.86 1.00     1090
+#> ar1_trend[series_1]       0.58      0.23     0.09     0.92 1.00      609
+#> ar1_trend[series_2]       0.41      0.21     0.04     0.83 1.00      692
+#> ar1_trend[series_3]       0.18      0.15     0.01     0.53 1.00      948
 #>                       Tail_ESS
-#> sigma_trend[series_1]     1262
-#> sigma_trend[series_2]     1417
-#> sigma_trend[series_3]     1551
-#> ar1_trend[series_1]       1007
-#> ar1_trend[series_2]       1205
-#> ar1_trend[series_3]       1083
+#> sigma_trend[series_1]      973
+#> sigma_trend[series_2]     1086
+#> sigma_trend[series_3]     1357
+#> ar1_trend[series_1]        956
+#> ar1_trend[series_2]       1012
+#> ar1_trend[series_3]       1329
 #> 
 #> Draws were sampled using sampling(NUTS). For each parameter, Bulk_ESS
 #> and Tail_ESS are effective sample size measures, and Rhat is the potential
@@ -705,12 +705,12 @@ summary(mod_big)
 #> == Observation Model ==
 #> Regression Coefficients:
 #>           Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> Intercept     4.94      0.09     4.77     5.12 1.02      202      343
+#> Intercept     5.09      0.12     4.85     5.33 1.01      229      635
 #> 
 #> == Trend Model ==
 #> Trend Specific Parameters:
 #>                 Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> sigma_trend[s1]     0.07      0.02     0.04     0.11 1.02      262      574
+#> sigma_trend[s1]     0.10      0.02     0.07     0.14 1.00      631      989
 #> 
 #> Draws were sampled using sampling(NUTS). For each parameter, Bulk_ESS
 #> and Tail_ESS are effective sample size measures, and Rhat is the potential

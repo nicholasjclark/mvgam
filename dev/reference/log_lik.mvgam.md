@@ -152,7 +152,7 @@ mod <- mvgam(y ~ s(x, k = 5),
               data    = simdat$data_train,
               family  = poisson(),
               chains  = 2, silent = 2)
-#> Warning: 9 of 2000 (0.0%) transitions ended with a divergence.
+#> Warning: 5 of 2000 (0.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 
 # One row per draw, one column per observation
@@ -165,7 +165,7 @@ dim(ll)
 ll_fixed <- log_lik(mod, incl_autocor = FALSE)
 c(with_trend = mean(rowSums(ll)), without = mean(rowSums(ll_fixed)))
 #> with_trend    without 
-#>  -197.2187  -302.9906 
+#>  -196.7539  -301.7138 
 
 # Next, loo() estimates the ELPD from these densities
 # }

@@ -318,28 +318,28 @@ simdat <- sim_mvgam(family = poisson(), n_series = 1L,
                     n_timepoints = 120L, trend_model = "None")
 mod <- mvgam(y ~ s(x), data = simdat$data_train,
              family = poisson(), chains = 2, silent = 2)
-#> Warning: 11 of 2000 (1.0%) transitions ended with a divergence.
+#> Warning: 5 of 2000 (0.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 # }
 # \dontrun{
 # The leave-one-out R^2 is lower than the in-sample one
 loo_R2(mod)
-#>     Estimate  Est.Error      Q2.5    Q97.5
-#> R2 0.5858806 0.06563688 0.4374937 0.692272
+#>     Estimate  Est.Error      Q2.5     Q97.5
+#> R2 0.5855756 0.06635884 0.4361466 0.6927905
 bayes_R2(mod)
-#>    Estimate  Est.Error      Q2.5     Q97.5
-#> R2 0.630727 0.04941012 0.5139853 0.7126687
+#>     Estimate  Est.Error      Q2.5     Q97.5
+#> R2 0.6313402 0.04892968 0.5197279 0.7093959
 
 # One PSIS object serves every leave-one-out prediction
 psis <- loo(mod, save_psis = TRUE)$psis_object
 head(loo_predict(mod, psis_object = psis))
 #>           mean
-#> [1,]  2.727864
-#> [2,] 12.898318
-#> [3,]  7.103390
-#> [4,]  8.620246
-#> [5,]  2.916558
-#> [6,]  9.095455
+#> [1,]  2.718588
+#> [2,] 13.052882
+#> [3,]  7.121861
+#> [4,]  8.625145
+#> [5,]  2.919068
+#> [6,]  9.045683
 head(loo_predictive_interval(mod, psis_object = psis))
 #>      q5 q95
 #> [1,]  0   6

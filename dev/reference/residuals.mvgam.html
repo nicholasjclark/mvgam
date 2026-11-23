@@ -171,8 +171,7 @@ columns of the summary. Default <code>c(0.025, 0.975)</code>, a 95% interval.</p
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
     <p>With <code>summary = FALSE</code>, an <code>[ndraws, nobs]</code> matrix of residual
-draws. A continuous family on the empirical route has one interval
-per observation. Its rows are then identical. With <code>summary = TRUE</code>,
+draws. With <code>summary = TRUE</code>,
 an <code>[nobs, 2 + length(probs)]</code> matrix. Its columns are <code>Estimate</code>
 (the mean, or the median with <code>robust = TRUE</code>), <code>Est.Error</code> (the
 standard deviation, or the MAD) and one quantile per <code>probs</code>.</p>
@@ -197,22 +196,21 @@ same parameterisation. The route covers <code>gaussian</code>, <code>student</co
 the marginal of one component: a Beta for <code><a href="diri.html">diri()</a></code>, a Binomial
 against the site's own total for <code><a href="multi.html">multi()</a></code> and a Bernoulli for
 <code><a href="categ.html">categ()</a></code>.</p>
-<p>Every other family takes the empirical route of DHARMa (Hartig 2024),
-among them the zero-inflated, hurdle and mixture families, <code><a href="occ.html">occ()</a></code>
-and <code><a href="nmix.html">nmix()</a></code>. The bounds are <code>mean(yrep &lt; y)</code> and <code>mean(yrep &lt;= y)</code>
-over the pooled <code><a href="posterior_predict.mvgam.html">posterior_predict.mvgam()</a></code> draws. The pooled
-predictive carries the posterior uncertainty in the latent state.
-Its residuals are narrower than N(0, 1). A QQ-plot of them is
-conservative.</p>
+<p>Every other family takes the empirical route, among them the
+zero-inflated, hurdle and mixture families, <code><a href="occ.html">occ()</a></code> and <code><a href="nmix.html">nmix()</a></code>.
+Under the model the observation and the <code>n</code> pooled
+<code><a href="posterior_predict.mvgam.html">posterior_predict.mvgam()</a></code> draws are exchangeable. The rank of the
+observation among those <code>n + 1</code> values, with ties broken at random,
+is then uniform. The bounds are <code>sum(yrep &lt; y) / (n + 1)</code> and
+<code>(sum(yrep &lt;= y) + 1) / (n + 1)</code>. An observation beyond every draw
+takes the top interval, <code>[n / (n + 1), 1]</code>. The pooled predictive
+carries the posterior uncertainty in the latent state. Its residuals
+are narrower than N(0, 1). A QQ-plot of them is conservative.</p>
 <p>The PIT value is clamped to <code>[eps, 1 - eps]</code>, with
 <code>eps = .Machine$double.eps</code>, to keep the residual finite. The clamp
 bounds a residual at about +/-8.13. On the analytic route one draw
 can place an observation beyond that bound. Such isolated values
-describe that draw. A misfit shifts the residual across most draws.
-The empirical route reaches the clamp whenever an observation lies
-outside every simulated value. With few draws that happens often.
-Use <code>ndraws &gt;= 500</code> there, the default of the residual histograms
-and ribbons of <code><a href="pp_check.mvgam.html">pp_check.mvgam()</a></code>.</p>
+describe that draw. A misfit shifts the residual across most draws.</p>
     </div>
     <div class="section level2">
     <h2 id="multivariate-families-mvn-mvt-diri-">Multivariate families (<code><a href="mvn.html">mvn()</a></code>, <code><a href="mvt.html">mvt()</a></code>, <code><a href="diri.html">diri()</a></code>)<a class="anchor" aria-label="anchor" href="#multivariate-families-mvn-mvt-diri-"></a></h2>
@@ -259,9 +257,6 @@ Compare QQ-plots with envelopes simulated from N(0, 1) in that case.</p>
     <p>Dunn, P. K. and Smyth, G. K. (1996). Randomized quantile
 residuals. <em>Journal of Computational and Graphical
 Statistics</em>, 5(3), 236-244.</p>
-<p>Hartig, F. (2024). DHARMa: Residual diagnostics for
-hierarchical (multi-level / mixed) regression models.
-R package. <a href="https://CRAN.R-project.org/package=DHARMa" class="external-link">https://CRAN.R-project.org/package=DHARMa</a></p>
     </div>
     <div class="section level2">
     <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>
@@ -286,19 +281,19 @@ R package. <a href="https://CRAN.R-project.org/package=DHARMa" class="external-l
 <span class="r-in"><span><span class="va">mod</span> <span class="op">&lt;-</span> <span class="fu"><a href="mvgam.html">mvgam</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="fu">s</span><span class="op">(</span><span class="va">x</span>, k <span class="op">=</span> <span class="fl">5</span><span class="op">)</span>, trend_formula <span class="op">=</span> <span class="op">~</span> <span class="fu"><a href="trend_constructors.html">AR</a></span><span class="op">(</span>p <span class="op">=</span> <span class="fl">1</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>             data <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span>, family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>             chains <span class="op">=</span> <span class="fl">2</span>, silent <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 9 of 2000 (0.0%) transitions ended with a divergence.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 5 of 2000 (0.0%) transitions ended with a divergence.</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> See https://mc-stan.org/misc/warnings for details.</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Quantile residuals summarised per observation</span></span></span>
 <span class="r-in"><span><span class="va">r</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/residuals.html" class="external-link">residuals</a></span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">r</span><span class="op">)</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>         Estimate Est.Error       Q2.5     Q97.5</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1,]  0.05016616 0.6208878 -1.1719081  1.188260</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [2,]  0.45159475 0.8897410 -1.3401760  2.193156</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [3,]  0.10471057 0.7602559 -1.4953299  1.494811</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [4,] -1.66500562 0.6209982 -2.9033198 -0.466234</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [5,]  0.76544423 0.7676848 -0.8074881  2.189400</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [6,]  0.06840744 0.7353594 -1.4522850  1.456570</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>         Estimate Est.Error       Q2.5      Q97.5</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1,]  0.03684423 0.6389760 -1.2724068  1.2399135</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [2,]  0.43111193 0.8701563 -1.3330821  2.0592069</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [3,]  0.09283389 0.7704823 -1.4820832  1.5845291</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [4,] -1.65562215 0.6251131 -2.9469608 -0.4902613</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [5,]  0.71784188 0.7604671 -0.8468861  2.2008915</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [6,]  0.06500426 0.7676791 -1.4502478  1.4977233</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># One draw of the residuals should look like N(0, 1) draws</span></span></span>
 <span class="r-in"><span><span class="va">r1</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/residuals.html" class="external-link">residuals</a></span><span class="op">(</span><span class="va">mod</span>, summary <span class="op">=</span> <span class="cn">FALSE</span>, draw_ids <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span></span>

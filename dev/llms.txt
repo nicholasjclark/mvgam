@@ -1563,6 +1563,8 @@ across species, and across survey protocols.
 
 Closure-unit families that separate what is there from what was seen.
 
+- [Occupancy models with
+  mvgam](https://nicholasjclark.github.io/mvgam/dev/articles/occupancy.md):
 - [N-mixture models with
   mvgam](https://nicholasjclark.github.io/mvgam/dev/articles/nmix.md):
 
