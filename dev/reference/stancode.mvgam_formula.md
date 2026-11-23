@@ -349,7 +349,7 @@ code
 #>   // priors including constants
 #>   target += lprior;
 #>   // Shared innovation priors
-#>   target += exponential_lpdf(sigma_trend | 2);
+#>   target += inv_gamma_lpdf(sigma_trend | 3, 1.07);
 #>   target += std_normal_lpdf(to_vector(innovations_trend));
 #>   // AR coefficient priors
 #>   target += normal_lpdf(ar1_trend | 0, 0.5);

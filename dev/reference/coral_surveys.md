@@ -1,11 +1,12 @@
-# Simulated coral bleaching index with irregular CAR(1) state
+# Simulated coral bleaching surveys with an irregular CAR(1) state
 
 A state-space dataset for three coral reefs surveyed at irregular
 monthly intervals (gap distribution `Uniform(1, 6)` months, mean
-approximately 3.5). The latent state is a continuous-time AR(1) (CAR(1))
-trend per reef with `phi = 0.7` and `sigma = 0.5`. The observation
-equation adds an observed sea-surface temperature (SST) driver via a
-smooth nonlinear effect.
+approximately 3.5). Each survey inspects between 20 and 40 colonies and
+counts those that have bleached. The latent state is a continuous-time
+AR(1) (CAR(1)) trend per reef with `phi = 0.9` and `sigma = 0.3` on the
+logit scale. The observation equation adds an observed sea-surface
+temperature (SST) driver through a smooth nonlinear effect.
 
 ## Usage
 
@@ -28,7 +29,7 @@ A `data.frame` with 150 rows and the following fields:
 
 - y:
 
-  numeric bleaching index (Gaussian, scaled); duplicated as `bleaching`.
+  integer count of bleached colonies; duplicated as `bleaching`.
 
 - reef:
 
@@ -40,31 +41,34 @@ A `data.frame` with 150 rows and the following fields:
 
 - bleaching:
 
-  numeric bleaching index, alias of `y`.
+  integer count of bleached colonies, alias of `y`.
+
+- colonies:
+
+  integer number of colonies inspected, the binomial trials.
 
 ## Details
 
-Naive AR(1) treats every consecutive observation as a unit gap and
-biases `phi` downward toward `phi^mean(dt)` (roughly 0.29 for this
-dataset), leaving the SST smooth to absorb persistence that belongs to
-the latent state. `trend_formula = ~ CAR()` with the supplied `time`
-column measures the damping over the median gap between surveys, three
-months here. Its `ar1_trend` is then near `0.7^3 = 0.34`, the monthly
-`phi` of `0.7` cubed. With persistence assigned to the latent state, the
-SST smooth is identifiable.
+A naive AR(1) treats every consecutive survey as one step. It gives a
+one-month gap and a six-month gap the same persistence.
+`trend_formula = ~ CAR()` with the supplied `time` column decays the
+state by the length of each gap. Its `ar1_trend` measures the
+persistence over the median gap between surveys, three months here. The
+simulated value is `0.9^3 = 0.73`.
 
-True generative components:
+True generative components, on the logit scale:
 
-- Per-reef intercepts (centred).
+- An intercept of -0.85, which puts a typical survey near 30% bleached.
+  Each reef adds its own centred intercept.
 
-- Latent CAR(1) state per reef with `phi = 0.7` and `sigma = 0.5`,
+- Latent CAR(1) state per reef with `phi = 0.9` and `sigma = 0.3`,
   propagated through
   `trend[t] = phi^dt * trend[t-1] + N(0, sigma * sqrt((1 - phi^(2*dt)) / (1 - phi^2)))`.
 
-- Shared smooth nonlinear obs-side effect of SST, evaluated via a
-  thin-plate basis.
+- Shared smooth nonlinear effect of SST, evaluated through a thin-plate
+  basis.
 
-- Observation noise `sigma_obs = 0.3`.
+- Binomial observations: `bleaching ~ Binomial(colonies, p)`.
 
 ## See also
 
@@ -79,8 +83,9 @@ to check the data.
 
 ``` r
 data(coral_surveys)
-mvgam_data(coral_surveys, family = gaussian())
-#> ✔ Data check passed for family 'gaussian (link = identity)'.
+mvgam_data(coral_surveys, formula = y | trials(colonies) ~ s(sst),
+           family = binomial())
+#> ✔ Data check passed for family 'binomial (link = logit)'.
 #> • series: 3 levels
 #> • time:   1 to 178
 #> • n obs:  150 (0 NA)
@@ -89,20 +94,18 @@ mvgam_data(coral_surveys, family = gaussian())
 # \dontrun{
 # A model with the structure the data were simulated from
 mod <- mvgam(
-  formula = y ~ s(sst, k = 8),
+  formula = y | trials(colonies) ~ series + s(sst, k = 8),
   trend_formula = ~ CAR(),
   data = coral_surveys,
-  family = gaussian(),
+  family = binomial(),
   chains = 2, silent = 2
 )
-#> Warning: 335 of 2000 (17.0%) transitions ended with a divergence.
-#> See https://mc-stan.org/misc/warnings for details.
-#> Warning: 2 of 2 chains had an E-BFMI less than 0.3.
+#> Warning: 29 of 2000 (1.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 summary(mod)
-#>  Family: gaussian 
-#>   Links: mu = identity; sigma = log 
-#> Formula: y ~ s(sst, k = 8) 
+#>  Family: binomial 
+#>   Links: mu = logit 
+#> Formula: y | trials(colonies) ~ series + s(sst, k = 8) 
 #>    Data: coral_surveys (Number of observations: 150) 
 #>  Series: 3 
 #>  Trends: CAR 
@@ -112,33 +115,31 @@ summary(mod)
 #> == Observation Model ==
 #> Smoothing Spline Hyperparameters:
 #>             Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> sds(ssst_1)     2.15      1.34     0.45     4.70 1.08       23       61
+#> sds(ssst_1)     2.33      1.25     0.68     5.48 1.00      949     1296
 #> 
 #> Regression Coefficients:
-#>           Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> Intercept     0.03      0.15    -0.32     0.27 1.08       19       18
-#> ssst_1       11.61      4.51     5.50    20.98 1.12       13       12
-#> 
-#> Further Distributional Parameters:
-#>       Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> sigma     0.48      0.10     0.31     0.68 1.09       18       73
+#>                Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
+#> Intercept         -0.64      0.19    -1.01    -0.29 1.00     1550     1580
+#> seriesmyrmidon    -0.83      0.55    -1.79     0.47 1.01      869      621
+#> seriespixie       -0.61      0.43    -1.48     0.19 1.00     1055      907
+#> ssst_1            12.80      4.39     5.87    23.20 1.00     1209     1037
 #> 
 #> == Trend Model ==
 #> Trend Specific Parameters:
 #>                       Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS
-#> sigma_trend[flynn]        0.62      0.16     0.21     0.87 1.05       63
-#> sigma_trend[myrmidon]     0.61      0.16     0.30     0.90 1.07       23
-#> sigma_trend[pixie]        0.30      0.11     0.10     0.52 1.04       78
-#> ar1_trend[flynn]          0.27      0.19     0.02     0.72 1.02      128
-#> ar1_trend[myrmidon]       0.82      0.10     0.60     0.97 1.07      143
-#> ar1_trend[pixie]          0.65      0.21     0.15     0.93 1.01       96
+#> sigma_trend[flynn]        0.54      0.11     0.35     0.78 1.00      740
+#> sigma_trend[myrmidon]     0.44      0.11     0.26     0.71 1.00      958
+#> sigma_trend[pixie]        0.47      0.10     0.31     0.68 1.00     1076
+#> ar1_trend[flynn]          0.48      0.20     0.08     0.85 1.00      675
+#> ar1_trend[myrmidon]       0.82      0.12     0.53     0.98 1.00      806
+#> ar1_trend[pixie]          0.76      0.12     0.49     0.96 1.00     1003
 #>                       Tail_ESS
-#> sigma_trend[flynn]         179
-#> sigma_trend[myrmidon]       32
-#> sigma_trend[pixie]         429
-#> ar1_trend[flynn]           523
-#> ar1_trend[myrmidon]        440
-#> ar1_trend[pixie]           271
+#> sigma_trend[flynn]         945
+#> sigma_trend[myrmidon]     1234
+#> sigma_trend[pixie]        1178
+#> ar1_trend[flynn]           987
+#> ar1_trend[myrmidon]       1019
+#> ar1_trend[pixie]          1039
 #> 
 #> Draws were sampled using sampling(NUTS). For each parameter, Bulk_ESS
 #> and Tail_ESS are effective sample size measures, and Rhat is the potential

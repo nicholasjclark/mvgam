@@ -36,6 +36,18 @@ on `"response"` keeps the observation noise. marginaleffects summarises
 the draws by their posterior median. For a right-skewed predictive
 distribution the median falls below the mean.
 
+An
+[`occ()`](https://nicholasjclark.github.io/mvgam/dev/reference/occ.md)
+or
+[`nmix()`](https://nicholasjclark.github.io/mvgam/dev/reference/nmix.md)
+fit takes two more types. `"detection"` gives the detection probability
+of each visit. `"latent_N"` gives the latent state that mvgam's own
+methods call `"latent_state"`. marginaleffects checks `type` against its
+own list, which records that state as `"latent_N"`. Each row of a grid
+from
+[`marginaleffects::datagrid()`](https://rdrr.io/pkg/marginaleffects/man/datagrid.html)
+becomes its own closure unit.
+
 ## The latent trend
 
 By default (`process_error = FALSE`) each prediction takes the covariate
@@ -84,7 +96,7 @@ mod <- mvgam(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1),
              chains = 2, silent = 2)
 #> Error: 'y' has values outside the support of family 'poisson'.
 #>   Requires: 0 <= 'y' (integers only).
-#>   Observed range: [-2.435, 2.893]. 22 of 45 values fall outside, the first
+#>   Observed range: [-2.504, 2.943]. 23 of 45 values fall outside, the first
 #>   at row 1.
 #>   Check the column for missing-data sentinels such as -1 or -999.
 

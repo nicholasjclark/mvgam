@@ -187,7 +187,9 @@ mod <- mvgam(
   chains = 2,
   silent = 2
 )
-#> Warning: 131 of 2000 (7.0%) transitions ended with a divergence.
+#> Warning: 118 of 2000 (6.0%) transitions ended with a divergence.
+#> See https://mc-stan.org/misc/warnings for details.
+#> Warning: 2 of 2000 (0.0%) transitions hit the maximum treedepth limit of 10.
 #> See https://mc-stan.org/misc/warnings for details.
 
 # Amplitude and peak month, first and last complete year
@@ -198,8 +200,8 @@ s
 #> 
 #> Period 12 (season)
 #>   series_1
-#>     amplitude 0.19 -> 0.21, P(larger) = 0.83
-#>     peak Aug (0.61) -> Aug (0.53), P(earlier) = 0.27, P(later) = 0.19
+#>     amplitude 0.19 -> 0.21, P(larger) = 0.82
+#>     peak Aug (0.63) -> Aug (0.52), P(earlier) = 0.27, P(later) = 0.16
 #>     strength 0.93 -> 0.92
 
 # The season by month in the first, last and forecast years
@@ -215,7 +217,7 @@ summary(s)$change
 #> # A tibble: 1 × 13
 #>   series period from_cycle to_cycle ratio_Q50 ratio_Q2.5 ratio_Q97.5 prob_larger
 #>   <chr>  <chr>       <int>    <int>     <dbl>      <dbl>       <dbl>       <dbl>
-#> 1 serie… season          1       12      1.11      0.893        1.47       0.832
+#> 1 serie… season          1       12      1.10      0.896        1.49       0.818
 #> # ℹ 5 more variables: shift_Q50 <dbl>, shift_Q2.5 <dbl>, shift_Q97.5 <dbl>,
 #> #   prob_earlier <dbl>, prob_later <dbl>
 

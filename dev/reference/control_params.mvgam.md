@@ -49,7 +49,7 @@ mod <- mvgam(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1),
              chains = 2, silent = 2)
 #> Error: 'y' has values outside the support of family 'poisson'.
 #>   Requires: 0 <= 'y' (integers only).
-#>   Observed range: [-2.435, 2.893]. 22 of 45 values fall outside, the first
+#>   Observed range: [-2.504, 2.943]. 23 of 45 values fall outside, the first
 #>   at row 1.
 #>   Check the column for missing-data sentinels such as -1 or -999.
 control_params(mod)$adapt_delta

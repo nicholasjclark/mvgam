@@ -29,9 +29,9 @@ factors `n_lv`.
 [`residual_cor()`](https://nicholasjclark.github.io/mvgam/dev/reference/residual_cor.md)
 summarises the residual correlations and
 [`shared_variation()`](https://nicholasjclark.github.io/mvgam/dev/reference/shared_variation.md)
-the part the factors share. `Psi` takes the prior `exponential(1)`,
-which suits responses near unit scale. `prior(..., class = Psi)` sets
-another.
+the part the factors share. `Psi` takes the prior `inv_gamma(3, 1.07)`,
+with median 0.40 and no mass at zero, which suits responses near unit
+scale. `prior(..., class = Psi)` sets another.
 
 With `K` components the data separate the factor part from the residual
 part only when `(K - n_lv)^2 >= K + n_lv`. Fewer factors or more
@@ -89,7 +89,7 @@ fit <- jsdgam(
   chains         = 2L,
   silent         = 2
 )
-#> Warning: 215 of 2000 (11.0%) transitions ended with a divergence.
+#> Warning: 7 of 2000 (0.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 #> Warning: 2 of 2 chains had an E-BFMI less than 0.3.
 #> See https://mc-stan.org/misc/warnings for details.
@@ -106,37 +106,37 @@ summary(fit)
 #> == Observation Model ==
 #> Regression Coefficients:
 #>                Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> Intercept         -0.40      0.11    -0.61    -0.21 1.02      221      525
-#> env                0.34      0.12     0.09     0.55 1.03      109      394
-#> seriessp_2         1.47      0.14     1.20     1.76 1.02      213      558
-#> seriessp_3         1.34      0.15     1.04     1.64 1.02      162      472
-#> seriessp_4         1.15      0.23     0.73     1.62 1.01      333      627
-#> seriessp_5         2.06      0.13     1.83     2.32 1.02      198      727
-#> env:seriessp_2    -1.59      0.16    -1.88    -1.25 1.03      149      414
-#> env:seriessp_3    -0.73      0.17    -1.08    -0.40 1.00      461      722
-#> env:seriessp_4    -1.48      0.28    -1.95    -0.89 1.07       27      331
-#> env:seriessp_5    -0.79      0.15    -1.05    -0.49 1.07       25       92
+#> Intercept         -0.41      0.11    -0.62    -0.19 1.00      310      540
+#> env                0.35      0.13     0.11     0.61 1.01      135      192
+#> seriessp_2         1.47      0.15     1.17     1.77 1.00      309      585
+#> seriessp_3         1.33      0.16     1.02     1.65 1.00      400      546
+#> seriessp_4         1.16      0.25     0.66     1.65 1.01      274      396
+#> seriessp_5         2.08      0.13     1.81     2.34 1.00      330      461
+#> env:seriessp_2    -1.61      0.18    -1.96    -1.28 1.01      147      211
+#> env:seriessp_3    -0.76      0.18    -1.11    -0.42 1.01      209      592
+#> env:seriessp_4    -1.49      0.29    -2.06    -0.93 1.01      139      153
+#> env:seriessp_5    -0.79      0.16    -1.10    -0.49 1.01      166      226
 #> 
 #> Further Distributional Parameters:
 #>        Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> Psi[1]     0.43      0.15     0.13     0.68 1.00       50       63
-#> Psi[2]     0.49      0.05     0.41     0.58 1.02       94      268
-#> Psi[3]     0.37      0.19     0.07     0.71 1.09       20       11
-#> Psi[4]     0.62      0.19     0.23     0.92 1.01       54       97
-#> Psi[5]     0.56      0.05     0.46     0.66 1.01      437      827
+#> Psi[1]     0.46      0.12     0.22     0.66 1.01      142      220
+#> Psi[2]     0.49      0.04     0.41     0.57 1.00     1154     1359
+#> Psi[3]     0.41      0.14     0.18     0.68 1.00       91      267
+#> Psi[4]     0.57      0.17     0.25     0.86 1.00      122      219
+#> Psi[5]     0.55      0.05     0.47     0.65 1.00     1145     1254
 #> 
 #> == Trend Model ==
 #> Factor Loadings:
 #>                 Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> Z_tilde[sp_1,1]     0.88      0.11     0.66     1.10 1.00      110      320
-#> Z_tilde[sp_2,1]    -0.29      0.06    -0.42    -0.17 1.00     1348     1547
-#> Z_tilde[sp_3,1]    -0.08      0.12    -0.32     0.17 1.02      441     1217
-#> Z_tilde[sp_4,1]    -1.05      0.16    -1.37    -0.74 1.00      164      941
-#> Z_tilde[sp_5,1]     0.02      0.10    -0.23     0.20 1.04       35       15
-#> Z_tilde[sp_2,2]     0.07      0.05     0.00     0.19 1.00      453     1310
-#> Z_tilde[sp_3,2]     0.52      0.72    -1.05     1.06 1.01      185       75
-#> Z_tilde[sp_4,2]    -0.41      0.57    -0.93     0.86 1.01      220      662
-#> Z_tilde[sp_5,2]    -0.19      0.25    -0.46     0.37 1.01      302     1416
+#> Z_tilde[sp_1,1]     0.89      0.11     0.69     1.11 1.00      254      727
+#> Z_tilde[sp_2,1]    -0.30      0.07    -0.43    -0.17 1.00     1550     1586
+#> Z_tilde[sp_3,1]    -0.07      0.13    -0.34     0.18 1.00      937     1530
+#> Z_tilde[sp_4,1]    -1.10      0.17    -1.43    -0.78 1.00      397     1172
+#> Z_tilde[sp_5,1]     0.02      0.08    -0.13     0.19 1.01     1238     1225
+#> Z_tilde[sp_2,2]     0.08      0.05     0.00     0.20 1.00     1472     1347
+#> Z_tilde[sp_3,2]     0.53      0.72    -1.03     1.09 1.00     1025     1174
+#> Z_tilde[sp_4,2]    -0.42      0.60    -0.97     0.91 1.00     1458     1187
+#> Z_tilde[sp_5,2]    -0.20      0.27    -0.48     0.40 1.00     1523     1573
 #> 
 #> Draws were sampled using sampling(NUTS). For each parameter, Bulk_ESS
 #> and Tail_ESS are effective sample size measures, and Rhat is the potential
@@ -155,11 +155,11 @@ summary(fit)
 # the simulation used
 round(residual_cor(fit)$cor, 2)
 #>       sp_1  sp_2  sp_3  sp_4  sp_5
-#> sp_1  1.00 -0.45 -0.07 -0.65  0.02
-#> sp_2 -0.45  1.00  0.12  0.33 -0.06
-#> sp_3 -0.07  0.12  1.00 -0.38 -0.44
-#> sp_4 -0.65  0.33 -0.38  1.00  0.21
-#> sp_5  0.02 -0.06 -0.44  0.21  1.00
+#> sp_1  1.00 -0.45 -0.07 -0.67  0.03
+#> sp_2 -0.45  1.00  0.13  0.34 -0.07
+#> sp_3 -0.07  0.13  1.00 -0.39 -0.45
+#> sp_4 -0.67  0.34 -0.39  1.00  0.22
+#> sp_5  0.03 -0.07 -0.45  0.22  1.00
 round(simdat$truth$residual_cor, 2)
 #>       sp_1  sp_2  sp_3  sp_4  sp_5
 #> sp_1  1.00 -0.46 -0.05 -0.64  0.04

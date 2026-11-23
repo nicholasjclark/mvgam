@@ -160,7 +160,7 @@ mod <- jsdgam(
   chains         = 2,
   silent         = 2
 )
-#> Warning: 98 of 2000 (5.0%) transitions ended with a divergence.
+#> Warning: 4 of 2000 (0.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 
 # The species-by-species covariance the two factors induce
@@ -171,13 +171,13 @@ sv
 #>   Quantile bounds: [0.025, 0.975] 
 #> 
 #> Diagonal (captured variance per series):
-#>      Estimate  Q2.5   Q97.5
-#> sp_1    0.812 0.012   4.095
-#> sp_2    9.200 0.031 116.929
-#> sp_3    5.262 0.015  84.939
-#> sp_4    1.917 0.013  15.850
-#> sp_5    5.711 0.044  48.416
-#> sp_6    1.346 0.017   8.470
+#>      Estimate  Q2.5 Q97.5
+#> sp_1    1.776 0.034 7.616
+#> sp_2    2.442 0.106 9.021
+#> sp_3    1.316 0.029 5.875
+#> sp_4    1.984 0.043 7.709
+#> sp_5    2.983 0.176 8.964
+#> sp_6    1.689 0.034 6.875
 #> 
 #> plot() draws the full matrix as a heatmap.
 plot(sv)

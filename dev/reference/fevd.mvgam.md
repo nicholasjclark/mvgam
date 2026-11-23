@@ -111,18 +111,28 @@ Nicholas J Clark
 
 ``` r
 # \dontrun{
-set.seed(0)
-simdat <- sim_mvgam(family = gaussian(), n_series = 3L,
-                    n_timepoints = 120L, trend_model = VAR(),
-                    prop_trend = 0.95)
-var_mod <- mvgam(y ~ 1, trend_formula = ~ VAR(p = 1),
-                 data = simdat$data_train, family = gaussian(),
+# Ten years of monthly counts of a prey species and its predator.
+# Predators suppress the prey a month later. Prey raise the
+# predators a month later.
+set.seed(2025)
+n_months <- 120
+A <- rbind(prey     = c(0.6, -0.5),
+           predator = c(0.4,  0.5))
+z <- matrix(0, n_months, 2)
+for (t in 2:n_months) {
+  z[t, ] <- A %*% z[t - 1, ] + rnorm(2, sd = 0.35)
+}
+predator_prey <- data.frame(
+  time = rep(seq_len(n_months), 2),
+  series = factor(rep(c("prey", "predator"), each = n_months),
+                  levels = c("prey", "predator")),
+  y = rpois(2 * n_months, exp(c(2.5 + z[, 1], 1.5 + z[, 2])))
+)
+var_mod <- mvgam(y ~ series, trend_formula = ~ VAR(),
+                 data = predator_prey, family = poisson(),
                  chains = 2, silent = 2)
-#> Warning: 25 of 2000 (1.0%) transitions ended with a divergence.
-#> See https://mc-stan.org/misc/warnings for details.
-#> Warning: 2 of 2 chains had an E-BFMI less than 0.3.
-#> See https://mc-stan.org/misc/warnings for details.
-
+# }
+# \dontrun{
 # The share of each series' forecast-error variance due to each
 # shock, over an eight-step horizon
 fevd_obj <- fevd(var_mod, h = 8L)

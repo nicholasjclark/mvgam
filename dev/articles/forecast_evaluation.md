@@ -154,10 +154,10 @@ unc_ar
 #> Forecast uncertainty by source, predictor, 500 draws, 20 replicates
 #> 
 #>  series sd_first sd_last dominant      support changes_at
-#>  DM     0.24     0.40    process error 1                 
-#>  DO     0.57     0.89    process error 1                 
-#>  PB     0.69     1.50    process error 1                 
-#>  PP     0.87     1.20    process error 1                 
+#>  DM     0.24     0.41    process error 1                 
+#>  DO     0.56     0.90    process error 1                 
+#>  PB     0.63     1.40    process error 1                 
+#>  PP     0.83     1.20    process error 1                 
 #> 
 #> summary() gives every source at every horizon.
 plot(unc_ar)
@@ -172,9 +172,9 @@ kind of source.
 
 Process error, the variance the state’s innovations add, leads for every
 species by month 12. Because this variance belongs to the process, more
-data will not shrink it. For DO it grows from 57% of the variance at
-month 1 to 75% at month 12. Because an AR(1) state loses its memory of
-the last training month, the latent dynamics fade from 26% to 5% over
+data will not shrink it. For DO it grows from 55% of the variance at
+month 1 to 74% at month 12. Because an AR(1) state loses its memory of
+the last training month, the latent dynamics fade from 28% to 4% over
 the same months.
 
 The bars jump at month 8. With `by = "source"` and `type = "share"`, the
@@ -219,8 +219,8 @@ Difference in the DO forecast’s predictor between a future one standard
 deviation warmer and the observed one, with nested 20%, 40%, 60% and 80%
 credible intervals.
 
-The median difference at month 12 is -0.13, with a 95% interval from
--0.54 to 0.35. The largest median difference, -0.22, falls at month 8.
+The median difference at month 12 is -0.11, with a 95% interval from
+-0.53 to 0.32. The largest median difference, -0.21, falls at month 8.
 
 ## Scoring the holdout
 
@@ -247,9 +247,9 @@ Negative values favour the AR or PW model. No species was observed at
 horizon 3.
 
 Between AR and the GAM, the lower mean CRPS goes to AR on DM, AR on DO,
-the GAM on PB and the GAM on PP. On DO the mean CRPS is 3.30 for AR and
-32.98 for the GAM. PB and PP recorded few or no captures over long
-stretches. Averaged over the species, AR scores 3.98 against 3.86 for
+the GAM on PB and the GAM on PP. On DO the mean CRPS is 3.31 for AR and
+33.51 for the GAM. PB and PP recorded few or no captures over long
+stretches. Averaged over the species, AR scores 3.98 against 3.85 for
 PW.
 
 The energy score grades the four forecasts at each horizon as one
@@ -270,7 +270,7 @@ horizon.](forecast_evaluation_files/figure-html/energy-1.png)
 
 Energy score of the joint forecast of the four species at each horizon.
 
-The GAM’s energy score runs from 7 to 91 over the twelve months. AR and
+The GAM’s energy score runs from 7 to 93 over the twelve months. AR and
 PW stay below 13.
 [`score()`](https://nicholasjclark.github.io/mvgam/dev/reference/score.mvgam_forecast.md)
 offers nine more rules, among them the variogram score for the
@@ -310,11 +310,11 @@ lfo_pw <- run_lfo(mod_pw)
 loo_compare(lfo_gam, lfo_ar, lfo_pw, model_names = c("GAM", "AR", "PW"))
 #>  model elpd_diff se_diff p_worse diag_diff diag_elpd
 #>     AR       0.0     0.0      NA                    
-#>     PW     -46.3    10.9    1.00   N < 100          
-#>    GAM    -115.9    12.8    1.00   N < 100
+#>     PW     -39.2    12.1    1.00   N < 100          
+#>    GAM     -76.3    14.8    1.00   N < 100
 ```
 
-AR leads. PW trails it by 46 (SE 11) and GAM by 116 (SE 13). The log
+AR leads. PW trails it by 39 (SE 12) and GAM by 76 (SE 15). The log
 score penalises an observation in the tail of a forecast far more
 heavily than the CRPS does.
 [`compare_elpds()`](https://nicholasjclark.github.io/mvgam/dev/reference/compare_elpds.md)
@@ -355,8 +355,8 @@ weights
 #> ------
 #>     weight
 #> GAM 0.000 
-#> AR  0.680 
-#> PW  0.320
+#> AR  0.697 
+#> PW  0.303
 fc_ens <- ensemble(fc_gam, fc_ar, fc_pw, weights = weights,
                    seed = 2026)
 crps_ens <- compare_scores(fc_gam, fc_ar, fc_pw, fc_ens, score = "crps",
@@ -364,13 +364,13 @@ crps_ens <- compare_scores(fc_gam, fc_ar, fc_pw, fc_ens, score = "crps",
 aggregate(score ~ model, FUN = mean,
           data = subset(crps_ens, series != "all_series"))
 #>      model     score
-#> 1      GAM 11.174849
-#> 2       AR  3.975065
-#> 3       PW  3.859577
-#> 4 Ensemble  3.808094
+#> 1      GAM 11.346268
+#> 2       AR  3.977615
+#> 3       PW  3.853498
+#> 4 Ensemble  3.812617
 ```
 
-Stacking gives 0 to the GAM, 0.68 to AR and 0.32 to PW. The ensemble’s
+Stacking gives 0 to the GAM, 0.7 to AR and 0.3 to PW. The ensemble’s
 mean CRPS on the holdout is 3.81, the lowest of the four.
 
 ## Summary

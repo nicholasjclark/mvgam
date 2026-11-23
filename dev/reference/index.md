@@ -646,9 +646,9 @@ Example data used across the vignettes, articles and examples.
 - [`portal_data`](https://nicholasjclark.github.io/mvgam/dev/reference/portal_data.md)
   : Portal Project rodent capture survey data
 - [`coral_surveys`](https://nicholasjclark.github.io/mvgam/dev/reference/coral_surveys.md)
-  : Simulated coral bleaching index with irregular CAR(1) state
+  : Simulated coral bleaching surveys with an irregular CAR(1) state
 - [`lake_chemistry`](https://nicholasjclark.github.io/mvgam/dev/reference/lake_chemistry.md)
-  : Simulated lake chemistry with correlated random-walk state
+  : Simulated lake phosphorus with correlated random-walk state
 
 ## Re-exports
 

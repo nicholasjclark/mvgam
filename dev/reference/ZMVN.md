@@ -295,20 +295,20 @@ summary(mod)
 #> == Observation Model ==
 #> Regression Coefficients:
 #>           Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> Intercept     1.68      0.06     1.56     1.80 1.00     1041     1298
+#> Intercept     1.68      0.06     1.56     1.80 1.00      678      868
 #> 
 #> == Trend Model ==
 #> Trend Specific Parameters:
 #>                       Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS
-#> sigma_trend[series_1]     0.75      0.09     0.60     0.93 1.01      688
-#> sigma_trend[series_2]     0.69      0.07     0.56     0.84 1.00      702
-#> sigma_trend[series_3]     0.82      0.09     0.67     1.01 1.00      976
-#> sigma_trend[series_4]     0.76      0.08     0.62     0.92 1.00      967
+#> sigma_trend[series_1]     0.73      0.08     0.59     0.91 1.00      593
+#> sigma_trend[series_2]     0.68      0.07     0.55     0.84 1.00      925
+#> sigma_trend[series_3]     0.81      0.08     0.66     0.98 1.00      680
+#> sigma_trend[series_4]     0.75      0.07     0.62     0.90 1.00      799
 #>                       Tail_ESS
-#> sigma_trend[series_1]     1065
-#> sigma_trend[series_2]     1091
-#> sigma_trend[series_3]     1180
-#> sigma_trend[series_4]     1326
+#> sigma_trend[series_1]      692
+#> sigma_trend[series_2]     1216
+#> sigma_trend[series_3]     1068
+#> sigma_trend[series_4]     1314
 #> 
 #> Draws were sampled using sampling(NUTS). For each parameter, Bulk_ESS
 #> and Tail_ESS are effective sample size measures, and Rhat is the potential
@@ -327,7 +327,7 @@ rc
 #>   Source     : correlated innovations
 #>   Covariance : stationary
 #>   Series     : 4
-#>   Mean |r_ij| (i != j): 0.35 [0.22, 0.48]
+#>   Mean |r_ij| (i != j): 0.34 [0.22, 0.47]
 #>   Pairs with prob_nonzero > 0.95: 6 / 6
 plot(rc)
 

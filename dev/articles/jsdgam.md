@@ -138,13 +138,13 @@ mod_env <- jsdgam(
   chains = 4, seed = 2025, silent = 2
 )
 fixef(mod_env, trend_effects = TRUE)
-#>                                Estimate Est.Error       Q2.5     Q97.5
-#> Bare.ground:.trend1_trend   0.141879572 0.2780325 -0.4449011 0.6644610
-#> Bare.ground:.trend2_trend   0.189307196 0.3034796 -0.4435432 0.7335655
-#> .trend1:Canopy.cover_trend  0.469787357 0.5170706 -0.7592491 1.2901162
-#> .trend2:Canopy.cover_trend  0.555287758 0.5870969 -0.7556979 1.3949672
-#> .trend1:Shrub.cover_trend  -0.009004259 0.2338782 -0.4453334 0.4680144
-#> .trend2:Shrub.cover_trend   0.073719634 0.2554418 -0.4505435 0.5443604
+#>                               Estimate Est.Error       Q2.5     Q97.5
+#> Bare.ground:.trend1_trend   0.14757957 0.2299146 -0.3253114 0.5851231
+#> Bare.ground:.trend2_trend   0.14904403 0.2375116 -0.3283565 0.6094964
+#> .trend1:Canopy.cover_trend  0.38902847 0.3817168 -0.4469189 1.0555936
+#> .trend2:Canopy.cover_trend  0.55781086 0.4310188 -0.5233924 1.2117815
+#> .trend1:Shrub.cover_trend  -0.02135222 0.2207813 -0.4441711 0.4091492
+#> .trend2:Shrub.cover_trend   0.09645195 0.2345308 -0.3851571 0.5364400
 ```
 
 [`fixef()`](https://rdrr.io/pkg/nlme/man/fixed.effects.html) reports the
@@ -171,9 +171,9 @@ Posterior mean response of each species to one standard deviation of
 each covariate, on the log scale of expected counts. Outlined cells have
 a posterior probability of their sign above 0.95.
 
-Under denser canopy 9 of the 41 species become more abundant and 13 less
+Under denser canopy 8 of the 41 species become more abundant and 10 less
 abundant, each with a posterior probability above 0.95. The mean
-responses run from -1.05 for Cardiocondyla nuda atalanta to 2.69 for
+responses run from -0.99 for Monomorium rothsteini to 1.89 for
 Aphaenogaster longiceps. `summary(se)` lists every species’ estimate and
 interval.
 
@@ -250,11 +250,11 @@ loo_cmp <- loo_compare(list(uninformed = loo(mod_base),
 loo_cmp
 #>           model elpd_diff se_diff p_worse diag_diff       diag_elpd
 #>  trait-informed       0.0     0.0      NA           21 k_psis > 0.7
-#>      uninformed     -30.8     8.5    1.00           23 k_psis > 0.7
+#>      uninformed     -30.0     7.3    1.00           18 k_psis > 0.7
 ```
 
 Leave-one-out ranks the trait-informed prior first. The other trails it
-by 30.8 (SE 8.5) in expected log predictive density.
+by 30.0 (SE 7.3) in expected log predictive density.
 
 ## Residual correlations
 
@@ -305,9 +305,9 @@ intervals.](jsdgam_files/figure-html/community-1.png)
 Posterior median expected richness along canopy cover, with nested 20%,
 40%, 60% and 80% credible intervals.
 
-Expected richness barely changes, from 20.2 species at the most open
-sites to 19.9 under the densest canopy. The posterior probability that
-dense canopy holds fewer species is 0.63.
+Expected richness barely changes, from 23.5 species at the most open
+sites to 22.9 under the densest canopy. The posterior probability that
+dense canopy holds fewer species is 0.60.
 
 Richness counts species without regard to how common they are. Each
 species weighs into diversity and traits by its expected count. A Hill
@@ -327,7 +327,7 @@ Hill numbers and abundance-weighted mean traits along canopy cover, with
 nested 20%, 40%, 60% and 80% credible intervals.
 
 The exponential of Shannon entropy, the Hill number of order one, peaks
-at 27 species near a canopy cover of -0.2 and falls to 15 under the
+at 27 species near a canopy cover of -0.1 and falls to 19 under the
 densest canopy. Dense canopy keeps a list of species as long as open
 ground does, while a few of them come to dominate the counts.
 
@@ -384,8 +384,8 @@ models fixed.
 
 The trait prior and column shrinkage tested two assumptions of the first
 ant community models: independent loadings and two factors.
-Leave-one-out ranked the trait-informed prior first, by 30.8 in expected
-log predictive density against a standard error of 8.5. Given a ceiling
+Leave-one-out ranked the trait-informed prior first, by 30.0 in expected
+log predictive density against a standard error of 7.3. Given a ceiling
 of 6 factors, the shrinkage prior kept 2 active, against the 2 the first
 models assumed. Each extension is one argument to a single
 [`jsdgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/jsdgam.md)

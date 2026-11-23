@@ -74,7 +74,7 @@ get_prior(
 #>                  (flat)           b        sx_1                                
 #>    student_t(3, 0, 2.5)         sds                                    0       
 #>    student_t(3, 0, 2.5)         sds s(x, k = 5)                        0       
-#>          exponential(2) sigma_trend                                    0       
+#>      inv_gamma(3, 1.07) sigma_trend                                    0       
 #>          normal(0, 0.5)   ar1_trend                                   -1  1    
 #>        source
 #>       default
@@ -91,7 +91,7 @@ persistent <- prior(normal(0.7, 0.15), class = ar1_trend)
 mod <- mvgam(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1),
              data = simdat$data_train, family = poisson(),
              prior = persistent, chains = 2, silent = 2)
-#> Warning: 3 of 2000 (0.0%) transitions ended with a divergence.
+#> Warning: 4 of 2000 (0.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 
 # The fitted model's prior table records the change
@@ -102,7 +102,7 @@ get_prior(mod)
 #>                  (flat)           b        sx_1                                
 #>    student_t(3, 0, 2.5)         sds                                    0       
 #>    student_t(3, 0, 2.5)         sds s(x, k = 5)                        0       
-#>          exponential(2) sigma_trend                                    0       
+#>      inv_gamma(3, 1.07) sigma_trend                                    0       
 #>       normal(0.7, 0.15)   ar1_trend                                   -1  1    
 #>        source
 #>       default

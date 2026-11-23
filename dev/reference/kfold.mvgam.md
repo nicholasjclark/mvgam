@@ -204,15 +204,15 @@ Nicholas J Clark
 ``` r
 # \dontrun{
 set.seed(13)
-simdat <- sim_mvgam(family = gaussian(), n_series = 1L,
+simdat <- sim_mvgam(family = negbinomial(), n_series = 1L,
                      n_timepoints = 120L, type = 6L)
 
-mod <- mvgam(y ~ s(season, bs = "cc"),
+mod <- mvgam(y ~ s(season, bs = "cc", k = 6),
               trend_formula = ~ CAR(),
               data    = simdat$data_train,
-              family  = gaussian(),
+              family  = negbinomial(),
               chains  = 2, silent = 2)
-#> Warning: 3 of 2000 (0.0%) transitions ended with a divergence.
+#> Warning: 46 of 2000 (2.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 
 # Neighbouring times share information through the trend. Folds of
@@ -221,31 +221,31 @@ mod <- mvgam(y ~ s(season, bs = "cc"),
 blocks <- cut(simdat$data_train$time, breaks = 4L, labels = FALSE)
 k <- kfold(mod, folds = blocks)
 #> kfold: refitting 4 fold(s) ...
-#> Warning: 5 of 2000 (0.0%) transitions ended with a divergence.
+#> Warning: 48 of 2000 (2.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
-#> Warning: 11 of 2000 (1.0%) transitions ended with a divergence.
+#> Warning: 17 of 2000 (1.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
-#> Warning: 4 of 2000 (0.0%) transitions ended with a divergence.
+#> Warning: 160 of 2000 (8.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 #> Warning: 12 of 2000 (1.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 k
 #> mvgam k-fold cross-validation
-#>   elpd_kfold : -135.02 (SE 8.26)
-#>   kfoldic    : 270.04 (SE 16.52)
+#>   elpd_kfold : -258.66 (SE 16.81)
+#>   kfoldic    : 517.32 (SE 33.63)
 #>   groups     : 4 (fold)
 #>   refits     : 4 of 4 folds
-#>   Pareto k   : max 1.60, median 1.02, threshold 0.70 (adaptive)
+#>   Pareto k   : max 1.21, median 1.07, threshold 0.70 (adaptive)
 #> 
 #> Lowest ELPD (share of the total):
-#>   2                    -39.02 (28.9%)
-#>   1                    -35.04 (26.0%)
-#>   4                    -30.90 (22.9%)
+#>   2                    -70.26 (27.2%)
+#>   1                    -68.77 (26.6%)
+#>   4                    -67.46 (26.1%)
 #> 
 #> Largest change from PSIS to refit:
-#>   1                    -30.99 -> -35.04
-#>   2                    -35.50 -> -39.02
-#>   3                    -28.29 -> -30.06
+#>   1                    -63.05 -> -68.77
+#>   4                    -63.27 -> -67.46
+#>   2                    -66.24 -> -70.26
 
 # The ELPD and Pareto k of each block
 plot(k)

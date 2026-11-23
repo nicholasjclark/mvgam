@@ -283,8 +283,6 @@ mod <- jsdgam(
   chains         = 2,
   silent         = 2
 )
-#> Warning: 28 of 2000 (1.0%) transitions ended with a divergence.
-#> See https://mc-stan.org/misc/warnings for details.
 
 summary(mod)
 #>  Family: occ 
@@ -300,40 +298,40 @@ summary(mod)
 #> == Observation Model ==
 #> Regression Coefficients:
 #>                Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> Intercept          1.02      0.60     0.13     2.56 1.02      206      153
-#> p_Intercept       -0.21      0.18    -0.56     0.14 1.00      736     1079
-#> seriessp_2        -0.32      0.85    -2.00     1.39 1.02      165      159
-#> seriessp_3        -1.23      0.66    -2.79    -0.19 1.02      229      151
-#> seriessp_4        -1.43      1.43    -3.71     2.07 1.01      270      215
-#> seriessp_5        -0.11      0.83    -1.80     1.57 1.02      250      180
-#> seriessp_6        -3.13      1.02    -5.55    -1.83 1.02      215      143
-#> env               -2.26      1.06    -5.33    -0.91 1.02      172      100
-#> seriessp_2:env     1.50      1.27    -0.70     4.60 1.03      121       98
-#> seriessp_3:env     2.18      1.11     0.61     5.36 1.02      187      101
-#> seriessp_4:env     0.02      1.70    -4.10     3.14 1.01      176      125
-#> seriessp_5:env     1.84      1.17     0.14     4.98 1.02      183      103
-#> seriessp_6:env     0.29      1.35    -2.00     3.53 1.03      177      102
-#> p_seriessp_2       0.55      0.24     0.08     1.03 1.00      866     1187
-#> p_seriessp_3       1.11      0.26     0.61     1.63 1.00     1022     1309
-#> p_seriessp_4      -1.05      0.44    -1.96    -0.23 1.00      685      485
-#> p_seriessp_5       0.51      0.24     0.02     0.97 1.00      872     1206
-#> p_seriessp_6       0.61      0.34    -0.02     1.30 1.00     1133     1184
-#> p_tod_c            0.01      0.02    -0.03     0.05 1.00     2123     1475
+#> Intercept          1.09      0.58     0.18     2.43 1.01      404      537
+#> p_Intercept       -0.23      0.17    -0.57     0.11 1.00     1239     1558
+#> seriessp_2        -0.46      0.68    -1.96     0.76 1.00      625      647
+#> seriessp_3        -1.32      0.64    -2.76    -0.23 1.01      566      655
+#> seriessp_4        -1.51      1.17    -3.58     1.36 1.00      568      486
+#> seriessp_5        -0.20      0.71    -1.70     1.11 1.00      618      654
+#> seriessp_6        -3.31      0.84    -5.22    -1.91 1.00      756      941
+#> env               -2.33      0.85    -4.37    -1.00 1.01      443      549
+#> seriessp_2:env     1.64      0.95     0.02     3.79 1.01      458      490
+#> seriessp_3:env     2.25      0.91     0.81     4.43 1.01      488      576
+#> seriessp_4:env    -0.02      1.46    -3.33     2.68 1.00      439      557
+#> seriessp_5:env     1.93      0.94     0.34     4.10 1.01      520      553
+#> seriessp_6:env     0.30      1.09    -1.74     2.55 1.00      545      685
+#> p_seriessp_2       0.57      0.24     0.10     1.03 1.00     1736     1847
+#> p_seriessp_3       1.12      0.27     0.60     1.66 1.00     1821     1450
+#> p_seriessp_4      -1.05      0.42    -1.88    -0.27 1.00      975      737
+#> p_seriessp_5       0.52      0.24     0.03     1.00 1.00     1607     1579
+#> p_seriessp_6       0.63      0.34    -0.05     1.29 1.00     2130     1771
+#> p_tod_c            0.01      0.02    -0.03     0.05 1.00     4660     1289
 #> 
 #> == Trend Model ==
 #> Factor Loadings:
 #>                 Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> Z_tilde[sp_1,1]     0.96      0.98     0.12     3.75 1.03      142       95
-#> Z_tilde[sp_2,1]     0.31      1.43    -1.58     3.27 1.01      939      309
-#> Z_tilde[sp_3,1]    -0.04      0.66    -1.44     1.27 1.00     1266      725
-#> Z_tilde[sp_4,1]     0.19      0.95    -1.46     2.12 1.01     1288      755
-#> Z_tilde[sp_5,1]     0.37      1.25    -1.67     3.45 1.01     1025      533
-#> Z_tilde[sp_6,1]     0.20      0.85    -1.19     1.84 1.00     1101      337
-#> Z_tilde[sp_2,2]     1.03      1.35     0.03     4.77 1.00      304      250
-#> Z_tilde[sp_3,2]     0.31      0.68    -0.90     1.81 1.00     1089      572
-#> Z_tilde[sp_4,2]     0.18      1.05    -1.58     2.30 1.01     1376      411
-#> Z_tilde[sp_5,2]    -0.82      1.36    -4.27     1.09 1.02      413      373
-#> Z_tilde[sp_6,2]    -0.13      0.92    -1.63     1.29 1.00      821      471
+#> Z_tilde[sp_1,1]     1.09      0.65     0.16     2.64 1.00      566      910
+#> Z_tilde[sp_2,1]     0.22      0.92    -1.60     2.07 1.00     1332     1627
+#> Z_tilde[sp_3,1]    -0.04      0.73    -1.56     1.45 1.00     1348     1370
+#> Z_tilde[sp_4,1]     0.39      0.94    -1.57     2.21 1.00     1274     1480
+#> Z_tilde[sp_5,1]     0.52      1.02    -1.69     2.36 1.00     1257     1510
+#> Z_tilde[sp_6,1]     0.40      0.90    -1.35     2.20 1.00     1012     1050
+#> Z_tilde[sp_2,2]     1.03      0.66     0.06     2.55 1.00     1142     1479
+#> Z_tilde[sp_3,2]     0.52      0.72    -1.06     2.03 1.00     1268     1412
+#> Z_tilde[sp_4,2]     0.27      0.98    -1.67     2.22 1.00     1769     1685
+#> Z_tilde[sp_5,2]    -0.91      0.91    -2.53     1.15 1.00     1163     1643
+#> Z_tilde[sp_6,2]    -0.26      0.88    -1.97     1.65 1.00     1468     1321
 #> 
 #> Draws were sampled using sampling(NUTS). For each parameter, Bulk_ESS
 #> and Tail_ESS are effective sample size measures, and Rhat is the potential
@@ -386,7 +384,7 @@ plot(cm, type = "cooccurrence")
 rv <- as_draws_rvars(cm)
 rv$richness[20] - rv$richness[1]
 #> rvar<2000>[1] mean ± sd:
-#> [1] -3.3 ± 0.45 
+#> [1] -3.3 ± 0.44 
 
 # Next, compare n_lv = 1 with update(mod, n_lv = 1L) and loo()
 # }

@@ -2,63 +2,41 @@
 
 ## mvgam 2.0.0
 
-mvgam now uses ‘brms’ to build its models. The observation model takes
-the full ‘brms’ formula syntax and a separate `trend_formula` specifies
-the latent process. Most 1.1.x calls need rewriting: see
+mvgam now builds its models through ‘brms’. The observation model takes
+the full ‘brms’ formula syntax. `trend_formula` specifies the latent
+process. Most 1.1.x code needs rewriting. Start with
 [`vignette("mvgam_overview")`](https://nicholasjclark.github.io/mvgam/dev/articles/mvgam_overview.md)
-and the package website for worked examples.
+and
+[`vignette("data")`](https://nicholasjclark.github.io/mvgam/dev/articles/data.md).
+The [articles](https://nicholasjclark.github.io/mvgam/articles/) work
+through each model class.
 
 ### Breaking changes
 
-- Trend constructors now go inside `trend_formula`,
-  e.g. `trend_formula = ~ AR(p = 1)`. The `trend_model` argument has
-  been removed
-- `n_lv` and `trend_map` moved onto the trend constructors. Removed
-  arguments: `use_lv`, `prior_simulation`, `return_model_data`,
-  `save_all_pars`, `parallel`
-- The trend constructors take `centred` in place of `noncentred`. Latent
-  states are sampled non-centred by default
+- Trend constructors go inside `trend_formula`, as in
+  `trend_formula = ~ AR(p = 1)`. `n_lv` and `trend_map` are arguments of
+  the trend constructors
+- Removed arguments: `trend_model`, `use_lv`, `prior_simulation`,
+  `return_model_data`, `save_all_pars`, `parallel`
 - Data for a model with a trend need a factor series column, even for
   one series
-- Renamed families: `nb()` is now
+- Renamed families: `nb()` is
   [`negbinomial()`](https://paulbuerkner.com/brms/reference/brmsfamily.html),
-  `student_t()` is now
+  `student_t()` is
   [`student()`](https://paulbuerkner.com/brms/reference/brmsfamily.html),
-  `betar()` is now
+  `betar()` is
   [`Beta()`](https://paulbuerkner.com/brms/reference/brmsfamily.html)
-- Default family is now
-  [`gaussian()`](https://rdrr.io/r/stats/family.html) in
-  [`mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam.md)
-  and
-  [`sim_mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/sim_mvgam.md).
+- The default family is
+  [`gaussian()`](https://rdrr.io/r/stats/family.html).
   [`jsdgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/jsdgam.md)
   defaults to [`binomial()`](https://rdrr.io/r/stats/family.html)
-- [`sim_mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/sim_mvgam.md)
-  has a new signature built around named scenarios
-- Removed `GP()`, `dynamic()`, `s(bs = "moi")`, `s(bs = "mod")`. Use
-  `gp()` and `mo()`
-- `incl_autocor` now chooses the prediction surface, replacing
-  `trend_state`. `hindcast(resample_innovations = )` is now
-  `process_error`
-- Renamed arguments: `residual_cor(by_group = )`,
-  `score(quantile_level = )`, `forecast(coef_uncertainty = )`,
-  `posterior_transition_matrix(groups = )`
-- `score(score = "drps")` no longer takes `log = TRUE`. Use `"crps"` on
-  the log scale
-- Posterior summaries by default from
-  [`irf()`](https://nicholasjclark.github.io/mvgam/dev/reference/irf.mvgam.md),
-  [`fevd()`](https://nicholasjclark.github.io/mvgam/dev/reference/fevd.mvgam.md),
-  [`stability()`](https://nicholasjclark.github.io/mvgam/dev/reference/stability.mvgam.md).
-  Pass `summary = FALSE` for draws
 - Removed functions, with their replacements: `get_mvgam_priors()`
   ([`get_prior()`](https://nicholasjclark.github.io/mvgam/dev/reference/get_prior.md)),
-  the `plot_mvgam_*()` functions
+  `plot_mvgam_*()`
   ([`plot()`](https://rdrr.io/r/graphics/plot.default.html)),
   `compare_mvgams()`
   ([`loo_compare()`](https://mc-stan.org/loo/reference/loo_compare.html)),
-  `eval_mvgam()`
-  ([`lfo_cv()`](https://nicholasjclark.github.io/mvgam/dev/reference/lfo_cv.mvgam.md)),
-  `roll_eval_mvgam()`
+  `eval_mvgam()` and `roll_eval_mvgam()`
   ([`lfo_cv()`](https://nicholasjclark.github.io/mvgam/dev/reference/lfo_cv.mvgam.md)),
   `lv_correlations()`
   ([`residual_cor()`](https://nicholasjclark.github.io/mvgam/dev/reference/residual_cor.md)),
@@ -67,195 +45,127 @@ and the package website for worked examples.
   `code()`
   ([`stancode()`](https://paulbuerkner.com/brms/reference/stancode.html)),
   `ppc()`
-  ([`pp_check()`](https://nicholasjclark.github.io/mvgam/dev/reference/pp_check.mvgam.md)).
-  `summary(include_states = )` has been removed
-- mvgam no longer re-exports `te()` and `ti()`
-- [`coef()`](https://rdrr.io/r/stats/coef.html) follows ‘brms’: each
-  level’s coefficients per grouping factor.
-  [`fixef()`](https://rdrr.io/pkg/nlme/man/fixed.effects.html) gives the
-  population-level effects
+  ([`pp_check()`](https://nicholasjclark.github.io/mvgam/dev/reference/pp_check.mvgam.md))
+- `gp()` and `mo()` replace `GP()`, `dynamic()`, `s(bs = "moi")`,
+  `s(bs = "mod")`
+- Renamed arguments: `incl_autocor` (was `trend_state`), `process_error`
+  (was `resample_innovations`), `centred` (was `noncentred`)
+- Parameter names follow ‘brms’, as do
+  [`summary()`](https://rdrr.io/r/base/summary.html),
+  [`coef()`](https://rdrr.io/r/stats/coef.html),
+  [`fixef()`](https://rdrr.io/pkg/nlme/man/fixed.effects.html). Trend
+  parameters are indexed by series name, as in `sigma_trend[DM]`
+- Posterior summaries by default from
+  [`irf()`](https://nicholasjclark.github.io/mvgam/dev/reference/irf.mvgam.md),
+  [`fevd()`](https://nicholasjclark.github.io/mvgam/dev/reference/fevd.mvgam.md),
+  [`stability()`](https://nicholasjclark.github.io/mvgam/dev/reference/stability.mvgam.md).
+  Pass `summary = FALSE` for draws
 - `mvgam_forecast` objects store `train_times` and `test_times` as
   per-series lists
-- Parameter names and [`summary()`](https://rdrr.io/r/base/summary.html)
-  blocks follow ‘brms’, with smooths, Gaussian processes and monotonic
-  effects named by term and trend parameters indexed by series name, as
-  in `sigma_trend[DM]`
-- [`series_to_mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/series_to_mvgam.md)
-  takes a `tsibble`, `ts`, `mts`, `msts` or wide data frame, fills gaps
-  and returns one data frame unless `h` or `train_prop` is given. `xts`
-  input has been removed
+- mvgam no longer re-exports `te()` and `ti()`.
+  [`series_to_mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/series_to_mvgam.md)
+  no longer takes `xts` input
+- [`sim_mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/sim_mvgam.md)
+  is built around named scenarios.
+  [`series_to_mvgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/series_to_mvgam.md)
+  returns one data frame unless `h` or `train_prop` is given
 
 ### New features
 
-- Families:
-  [`tweedie()`](https://nicholasjclark.github.io/mvgam/dev/reference/tweedie.md),
-  [`beta_nb()`](https://nicholasjclark.github.io/mvgam/dev/reference/beta_nb.md),
-  [`com_binomial()`](https://nicholasjclark.github.io/mvgam/dev/reference/com_binomial.md),
-  [`occ()`](https://nicholasjclark.github.io/mvgam/dev/reference/occ.md),
-  [`diri()`](https://nicholasjclark.github.io/mvgam/dev/reference/diri.md),
-  [`multi()`](https://nicholasjclark.github.io/mvgam/dev/reference/multi.md),
-  [`categ()`](https://nicholasjclark.github.io/mvgam/dev/reference/categ.md),
-  [`mvn()`](https://nicholasjclark.github.io/mvgam/dev/reference/mvn.md),
-  [`mvt()`](https://nicholasjclark.github.io/mvgam/dev/reference/mvt.md).
-  [`nmix()`](https://nicholasjclark.github.io/mvgam/dev/reference/nmix.md)
-  gained Royle-Nichols, Poisson-Poisson and multi-season variants
-- `forecast(type = "latent_state")` forecasts the occupancy or abundance
-  of an
+- `mvbind()` and `mvbf()` responses share one latent process. See the
+  [multivariate](https://nicholasjclark.github.io/mvgam/articles/mvbf.html)
+  and [integrated distribution
+  model](https://nicholasjclark.github.io/mvgam/articles/idm.html)
+  articles
+- Imperfect detection through
   [`occ()`](https://nicholasjclark.github.io/mvgam/dev/reference/occ.md)
-  or
-  [`nmix()`](https://nicholasjclark.github.io/mvgam/dev/reference/nmix.md)
-  fit. A multi-season fit reports the mean over the sites of each season
-- @jbogomolovas2 contributed the
-  [`com_binomial()`](https://nicholasjclark.github.io/mvgam/dev/reference/com_binomial.md)
-  mathematics and tested the bounded count families
-- Multivariate responses through `mvbind()` and `mvbf()`. Each response
-  keeps the rows where it was observed.
-  [`summary()`](https://rdrr.io/r/base/summary.html) reports each
-  response’s count
-- [`forecast_uncertainty()`](https://nicholasjclark.github.io/mvgam/dev/reference/forecast_uncertainty.md)
-  splits a forecast’s variance by source and horizon. It also compares
-  covariate scenarios.
-  [`variance_partition()`](https://nicholasjclark.github.io/mvgam/dev/reference/variance_partition.md)
-  splits the fitted predictor’s variance by source
-- [`community()`](https://nicholasjclark.github.io/mvgam/dev/reference/community.md)
-  gives richness, Hill numbers, community-weighted mean traits and
-  excess co-occurrence, along gradients, at the fitted sites or over a
-  forecast
-- Checks of a model and its data before fitting or prediction:
-  [`mvgam_formula()`](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam_formula.md),
-  [`mvgam_data()`](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam_data.md),
-  [`check_newdata()`](https://nicholasjclark.github.io/mvgam/dev/reference/check_newdata.md)
-- Moving average terms in
+  and
+  [`nmix()`](https://nicholasjclark.github.io/mvgam/dev/reference/nmix.md),
+  each with a multi-season variant. `forecast(type = "latent_state")`
+  forecasts occupancy or abundance. See the
+  [occupancy](https://nicholasjclark.github.io/mvgam/articles/occupancy.html)
+  and
+  [N-mixture](https://nicholasjclark.github.io/mvgam/articles/nmix.html)
+  articles
+- [`jsdgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/jsdgam.md)
+  takes traits, trait slopes, a phylogeny and the composition families
+  ([`diri()`](https://nicholasjclark.github.io/mvgam/dev/reference/diri.md),
+  [`multi()`](https://nicholasjclark.github.io/mvgam/dev/reference/multi.md),
+  [`categ()`](https://nicholasjclark.github.io/mvgam/dev/reference/categ.md)).
+  Summaries of the fit:
+  [`species_effects()`](https://nicholasjclark.github.io/mvgam/dev/reference/species_effects.md),
+  [`community()`](https://nicholasjclark.github.io/mvgam/dev/reference/community.md),
+  [`residual_cor()`](https://nicholasjclark.github.io/mvgam/dev/reference/residual_cor.md).
+  See the [JSDM
+  article](https://nicholasjclark.github.io/mvgam/articles/jsdgam.html)
+- New dynamics: moving average terms and coefficient pooling in
   [`AR()`](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md)
   and
   [`VAR()`](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md),
-  coefficient pooling in
-  [`AR()`](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md)
-  and partially fixed `trend_map`
-- [`CAR()`](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md)
-  gained `cor = TRUE`, takes series observed at their own times and
-  takes `trend_formula` covariates on several series
-- [`LLT()`](https://nicholasjclark.github.io/mvgam/dev/reference/LLT.md)
-  adds a local linear trend: a level with a time-varying slope that can
-  be damped, plus an optional trigonometric season whose shape drifts
-  (`season`, `harmonics`). Its level, slope and season come back from
-  [`hindcast()`](https://nicholasjclark.github.io/mvgam/dev/reference/hindcast.mvgam.md)
-  and [`forecast()`](https://generics.r-lib.org/reference/forecast.html)
-  with `component`
-- `loadings_prior` for structured factor loadings. Helpers for the
-  fitted loadings:
+  hierarchical VARs, the local linear trend
+  [`LLT()`](https://nicholasjclark.github.io/mvgam/dev/reference/LLT.md),
+  an extended
+  [`CAR()`](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md).
+  See the
+  [VAR](https://nicholasjclark.github.io/mvgam/articles/var.html) and
+  [hierarchical
+  VAR](https://nicholasjclark.github.io/mvgam/articles/hierarchical_var.html)
+  articles
+- Structured factor loadings through `loadings_prior`. Tools to
+  interpret the loadings:
   [`active_factors()`](https://nicholasjclark.github.io/mvgam/dev/reference/active_factors.md),
   [`shared_variation()`](https://nicholasjclark.github.io/mvgam/dev/reference/shared_variation.md),
   [`compare_loadings()`](https://nicholasjclark.github.io/mvgam/dev/reference/compare_loadings.md),
-  [`ordinate()`](https://nicholasjclark.github.io/mvgam/dev/reference/ordinate.md)
-- AR factor models with estimated loadings give every draw one factor
-  order and orientation.
-  [`summary()`](https://rdrr.io/r/base/summary.html) reports their
-  loadings as `Z` and their AR coefficients per factor
-- [`jsdgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/jsdgam.md)
-  gained three arguments: `traits`, `trait_slopes`, `phylo`.
-  [`lv_axis()`](https://nicholasjclark.github.io/mvgam/dev/reference/lv_axis.md)
-  in a `trend_formula` term gives each latent factor, or each series of
-  a model without factors, its own effect
+  [`ordinate()`](https://nicholasjclark.github.io/mvgam/dev/reference/ordinate.md).
+  See
+  [`vignette("dfm")`](https://nicholasjclark.github.io/mvgam/dev/articles/dfm.md)
+- New families:
+  [`tweedie()`](https://nicholasjclark.github.io/mvgam/dev/reference/tweedie.md),
+  [`beta_nb()`](https://nicholasjclark.github.io/mvgam/dev/reference/beta_nb.md),
+  [`com_binomial()`](https://nicholasjclark.github.io/mvgam/dev/reference/com_binomial.md)
+  (mathematics by [@jbogomolovas2](https://github.com/jbogomolovas2)),
+  [`mvn()`](https://nicholasjclark.github.io/mvgam/dev/reference/mvn.md),
+  [`mvt()`](https://nicholasjclark.github.io/mvgam/dev/reference/mvt.md)
 - The ‘brms’ post-processing methods work on mvgam fits. Examples:
   `posterior_predict()`,
   [`log_lik()`](https://mc-stan.org/rstantools/reference/log_lik.html),
   [`update()`](https://rdrr.io/r/stats/update.html),
   [`hypothesis()`](https://paulbuerkner.com/brms/reference/hypothesis.brmsfit.html),
-  `as_draws_*()`
-- Exact `gp()` terms (no `k`) under any ‘brms’ kernel, with predictions
-  and forecasts at new covariate values
-- [`species_effects()`](https://nicholasjclark.github.io/mvgam/dev/reference/species_effects.md)
-  gives each species’ response to named covariates with the posterior
-  probability of its sign, plus the trait effects of a `trait_slopes`
-  fit
-- `bayes_R2(by_series = TRUE)` scores each series, adding Tjur’s R^2 and
-  the AUC for binary responses
-- Four functions take `prob_threshold`, the sign probability a supported
-  entry exceeds:
-  [`residual_cor()`](https://nicholasjclark.github.io/mvgam/dev/reference/residual_cor.md),
-  [`posterior_transition_matrix()`](https://nicholasjclark.github.io/mvgam/dev/reference/posterior_transition_matrix.md),
-  [`community()`](https://nicholasjclark.github.io/mvgam/dev/reference/community.md),
-  [`species_effects()`](https://nicholasjclark.github.io/mvgam/dev/reference/species_effects.md).
-  Their heatmaps outline the entries whose sign probability exceeds it
-  and can hide the rest
-- Model comparison:
-  [`bridge_sampler()`](https://rdrr.io/pkg/bridgesampling/man/bridge_sampler.html),
-  [`bayes_factor()`](https://rdrr.io/pkg/bridgesampling/man/bf.html),
-  [`waic()`](https://mc-stan.org/loo/reference/waic.html),
-  [`loo_model_weights()`](https://mc-stan.org/loo/reference/loo_model_weights.html),
-  [`pp_average()`](https://paulbuerkner.com/brms/reference/pp_average.brmsfit.html),
-  [`compare_scores()`](https://nicholasjclark.github.io/mvgam/dev/reference/compare_scores.md),
+  [`bridge_sampler()`](https://rdrr.io/pkg/bridgesampling/man/bridge_sampler.html)
+- [`forecast_uncertainty()`](https://nicholasjclark.github.io/mvgam/dev/reference/forecast_uncertainty.md)
+  splits forecast variance by source and horizon.
+  [`compare_scores()`](https://nicholasjclark.github.io/mvgam/dev/reference/compare_scores.md)
+  and
   [`compare_elpds()`](https://nicholasjclark.github.io/mvgam/dev/reference/compare_elpds.md)
-- `threads`, `init = "pathfinder"`,
-  [`mvgam_multiple()`](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam_multiple.md)
-  for imputed data, and helpers to pivot wide occupancy and species data
+  compare models. See the [forecast evaluation
+  article](https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html)
+- Checks of a model and its data before fitting or prediction:
+  [`mvgam_formula()`](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam_formula.md),
+  [`mvgam_data()`](https://nicholasjclark.github.io/mvgam/dev/reference/mvgam_data.md),
+  [`check_newdata()`](https://nicholasjclark.github.io/mvgam/dev/reference/check_newdata.md)
 - [`methods_md()`](https://nicholasjclark.github.io/mvgam/dev/reference/methods_md.md)
   writes a model description.
   [`bibtex()`](https://nicholasjclark.github.io/mvgam/dev/reference/bibtex.md)
   extracts the citation
-- `pp_check(type = "resid_variogram")` checks residuals by time lag.
-  `plot(type = "residuals")` draws it for unevenly spaced series
-- On a hierarchical VAR,
-  [`stability()`](https://nicholasjclark.github.io/mvgam/dev/reference/stability.mvgam.md)
-  reports each group and
-  [`posterior_transition_matrix()`](https://nicholasjclark.github.io/mvgam/dev/reference/posterior_transition_matrix.md)
-  averages the group matrices. Plots of
-  [`irf()`](https://nicholasjclark.github.io/mvgam/dev/reference/irf.mvgam.md)
-  and
-  [`fevd()`](https://nicholasjclark.github.io/mvgam/dev/reference/fevd.mvgam.md)
-  select processes by name
 
 ### Changed defaults
 
-- The `posterior_*()` prediction methods and
+- The `posterior_*()` methods and
   [`fitted()`](https://rdrr.io/r/stats/fitted.values.html) default to
   `process_error = FALSE`, matching
   [`predict()`](https://rdrr.io/r/stats/predict.html)
-- [`fitted()`](https://rdrr.io/r/stats/fitted.values.html) includes the
-  fitted trend state for the training data, as
-  [`residuals()`](https://rdrr.io/r/stats/residuals.html) does
-- Predictions with `incl_autocor = TRUE` and
-  [`log_lik()`](https://mc-stan.org/rstantools/reference/log_lik.html)
-  refuse times outside the fitted times. Use
-  [`forecast()`](https://generics.r-lib.org/reference/forecast.html)
-- [`ZMVN()`](https://nicholasjclark.github.io/mvgam/dev/reference/ZMVN.md)
-  and
-  [`PW()`](https://nicholasjclark.github.io/mvgam/dev/reference/piecewise_trends.md)
-  forecasts require every series to share one set of forecast times
 - [`conditional_effects()`](https://paulbuerkner.com/brms/reference/conditional_effects.brmsfit.html)
   defaults to `type = "expected"`
-- Quantile residuals of families without a distribution function place
-  each observation by its rank among the posterior predictive draws. An
-  observation beyond every draw keeps a finite residual
-- [`pp_check()`](https://nicholasjclark.github.io/mvgam/dev/reference/pp_check.mvgam.md)
-  draws bars for a bernoulli or ordinal response and a rootogram for
-  counts
-- Trend scale priors take the response’s spread on the link scale as
-  ‘brms’ defaults do.
-  [`LLT()`](https://nicholasjclark.github.io/mvgam/dev/reference/LLT.md)
-  and
-  [`PW()`](https://nicholasjclark.github.io/mvgam/dev/reference/piecewise_trends.md)
-  growth priors also scale with the series length
-- [`PW()`](https://nicholasjclark.github.io/mvgam/dev/reference/piecewise_trends.md)
-  `changepoint_scale` (default `0.3`) is a change in growth over the
-  whole series
-- [`CAR()`](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md)
-  keeps its autoregressive parameter inside `(0, 1)` and measures time
-  in median observation gaps
-- The
-  [`com_binomial()`](https://nicholasjclark.github.io/mvgam/dev/reference/com_binomial.md)
-  prior on `nu` is now `normal(1, 1)`
-- A distributional regression on a
-  [`tweedie()`](https://nicholasjclark.github.io/mvgam/dev/reference/tweedie.md),
-  [`beta_nb()`](https://nicholasjclark.github.io/mvgam/dev/reference/beta_nb.md)
-  or other custom family’s parameter gives its intercept a
-  `student_t(3, 0, 2.5)` prior, as ‘brms’ does for its own families
+- Predictions with `incl_autocor = TRUE` refuse times outside the fitted
+  times. Use
+  [`forecast()`](https://generics.r-lib.org/reference/forecast.html)
+- Trend scale priors follow the response’s spread on the link scale, as
+  ‘brms’ defaults do
 
 ### Deprecations
 
 - `samples` and `burnin` (use `iter` and `warmup`), `lfo_cv(data = )`
-  (use `newdata`), `incl_dynamics` (use `incl_autocor`) and `by = trend`
+  (use `newdata`), `incl_dynamics` (use `incl_autocor`), `by = trend`
   (use `by = lv_axis()`)
 
 ### Bug fixes
@@ -263,33 +173,20 @@ and the package website for worked examples.
 - Binomial predictions with varying trial counts stay within each
   observation’s total (thanks to
   [@jbogomolovas2](https://github.com/jbogomolovas2))
-- [`update()`](https://rdrr.io/r/stats/update.html) works when a trend
-  constructor argument came from a variable
-- [`prior_summary()`](https://mc-stan.org/rstantools/reference/prior_summary.html)
-  reports the priors in the compiled Stan model
-- [`nmix()`](https://nicholasjclark.github.io/mvgam/dev/reference/nmix.md)
-  models accept missing responses
+- [`CAR()`](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md)
+  process variance scales with the time lag
+  ([\#107](https://github.com/nicholasjclark/mvgam/issues/107))
 - [`ensemble()`](https://nicholasjclark.github.io/mvgam/dev/reference/ensemble.mvgam_forecast.md)
   combines
   [`hindcast()`](https://nicholasjclark.github.io/mvgam/dev/reference/hindcast.mvgam.md)
   results
-- [`CAR()`](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md)
-  process variance scales with the time lag
-  ([\#107](https://github.com/nicholasjclark/mvgam/issues/107))
-- `score(score = "brier")` scores the forecast probability, the mean of
-  the draws
-- `score(score = "variogram")` follows Scheuerer and Hamill (2015)
-  through
-  [`scoringRules::vs_sample()`](https://rdrr.io/pkg/scoringRules/man/scores_sample_multiv.html)
-- Variational, Laplace and Pathfinder fits name their algorithm in
-  [`summary()`](https://rdrr.io/r/base/summary.html) and
-  [`glance()`](https://generics.r-lib.org/reference/glance.html)
-- `algorithm = "laplace"` honours `silent = 2`
-- Fixes to forecast scores with one test observation, offsets with
-  `gp()` terms, piecewise trend predictions, by-factor Gaussian Process
-  predictions, the `max_treedepth` check in
-  [`summary()`](https://rdrr.io/r/base/summary.html) and plots of
-  residuals with missing values (thanks to
+- [`update()`](https://rdrr.io/r/stats/update.html) works when a trend
+  argument came from a variable
+- Fixes to the Brier and variogram scores and to scores of forecasts
+  with one test observation
+- Fixes to offsets with `gp()` terms, piecewise trend predictions,
+  by-factor Gaussian Process predictions and residual plots with missing
+  values (thanks to
   [@StefanoMezzini](https://github.com/StefanoMezzini))
 
 ## mvgam 1.1.51

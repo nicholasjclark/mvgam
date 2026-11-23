@@ -593,7 +593,7 @@ get_prior(
 #>  student_t(3, 1.6, 2.5)     Intercept                                       
 #>    student_t(3, 0, 2.5)           sds                                       
 #>    student_t(3, 0, 2.5)           sds s(season, bs = "cc", k = 6)           
-#>          exponential(2)   sigma_trend                                       
+#>      inv_gamma(3, 1.07)   sigma_trend                                       
 #>          normal(0, 0.5)     ar1_trend                                       
 #>    lkj_corr_cholesky(2) L_Omega_trend                                       
 #>  dpar nlpar    lb    ub tag       source
@@ -613,6 +613,8 @@ mod <- mvgam(
   chains        = 2,
   silent        = 2
 )
+#> Warning: 2 of 2000 (0.0%) transitions ended with a divergence.
+#> See https://mc-stan.org/misc/warnings for details.
 summary(mod)
 #>  Family: poisson 
 #>   Links: mu = log 
@@ -626,28 +628,28 @@ summary(mod)
 #> == Observation Model ==
 #> Smoothing Spline Hyperparameters:
 #>                Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> sds(sseason_1)     1.52      0.65     0.72     3.33 1.00      730     1045
+#> sds(sseason_1)     1.52      0.68     0.69     3.44 1.00      923     1338
 #> 
 #> Regression Coefficients:
 #>           Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> Intercept     1.58      0.09     1.40     1.75 1.00     1166     1339
+#> Intercept     1.58      0.09     1.40     1.74 1.00     1739     1588
 #> 
 #> == Trend Model ==
 #> Trend Specific Parameters:
 #>                       Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS
-#> sigma_trend[series_1]     0.32      0.10     0.15     0.52 1.00      701
-#> sigma_trend[series_2]     0.49      0.13     0.26     0.78 1.00      816
-#> sigma_trend[series_3]     0.59      0.12     0.39     0.86 1.00     1090
-#> ar1_trend[series_1]       0.58      0.23     0.09     0.92 1.00      609
-#> ar1_trend[series_2]       0.41      0.21     0.04     0.83 1.00      692
-#> ar1_trend[series_3]       0.18      0.15     0.01     0.53 1.00      948
+#> sigma_trend[series_1]     0.32      0.09     0.17     0.51 1.00      981
+#> sigma_trend[series_2]     0.47      0.12     0.26     0.73 1.00     1097
+#> sigma_trend[series_3]     0.57      0.12     0.38     0.83 1.00     1405
+#> ar1_trend[series_1]       0.60      0.21     0.12     0.92 1.00      681
+#> ar1_trend[series_2]       0.41      0.22     0.04     0.83 1.00      929
+#> ar1_trend[series_3]       0.18      0.15     0.01     0.54 1.00     1621
 #>                       Tail_ESS
-#> sigma_trend[series_1]      973
-#> sigma_trend[series_2]     1086
-#> sigma_trend[series_3]     1357
-#> ar1_trend[series_1]        956
-#> ar1_trend[series_2]       1012
-#> ar1_trend[series_3]       1329
+#> sigma_trend[series_1]     1175
+#> sigma_trend[series_2]     1416
+#> sigma_trend[series_3]     1526
+#> ar1_trend[series_1]       1144
+#> ar1_trend[series_2]       1248
+#> ar1_trend[series_3]       1219
 #> 
 #> Draws were sampled using sampling(NUTS). For each parameter, Bulk_ESS
 #> and Tail_ESS are effective sample size measures, and Rhat is the potential
@@ -705,12 +707,12 @@ summary(mod_big)
 #> == Observation Model ==
 #> Regression Coefficients:
 #>           Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> Intercept     5.09      0.12     4.85     5.33 1.01      229      635
+#> Intercept     4.88      0.14     4.59     5.15 1.01      226      487
 #> 
 #> == Trend Model ==
 #> Trend Specific Parameters:
 #>                 Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> sigma_trend[s1]     0.10      0.02     0.07     0.14 1.00      631      989
+#> sigma_trend[s1]     0.12      0.02     0.09     0.16 1.00      537      858
 #> 
 #> Draws were sampled using sampling(NUTS). For each parameter, Bulk_ESS
 #> and Tail_ESS are effective sample size measures, and Rhat is the potential

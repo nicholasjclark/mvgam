@@ -142,10 +142,17 @@ scale of 2.5 by the factor \\s = \max(1, \mathrm{mad}(\mathrm{link}(y))
 taking the widest over several responses and \\s = 1\\ under any other
 link:
 
-- `sigma_trend` and `sigma_group_trend` take `exponential(2 / s)`, with
-  mean \\s / 2\\.
+- `sigma_trend` and `sigma_group_trend` take `inv_gamma(3, 1.07 s)`,
+  with median \\0.40 s\\. It has no mass at zero. The process noise then
+  stays separate from an observation noise that competes for the same
+  variance.
 
-- The factor loadings `Z` take `student_t(3, 0, 0.5 s)`.
+- The factor loadings `Z` take `student_t(3, 0, 0.5 s)`. The static
+  factors of
+  [`ZMVN()`](https://nicholasjclark.github.io/mvgam/dev/reference/ZMVN.md),
+  which
+  [`jsdgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/jsdgam.md)
+  builds, take `normal(0, s)`.
 
 - [`LLT()`](https://nicholasjclark.github.io/mvgam/dev/reference/LLT.md)
   is the exception. Its shock scales (`sigma_trend` among them) and its
@@ -206,7 +213,7 @@ get_prior(mf, data = dat, family = poisson())
 #>                  (flat)           b        sx_1                                
 #>    student_t(3, 0, 2.5)         sds                                    0       
 #>    student_t(3, 0, 2.5)         sds s(x, k = 5)                        0       
-#>          exponential(2) sigma_trend                                    0       
+#>      inv_gamma(3, 1.07) sigma_trend                                    0       
 #>          normal(0, 0.5)   ar1_trend                                   -1  1    
 #>        source
 #>       default

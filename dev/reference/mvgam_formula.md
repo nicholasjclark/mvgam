@@ -166,7 +166,7 @@ get_prior(f, data = simdat$data_train, family = poisson())
 #>                  (flat)           b sx_1                                
 #>    student_t(3, 0, 2.5)         sds                             0       
 #>    student_t(3, 0, 2.5)         sds s(x)                        0       
-#>          exponential(2) sigma_trend                             0       
+#>      inv_gamma(3, 1.07) sigma_trend                             0       
 #>          normal(0, 0.5)   ar1_trend                            -1  1    
 #>        source
 #>       default
@@ -274,7 +274,7 @@ stancode(f, data = simdat$data_train, family = poisson())
 #>   // priors including constants
 #>   target += lprior;
 #>   // Shared innovation priors
-#>   target += exponential_lpdf(sigma_trend | 2);
+#>   target += inv_gamma_lpdf(sigma_trend | 3, 1.07);
 #>   target += std_normal_lpdf(to_vector(innovations_trend));
 #>   // AR coefficient priors
 #>   target += normal_lpdf(ar1_trend | 0, 0.5);

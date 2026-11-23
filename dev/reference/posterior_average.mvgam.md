@@ -181,7 +181,7 @@ simdat <- sim_mvgam(family = poisson(), n_series = 1L,
                     n_timepoints = 120L, trend_model = "None")
 mod <- mvgam(y ~ s(x), data = simdat$data_train,
              family = poisson(), chains = 2, silent = 2)
-#> Warning: 5 of 2000 (0.0%) transitions ended with a divergence.
+#> Warning: 11 of 2000 (1.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 # }
 # \dontrun{
@@ -193,31 +193,31 @@ loo_model_weights(mod, mod_lin)
 #> Method: stacking
 #> ------
 #>         weight
-#> mod     0.893 
-#> mod_lin 0.107 
+#> mod     0.900 
+#> mod_lin 0.100 
 
 # The intercept, averaged over both fits under those weights
 pa <- posterior_average(mod, mod_lin, variable = "b_Intercept")
 attr(pa, "weights")
-#>       mod   mod_lin 
-#> 0.8928415 0.1071585 
+#>        mod    mod_lin 
+#> 0.90006149 0.09993851 
 summary(pa)
 #>   b_Intercept   
-#>  Min.   :1.457  
-#>  1st Qu.:1.601  
-#>  Median :1.634  
-#>  Mean   :1.633  
-#>  3rd Qu.:1.667  
+#>  Min.   :1.452  
+#>  1st Qu.:1.603  
+#>  Median :1.637  
+#>  Mean   :1.636  
+#>  3rd Qu.:1.669  
 #>  Max.   :1.790  
 
 # Averaged expected counts, one row per observation
 head(pp_average(mod, mod_lin, method = "posterior_epred"))
 #>       Estimate Est.Error     Q2.5     Q97.5
-#> [1,]  2.920095 0.5076075 2.036622  4.000498
-#> [2,] 13.018597 2.1120540 7.837783 16.165118
-#> [3,]  7.124993 0.6409050 6.016211  8.399226
-#> [4,]  8.671362 1.0330466 6.924731 11.087513
-#> [5,]  2.783317 0.5336033 1.877674  3.965607
-#> [6,]  8.408340 1.9114308 5.441091 12.812283
+#> [1,]  2.917276 0.5032926 2.042109  3.992054
+#> [2,] 13.036550 2.0955562 7.866624 16.432100
+#> [3,]  7.120997 0.6529359 5.951876  8.424106
+#> [4,]  8.683885 1.0082068 6.991904 11.017109
+#> [5,]  2.781831 0.5425894 1.851517  3.979510
+#> [6,]  8.372967 1.8643111 5.648742 12.807312
 # }
 ```

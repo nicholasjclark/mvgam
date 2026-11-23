@@ -166,28 +166,28 @@ summary(mod_joint)
 #> == Observation Model ==
 #> Regression Coefficients:
 #>                 Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> count_Intercept     1.03      0.14     0.75     1.30 1.00     5335     3249
-#> pa_Intercept       -0.23      0.15    -0.52     0.05 1.00     5818     3077
-#> po_Intercept        0.34      0.10     0.13     0.52 1.00     3355     2826
+#> count_Intercept     1.03      0.14     0.75     1.30 1.00     3238     2497
+#> pa_Intercept       -0.23      0.15    -0.55     0.07 1.00     3562     2607
+#> po_Intercept        0.33      0.10     0.12     0.52 1.00     2565     1997
 #> 
 #> == Trend Model ==
 #> Smoothing Spline Hyperparameters:
 #>             Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> sds(senv_1)     2.00      1.16     0.48     4.67 1.00     1745     2056
+#> sds(senv_1)     1.98      1.15     0.45     4.91 1.00     1434     1491
 #> 
 #> Regression Coefficients:
 #>        Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> senv_1    -0.84      3.49    -9.05     5.08 1.00     2022     2195
+#> senv_1    -0.81      3.52    -9.17     5.17 1.00     1469     1588
 #> 
 #> Trend Specific Parameters:
 #>                       Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS
-#> sigma_trend[species1]     0.32      0.11     0.08     0.54 1.01      946
-#> ar1_trend[species1]       0.12      0.26    -0.42     0.63 1.00     1806
-#> ar12_trend[species1]     -0.10      0.30    -0.68     0.48 1.00     2227
+#> sigma_trend[species1]     0.34      0.09     0.17     0.54 1.00     1294
+#> ar1_trend[species1]       0.12      0.24    -0.38     0.57 1.00     1417
+#> ar12_trend[species1]     -0.10      0.30    -0.67     0.46 1.00     1050
 #>                       Tail_ESS
-#> sigma_trend[species1]      973
-#> ar1_trend[species1]       1735
-#> ar12_trend[species1]      2726
+#> sigma_trend[species1]     2131
+#> ar1_trend[species1]       2084
+#> ar12_trend[species1]      1557
 #> 
 #> Draws were sampled using sampling(NUTS). For each parameter, Bulk_ESS
 #> and Tail_ESS are effective sample size measures, and Rhat is the potential
@@ -224,7 +224,7 @@ constants
 #> Hypothesis Tests for class :
 #>     Hypothesis Estimate Est.Error CI.Lower CI.Upper Evid.Ratio Post.Prob Star
 #> 1     log area    -1.26      0.20    -1.64    -0.88         NA        NA    *
-#> 2 log thinning    -0.69      0.16    -1.00    -0.38         NA        NA    *
+#> 2 log thinning    -0.69      0.16    -1.01    -0.38         NA        NA    *
 #> ---
 #> 'CI': 90%-CI for one-sided and 95%-CI for two-sided hypotheses.
 #> '*': For one-sided hypotheses, the posterior probability exceeds 95%;
@@ -341,7 +341,7 @@ model.
 After month 24, the counts-alone model has no data on abundance. Its
 estimates come only from the autoregression and the environmental index.
 Its intervals grow wider over time. Across the 72 unsurveyed months, its
-95% intervals have a median width of 10.6 individuals. The joint model
+95% intervals have a median width of 13.9 individuals. The joint model
 still has sightings and occupancy records in those months. Its intervals
 have a median width of 4.8 individuals.
 
@@ -397,7 +397,7 @@ simulated response.
 
 The 95% intervals of both models contain the simulated response across
 the whole range of env. With six more years of sightings and occupancy
-records, the joint model’s 95% interval is on average 41% narrower.
+records, the joint model’s 95% interval is on average 43% narrower.
 
 ## Forecasts
 

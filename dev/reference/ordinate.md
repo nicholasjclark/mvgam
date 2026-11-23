@@ -176,12 +176,12 @@ Nicholas J Clark
 
 ``` r
 # \dontrun{
-# Gaussian responses of 10 species at 60 sites, driven by two
+# Presence and absence of 10 species at 60 sites, driven by two
 # latent factors
-simdat <- sim_jsdgam(family = gaussian(), n_species = 10L,
+simdat <- sim_jsdgam(family = bernoulli(), n_species = 10L,
                      n_sites = 60L, n_lv = 2L, seed = 3L)
 mod <- jsdgam(y ~ env * series, data = simdat$data_train,
-              family = gaussian(), n_lv = 2L, chains = 2, silent = 2)
+              family = bernoulli(), n_lv = 2L, chains = 2, silent = 2)
 
 # Sites as points and species loadings as arrows
 ordinate(mod)
@@ -192,17 +192,17 @@ p <- ordinate(mod, rotation = "varimax", label_sites = FALSE)
 p
 
 attr(p, "rotation")$loadings
-#>              [,1]       [,2]
-#> sp_1   0.58796352 -0.2672631
-#> sp_2   0.69994485  0.2317411
-#> sp_3   0.13975171  0.1347866
-#> sp_4  -0.08477643 -0.7192936
-#> sp_5  -0.50586694  0.1521342
-#> sp_6  -0.12265392 -0.1349470
-#> sp_7   0.49445223  0.3185944
-#> sp_8  -0.01798119  0.8287413
-#> sp_9  -0.50835795 -1.1005488
-#> sp_10 -0.68247589  0.5560548
+#>                [,1]       [,2]
+#> sp_1   0.7319661853 -0.1079124
+#> sp_2  -0.4269765367  0.1533939
+#> sp_3   0.4086723348 -0.1977482
+#> sp_4   0.4281216700 -0.6806198
+#> sp_5  -0.2246430209 -0.1554040
+#> sp_6  -0.5996406810 -0.1362929
+#> sp_7   0.1240264586  0.5902160
+#> sp_8  -0.5153876939  0.5277136
+#> sp_9   0.0744193261 -0.5646555
+#> sp_10 -0.0005580425  0.5713094
 
 # Next, residual_cor(mod) gives the species correlations the
 # factors imply

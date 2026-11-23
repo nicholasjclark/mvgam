@@ -209,7 +209,7 @@ simdat <- sim_mvgam(family = poisson(), n_series = 1L,
 mod <- mvgam(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1),
              data = simdat$data_train, family = poisson(),
              chains = 2, silent = 2)
-#> Warning: 5 of 2000 (0.0%) transitions ended with a divergence.
+#> Warning: 8 of 2000 (0.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 
 # One row per draw, one column per observation
@@ -235,7 +235,7 @@ ggplot(simdat$data_train, aes(time, y)) +
 c(fixed = mean(ep),
   innovations = mean(posterior_epred(mod, process_error = TRUE)))
 #>       fixed innovations 
-#>    6.116486    7.344443 
+#>    6.192951    7.426497 
 
 # A site the fit never saw takes the spread of the fitted sites
 train <- simdat$data_train
@@ -243,15 +243,15 @@ train$site <- rep(paste0("site", 1:6), length.out = nrow(train))
 mod_site <- mvgam(y ~ (1 | site), trend_formula = ~ AR(p = 1),
                   data = train, family = poisson(),
                   chains = 2, silent = 2)
-#> Warning: 10 of 2000 (0.0%) transitions ended with a divergence.
+#> Warning: 1 of 2000 (0.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 new_site <- transform(train[1:3, ], site = "unseen")
 posterior_epred(mod_site, newdata = new_site, allow_new_levels = TRUE,
                 sample_new_levels = "gaussian", ndraws = 3)
 #>          [,1]     [,2]     [,3]
-#> [1,] 5.106027 5.106027 5.106027
-#> [2,] 4.820497 4.820497 4.820497
-#> [3,] 6.418029 6.418029 6.418029
+#> [1,] 5.238747 5.238747 5.238747
+#> [2,] 4.945942 4.945942 4.945942
+#> [3,] 4.689700 4.689700 4.689700
 
 # Next: posterior_predict() adds observation noise to these means
 # }

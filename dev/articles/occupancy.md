@@ -238,23 +238,23 @@ summary(mod)
 #> == Observation Model ==
 #> Smoothing Spline Hyperparameters:
 #>                Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> sds(sforest_1)     2.30      2.12     0.06     8.44 1.01      461      258
+#> sds(sforest_1)     2.04      1.75     0.07     6.68 1.00     1337      908
 #> 
 #> Regression Coefficients:
 #>             Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> Intercept      -0.42      0.27    -0.98     0.09 1.00      768      311
-#> p_Intercept     0.59      0.19     0.22     0.95 1.00     3089     1722
-#> p_rain         -1.95      0.33    -2.58    -1.30 1.00     2232     2518
-#> sforest_1       8.21      4.14    -1.89    14.44 1.02      397      129
+#> Intercept      -0.42      0.28    -0.99     0.09 1.00     1412     1312
+#> p_Intercept     0.60      0.19     0.22     0.96 1.00     4286     2731
+#> p_rain         -1.96      0.32    -2.61    -1.34 1.00     3839     2969
+#> sforest_1       8.86      3.62     0.38    14.92 1.00     1240      631
 #> 
 #> == Trend Model ==
 #> Trend Specific Parameters:
 #>                       Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS
-#> sigma_trend[species1]     0.30      0.22     0.01     0.85 1.01      964
-#> ar1_trend[species1]       0.06      0.41    -0.75     0.80 1.01     2002
+#> sigma_trend[species1]     0.38      0.17     0.14     0.78 1.00     1804
+#> ar1_trend[species1]       0.06      0.40    -0.71     0.81 1.00     1566
 #>                       Tail_ESS
-#> sigma_trend[species1]     1108
-#> ar1_trend[species1]       1957
+#> sigma_trend[species1]     1925
+#> ar1_trend[species1]       1378
 #> 
 #> Draws were sampled using sampling(NUTS). For each parameter, Bulk_ESS
 #> and Tail_ESS are effective sample size measures, and Rhat is the potential
@@ -269,8 +269,8 @@ summary(mod)
 #> Use `how_to_cite(fit)` for a methods paragraph and `methods_md(fit)` for its equations.
 ```
 
-The estimated effect of rain on detection (`p_rain`) is -1.95 \[-2.58,
--1.30\] on the logit scale, which is close to the true simulated value
+The estimated effect of rain on detection (`p_rain`) is -1.96 \[-2.61,
+-1.34\] on the logit scale, which is close to the true simulated value
 of $`-2`$.
 
 ## Estimating the proportion of sites occupied
@@ -403,8 +403,8 @@ proportion.](occupancy_files/figure-html/forecast-1.png)
 Expected proportion of sites occupied over the training seasons and the
 two held-out seasons. Points show the true proportion.
 
-The forecast proportions of sites occupied are 0.45 \[0.29, 0.61\] and
-0.45 \[0.28, 0.60\] for the two held-out seasons, compared to true
+The forecast proportions of sites occupied are 0.45 \[0.27, 0.62\] and
+0.44 \[0.27, 0.62\] for the two held-out seasons, compared to true
 proportions of 0.57 and 0.45. The forecast intervals are much wider than
 the hindcast intervals because no detections from these seasons enter
 the model. If we instead want forecasts of the detections themselves,
@@ -431,10 +431,10 @@ fit_stat
 #>   Statistic:        chi-squared
 #>   Aggregation:      closure unit
 #>   Posterior draws:  500
-#>   Bayesian p-value: 0.520
+#>   Bayesian p-value: 0.508
 ```
 
-The value here, 0.52, gives no sign of lack of fit. We can also inspect
+The value here, 0.51, gives no sign of lack of fit. We can also inspect
 randomised quantile residuals, which `mvgam` computes for each site in
 each season from its total detections:
 
@@ -519,7 +519,7 @@ where:
 \alpha &\sim \text{StudentT}(3, 0, 2.5) \\
 \sigma^{(s)}_{\mathrm{forest}} &\sim \text{StudentT}(3, 0, 2.5) \\
 \alpha^{(p)} &\sim \text{Normal}(0, 1.5) \\
-\sigma_\eta &\sim \text{Exponential}(2) \\
+\sigma_\eta &\sim \text{InvGamma}(3, 1.07) \\
 \phi_{1} &\sim \text{Normal}(0, 0.5)
 \end{aligned}
 ```

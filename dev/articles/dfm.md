@@ -173,7 +173,8 @@ fit_known <- mvgam(
   iter = 2000L,
   warmup = 1000L,
   seed = 1L,
-  silent = 2L
+  silent = 2L,
+  seed = 1L
 )
 ```
 
@@ -192,21 +193,21 @@ summary(fit_known)
 #> == Observation Model ==
 #> Regression Coefficients:
 #>           Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> Intercept     0.03      0.05    -0.07     0.12 1.00     1199     2000
+#> Intercept     0.03      0.05    -0.06     0.12 1.00      993     1837
 #> 
 #> Further Distributional Parameters:
 #>       Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> sigma     0.20      0.01     0.18     0.22 1.00     2006     2769
+#> sigma     0.20      0.01     0.18     0.22 1.00     1969     2562
 #> 
 #> == Trend Model ==
 #> Trend Specific Parameters:
 #>                Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> sigma_trend[1]     0.54      0.05     0.46     0.65 1.00      872     1327
-#> sigma_trend[2]     0.34      0.04     0.28     0.42 1.00     1289     1861
-#> sigma_trend[3]     0.82      0.08     0.68     0.99 1.00      985     1801
-#> ar1_trend[1]       0.72      0.08     0.56     0.88 1.01      643      970
-#> ar1_trend[2]       0.06      0.14    -0.22     0.34 1.00     1083     1529
-#> ar1_trend[3]       0.46      0.12     0.22     0.68 1.00      635      846
+#> sigma_trend[1]     0.54      0.05     0.45     0.66 1.00     1000     1863
+#> sigma_trend[2]     0.34      0.03     0.28     0.41 1.00     1298     2082
+#> sigma_trend[3]     0.81      0.08     0.68     0.97 1.00      881     1531
+#> ar1_trend[1]       0.72      0.08     0.57     0.88 1.01      460     1012
+#> ar1_trend[2]       0.05      0.14    -0.23     0.34 1.00      954     1901
+#> ar1_trend[3]       0.46      0.12     0.23     0.68 1.01      601     1357
 #> 
 #> Draws were sampled using sampling(NUTS). For each parameter, Bulk_ESS
 #> and Tail_ESS are effective sample size measures, and Rhat is the potential
@@ -285,7 +286,8 @@ fit_free <- mvgam(
   iter = 2000L,
   warmup = 1000L,
   seed = 1L,
-  silent = 2L
+  silent = 2L,
+  seed = 1L
 )
 ```
 
@@ -399,10 +401,10 @@ round(data.frame(trend = 1:3, sd_known, loading_free,
 #>   trend sd_known loading_free
 #> 1     1     0.54         0.55
 #> 2     2     0.34         0.34
-#> 3     3     0.82         0.77
+#> 3     3     0.81         0.77
 ```
 
-The two estimates differ by at most 0.06 for any trend.
+The two estimates differ by at most 0.04 for any trend.
 
 ``` r
 
@@ -485,7 +487,8 @@ fit_pooled <- mvgam(
   iter = 2000L,
   warmup = 1000L,
   seed = 1L,
-  silent = 2L
+  silent = 2L,
+  seed = 1L
 )
 ```
 
@@ -573,8 +576,8 @@ crps
 #> 
 #>  model  mean_score difference
 #>  known  2.5        0.000     
-#>  free   2.6        0.028     
-#>  pooled 2.7        0.200     
+#>  free   2.6        0.029     
+#>  pooled 2.8        0.200     
 #> 
 #> 'difference' is the gap to the best. plot() shows each horizon.
 logs <- compare_scores(known = fc_known, free = fc_free,
@@ -584,16 +587,16 @@ logs
 #> 
 #>  model  mean_score difference
 #>  known  6.2        0.000     
-#>  free   6.3        0.075     
+#>  free   6.3        0.048     
 #>  pooled 7.4        1.200     
 #> 
 #> 'difference' is the gap to the best. plot() shows each horizon.
 ```
 
-The pooled model ranks last on both scores. Its mean log score of 7.39
-compares with 6.22 for the model given the true loadings. The model that
+The pooled model ranks last on both scores. Its mean log score of 7.41
+compares with 6.25 for the model given the true loadings. The model that
 estimates its loadings scores 2.58 on CRPS and 6.30 on the log score,
-close to the 2.55 and 6.22 of the model given the true loadings. In this
+close to the 2.55 and 6.25 of the model given the true loadings. In this
 simulation, estimating the loadings costs little forecast accuracy. A
 wrong grouping costs much more.
 

@@ -104,7 +104,7 @@ Other model fitting:
 # imputation model would draw the fills. This example draws them
 # from a normal distribution.
 set.seed(1)
-dat <- sim_mvgam(family = gaussian(), n_series = 1L,
+dat <- sim_mvgam(family = poisson(), n_series = 1L,
                  n_timepoints = 60L, trend_model = AR())$data_train
 missing_x <- sample(nrow(dat), 10L)
 dat$x[missing_x] <- NA
@@ -120,23 +120,15 @@ fit_pooled <- mvgam_multiple(
   formula = y ~ x,
   trend_formula = ~ AR(p = 1),
   data_list = imputed_list,
-  family = gaussian(),
+  family = poisson(),
   chains = 2,
   silent = 2
 )
-#> Warning: 143 of 2000 (7.0%) transitions ended with a divergence.
-#> See https://mc-stan.org/misc/warnings for details.
-#> Warning: 1 of 2 chains had an E-BFMI less than 0.3.
-#> See https://mc-stan.org/misc/warnings for details.
-#> Warning: 45 of 2000 (2.0%) transitions ended with a divergence.
-#> See https://mc-stan.org/misc/warnings for details.
-#> Warning: 10 of 2000 (0.0%) transitions ended with a divergence.
-#> See https://mc-stan.org/misc/warnings for details.
 
 # The summary adds the convergence of each imputation fit
 summary(fit_pooled)
-#>  Family: gaussian 
-#>   Links: mu = identity; sigma = log 
+#>  Family: poisson 
+#>   Links: mu = log 
 #> Formula: y ~ x 
 #>    Data: imputed_list (Number of observations: 45) 
 #>  Trends: AR(1) 
@@ -146,21 +138,17 @@ summary(fit_pooled)
 #> == Observation Model ==
 #> Regression Coefficients:
 #>           Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> Intercept     0.09      0.19    -0.29     0.45 1.01     2335     2515
-#> x             0.45      0.18     0.12     0.80 1.02     3551     2961
-#> 
-#> Further Distributional Parameters:
-#>       Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> sigma     1.12      0.19     0.68     1.47 1.13      583      444
+#> Intercept     1.68      0.19     1.29     2.05 1.00     2219     2704
+#> x             0.31      0.13     0.06     0.56 1.00     2404     3075
 #> 
 #> == Trend Model ==
 #> Trend Specific Parameters:
 #>                       Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS
-#> sigma_trend[series_1]     0.36      0.29     0.01     1.05 1.12      448
-#> ar1_trend[series_1]       0.07      0.37    -0.69     0.75 1.03     3286
+#> sigma_trend[series_1]     0.71      0.12     0.51     0.97 1.00     1993
+#> ar1_trend[series_1]       0.32      0.18    -0.05     0.67 1.01     1492
 #>                       Tail_ESS
-#> sigma_trend[series_1]      582
-#> ar1_trend[series_1]       3229
+#> sigma_trend[series_1]     3168
+#> ar1_trend[series_1]       2614
 #> 
 #> Draws were sampled using sampling(NUTS). For each parameter, Bulk_ESS
 #> and Tail_ESS are effective sample size measures, and Rhat is the potential
@@ -176,9 +164,9 @@ summary(fit_pooled)
 #> Multiple imputation: 3 fits of 2000 draws each, pooled.
 #> Rhat is each parameter's largest and each ESS its sum over the fits.
 #>    Imputation Max_Rhat Min_Bulk_ESS Min_Tail_ESS
-#>             1    1.126           11           12
-#>             2    1.022          275          263
-#>             3    1.014          160          118
+#>             1    1.006          460          736
+#>             2    1.013          453          849
+#>             3    1.005          580          810
 
 # Next, `combine = FALSE` returns the three fits as a list
 # }

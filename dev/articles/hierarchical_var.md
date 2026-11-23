@@ -216,7 +216,7 @@ shocks.](hierarchical_var_files/figure-html/alpha-1.png)
 Posterior distribution of the weight on the shared correlation of the
 shocks.
 
-The weight is 0.81 \[0.74, 0.87\]. Savage estimated 0.82 \[0.75, 0.90\]
+The weight is 0.81 \[0.74, 0.88\]. Savage estimated 0.82 \[0.75, 0.90\]
 from 313 annual observations of an earlier vintage of the same
 indicators.
 
@@ -233,15 +233,15 @@ summary(rc)
 #> # A tibble: 3 × 11
 #>   series_1    series_2    Estimate Est.Error Q_lower Q_upper   ESS prob_positive
 #>   <chr>       <chr>          <dbl>     <dbl>   <dbl>   <dbl> <dbl>         <dbl>
-#> 1 GDP         Investment     0.923    0.186    0.854   0.965 2892.             1
-#> 2 GDP         Consumption    0.876    0.150    0.799   0.934 2444.             1
-#> 3 Consumption Investment     0.670    0.0992   0.559   0.773 3002.             1
+#> 1 GDP         Investment     0.921    0.190    0.853   0.966 2326.             1
+#> 2 GDP         Consumption    0.873    0.148    0.795   0.930 2321.             1
+#> 3 Consumption Investment     0.662    0.0998   0.549   0.765 3075.             1
 #> # ℹ 3 more variables: prob_negative <dbl>, prob_nonzero <dbl>, sig <lgl>
 ```
 
 GDP shocks correlate with investment shocks at 0.92 \[0.85, 0.97\] and
-with consumption shocks at 0.88 \[0.80, 0.93\]. Consumption and
-investment shocks correlate at 0.67 \[0.56, 0.77\]. Savage’s estimates
+with consumption shocks at 0.87 \[0.79, 0.93\]. Consumption and
+investment shocks correlate at 0.66 \[0.55, 0.76\]. Savage’s estimates
 were 0.93, 0.89 and 0.74, in the same order.
 
 `by_group = TRUE` returns the correlation of each economy’s shocks:
@@ -259,7 +259,7 @@ pairs have a posterior probability of their sign above
 Posterior mean correlations of the shocks in each economy. Outlined
 pairs have a posterior probability of their sign above 0.95.
 
-The economies’ GDP and investment shocks correlate at 0.71 to 0.83,
+The economies’ GDP and investment shocks correlate at 0.70 to 0.83,
 against the shared 0.92. Every economy’s correlation is below the shared
 one. Forty-nine years of shocks move each deviation little from the
 identity its LKJ(10) prior favours. The fifth of each economy’s
@@ -298,19 +298,19 @@ A
 #>   Mean |A_ij| (i != j): 0.12
 #>   Point estimate:
 #>              GDP Consumption Investment
-#> GDP         0.05        0.27       0.12
-#> Consumption 0.05        0.46       0.02
+#> GDP         0.05        0.27       0.13
+#> Consumption 0.05        0.47       0.02
 #> Investment  0.09        0.14       0.21
 #>   95% CI on each cell available in `A_lower` / `A_upper`.
 ```
 
 On average, consumption growth is the most persistent of the three
-outcomes. The average diagonal coefficient is 0.46 \[0.33, 0.60\] for
-consumption and 0.05 \[-0.15, 0.25\] for GDP.
+outcomes. The average diagonal coefficient is 0.47 \[0.34, 0.60\] for
+consumption and 0.05 \[-0.16, 0.25\] for GDP.
 
-Consider the United States. Its GDP diagonal is -0.85 \[-1.75, -0.09\]
-and its GDP growth loads on last year’s consumption growth at 1.05
-\[0.46, 1.71\]. In the United States, the states of GDP and consumption
+Consider the United States. Its GDP diagonal is -0.90 \[-1.82, -0.12\]
+and its GDP growth loads on last year’s consumption growth at 1.08
+\[0.50, 1.80\]. In the United States, the states of GDP and consumption
 correlate at 0.82, the most strongly of the eight. Last year’s GDP and
 consumption then carry nearly the same information about this year. The
 model can trade a negative coefficient on one against a positive
@@ -352,9 +352,9 @@ Generalised impulse responses of Australian GDP, consumption and
 investment to a one standard deviation shock in Australian investment,
 with 95% credible intervals.
 
-The shock raises Australian investment by 0.62 \[0.52, 0.75\] standard
+The shock raises Australian investment by 0.61 \[0.51, 0.75\] standard
 deviations in its first year. Because investment and GDP shocks
-correlate, GDP moves with it, by 0.38 \[0.30, 0.49\]. In the second year
+correlate, GDP moves with it, by 0.37 \[0.29, 0.47\]. In the second year
 consumption is at 0.14 \[0.05, 0.24\]. Every response stays within 0.01
 of zero from year 5.
 
@@ -386,7 +386,7 @@ In the first year, GDP shocks generate 59% of the forecast variance of
 Australian investment. That share is the part of two correlated shocks
 the ordering assigns to GDP. The shares barely move with the horizon. At
 eight years GDP shocks generate 97% of the forecast variance of GDP
-itself and 51% of that of consumption. Reordering the levels of
+itself and 50% of that of consumption. Reordering the levels of
 `outcome` and refitting would move the shared part of each correlated
 pair to the other outcome. The generalised impulse responses above are
 the same in any order.
@@ -421,10 +421,10 @@ Posterior medians and 95% credible intervals of reactivity and of the
 mean and variance return rates of each economy. The dashed line marks
 zero reactivity.
 
-The median mean return rates run from 0.39 to 0.64. A deviation of
+The median mean return rates run from 0.38 to 0.64. A deviation of
 growth from its mean halves within two years in every economy.
 Reactivity intervals lie above zero for the United States. The United
-States has a reactivity of 0.83 \[0.08, 1.40\], shaped by the large
+States has a reactivity of 0.88 \[0.14, 1.42\], shaped by the large
 offsetting coefficients of its transition matrix.
 
 Partial pooling puts four fifths of the weight on a correlation of

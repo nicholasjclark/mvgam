@@ -96,27 +96,27 @@ Other trend models:
 lv_axis()
 
 # \dontrun{
-# Three series whose seasonal effect differs: 1, 0.5 and -1
+# Proportions in three series whose seasonal effect on the logit
+# scale differs: 1, 0.5 and -1
 set.seed(1)
-dat <- sim_mvgam(family = gaussian(), n_series = 3L,
+dat <- sim_mvgam(family = Beta(), n_series = 3L,
                  n_timepoints = 60L)$data_train
 dat$season <- sin(2 * pi * dat$time / 12)
-dat$y <- dat$y + c(1, 0.5, -1)[as.integer(dat$series)] * dat$season
+dat$y <- plogis(qlogis(dat$y) +
+                  c(1, 0.5, -1)[as.integer(dat$series)] * dat$season)
 
 # One seasonal slope per series
 mod <- mvgam(
   formula       = y ~ 1,
   trend_formula = ~ season:lv_axis() + AR(p = 1),
   data          = dat,
-  family        = gaussian(),
+  family        = Beta(),
   chains        = 2,
   silent        = 2
 )
-#> Warning: 15 of 2000 (1.0%) transitions ended with a divergence.
-#> See https://mc-stan.org/misc/warnings for details.
 summary(mod)
-#>  Family: gaussian 
-#>   Links: mu = identity; sigma = log 
+#>  Family: beta 
+#>   Links: mu = logit; phi = log 
 #> Formula: y ~ 1 
 #>    Data: dat (Number of observations: 135) 
 #>  Series: 3 
@@ -127,38 +127,38 @@ summary(mod)
 #> == Observation Model ==
 #> Regression Coefficients:
 #>           Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> Intercept     0.06      0.26    -0.45     0.51 1.00      222      661
+#> Intercept     0.23      0.20    -0.23     0.59 1.00      607      419
 #> 
 #> Further Distributional Parameters:
-#>       Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> sigma     0.89      0.11     0.68     1.11 1.02      163      264
+#>     Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
+#> phi     3.22      0.54     2.33     4.45 1.00      667      991
 #> 
 #> == Trend Model ==
 #> Regression Coefficients:
 #>                       Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS
-#> season:seriesseries_1     1.32      0.23     0.88     1.76 1.00     1594
-#> season:seriesseries_2     0.72      0.31     0.06     1.33 1.00      965
-#> season:seriesseries_3    -1.04      0.27    -1.56    -0.45 1.00     1557
+#> season:seriesseries_1     0.90      0.25     0.42     1.40 1.00     1961
+#> season:seriesseries_2     0.45      0.28    -0.09     1.01 1.00     1612
+#> season:seriesseries_3    -0.77      0.28    -1.33    -0.20 1.00     1466
 #>                       Tail_ESS
-#> season:seriesseries_1     1255
-#> season:seriesseries_2     1070
-#> season:seriesseries_3     1132
+#> season:seriesseries_1     1293
+#> season:seriesseries_2     1357
+#> season:seriesseries_3      976
 #> 
 #> Trend Specific Parameters:
 #>                       Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS
-#> sigma_trend[series_1]     0.35      0.21     0.03     0.86 1.00      325
-#> sigma_trend[series_2]     0.71      0.26     0.13     1.20 1.02      210
-#> sigma_trend[series_3]     0.43      0.18     0.13     0.81 1.01      387
-#> ar1_trend[series_1]       0.43      0.49    -0.62     0.99 1.00      237
-#> ar1_trend[series_2]       0.46      0.30    -0.26     0.94 1.00      291
-#> ar1_trend[series_3]       0.76      0.24     0.02     0.98 1.00      424
+#> sigma_trend[series_1]     0.45      0.20     0.16     0.91 1.00      502
+#> sigma_trend[series_2]     0.46      0.17     0.22     0.87 1.00      834
+#> sigma_trend[series_3]     0.42      0.14     0.21     0.76 1.00      787
+#> ar1_trend[series_1]       0.01      0.44    -0.77     0.88 1.00      447
+#> ar1_trend[series_2]       0.83      0.17     0.36     0.98 1.00      549
+#> ar1_trend[series_3]       0.90      0.08     0.68     0.99 1.00      963
 #>                       Tail_ESS
-#> sigma_trend[series_1]      397
-#> sigma_trend[series_2]      252
-#> sigma_trend[series_3]      565
-#> ar1_trend[series_1]        704
-#> ar1_trend[series_2]        310
-#> ar1_trend[series_3]        360
+#> sigma_trend[series_1]     1266
+#> sigma_trend[series_2]     1215
+#> sigma_trend[series_3]     1283
+#> ar1_trend[series_1]        328
+#> ar1_trend[series_2]        628
+#> ar1_trend[series_3]       1148
 #> 
 #> Draws were sampled using sampling(NUTS). For each parameter, Bulk_ESS
 #> and Tail_ESS are effective sample size measures, and Rhat is the potential
@@ -181,23 +181,23 @@ get_prior(
   mvgam_formula(y ~ 1,
                 trend_formula = ~ season:lv_axis() + AR(p = 1, n_lv = 2)),
   data   = dat,
-  family = gaussian()
+  family = Beta()
 )
-#>                   prior     class           coef group resp dpar nlpar lb ub
-#>  student_t(3, 0.1, 2.5) Intercept                                           
-#>    student_t(3, 0, 2.5)     sigma                                       0   
-#>          normal(0, 0.5) ar1_trend                                      -1  1
-#>    student_t(3, 0, 0.5)         Z                                           
-#>                  (flat)   b_trend                                           
-#>                  (flat)   b_trend season:.trend1                            
-#>                  (flat)   b_trend season:.trend2                            
-#>  tag       source
-#>           default
-#>           default
-#>           default
-#>           default
-#>           default
-#>      (vectorized)
-#>      (vectorized)
+#>                 prior     class           coef group resp dpar nlpar lb ub tag
+#>  student_t(3, 0, 2.5) Intercept                                               
+#>     gamma(0.01, 0.01)       phi                                       0       
+#>        normal(0, 0.5) ar1_trend                                      -1  1    
+#>  student_t(3, 0, 0.5)         Z                                               
+#>                (flat)   b_trend                                               
+#>                (flat)   b_trend season:.trend1                                
+#>                (flat)   b_trend season:.trend2                                
+#>        source
+#>       default
+#>       default
+#>       default
+#>       default
+#>       default
+#>  (vectorized)
+#>  (vectorized)
 # }
 ```

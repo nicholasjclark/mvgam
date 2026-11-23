@@ -166,46 +166,46 @@ summary(mod)
 #> == Observation Model ==
 #> Regression Coefficients:
 #>              Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> Intercept        3.52      0.12     3.30     3.79 1.00     2291     2276
-#> p_Intercept      0.58      0.24     0.11     1.04 1.00     2503     2705
-#> seriessp_2      -0.92      0.18    -1.29    -0.59 1.00     2128     1833
-#> seriessp_3      -0.40      0.24    -0.87     0.04 1.00     1785     1921
-#> seriessp_4      -1.16      0.21    -1.57    -0.71 1.00     1948     1851
-#> p_seriessp_2     0.42      0.26    -0.11     0.94 1.00     2491     2131
-#> p_seriessp_3    -0.97      0.30    -1.53    -0.37 1.00     2014     1924
-#> p_seriessp_4    -0.09      0.33    -0.78     0.54 1.00     2138     1747
-#> p_wind          -1.39      0.13    -1.65    -1.15 1.00     3304     2719
+#> Intercept        3.53      0.15     3.26     3.84 1.00     1541     1690
+#> p_Intercept      0.54      0.24     0.08     1.00 1.00     2513     2664
+#> seriessp_2      -0.92      0.24    -1.37    -0.45 1.00     1130     1121
+#> seriessp_3      -0.40      0.26    -0.90     0.07 1.00     1755     2096
+#> seriessp_4      -1.17      0.25    -1.63    -0.68 1.01     1537     1985
+#> p_seriessp_2     0.42      0.28    -0.13     0.95 1.00     2584     2782
+#> p_seriessp_3    -0.98      0.29    -1.52    -0.39 1.00     2439     2348
+#> p_seriessp_4    -0.09      0.34    -0.80     0.52 1.00     2364     2717
+#> p_wind          -1.37      0.12    -1.62    -1.14 1.00     2962     2871
 #> 
 #> == Trend Model ==
 #> Smoothing Spline Hyperparameters:
 #>                        Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS
-#> sds(stempseriessp_1_1)     1.68      1.24     0.08     4.52 1.00     1078
-#> sds(stempseriessp_2_1)     3.96      1.79     1.80     8.42 1.00     2055
-#> sds(stempseriessp_3_1)     1.00      1.04     0.03     3.56 1.00     1468
-#> sds(stempseriessp_4_1)     1.24      1.09     0.05     3.98 1.00     1510
+#> sds(stempseriessp_1_1)     1.43      1.26     0.05     4.55 1.01      907
+#> sds(stempseriessp_2_1)     3.95      1.74     1.74     8.51 1.00     2404
+#> sds(stempseriessp_3_1)     1.02      1.03     0.02     3.89 1.00     1546
+#> sds(stempseriessp_4_1)     1.21      1.06     0.05     3.93 1.00     1477
 #>                        Tail_ESS
-#> sds(stempseriessp_1_1)     1526
-#> sds(stempseriessp_2_1)     2597
-#> sds(stempseriessp_3_1)     1407
-#> sds(stempseriessp_4_1)     1155
+#> sds(stempseriessp_1_1)      604
+#> sds(stempseriessp_2_1)     3029
+#> sds(stempseriessp_3_1)     1684
+#> sds(stempseriessp_4_1)     1150
 #> 
 #> Regression Coefficients:
 #>                    Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> stemp:seriessp_1_1     0.92      1.78    -2.64     3.96 1.00     1196     1883
-#> stemp:seriessp_2_1     2.45      2.78    -3.00     8.03 1.00     2435     2696
-#> stemp:seriessp_3_1    -3.01      1.37    -5.85    -0.20 1.00     1730      935
-#> stemp:seriessp_4_1    -1.07      1.54    -4.00     2.42 1.00     2381     1812
+#> stemp:seriessp_1_1     1.59      1.89    -2.87     4.44 1.01      857      596
+#> stemp:seriessp_2_1     2.05      3.00    -3.82     7.81 1.00     1598     2227
+#> stemp:seriessp_3_1    -2.99      1.53    -6.09     0.40 1.00     1529     1199
+#> stemp:seriessp_4_1    -1.11      1.66    -4.16     2.70 1.00     2026     2238
 #> 
 #> Trend Specific Parameters:
 #>                   Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> sigma_trend[sp_1]     0.11      0.08     0.01     0.30 1.00      996     1551
-#> sigma_trend[sp_2]     0.14      0.10     0.01     0.36 1.00     1359     1642
-#> sigma_trend[sp_3]     0.19      0.11     0.02     0.43 1.00     1028     1195
-#> sigma_trend[sp_4]     0.12      0.10     0.00     0.36 1.00     1761     1638
-#> ar1_trend[sp_1]       0.01      0.41    -0.77     0.82 1.00     2565     1585
-#> ar1_trend[sp_2]       0.12      0.40    -0.65     0.85 1.00     2237     1987
-#> ar1_trend[sp_3]       0.14      0.38    -0.61     0.85 1.00     2090     1565
-#> ar1_trend[sp_4]       0.03      0.40    -0.75     0.82 1.00     3568     2045
+#> sigma_trend[sp_1]     0.22      0.07     0.11     0.37 1.00     1785     2664
+#> sigma_trend[sp_2]     0.24      0.08     0.12     0.43 1.00     1640      749
+#> sigma_trend[sp_3]     0.26      0.08     0.13     0.45 1.00     1783     1517
+#> sigma_trend[sp_4]     0.23      0.08     0.12     0.42 1.00     2857     2355
+#> ar1_trend[sp_1]       0.05      0.37    -0.62     0.79 1.00     1511     1748
+#> ar1_trend[sp_2]       0.19      0.39    -0.56     0.90 1.00     1354      992
+#> ar1_trend[sp_3]       0.20      0.35    -0.50     0.84 1.00     1666     1833
+#> ar1_trend[sp_4]       0.06      0.36    -0.64     0.77 1.00     2075      933
 #> 
 #> Draws were sampled using sampling(NUTS). For each parameter, Bulk_ESS
 #> and Tail_ESS are effective sample size measures, and Rhat is the potential
@@ -220,7 +220,7 @@ summary(mod)
 #> Use `how_to_cite(fit)` for a methods paragraph and `methods_md(fit)` for its equations.
 ```
 
-The wind coefficient `p_wind` is -1.39 \[-1.65, -1.15\] on the logit
+The wind coefficient `p_wind` is -1.37 \[-1.62, -1.14\] on the logit
 scale, against the simulated value of $`-1.5`$.
 
 ## Latent abundance
@@ -340,11 +340,11 @@ fit_stat
 #>   Statistic:        chi-squared
 #>   Aggregation:      closure unit
 #>   Posterior draws:  500
-#>   Bayesian p-value: 0.362
+#>   Bayesian p-value: 0.562
 ```
 
 A Bayesian p-value near 0 would mean the replicates rarely reach the
-discrepancy of the observed counts. The value here, 0.36, gives no sign
+discrepancy of the observed counts. The value here, 0.56, gives no sign
 of lack of fit.
 [`latent_N_saturation()`](https://nicholasjclark.github.io/mvgam/dev/reference/latent_N_saturation.md)
 reports the posterior probability that $`N`$ reaches the cap in each
@@ -354,11 +354,11 @@ unit:
 
 sat <- latent_N_saturation(mod)
 max(sat$p_saturated)
-#> [1] 0.0185
+#> [1] 0.026
 ```
 
 The largest probability any unit gives to reaching the cap of 80 is
-0.018.
+0.026.
 
 ## Other observation processes
 

@@ -112,12 +112,14 @@ mod <- mvgam(y ~ x,
               data    = simdat$data_train,
               family  = poisson(),
               chains  = 2, silent = 2)
+#> Warning: 1 of 2000 (0.0%) transitions ended with a divergence.
+#> See https://mc-stan.org/misc/warnings for details.
 
 # A population-level coefficient, named as fixef() names it.
 hypothesis(mod, "x > 0")
 #> Hypothesis Tests for class :
 #>   Hypothesis Estimate Est.Error CI.Lower CI.Upper Evid.Ratio Post.Prob Star
-#> 1    (x) > 0    -0.36      0.07    -0.48    -0.24          0         0     
+#> 1    (x) > 0    -0.36      0.08    -0.48    -0.24          0         0     
 #> ---
 #> 'CI': 90%-CI for one-sided and 95%-CI for two-sided hypotheses.
 #> '*': For one-sided hypotheses, the posterior probability exceeds 95%;
@@ -130,8 +132,8 @@ hypothesis(mod, c("ar1_trend[series_1] > 0",
            class = NULL)
 #> Hypothesis Tests for class :
 #>                 Hypothesis Estimate Est.Error CI.Lower CI.Upper Evid.Ratio
-#> 1 (ar1_trend[series... > 0     0.42      0.15     0.18     0.67     665.67
-#> 2 (sigma_trend[seri... < 0    -0.36      0.08    -0.49    -0.22    1999.00
+#> 1 (ar1_trend[series... > 0     0.44      0.15     0.18     0.67     665.67
+#> 2 (sigma_trend[seri... < 0    -0.37      0.08    -0.49    -0.23        Inf
 #>   Post.Prob Star
 #> 1         1    *
 #> 2         1    *

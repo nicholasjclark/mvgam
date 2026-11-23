@@ -294,40 +294,40 @@ mod <- mvgam(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1),
               data    = simdat$data_train,
               family  = poisson(),
               chains  = 2, silent = 2)
-#> Warning: 5 of 2000 (0.0%) transitions ended with a divergence.
+#> Warning: 8 of 2000 (0.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 
 # Predicted counts with their 95% intervals
 head(predict(mod))
-#>      Estimate Est.Error Q2.5 Q97.5
-#> [1,]   2.1840  1.522926    0     6
-#> [2,]  12.3365  4.320255    5    22
-#> [3,]   8.2875  3.165731    3    15
-#> [4,]   8.9510  3.403879    3    16
-#> [5,]   4.6360  2.366285    1    10
-#> [6,]   6.5570  3.100574    2    13
+#>      Estimate Est.Error Q2.5  Q97.5
+#> [1,]   2.1840  1.520625    0  6.000
+#> [2,]  12.4625  4.265993    5 22.000
+#> [3,]   8.3325  3.262095    3 15.000
+#> [4,]   9.0150  3.434774    3 16.025
+#> [5,]   4.7000  2.360675    1 10.000
+#> [6,]   6.6880  3.234948    2 14.000
 
 # The same fit on the link scale, as an expected count and as the
 # variance of a count. A Poisson's variance equals its mean.
 head(predict(mod, type = "link"))
 #>      Estimate Est.Error      Q2.5    Q97.5
-#> [1,] 0.742674 0.2175503 0.3025291 1.153017
-#> [2,] 2.495459 0.1842660 2.1384613 2.855244
-#> [3,] 2.095707 0.1685675 1.7535905 2.416998
-#> [4,] 2.169469 0.1822348 1.8195718 2.514370
-#> [5,] 1.492947 0.2312347 1.0269223 1.949018
-#> [6,] 1.845557 0.2667415 1.3251658 2.364273
+#> [1,] 0.752742 0.2254049 0.3163901 1.185410
+#> [2,] 2.507094 0.1899095 2.1329823 2.884570
+#> [3,] 2.106909 0.1689847 1.7750936 2.427004
+#> [4,] 2.181112 0.1855064 1.8217492 2.578196
+#> [5,] 1.511086 0.2289429 1.0548113 1.949942
+#> [6,] 1.857242 0.2708773 1.3329413 2.418913
 head(cbind(
   expected = predict(mod, type = "expected")[, "Estimate"],
   variance = predict(mod, type = "variance")[, "Estimate"]
 ))
 #>       expected  variance
-#> [1,]  2.151583  2.151583
-#> [2,] 12.336125 12.336125
-#> [3,]  8.247302  8.247302
-#> [4,]  8.901273  8.901273
-#> [5,]  4.569433  4.569433
-#> [6,]  6.559537  6.559537
+#> [1,]  2.177799  2.177799
+#> [2,] 12.494874 12.494874
+#> [3,]  8.342220  8.342220
+#> [4,]  9.012999  9.012999
+#> [5,]  4.651361  4.651361
+#> [6,]  6.649075  6.649075
 
 # `summary = FALSE` returns the draws, one row per draw
 dim(predict(mod, summary = FALSE))

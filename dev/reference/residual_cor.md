@@ -234,21 +234,19 @@ mod <- jsdgam(formula = bf(y ~ series * env, p ~ series + tod_c),
               factor_formula = ~ -1,
               data = simdat$data_train, family = occ(),
               n_lv = 2L, chains = 2, silent = 2)
-#> Warning: 1018 of 2000 (51.0%) transitions ended with a divergence.
-#> See https://mc-stan.org/misc/warnings for details.
-#> Warning: 3 of 2000 (0.0%) transitions hit the maximum treedepth limit of 10.
+#> Warning: 4 of 2000 (0.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 
 # Species correlations after the fixed effects
 rc <- residual_cor(mod)
 round(rc$cor, 2)
-#>       sp_1  sp_2  sp_3  sp_4  sp_5  sp_6
-#> sp_1  1.00  0.18 -0.34 -0.35  0.62  0.87
-#> sp_2  0.18  1.00  0.69  0.47 -0.69 -0.13
-#> sp_3 -0.34  0.69  1.00  0.87 -0.86 -0.54
-#> sp_4 -0.35  0.47  0.87  1.00 -0.90 -0.51
-#> sp_5  0.62 -0.69 -0.86 -0.90  1.00  0.83
-#> sp_6  0.87 -0.13 -0.54 -0.51  0.83  1.00
+#>       sp_1  sp_2  sp_3 sp_4  sp_5  sp_6
+#> sp_1  1.00  0.16 -0.18 0.37  0.43  0.49
+#> sp_2  0.16  1.00  0.77 0.49 -0.84 -0.34
+#> sp_3 -0.18  0.77  1.00 0.56 -0.73 -0.30
+#> sp_4  0.37  0.49  0.56 1.00  0.01  0.34
+#> sp_5  0.43 -0.84 -0.73 0.01  1.00  0.74
+#> sp_6  0.49 -0.34 -0.30 0.34  0.74  1.00
 plot(rc)
 
 

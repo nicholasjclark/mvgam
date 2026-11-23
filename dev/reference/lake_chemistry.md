@@ -1,11 +1,13 @@
-# Simulated lake chemistry with correlated random-walk state
+# Simulated lake phosphorus with correlated random-walk state
 
-A state-space dataset for five lakes observed monthly across 60 months.
-The latent process is a correlated random walk across lakes (two
-regional clusters share positive innovation correlation, a fifth lake is
-independent). The observation equation adds a binary treatment indicator
-that switches on at month 31, with heterogeneous slopes across lakes:
-two lakes respond positively and three respond negatively.
+A state-space dataset for five lakes sampled monthly across 60 months.
+Each sample records total phosphorus in micrograms per litre, drawn from
+a Gamma distribution with a log link. The latent process is a correlated
+random walk across lakes. Two regional clusters share positive
+innovation correlation. A fifth lake is independent. The observation
+equation adds a binary treatment indicator that switches on at month 31,
+with heterogeneous slopes across lakes. Phosphorus rises in two lakes
+and falls in three.
 
 ## Usage
 
@@ -28,7 +30,8 @@ A `data.frame` with 300 rows and the following fields:
 
 - y:
 
-  numeric chemistry measurement (Gaussian); duplicated as `chemistry`.
+  positive total phosphorus in micrograms per litre; duplicated as
+  `chemistry`.
 
 - lake:
 
@@ -45,7 +48,7 @@ A `data.frame` with 300 rows and the following fields:
 
 - chemistry:
 
-  numeric chemistry measurement, alias of `y`.
+  positive total phosphorus, alias of `y`.
 
 ## Details
 
@@ -55,18 +58,20 @@ responses cancel. A state-space fit (`trend_formula = ~ RW(cor = TRUE)`)
 with a treatment slope for each lake recovers the response of every
 lake.
 
-True generative components:
+True generative components, on the log scale:
 
-- Per-lake intercepts (centred).
+- An intercept of `log(20)`, a typical 20 micrograms per litre. Each
+  lake adds its own centred intercept.
 
 - Latent random walk with cross-lake innovation correlation `0.6`
   between `(alpine, boreal)` and `(coastal, delta)`, independent for
-  `estuary`. Innovation standard deviation `0.25`.
+  `estuary`. Innovation standard deviation `0.1`.
 
 - Heterogeneous treatment slopes:
   `(alpine = +0.8, boreal = +0.6, coastal = -0.5, delta = -0.7, estuary = -0.6)`.
 
-- Observation noise `sigma = 0.4`.
+- Gamma observations with shape `10`, a coefficient of variation near
+  0.32.
 
 ## See also
 
@@ -83,8 +88,8 @@ to check the data.
 
 ``` r
 data(lake_chemistry)
-mvgam_data(lake_chemistry, family = gaussian())
-#> ✔ Data check passed for family 'gaussian (link = identity)'.
+mvgam_data(lake_chemistry, family = Gamma(link = "log"))
+#> ✔ Data check passed for family 'gamma (link = log)'.
 #> • series: 5 levels
 #> • time:   1 to 60
 #> • n obs:  300 (0 NA)
@@ -96,12 +101,12 @@ mod <- mvgam(
   formula = y ~ treated + (treated || lake),
   trend_formula = ~ RW(cor = TRUE),
   data = lake_chemistry,
-  family = gaussian(),
+  family = Gamma(link = "log"),
   chains = 2, silent = 2
 )
 summary(mod)
-#>  Family: gaussian 
-#>   Links: mu = identity; sigma = log 
+#>  Family: gamma 
+#>   Links: mu = log; shape = log 
 #> Formula: y ~ treated + (treated || lake) 
 #>    Data: lake_chemistry (Number of observations: 300) 
 #>  Series: 5 
@@ -113,32 +118,32 @@ summary(mod)
 #> Multilevel Hyperparameters:
 #> ~lake (Number of levels: 5)
 #>               Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> sd(Intercept)     2.01      0.89     0.91     4.38 1.00      994     1199
-#> sd(treated)       1.14      0.68     0.29     2.85 1.00     1082     1010
+#> sd(Intercept)     1.14      0.57     0.45     2.60 1.01     1076     1157
+#> sd(treated)       1.11      0.56     0.41     2.55 1.00     1253     1489
 #> 
 #> Regression Coefficients:
 #>           Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> Intercept     0.18      0.90    -1.56     2.15 1.00      671      876
-#> treated      -0.40      0.68    -1.77     1.09 1.00      687      506
+#> Intercept     2.97      0.55     1.82     4.13 1.00      782     1103
+#> treated      -0.16      0.56    -1.27     0.90 1.01      901      980
 #> 
 #> Further Distributional Parameters:
 #>       Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> sigma     0.41      0.03     0.35     0.46 1.01      424      612
+#> shape    10.50      1.07     8.68    12.81 1.00     1142     1320
 #> 
 #> == Trend Model ==
 #> Trend Specific Parameters:
 #>                      Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS
-#> sigma_trend[alpine]      0.33      0.08     0.21     0.51 1.00      469
-#> sigma_trend[boreal]      0.26      0.05     0.17     0.38 1.00     1178
-#> sigma_trend[coastal]     0.24      0.06     0.14     0.37 1.00      957
-#> sigma_trend[delta]       0.34      0.07     0.22     0.49 1.00     1168
-#> sigma_trend[estuary]     0.34      0.07     0.21     0.49 1.00      747
+#> sigma_trend[alpine]      0.17      0.04     0.11     0.25 1.00     1208
+#> sigma_trend[boreal]      0.16      0.04     0.10     0.25 1.00     1385
+#> sigma_trend[coastal]     0.14      0.04     0.08     0.22 1.00     1612
+#> sigma_trend[delta]       0.17      0.04     0.10     0.27 1.00     1191
+#> sigma_trend[estuary]     0.21      0.05     0.13     0.32 1.00     1056
 #>                      Tail_ESS
-#> sigma_trend[alpine]      1222
-#> sigma_trend[boreal]      1496
-#> sigma_trend[coastal]     1553
-#> sigma_trend[delta]       1385
-#> sigma_trend[estuary]     1057
+#> sigma_trend[alpine]      1321
+#> sigma_trend[boreal]      1513
+#> sigma_trend[coastal]     1446
+#> sigma_trend[delta]       1445
+#> sigma_trend[estuary]     1748
 #> 
 #> Draws were sampled using sampling(NUTS). For each parameter, Bulk_ESS
 #> and Tail_ESS are effective sample size measures, and Rhat is the potential

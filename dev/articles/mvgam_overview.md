@@ -11,6 +11,16 @@ packages: `brms`, `marginaleffects`, `loo`, `bayesplot`. The
 [cheatsheet](https://nicholasjclark.github.io/mvgam/dev/cheatsheets/mvgam_cheatsheet.pdf)
 summarises the main functions on one page.
 
+![A state-space model. The latent process X (written \eta below) evolves
+from one time to the next. Each observation Y depends on the process at
+its own time. Where an observation is missing, as at time 2, the process
+is still estimated.](SS_model.svg)
+
+A state-space model. The latent process $`X`$ (written $`\eta`$ below)
+evolves from one time to the next. Each observation $`Y`$ depends on the
+process at its own time. Where an observation is missing, as at time 2,
+the process is still estimated.
+
 For an observation $`y_{i,t}`$ on series $`i`$ at time $`t`$, with link
 function $`g`$ and a response distribution $`\mathcal{F}`$:
 
@@ -146,7 +156,8 @@ fit_gam <- mvgam(
   family  = poisson(),
   data    = pp_train,
   newdata = pp_test,
-  silent  = 2
+  silent  = 2,
+  seed    = 1
 )
 ```
 
@@ -173,7 +184,8 @@ fit_ar <- mvgam(
   family        = poisson(),
   data          = pp_train,
   newdata       = pp_test,
-  silent        = 2
+  silent        = 2,
+  seed          = 1
 )
 ```
 
@@ -191,23 +203,23 @@ summary(fit_ar)
 #> == Observation Model ==
 #> Regression Coefficients:
 #>           Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> Intercept     0.84      0.59    -0.26     2.03 1.00     1553     1549
+#> Intercept     0.86      0.56    -0.27     2.03 1.00     1487     1405
 #> 
 #> == Trend Model ==
 #> Smoothing Spline Hyperparameters:
 #>                   Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> sds(smintemp_1)       1.08      0.96     0.04     3.52 1.00     1838     2256
-#> sds(sndvi_ma12_1)     2.44      1.60     0.21     6.40 1.00     1595     1727
+#> sds(smintemp_1)       1.06      0.95     0.03     3.59 1.00     2383     2439
+#> sds(sndvi_ma12_1)     2.48      1.65     0.18     6.64 1.00     1693     1503
 #> 
 #> Regression Coefficients:
 #>              Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> smintemp_1       3.40      2.18    -0.84     8.24 1.00     1804     1851
-#> sndvi_ma12_1     3.06      4.17    -4.49    12.48 1.00     1764     1626
+#> smintemp_1       3.48      2.28    -0.86     8.53 1.00     1701     1771
+#> sndvi_ma12_1     3.08      4.31    -4.39    12.99 1.00     1512     1156
 #> 
 #> Trend Specific Parameters:
 #>                 Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> sigma_trend[PP]     0.69      0.15     0.45     1.00 1.00     1383     2061
-#> ar1_trend[PP]       0.82      0.10     0.60     0.96 1.00     1146     1286
+#> sigma_trend[PP]     0.67      0.14     0.43     0.97 1.00     1320     2349
+#> ar1_trend[PP]       0.82      0.09     0.61     0.97 1.00     1255     1134
 #> 
 #> Draws were sampled using sampling(NUTS). For each parameter, Bulk_ESS
 #> and Tail_ESS are effective sample size measures, and Rhat is the potential
@@ -220,6 +232,24 @@ summary(fit_ar)
 #>   - `conditional_effects(fit)`: covariate effects
 #> Use `how_to_cite(fit)` for a methods paragraph and `methods_md(fit)` for its equations.
 ```
+
+An Rhat above 1.01 or a small effective sample size marks a parameter
+the chains disagree on. A pairs plot shows the cause. Each panel
+scatters the posterior draws of two parameters. A narrow ridge or a
+funnel means the data separate the pair poorly. Blue crosses mark
+divergent transitions:
+
+``` r
+
+pairs(fit_ar, variable = c("trend_params", "trend_smooth_params"))
+```
+
+![](mvgam_overview_files/figure-html/ar-pairs-1.png)
+
+A Gaussian response adds white noise to the latent state. There,
+`variable = c("obs_params", "trend_params")` sets the observation noise
+`sigma` against the process noise `sigma_trend`. The two compete for the
+same variance and often form a ridge.
 
 The latent state absorbs the persistence from one month to the next. The
 residuals of this fit show no autocorrelation left:
@@ -293,25 +323,25 @@ summary(scores)
 #> # A tibble: 12 × 4
 #>    series eval_horizon    GAM     AR
 #>    <fct>         <int>  <dbl>  <dbl>
-#>  1 PP                1  8.38   4.88 
-#>  2 PP                2 14.3    9.85 
+#>  1 PP                1  8.34   4.88 
+#>  2 PP                2 14.3   10.0  
 #>  3 PP                3 NA     NA    
-#>  4 PP                4  0.479  1.60 
-#>  5 PP                5  6.15   4.01 
-#>  6 PP                6  4.50   3.12 
-#>  7 PP                7  2.08   1.84 
-#>  8 PP                8  0.369  0.735
-#>  9 PP                9  1.51   1.69 
-#> 10 PP               10  4.45   3.34 
-#> 11 PP               11  9.81   7.01 
-#> 12 PP               12  9.16   6.41
+#>  4 PP                4  0.485  1.61 
+#>  5 PP                5  6.11   3.98 
+#>  6 PP                6  4.45   3.05 
+#>  7 PP                7  2.10   1.81 
+#>  8 PP                8  0.363  0.729
+#>  9 PP                9  1.48   1.64 
+#> 10 PP               10  4.41   3.36 
+#> 11 PP               11  9.80   7.12 
+#> 12 PP               12  9.12   6.53
 plot(scores, relative = "GAM")
 ```
 
 ![](mvgam_overview_files/figure-html/scores-1.png)
 
 The latent state improves the forecasts. The AR model has the lower CRPS
-in 8 of the 11 scored months. Its CRPS sums to 44.5 against 61.2 for the
+in 8 of the 11 scored months. Its CRPS sums to 44.7 against 60.9 for the
 smooth-only model. Its 90% intervals contain 11 of the 11 held-out
 counts. Those of the model without a latent state contain 4.
 
@@ -340,7 +370,8 @@ fit_cor <- mvgam(
   family        = poisson(),
   data          = train,
   newdata       = test,
-  silent        = 2
+  silent        = 2,
+  seed          = 1
 )
 ```
 
@@ -401,7 +432,7 @@ plot(rc)
 ![](mvgam_overview_files/figure-html/cor-resid-1.png)
 
 The two pocket mouse species, PB and PP, share the strongest
-correlation, 0.55 (95% interval 0.13 to 0.84). `n_lv` would instead
+correlation, 0.54 (95% interval 0.11 to 0.84). `n_lv` would instead
 estimate a few shared latent factors for many species.
 [`VAR()`](https://nicholasjclark.github.io/mvgam/dev/reference/trend_constructors.md)
 would estimate how each species’ state affects the others at the next
@@ -473,7 +504,7 @@ where:
 \alpha &\sim \text{StudentT}(3, 1.2, 2.5) \\
 \sigma^{(s, \eta)}_{\mathrm{mintemp}} &\sim \text{StudentT}(3, 0, 2.5) \\
 \sigma^{(s, \eta)}_{\mathrm{ndvi\_ma12}} &\sim \text{StudentT}(3, 0, 2.5) \\
-\sigma_\eta &\sim \text{Exponential}(2) \\
+\sigma_\eta &\sim \text{InvGamma}(3, 1.07) \\
 \phi_{1} &\sim \text{Normal}(0, 0.5)
 \end{aligned}
 ```

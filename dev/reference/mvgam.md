@@ -286,12 +286,17 @@ An object of class `mvgam`.
 
 A factor trend loads each series on a few latent factors through the
 matrix `Z`. By default each entry of `Z` takes an independent
-`student_t(3, 0, 0.5)` prior. `loadings_prior` replaces it with the
-structured prior of Heaps and Jermyn (2024). Each column of `Z` then
-follows a multivariate normal whose covariance `Phi` makes similar
-series load alike. `Phi` is the product of a kernel over series features
-and one factor `exp(-d / theta)` per distance matrix. The argument
-requires a `trend_formula` whose trend has latent factors.
+`student_t(3, 0, 0.5)` prior. The static factors of
+[`ZMVN()`](https://nicholasjclark.github.io/mvgam/dev/reference/ZMVN.md)
+take `normal(0, 1)`, as
+[`jsdgam()`](https://nicholasjclark.github.io/mvgam/dev/reference/jsdgam.md)
+describes. Both scales widen with the responses' spread on their link
+scale. `loadings_prior` replaces the default with the structured prior
+of Heaps and Jermyn (2024). Each column of `Z` then follows a
+multivariate normal whose covariance `Phi` makes similar series load
+alike. `Phi` is the product of a kernel over series features and one
+factor `exp(-d / theta)` per distance matrix. The argument requires a
+`trend_formula` whose trend has latent factors.
 
 The list takes these fields:
 
@@ -545,7 +550,7 @@ get_prior(
 #>                  (flat)           b        sx_1                                
 #>    student_t(3, 0, 2.5)         sds                                    0       
 #>    student_t(3, 0, 2.5)         sds s(x, k = 5)                        0       
-#>          exponential(2) sigma_trend                                    0       
+#>      inv_gamma(3, 1.07) sigma_trend                                    0       
 #>          normal(0, 0.5)   ar1_trend                                   -1  1    
 #>        source
 #>       default
@@ -567,7 +572,7 @@ mod <- mvgam(
   chains        = 2,
   silent        = 2
 )
-#> Warning: 13 of 2000 (1.0%) transitions ended with a divergence.
+#> Warning: 12 of 2000 (1.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 summary(mod)
 #>  Family: poisson 
@@ -581,21 +586,21 @@ summary(mod)
 #> == Observation Model ==
 #> Smoothing Spline Hyperparameters:
 #>           Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> sds(sx_1)     4.28      1.88     1.72     8.90 1.00      741      993
+#> sds(sx_1)     4.17      1.82     1.69     8.91 1.00      728      972
 #> 
 #> Regression Coefficients:
 #>           Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> Intercept     1.55      0.16     1.25     1.87 1.00      720      772
-#> sx_1          7.17      2.82     1.84    12.61 1.01      632      976
+#> Intercept     1.55      0.15     1.25     1.85 1.00      673      763
+#> sx_1          7.15      2.80     1.66    12.44 1.00      598      932
 #> 
 #> == Trend Model ==
 #> Trend Specific Parameters:
 #>                       Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS
-#> sigma_trend[series_1]     0.54      0.09     0.39     0.71 1.00      732
-#> ar1_trend[series_1]       0.48      0.17     0.12     0.79 1.00      431
+#> sigma_trend[series_1]     0.53      0.09     0.37     0.72 1.00      416
+#> ar1_trend[series_1]       0.47      0.17     0.09     0.77 1.01      360
 #>                       Tail_ESS
-#> sigma_trend[series_1]     1172
-#> ar1_trend[series_1]        899
+#> sigma_trend[series_1]      725
+#> ar1_trend[series_1]        676
 #> 
 #> Draws were sampled using sampling(NUTS). For each parameter, Bulk_ESS
 #> and Tail_ESS are effective sample size measures, and Rhat is the potential

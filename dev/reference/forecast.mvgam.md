@@ -208,7 +208,7 @@ mod <- mvgam(
   family  = poisson(),
   chains  = 2, silent = 2
 )
-#> Warning: 59 of 2000 (3.0%) transitions ended with a divergence.
+#> Warning: 27 of 2000 (1.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 
 # The held-out data given to mvgam() set the forecast horizon
@@ -227,12 +227,12 @@ plot(forecast(mod, type = "expected"))
 # Next, score the forecast against the held-out counts
 head(score(fc, score = "crps")[[1]])
 #>       score in_interval interval_width eval_horizon score_type
-#> 1 1.8363660           1            0.9            1       crps
-#> 2 2.1702190           1            0.9            2       crps
-#> 3 2.2556043           1            0.9            3       crps
-#> 4 1.3527555           1            0.9            4       crps
-#> 5 0.6259065           1            0.9            5       crps
-#> 6 4.4490207           1            0.9            6       crps
+#> 1 1.7294230           1            0.9            1       crps
+#> 2 2.1344390           1            0.9            2       crps
+#> 3 2.2260678           1            0.9            3       crps
+#> 4 1.2982347           1            0.9            4       crps
+#> 5 0.5809273           1            0.9            5       crps
+#> 6 4.6203150           1            0.9            6       crps
 
 # The sources of the forecast's variance at each horizon
 plot(forecast_uncertainty(mod, ndraws = 200))

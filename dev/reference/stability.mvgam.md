@@ -230,24 +230,34 @@ Nicholas J Clark
 
 ``` r
 # \dontrun{
-set.seed(0)
-simdat <- sim_mvgam(family = gaussian(), n_series = 3L,
-                    n_timepoints = 120L, trend_model = VAR(),
-                    prop_trend = 0.95)
-var_mod <- mvgam(y ~ 1, trend_formula = ~ VAR(p = 1),
-                 data = simdat$data_train, family = gaussian(),
+# Ten years of monthly counts of a prey species and its predator.
+# Predators suppress the prey a month later. Prey raise the
+# predators a month later.
+set.seed(2025)
+n_months <- 120
+A <- rbind(prey     = c(0.6, -0.5),
+           predator = c(0.4,  0.5))
+z <- matrix(0, n_months, 2)
+for (t in 2:n_months) {
+  z[t, ] <- A %*% z[t - 1, ] + rnorm(2, sd = 0.35)
+}
+predator_prey <- data.frame(
+  time = rep(seq_len(n_months), 2),
+  series = factor(rep(c("prey", "predator"), each = n_months),
+                  levels = c("prey", "predator")),
+  y = rpois(2 * n_months, exp(c(2.5 + z[, 1], 1.5 + z[, 2])))
+)
+var_mod <- mvgam(y ~ series, trend_formula = ~ VAR(),
+                 data = predator_prey, family = poisson(),
                  chains = 2, silent = 2)
-#> Warning: 25 of 2000 (1.0%) transitions ended with a divergence.
-#> See https://mc-stan.org/misc/warnings for details.
-#> Warning: 2 of 2 chains had an E-BFMI less than 0.3.
-#> See https://mc-stan.org/misc/warnings for details.
-
+# }
+# \dontrun{
 # Posterior medians and intervals of the stability metrics
 stab <- stability(var_mod)
 stab[stab$metric %in% c("reactivity", "mean_return_rate"), ]
-#>             metric    Estimate  Est.Error       Q2.5     Q97.5
-#> 7       reactivity -0.08714044 0.09822209 -0.2672851 0.2413728
-#> 8 mean_return_rate  0.83372784 0.06963219  0.6824315 0.9422311
+#>             metric   Estimate  Est.Error       Q2.5      Q97.5
+#> 7       reactivity -0.1869083 0.11872230 -0.4362667 0.06179284
+#> 8 mean_return_rate  0.7000529 0.06670612  0.5477350 0.81776418
 
 # The full posterior of each metric
 plot(stability(var_mod, summary = FALSE))

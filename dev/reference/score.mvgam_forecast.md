@@ -200,7 +200,7 @@ mod <- mvgam(y ~ s(x, k = 5),
              data = simdat$data_train,
              family = poisson(),
              chains = 2, silent = 2)
-#> Warning: 38 of 2000 (2.0%) transitions ended with a divergence.
+#> Warning: 114 of 2000 (6.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 
 # Forecast the held-out times, then score each series
@@ -208,12 +208,12 @@ fc <- forecast(mod, newdata = simdat$data_test)
 sc <- score(fc, score = "drps")
 head(sc$series_1)
 #>       score in_interval interval_width eval_horizon score_type
-#> 1 11.814349           0            0.9            1       drps
-#> 2  6.761975           1            0.9            2       drps
-#> 3  5.028120           0            0.9            3       drps
-#> 4  5.142209           1            0.9            4       drps
-#> 5 33.832783           0            0.9            5       drps
-#> 6  3.212600           1            0.9            6       drps
+#> 1 12.004569           0            0.9            1       drps
+#> 2  6.646237           1            0.9            2       drps
+#> 3  5.028520           0            0.9            3       drps
+#> 4  4.842653           1            0.9            4       drps
+#> 5 33.575784           0            0.9            5       drps
+#> 6  3.057987           1            0.9            6       drps
 
 # The DRPS summed over series at each forecast horizon
 library(ggplot2)
@@ -227,12 +227,12 @@ ggplot(sc$all_series, aes(eval_horizon, score)) +
 # A joint score of both series at each horizon
 head(score(fc, score = "energy")$all_series)
 #>       score eval_horizon score_type
-#> 1 10.918771            1     energy
-#> 2 10.393788            2     energy
-#> 3  5.130148            3     energy
-#> 4  6.000030            4     energy
-#> 5 33.481213            5     energy
-#> 6  3.492114            6     energy
+#> 1 11.091482            1     energy
+#> 2 10.287315            2     energy
+#> 3  5.100672            3     energy
+#> 4  5.706271            4     energy
+#> 5 33.237258            5     energy
+#> 6  3.367271            6     energy
 
 # Next: compare_scores() ranks several models by one rule
 # }

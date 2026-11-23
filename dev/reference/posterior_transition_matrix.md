@@ -191,30 +191,39 @@ Nicholas J Clark
 
 ``` r
 # \dontrun{
-set.seed(0)
-simdat <- sim_mvgam(family = gaussian(), n_series = 3L,
-                    n_timepoints = 120L, trend_model = VAR(),
-                    prop_trend = 0.95)
-var_mod <- mvgam(y ~ 1, trend_formula = ~ VAR(p = 1),
-                 data = simdat$data_train, family = gaussian(),
+# Ten years of monthly counts of a prey species and its predator.
+# Predators suppress the prey a month later. Prey raise the
+# predators a month later.
+set.seed(2025)
+n_months <- 120
+A <- rbind(prey     = c(0.6, -0.5),
+           predator = c(0.4,  0.5))
+z <- matrix(0, n_months, 2)
+for (t in 2:n_months) {
+  z[t, ] <- A %*% z[t - 1, ] + rnorm(2, sd = 0.35)
+}
+predator_prey <- data.frame(
+  time = rep(seq_len(n_months), 2),
+  series = factor(rep(c("prey", "predator"), each = n_months),
+                  levels = c("prey", "predator")),
+  y = rpois(2 * n_months, exp(c(2.5 + z[, 1], 1.5 + z[, 2])))
+)
+var_mod <- mvgam(y ~ series, trend_formula = ~ VAR(),
+                 data = predator_prey, family = poisson(),
                  chains = 2, silent = 2)
-#> Warning: 25 of 2000 (1.0%) transitions ended with a divergence.
-#> See https://mc-stan.org/misc/warnings for details.
-#> Warning: 2 of 2 chains had an E-BFMI less than 0.3.
-#> See https://mc-stan.org/misc/warnings for details.
-
+# }
+# \dontrun{
 # Each series' persistence and its effects on the others
 A <- posterior_transition_matrix(var_mod)
 A
 #> Lag-1 VAR transition matrix from an mvgam fit
 #>   Group      : single-panel
-#>   Dimension  : 3 x 3
-#>   Mean |A_ij| (i != j): 0.12
+#>   Dimension  : 2 x 2
+#>   Mean |A_ij| (i != j): 0.53
 #>   Point estimate:
-#>          series_1 series_2 series_3
-#> series_1     0.66     0.04     0.15
-#> series_2     0.06     0.53     0.23
-#> series_3     0.17     0.10     0.56
+#>          prey predator
+#> prey     0.44    -0.58
+#> predator 0.47     0.50
 #>   95% CI on each cell available in `A_lower` / `A_upper`.
 plot(A)
 

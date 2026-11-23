@@ -84,7 +84,7 @@ mod <- mvgam(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1),
               data    = simdat$data_train,
               family  = poisson(),
               chains  = 2, silent = 2)
-#> Warning: 5 of 2000 (0.0%) transitions ended with a divergence.
+#> Warning: 8 of 2000 (0.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 
 # The equations, glossary and priors as Markdown
@@ -129,7 +129,7 @@ md
 #> \begin{aligned}
 #> \alpha &\sim \text{StudentT}(3, 1.6, 2.5) \\
 #> \sigma^{(s)}_{x} &\sim \text{StudentT}(3, 0, 2.5) \\
-#> \sigma_\eta &\sim \text{Exponential}(2) \\
+#> \sigma_\eta &\sim \text{InvGamma}(3, 1.07) \\
 #> \phi_{1} &\sim \text{Normal}(0, 0.5)
 #> \end{aligned}
 #> $$
