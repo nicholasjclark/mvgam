@@ -267,7 +267,8 @@ test_that("the draws put the same mass at zero", {
 
 test_that("the support has an atom at zero and is continuous above it", {
   set.seed(3L)
-  pp <- posterior_predict(fit, draw_ids = ids)
+  # The fitted trend state enters both surfaces compared below
+  pp <- posterior_predict(fit, draw_ids = ids, incl_autocor = TRUE)
   expect_true(all(pp >= 0))
   expect_true(any(pp == 0))
   # Every positive draw is continuous. A count family would fail

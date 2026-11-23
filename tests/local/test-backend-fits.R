@@ -40,11 +40,14 @@ test_that("sampler arguments reach cmdstanr", {
 
 test_that("sampler arguments reach rstan", {
   # rstan raises its convergence checks and divergences as R warnings.
-  # 2000 iterations and smaller steps keep this model clear of both.
+  # A model with no latent state has no funnel to diverge in. 2000
+  # iterations keep it clear of the convergence checks.
   out <- capture.output(
-    fit <- suppressMessages(fit_ar(backend = "rstan", iter = 2000L,
-                                   refresh = 0, save_warmup = TRUE,
-                                   control = list(adapt_delta = 0.95)))
+    fit <- suppressMessages(mvgam(y ~ 1, data = dat, family = poisson(),
+                                  chains = 2L, iter = 2000L, seed = 1L,
+                                  backend = "rstan", refresh = 0,
+                                  save_warmup = TRUE,
+                                  control = list(adapt_delta = 0.95)))
   )
   expect_false(any(grepl("Iteration", out)))
   expect_identical(as.integer(fit$fit@sim$warmup2), c(1000L, 1000L))
