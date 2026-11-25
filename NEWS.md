@@ -28,6 +28,7 @@ mvgam now builds its models through 'brms'. The observation model takes the full
 * `forecast_uncertainty()` splits forecast variance by source and horizon. `compare_scores()` and `compare_elpds()` compare models. See the [forecast evaluation article](https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html)
 * Checks of a model and its data before fitting or prediction: `mvgam_formula()`, `mvgam_data()`, `check_newdata()`
 * `methods_md()` writes a model description. `bibtex()` extracts the citation
+* Fits with 'cmdstanr' 1.0, which drops `cmdstan_model(compile = FALSE)`
 
 ## Changed defaults
 * The `posterior_*()` methods and `fitted()` default to `process_error = FALSE`, matching `predict()`

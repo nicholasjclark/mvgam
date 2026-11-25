@@ -100,12 +100,24 @@ parse_model <- function(model, backend, ...) {
   checkmate::assert_string(model)
   insight::check_if_installed("cmdstanr")
   temp_file <- cmdstanr::write_stan_file(model)
-  out <- eval_silent(
-    cmdstanr::cmdstan_model(temp_file, compile = FALSE, ...),
-    type = "message", silent = silent
-  )
-  out$check_syntax(quiet = TRUE)
-  paste(out$code(), collapse = "\n")
+  # cmdstanr 1.0 checks a file with `check_syntax_stan_file()` and
+  # drops `cmdstan_model(compile = FALSE)`. Earlier releases have only
+  # the model method. The function is fetched by name: a namespace
+  # call would fail R CMD check against an earlier cmdstanr.
+  if ("check_syntax_stan_file" %in% getNamespaceExports("cmdstanr")) {
+    check_syntax <- getExportedValue("cmdstanr", "check_syntax_stan_file")
+    eval_silent(
+      check_syntax(temp_file, quiet = TRUE, ...),
+      type = "message", silent = silent
+    )
+  } else {
+    out <- eval_silent(
+      cmdstanr::cmdstan_model(temp_file, compile = FALSE, ...),
+      type = "message", silent = silent
+    )
+    out$check_syntax(quiet = TRUE)
+  }
+  model
 }
 
 #' Parse Stan model code with the mock backend
