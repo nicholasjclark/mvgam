@@ -124,9 +124,11 @@ row of one combination stays in the same fold.
 }
 \examples{
 \dontrun{
+# Overdispersed counts: a negative binomial size of 2
 set.seed(13)
 simdat <- sim_mvgam(family = negbinomial(), n_series = 1L,
-                     n_timepoints = 120L, type = 6L)
+                     n_timepoints = 120L, type = 6L,
+                     family_pars = list(size = 2))
 
 mod <- mvgam(y ~ s(season, bs = "cc", k = 6),
               trend_formula = ~ CAR(),

@@ -73,13 +73,15 @@
 #'
 #' @examples
 #' \dontrun{
-#' # Monthly airline passengers, the final year held out
+#' # Monthly airline passengers, the final year held out. Counts in the
+#' # hundreds determine each month's state closely. Centred states then
+#' # sample better than the default non-centred ones.
 #' air <- series_to_mvgam(AirPassengers, h = 12)
 #' mod <- mvgam(
 #'   y ~ 1,
-#'   trend_formula = ~ LLT(season = 12, harmonics = 3),
+#'   trend_formula = ~ LLT(season = 12, harmonics = 3, centred = TRUE),
 #'   data = air$data_train,
-#'   family = negbinomial(),
+#'   family = poisson(),
 #'   chains = 2,
 #'   seed = 1,
 #'   silent = 2

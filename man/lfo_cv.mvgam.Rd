@@ -131,7 +131,7 @@ mod <- mvgam(
   trend_formula = ~ AR(p = 1),
   data    = simdat$data_train,
   family  = poisson(),
-  chains  = 2, silent = 2
+  chains  = 2, seed = 1, silent = 2
 )
 
 # Forecasts one time step after each origin from t = 60, scored by
