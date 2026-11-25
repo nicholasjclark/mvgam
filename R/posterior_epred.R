@@ -637,7 +637,7 @@ family_mean_from_kernel <- function(family_name, mu, family_pars,
   if (length(missing) > 0L) {
     stop_mvgam_fault(
       paste0("Family '", family_name, "' needs ",
-             paste(shQuote(missing), collapse = ", "), " for its mean."),
+             paste0("'", missing, "'", collapse = ", "), " for its mean."),
       "The caller omitted them."
     )
   }

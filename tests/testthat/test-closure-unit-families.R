@@ -801,7 +801,7 @@ test_that("every detection family dispatches its units through reduce_sum", {
     # made stanc report at every closure-unit compile
     expect_match(sc, "int grainsize = N_unit >= 8 ? N_unit %/% 8 : 1;",
                  fixed = TRUE, label = key)
-    expect_match(sc, case$call, fixed = TRUE, label = key)
+    expect_true(stan_pattern(case$call, sc, fixed = TRUE), label = key)
     # The data arrays have one entry per unit, and visit_idx one
     # column per visit
     expect_match(sc, "int<lower=1> N_unit;", fixed = TRUE, label = key)

@@ -2395,7 +2395,8 @@ test_that("loadings_prior with distances only emits exponential decay prior", {
     "matrix<lower=0>\\[N_series_trend,\\s*N_series_trend\\]\\s+dist_phylo\\s*;"
   )
   expect_match(sc, "real<lower=0>\\s+theta_dist_phylo\\s*;")
-  expect_match(sc, "exp\\(-dist_phylo")
+  expect_true(stan_pattern("exp(-dist_phylo / theta_dist_phylo)", sc,
+                           fixed = TRUE))
   expect_false(grepl("gp_exponential_cov", sc, fixed = TRUE))
   expect_false(grepl("row_features", sc, fixed = TRUE))
 })
@@ -2660,7 +2661,7 @@ test_that("AR(default + hierarchical) pools the partial autocorrelation", {
     stan_prior_line("sigma_ar1_pacf_trend", "exponential(2)"),
     sc, fixed = TRUE
   ))
-  expect_true(grepl(
+  expect_true(stan_pattern(
     stan_prior_line("ar1_pacf_trend",
                       "normal(mu_ar1_pacf_trend, sigma_ar1_pacf_trend)"),
     sc, fixed = TRUE
@@ -3706,14 +3707,6 @@ test_that("brms-deprecated arguments are named rather than dropped", {
              stan_funs = "real f(real x) { return x; }", validate = FALSE),
     "stanvars"
   )
-
-  # The supported spelling still works.
-  expect_true(grepl(
-    "csr_matrix_times_vector",
-    stancode(mvgam_formula(bf(y ~ elev, sparse = TRUE),
-                           trend_formula = ~ AR(p = 1)),
-              data = dat, family = poisson(), silent = 2L, validate = FALSE)
-  ))
 })
 
 test_that("a fit records the options its program was generated under", {

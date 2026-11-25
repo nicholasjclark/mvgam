@@ -219,6 +219,13 @@ setup_brms_lightweight <- function(formula, data, family = gaussian(),
   # brms announces the defaults it settles, such as `rescor` on a
   # multivariate formula, with `message()`. `silent = 2` turns
   # messages off, as it does for `brms::brm()`.
+  #
+  # `compile_check = NULL` skips the mock backend's parse of the
+  # observation program with `rstan::stanc()`. That program is a
+  # fragment of the one mvgam assembles, which `build_stan_components()`
+  # parses when `validate = TRUE`. A parse here would run under
+  # `validate = FALSE` too, with whichever stanc the installed
+  # StanHeaders bundles.
   mock_setup <- eval_silent(
     do.call(brms::brm, c(
       list(
@@ -231,6 +238,7 @@ setup_brms_lightweight <- function(formula, data, family = gaussian(),
         threads = brm_threads,
         backend = "mock",
         mock_fit = 1,
+        compile_check = NULL,
         rename = FALSE
       ),
       codegen_args_for(codegen, mvgam_codegen_stancode_options)
