@@ -972,6 +972,7 @@ test_that("nmix PPM emits Poisson(N * p) and log(p) link", {
 })
 
 test_that("diri() writes one simplex per unit against the first series", {
+  skip_if_not_installed("cmdstanr")
   set.seed(1L)
   K <- 3L; n_sites <- 5L
   d <- expand.grid(
@@ -1120,6 +1121,7 @@ test_that("mvbind rescor priors carry response superscripts", {
 })
 
 test_that("mvn() emits MVNormal with a diagonal Sigma", {
+  skip_if_not_installed("cmdstanr")
   set.seed(1L)
   K <- 3L; n_sites <- 6L
   d <- expand.grid(
@@ -1147,6 +1149,7 @@ test_that("mvn() emits MVNormal with a diagonal Sigma", {
 })
 
 test_that("a jsdgam model names species, sampling units and factors", {
+  skip_if_not_installed("cmdstanr")
   set.seed(1L)
   d <- expand.grid(time = 1:6, series = factor(paste0("sp", 1:3)))
   d$env <- rep(rnorm(6), times = 3)

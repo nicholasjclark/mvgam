@@ -1663,7 +1663,13 @@ test_that("community richness sums each species' chance of a count", {
                    draw_ids = ids, n_nodes = 4000L)
   lp <- posterior_linpred(fit, newdata = one$frame, draw_ids = ids)
   pair <- c(3L, 4L)
-  rule <- statmod::gauss.quad.prob(30L, "normal")
+  # Gauss-Hermite rule for a standard normal by Golub-Welsch: the
+  # eigenvalues of the Jacobi matrix are the nodes. Each weight is the
+  # squared first component of its eigenvector.
+  jacobi <- matrix(0, 30L, 30L)
+  jacobi[cbind(1:29, 2:30)] <- jacobi[cbind(2:30, 1:29)] <- sqrt(1:29)
+  eig <- eigen(jacobi, symmetric = TRUE)
+  rule <- list(nodes = eig$values, weights = eig$vectors[1L, ]^2)
   grid <- expand.grid(a = seq_len(30L), b = seq_len(30L))
   z <- cbind(rule$nodes[grid$a], rule$nodes[grid$b])
   weight <- rule$weights[grid$a] * rule$weights[grid$b]

@@ -64,6 +64,7 @@ test_that("a refusal names the caller's own value", {
 
 
 test_that("a misspelt argument is refused before the model is built", {
+  skip_if_not_installed("cmdstanr")
   d <- data.frame(y = rpois(20, 3), time = 1:20, series = factor("a"))
   # The sampler would refuse `familly` only after the model compiled
   expect_error(

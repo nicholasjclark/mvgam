@@ -302,7 +302,8 @@ mvgam_imputation_forwarded <- c(
 #'   phylogeny. Most models leave it `NULL`. The section 'Structured
 #'   loadings priors' of [mvgam()] describes its fields.
 #' @param backend `"cmdstanr"` or `"rstan"`. Defaults to
-#'   `getOption("brms.backend", "cmdstanr")`.
+#'   `getOption("brms.backend")` when it is set. Otherwise cmdstanr
+#'   when it is installed and rstan when it is not.
 #' @param combine Logical. With imputed `data`, `TRUE` (default) pools
 #'   the imputation fits into one and `FALSE` returns them as a list.
 #' @param family A description of the response distribution and link
@@ -624,7 +625,7 @@ mvgam_imputation_forwarded <- c(
 mvgam <- function(formula, trend_formula = NULL, data = NULL,
                            newdata = NULL,
                            loadings_prior = NULL,
-                           backend = getOption("brms.backend", "cmdstanr"),
+                           backend = default_backend(),
                            combine = TRUE, family = gaussian(),
                            threads = NULL,
                            save_pars = brms::save_pars(),
@@ -694,6 +695,7 @@ mvgam_from_data <- function(formula, trend_formula, data, newdata,
   validate_model_formulas(formula, trend_formula)
 
   if (inherits(data, "mids")) {
+    insight::check_if_installed("mice", reason = "to complete a 'mids' object")
     data <- lapply(seq_len(data$m), function(i) mice::complete(data, i))
   }
   checkmate::assert(

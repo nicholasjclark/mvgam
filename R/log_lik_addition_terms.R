@@ -102,9 +102,7 @@ family_dist_spec <- function(family_name, link, linpred, family_pars,
       list(size = trials[j], prob = mu[, j])
     }),
     beta_binomial = spec("bbinom", function(j) {
-      shapes <- beta_shapes(mu[, j], phi[, j])
-      list(size = trials[j],
-           alpha = shapes$shape1, beta = shapes$shape2)
+      list(size = trials[j], mu = mu[, j], phi = phi[, j])
     }),
     poisson = spec("pois", function(j) {
       list(lambda = mu[, j])
@@ -181,8 +179,7 @@ family_dist_spec <- function(family_name, link, linpred, family_pars,
 
 #' The density, distribution or quantile function of a distribution
 #'
-#' Most come from base R. `bbinom` comes from extraDistr and
-#' `asym_laplace` from brms. `cmb`, `com_poisson`, `beta_nb` and
+#' Most come from base R. `bbinom` and `asym_laplace` come from brms. `cmb`, `com_poisson`, `beta_nb` and
 #' `tweedie` use the package's own kernels.
 #'
 #' @param dist Character distribution name from `family_dist_spec()`
@@ -195,19 +192,10 @@ dist_fun <- function(dist, kind = c("d", "p", "q")) {
   kind <- match.arg(kind)
   switch(
     dist,
-    bbinom = {
-      insight::check_if_installed(
-        "extraDistr",
-        reason = paste0(
-          "to compute censored or truncated beta_binomial ",
-          "likelihoods"
-        )
-      )
-      # extraDistr has no beta-binomial quantile function; `NULL`
-      # sends the truncation sampler to rejection sampling.
-      switch(kind, d = extraDistr::dbbinom, p = extraDistr::pbbinom,
-             q = NULL)
-    },
+    # brms has no beta-binomial quantile function. `NULL` sends the
+    # truncation sampler to rejection sampling.
+    bbinom = switch(kind, d = brms::dbeta_binomial,
+                    p = brms::pbeta_binomial, q = NULL),
     # A COM-binomial, a COM-Poisson, a beta negative binomial and a
     # Tweedie have no quantile function here. `NULL` tells a caller
     # asking for one to take rejection sampling.

@@ -19,7 +19,7 @@ jsdgam(
   trait_slopes = NULL,
   phylo = NULL,
   loadings_prior = NULL,
-  backend = getOption("brms.backend", "cmdstanr"),
+  backend = default_backend(),
   threads = NULL,
   run_model = TRUE,
   ...
@@ -156,7 +156,8 @@ Supplying an explicit \code{loadings_prior} as well is refused.}
 \code{phylo} as well is refused.}
 
 \item{backend}{\code{"cmdstanr"} or \code{"rstan"}. Defaults to
-\code{getOption("brms.backend", "cmdstanr")}.}
+\code{getOption("brms.backend")} when it is set. Otherwise cmdstanr
+when it is installed and rstan when it is not.}
 
 \item{threads}{Positive integer number of threads per chain, or
 \code{NULL} (the default) for none. The model is compiled with

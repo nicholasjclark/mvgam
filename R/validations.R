@@ -4258,27 +4258,30 @@ trend_cell_frame <- function(data, covariates, time_vals, series_vals,
   checkmate::assert_flag(has_by_lv)
   checkmate::assert_flag(fill_grid)
   columns <- trend_covariate_names(covariates)
-  cells <- data %>%
-    dplyr::mutate(time = time_vals, series = series_vals) %>%
-    dplyr::group_by(.data$time, .data$series) %>%
-    dplyr::summarise(dplyr::across(dplyr::all_of(columns), dplyr::first),
-                     .groups = "drop")
+  cells <- dplyr::mutate(data, time = time_vals, series = series_vals)
+  cells <- dplyr::summarise(
+    dplyr::group_by(cells, .data$time, .data$series),
+    dplyr::across(dplyr::all_of(columns), dplyr::first),
+    .groups = "drop"
+  )
   if (fill_grid) {
     cells <- dplyr::full_join(
-      tidyr::expand_grid(time = unique(cells$time),
-                         series = unique(cells$series)),
+      cross_grid(time = unique(cells$time), series = unique(cells$series)),
       cells, by = c("time", "series")
     )
   }
   cells <- dplyr::arrange(cells, .data$time, .data$series)
   if (has_by_lv) {
-    time_level <- cells %>%
-      dplyr::group_by(.data$time) %>%
-      dplyr::summarise(dplyr::across(dplyr::all_of(columns), dplyr::first),
-                       .groups = "drop")
-    cells <- expand_factor_axis(n_lv_for_grain, time = time_level$time) %>%
-      dplyr::left_join(time_level, by = "time") %>%
-      dplyr::arrange(.data$time, .data[[factor_axis_column]])
+    time_level <- dplyr::summarise(
+      dplyr::group_by(cells, .data$time),
+      dplyr::across(dplyr::all_of(columns), dplyr::first),
+      .groups = "drop"
+    )
+    cells <- dplyr::left_join(
+      expand_factor_axis(n_lv_for_grain, time = time_level$time),
+      time_level, by = "time"
+    )
+    cells <- dplyr::arrange(cells, .data$time, .data[[factor_axis_column]])
   }
   remove_mvgam_variables(cells)
 }
@@ -4334,16 +4337,13 @@ assert_trend_covariates_constant <- function(data, trend_variables,
   if (length(checked) == 0L) {
     return(invisible(TRUE))
   }
-  varying <- frame %>%
-    dplyr::group_by(dplyr::across(dplyr::all_of(cell_vars))) %>%
-    dplyr::summarise(
-      dplyr::across(dplyr::all_of(checked), ~ length(unique(.x)) > 1),
-      .groups = "drop"
-    ) %>%
-    dplyr::select(dplyr::all_of(checked)) %>%
-    dplyr::summarise(dplyr::across(dplyr::everything(), any)) %>%
-    dplyr::select(dplyr::where(isTRUE)) %>%
-    names()
+  per_cell <- dplyr::summarise(
+    dplyr::group_by(frame, dplyr::across(dplyr::all_of(cell_vars))),
+    dplyr::across(dplyr::all_of(checked), ~ length(unique(.x)) > 1),
+    .groups = "drop"
+  )
+  varying <- checked[vapply(checked, function(v) any(per_cell[[v]]),
+                            logical(1L))]
   if (length(varying) > 0) {
     cell_label <- if (by_time) {
       "time"

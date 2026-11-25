@@ -104,10 +104,10 @@ apply_truncation <- function(samples, lb, ub, ntrys, ndraws, nobs,
 
 #' Draw beta-binomial variates in the mean-precision parameterisation
 #'
-#' `extraDistr::rbbinom()` takes the two Beta shapes, while brms and
-#' mvgam both parameterise the family by a per-trial probability and a
-#' precision. Converting in one place keeps the two samplers that need
-#' it agreeing with `dbeta_binomial()` and with the Stan likelihood.
+#' brms and mvgam parameterise the family by a per-trial probability
+#' and a precision. The draw goes through the two Beta shapes these
+#' imply. Converting in one place keeps the two samplers that need it
+#' agreeing with `dbeta_binomial()` and with the Stan likelihood.
 #'
 #' @param n Number of variates
 #' @param size Trial counts, one per variate or a single count
@@ -232,7 +232,7 @@ sample_from_family <- function(family_name, ndraws, epred,
     "student" = {
       checkmate::assert_matrix(sigma, nrows = ndraws, ncols = ncol(epred))
       checkmate::assert_matrix(nu, nrows = ndraws, ncols = ncol(epred))
-      extraDistr::rlst(length(epred), df = nu, mu = epred, sigma = sigma)
+      brms::rstudent_t(length(epred), df = nu, mu = epred, sigma = sigma)
     },
 
     "skew_normal" = {
@@ -261,7 +261,7 @@ sample_from_family <- function(family_name, ndraws, epred,
     "frechet" = {
       checkmate::assert_matrix(shape, nrows = ndraws, ncols = ncol(epred))
       scale <- epred / gamma(1 - 1 / shape)
-      extraDistr::rfrechet(length(epred), scale = scale, shape = shape)
+      brms::rfrechet(length(epred), scale = scale, shape = shape)
     },
 
     "gen_extreme_value" = {
@@ -273,7 +273,7 @@ sample_from_family <- function(family_name, ndraws, epred,
 
     "inverse.gaussian" = {
       checkmate::assert_matrix(shape, nrows = ndraws, ncols = ncol(epred))
-      statmod::rinvgauss(length(epred), mean = epred, shape = shape)
+      brms::rinv_gaussian(length(epred), mu = epred, shape = shape)
     },
 
     "tweedie" = {

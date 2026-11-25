@@ -58,6 +58,7 @@ test_that("stack_fcs_per_horizon groups the series at each horizon", {
 # ----- CRPS -------------------------------------------------------
 
 test_that("CRPS of a degenerate forecast (all draws equal truth) is 0", {
+  skip_if_not_installed("scoringRules")
   fc <- matrix(2.5, nrow = 100L, ncol = 1L)
   out <- univariate_score("crps", truth = 2.5, fc = fc)
   expect_equal(as.numeric(out[1, "score"]), 0)
@@ -66,6 +67,7 @@ test_that("CRPS of a degenerate forecast (all draws equal truth) is 0", {
 
 
 test_that("CRPS of a wider forecast is larger than a narrower one", {
+  skip_if_not_installed("scoringRules")
   set.seed(3L)
   truth <- 0
   fc_narrow <- matrix(stats::rnorm(2000L, sd = 0.1),
@@ -158,6 +160,7 @@ test_that("Energy score at each horizon is es_sample over the series", {
 
 
 test_that("Energy of a degenerate forecast (draws = truth) is ~0", {
+  skip_if_not_installed("scoringRules")
   truths <- matrix(c(1, 2, 3, 4), nrow = 2L, ncol = 2L)
   # 50 draws each identical to the per-series truth.
   fcs <- lapply(seq_len(2L), function(s) {
@@ -171,6 +174,7 @@ test_that("Energy of a degenerate forecast (draws = truth) is ~0", {
 # ----- Variogram --------------------------------------------------
 
 test_that("Variogram score of draws equal to the truth is 0", {
+  skip_if_not_installed("scoringRules")
   truths <- matrix(c(0, 1, 0.5, 1.5,
                      -1, 0), nrow = 2L, ncol = 3L)
   # Draws equal to the truth reproduce the truth-side pairwise
@@ -185,6 +189,7 @@ test_that("Variogram score of draws equal to the truth is 0", {
 
 
 test_that("Variogram score accepts per-series weights", {
+  skip_if_not_installed("scoringRules")
   set.seed(8L)
   truths <- matrix(c(0, 1, 0.5, 1.5), nrow = 2L, ncol = 2L)
   fcs <- list(
@@ -208,6 +213,7 @@ test_that("Variogram score accepts per-series weights", {
 # ----- Log score --------------------------------------------------
 
 test_that("Log score decreases as fc concentrates on truth", {
+  skip_if_not_installed("scoringRules")
   set.seed(9L)
   fc_wide <- matrix(stats::rnorm(1000L, sd = 2),
                      nrow = 500L, ncol = 2L)
@@ -224,6 +230,7 @@ test_that("Log score decreases as fc concentrates on truth", {
 # ----- DSS --------------------------------------------------------
 
 test_that("DSS matches its analytic formula on Gaussian draws", {
+  skip_if_not_installed("scoringRules")
   set.seed(10L)
   truth <- 0
   fc <- matrix(stats::rnorm(5000L, mean = 0, sd = 1),
@@ -241,6 +248,7 @@ test_that("DSS matches its analytic formula on Gaussian draws", {
 # ----- Quantile (pinball) score -----------------------------------
 
 test_that("Quantile score is 0 when truth equals the alpha quantile", {
+  skip_if_not_installed("scoringRules")
   fc <- matrix(seq.int(1L, 100L), nrow = 100L, ncol = 1L)
   # 0.5 quantile of 1..100 is 50.5; pick truth at the median.
   out <- univariate_score("qs", truth = 50.5, fc = fc,
@@ -251,6 +259,7 @@ test_that("Quantile score is 0 when truth equals the alpha quantile", {
 
 
 test_that("Quantile score weights a miss by its quantile level", {
+  skip_if_not_installed("scoringRules")
   set.seed(11L)
   # When truth lies in the upper tail, the 0.95-quantile pinball
   # loss applies the larger asymmetric weight (0.95 vs 0.05),
@@ -270,6 +279,7 @@ test_that("Quantile score weights a miss by its quantile level", {
 # ----- Threshold-weighted CRPS ------------------------------------
 
 test_that("twCRPS with (a = -Inf, b = Inf) equals plain CRPS", {
+  skip_if_not_installed("scoringRules")
   set.seed(12L)
   truth <- 1
   fc <- matrix(stats::rnorm(500L), nrow = 500L, ncol = 1L)
@@ -282,6 +292,7 @@ test_that("twCRPS with (a = -Inf, b = Inf) equals plain CRPS", {
 
 
 test_that("twCRPS with a > truth focuses scoring on the upper tail", {
+  skip_if_not_installed("scoringRules")
   set.seed(13L)
   truth <- 0
   fc <- matrix(stats::rnorm(500L), nrow = 500L, ncol = 1L)
@@ -298,6 +309,7 @@ test_that("twCRPS with a > truth focuses scoring on the upper tail", {
 # ----- Threshold-weighted Energy ----------------------------------
 
 test_that("twEnergy is the energy score of the clamped values", {
+  skip_if_not_installed("scoringRules")
   set.seed(14L)
   truths <- matrix(c(0, 1, 0.5, 1.5), nrow = 2L, ncol = 2L)
   fcs <- list(

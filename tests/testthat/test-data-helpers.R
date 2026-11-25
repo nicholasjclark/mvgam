@@ -342,6 +342,7 @@ test_that("a tsibble fills its gaps and keeps keys and covariates", {
 })
 
 test_that("a wide data.frame pivots with series in column order", {
+  skip_if_not_installed("tsibble")
   wide <- data.frame(
     date = as.Date("2024-01-01") + c(0:1, 4:9),
     zeta = 1:8, alpha = 11:18

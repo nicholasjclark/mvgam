@@ -199,6 +199,7 @@ test_that("the sites are labelled by the fit's own time axis", {
 
 
 test_that("label_species labels the longest arrows, every arrow or none", {
+  skip_if_not_installed("ggrepel")
   # Arrow s12 is the longest and s1 the shortest
   loadings <- cbind(seq(0.1, 1.2, by = 0.1), 0)
   comp <- list(scores = matrix(0, 3L, 2L), loadings = loadings)

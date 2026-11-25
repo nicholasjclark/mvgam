@@ -79,13 +79,16 @@
 #' deaths <- series_to_mvgam(cbind(male = mdeaths, female = fdeaths))
 #' levels(deaths$series)
 #'
-#' # A wide data.frame with a date column
-#' wide <- data.frame(
-#'   date = seq(as.Date("2024-01-01"), by = "day", length.out = 28),
-#'   site_a = rpois(28, 5),
-#'   site_b = rpois(28, 8)
-#' )
-#' head(series_to_mvgam(wide))
+#' # A wide data.frame with a date column. Converting dates needs the
+#' # tsibble package.
+#' if (requireNamespace("tsibble", quietly = TRUE)) {
+#'   wide <- data.frame(
+#'     date = seq(as.Date("2024-01-01"), by = "day", length.out = 28),
+#'     site_a = rpois(28, 5),
+#'     site_b = rpois(28, 8)
+#'   )
+#'   head(series_to_mvgam(wide))
+#' }
 #'
 #' # Next: fit the training data, for example with
 #' # mvgam(y ~ s(season, bs = "cc"), trend_formula = ~ AR(),

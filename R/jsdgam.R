@@ -304,7 +304,7 @@ jsdgam <- function(formula,
                    trait_slopes = NULL,
                    phylo = NULL,
                    loadings_prior = NULL,
-                   backend = getOption("brms.backend", "cmdstanr"),
+                   backend = default_backend(),
                    threads = NULL,
                    run_model = TRUE,
                    ...) {

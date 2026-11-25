@@ -36,95 +36,50 @@ check_marginaleffects <- function() {
   }, args = list(lib = lib), show = TRUE)
 }
 
-# 4. Pre-build the vignettes into inst/doc with their code evaluated
-build_vignettes <- function() {
-  source("build_vignettes_CRAN.R")
-}
-
-# 4b. The pre-built vignettes as R CMD check judges them. R CMD check
-# warns when any file in vignettes/ is more than 10 s newer than the
-# newest file in inst/doc, or than its own copy there. Because a
-# tarball keeps file times, an edit or a git checkout after the
-# pre-build fails CRAN. Each inst/doc .Rmd must also match its source.
-# Each .R must match a fresh purl. Each html must hold evaluated output.
-# Pass the package root, or the tarball from `build_tarball()`.
-check_vignette_outputs <- function(path = ".") {
-  if (grepl("\\.tar\\.gz$", path)) {
-    exdir <- tempfile()
-    utils::untar(path, exdir = exdir)
-    path <- list.files(exdir, full.names = TRUE)[1L]
-  }
-  vign <- file.path(path, "vignettes")
-  doc <- file.path(path, "inst", "doc")
-  src <- list.files(vign, recursive = TRUE)
-  # A package folder holds files that .Rbuildignore keeps out of the
-  # tarball, such as vignettes/articles. R CMD check never sees them.
-  ignore_file <- file.path(path, ".Rbuildignore")
-  if (file.exists(ignore_file)) {
-    patterns <- readLines(ignore_file)
-    # A pattern that matches a folder drops everything inside it
-    ignored <- vapply(file.path("vignettes", src), function(f) {
-      parts <- strsplit(f, "/", fixed = TRUE)[[1L]]
-      prefixes <- vapply(seq_along(parts), function(i) {
-        paste(parts[seq_len(i)], collapse = "/")
-      }, character(1L))
-      any(vapply(patterns, function(p) any(grepl(p, prefixes,
-                                                  perl = TRUE)),
-                 logical(1L)))
-    }, logical(1L))
-    src <- src[!ignored]
-  }
-  out <- list.files(doc, recursive = TRUE)
-  tol <- 10
-  src_time <- file.mtime(file.path(vign, src))
-  out_time <- file.mtime(file.path(doc, out))
-  shared <- intersect(src, out)
-  rmds <- list.files(vign, pattern = "\\.Rmd$")
-  # purl() writes the evaluated params, which depend on NOT_CRAN as the
-  # pre-build sets it
-  purl_matches <- vapply(rmds, function(x) {
-    fresh <- withr::with_envvar(
-      c(NOT_CRAN = "true"),
-      knitr::purl(file.path(vign, x), output = tempfile(), quiet = TRUE)
-    )
-    identical(readLines(fresh), readLines(file.path(doc, sub(
-      "\\.Rmd$", ".R", x))))
-  }, logical(1L))
-  evaluated <- vapply(rmds, function(x) {
-    html <- readLines(file.path(doc, sub("\\.Rmd$", ".html", x)),
-                      warn = FALSE)
-    any(grepl("#&gt;|data:image/png", html))
-  }, logical(1L))
-  problems <- c(
-    newer_than_all = src[src_time > max(out_time) + tol],
-    newer_than_copy = shared[file.mtime(file.path(vign, shared)) >
-                               file.mtime(file.path(doc, shared)) + tol],
-    missing_output = setdiff(c(rmds, sub("\\.Rmd$", ".R", rmds),
-                               sub("\\.Rmd$", ".html", rmds)), out),
-    rmd_differs = rmds[!vapply(rmds, function(x) identical(
-      readLines(file.path(vign, x)), readLines(file.path(doc, x))),
-      logical(1L))],
-    purl_differs = rmds[!purl_matches],
-    not_evaluated = rmds[!evaluated]
-  )
-  if (length(problems)) {
-    print(problems)
-    stop("Rebuild the vignettes with build_vignettes().", call. = FALSE)
-  }
-  message("Vignette outputs are current, complete and evaluated.")
-  invisible(TRUE)
-}
-
-# 5. Check the package without rebuilding the vignettes
+# 4. Check the package without its vignettes or tests, for a quick
+# look at the documentation and examples
 check_package <- function() {
   devtools::check(vignettes = FALSE, run_dont_test = FALSE,
                   args = c("--timings", "--no-tests"),
                   check_dir = out_dir)
 }
 
-# 6. Build the tarball to submit. Its vignettes are the pre-built ones.
+# 5. Build the tarball to submit. Under NOT_CRAN = "true", R CMD build
+# knits each vignette with its fits. It writes the evaluated outputs
+# and the vignette index into the tarball. On CRAN the vignettes
+# rebuild without fitting anything.
 build_tarball <- function() {
-  devtools::build(path = out_dir, vignettes = FALSE)
+  withr::with_envvar(c(NOT_CRAN = "true"),
+                     devtools::build(path = out_dir, vignettes = TRUE))
+}
+
+# 6. The tarball must hold the vignette index. Each vignette needs its
+# R script and an html with evaluated output.
+check_vignette_outputs <- function(tarball) {
+  exdir <- tempfile()
+  utils::untar(tarball, exdir = exdir)
+  pkg <- list.files(exdir, full.names = TRUE)[1L]
+  doc <- file.path(pkg, "inst", "doc")
+  rmds <- list.files(file.path(pkg, "vignettes"), pattern = "\\.Rmd$")
+  outputs <- c(sub("\\.Rmd$", ".R", rmds), sub("\\.Rmd$", ".html", rmds))
+  evaluated <- vapply(rmds, function(x) {
+    html <- file.path(doc, sub("\\.Rmd$", ".html", x))
+    file.exists(html) &&
+      any(grepl("#&gt;|data:image/png", readLines(html, warn = FALSE)))
+  }, logical(1L))
+  problems <- c(
+    no_index = if (!file.exists(file.path(pkg, "build", "vignette.rds"))) {
+      "build/vignette.rds"
+    },
+    missing_output = outputs[!file.exists(file.path(doc, outputs))],
+    not_evaluated = rmds[!evaluated]
+  )
+  if (length(problems)) {
+    print(problems)
+    stop("Rebuild the tarball with build_tarball().", call. = FALSE)
+  }
+  message("The tarball's vignettes are indexed, complete and evaluated.")
+  invisible(TRUE)
 }
 
 # 7. Check the tarball as CRAN will, tests included. NOT_CRAN = "false"
@@ -138,6 +93,20 @@ check_as_cran <- function(tarball) {
   )
 }
 
+# 7b. The check CRAN runs without suggested packages. Under
+# `_R_CHECK_DEPENDS_ONLY_`, R CMD check links into a fresh library
+# only the packages that DESCRIPTION lists in Depends, Imports and
+# LinkingTo. A test or example that calls a suggested package without
+# guarding it fails here.
+check_no_suggests <- function(tarball) {
+  withr::with_envvar(
+    c(NOT_CRAN = "false", `_R_CHECK_DEPENDS_ONLY_` = "true"),
+    rcmdcheck::rcmdcheck(tarball, args = c("--as-cran", "--no-manual"),
+                         check_dir = file.path(out_dir, "no_suggests"),
+                         error_on = "never")
+  )
+}
+
 # 8. win-builder release and devel. Results arrive by email to the
 # maintainer within about an hour.
 submit_win_builder <- function() {
@@ -146,9 +115,8 @@ submit_win_builder <- function() {
 }
 
 # Usage:
-#   cran_status(); check_text(); check_marginaleffects()
-#   build_vignettes(); check_vignette_outputs(); check_package()
+#   cran_status(); check_text(); check_marginaleffects(); check_package()
 #   tarball <- build_tarball(); check_vignette_outputs(tarball)
-#   check_as_cran(tarball)
+#   check_as_cran(tarball); check_no_suggests(tarball)
 #   submit_win_builder()
 #   devtools::submit_cran()

@@ -23,6 +23,11 @@ test_that("backend_algorithms() withholds cmdstanr-only algorithms from rstan", 
 
 test_that("backend_algorithms() rejects an unknown backend", {
   expect_error(mvgam:::backend_algorithms("jags"), "backend")
+  # Without the option or cmdstanr, a fit takes rstan, which mvgam
+  # imports
+  withr::local_options(brms.backend = NULL)
+  expect_identical(mvgam:::default_backend(cmdstanr_installed = FALSE),
+                   "rstan")
 })
 
 

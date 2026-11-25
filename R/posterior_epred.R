@@ -1353,7 +1353,7 @@ ordinal_probs <- function(eta, thres, family, disc = NULL, hu = NULL,
   )
   if ("extra_cat" %in% family$specials) {
     checkmate::assert_matrix(hu, nrows = ndraws, ncols = nobs)
-    probs <- abind::abind(hu, probs * as.vector(1 - hu), along = 3L)
+    probs <- bind_slices(hu, probs * as.vector(1 - hu))
   }
   dimnames(probs) <- list(NULL, NULL, ordinal_level_values(nthres, family))
   probs
@@ -1511,7 +1511,7 @@ ordinal_draws <- function(probs) {
 #' @noRd
 inv_link_cumulative <- function(x, link) {
   x <- inv_link(x, link)
-  abind::abind(x, category_slab(x, 1)) - abind::abind(category_slab(x, 0), x)
+  bind_slices(x, category_slab(x, 1)) - bind_slices(category_slab(x, 0), x)
 }
 
 #' Inverse Link for Sequential Ratio Models
@@ -1524,7 +1524,7 @@ inv_link_cumulative <- function(x, link) {
 inv_link_sratio <- function(x, link) {
   x <- inv_link(x, link)
   ones <- category_slab(x, 1)
-  abind::abind(x, ones) * abind::abind(ones, cumprod_thresholds(1 - x))
+  bind_slices(x, ones) * bind_slices(ones, cumprod_thresholds(1 - x))
 }
 
 #' Inverse Link for Continuation Ratio Models
@@ -1537,7 +1537,7 @@ inv_link_sratio <- function(x, link) {
 inv_link_cratio <- function(x, link) {
   x <- inv_link(x, link)
   ones <- category_slab(x, 1)
-  abind::abind(1 - x, ones) * abind::abind(ones, cumprod_thresholds(x))
+  bind_slices(1 - x, ones) * bind_slices(ones, cumprod_thresholds(x))
 }
 
 #' Inverse Link for Adjacent Category Models
@@ -1551,13 +1551,13 @@ inv_link_cratio <- function(x, link) {
 inv_link_acat <- function(x, link) {
   ones <- category_slab(x, 1)
   out <- if (link == "logit") {
-    abind::abind(ones, cumprod_thresholds(exp(x)))
+    bind_slices(ones, cumprod_thresholds(exp(x)))
   } else {
     x <- inv_link(x, link)
     rev_k <- rev(seq_len(dim(x)[3L]))
     later <- cumprod_thresholds(1 - x[, , rev_k, drop = FALSE])
-    abind::abind(ones, cumprod_thresholds(x)) *
-      abind::abind(later[, , rev_k, drop = FALSE], ones)
+    bind_slices(ones, cumprod_thresholds(x)) *
+      bind_slices(later[, , rev_k, drop = FALSE], ones)
   }
   out / array(rowSums(out, dims = 2L), dim(out))
 }

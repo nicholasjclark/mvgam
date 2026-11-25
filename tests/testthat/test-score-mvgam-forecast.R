@@ -45,6 +45,7 @@ make_mock_forecast <- function(n_series = 2L, h = 5L,
 # ----- Return-shape contract --------------------------------------
 
 test_that("Univariate scorers return per-series df + all_series", {
+  skip_if_not_installed("scoringRules")
   fc <- make_mock_forecast(n_series = 2L, h = 5L)
   out <- score(fc, "crps")
   expect_named(out, c("s1", "s2", "all_series"))
@@ -58,6 +59,7 @@ test_that("Univariate scorers return per-series df + all_series", {
 
 
 test_that("all_series row-sums the per-series score column", {
+  skip_if_not_installed("scoringRules")
   fc <- make_mock_forecast(n_series = 2L, h = 4L)
   out <- score(fc, "crps")
   expect_identical(nrow(out$all_series), 4L)
@@ -77,6 +79,7 @@ test_that("all_series row-sums the per-series score column", {
 
 
 test_that("Multivariate scorers return per-series coverage + joint", {
+  skip_if_not_installed("scoringRules")
   fc <- make_mock_forecast(n_series = 2L, h = 4L)
   out <- score(fc, "energy")
   expect_named(out, c("s1", "s2", "all_series"))
@@ -93,6 +96,7 @@ test_that("Multivariate scorers return per-series coverage + joint", {
 # ----- Dispatch routing -------------------------------------------
 
 test_that("Every scorer routes without error and returns the expected shape", {
+  skip_if_not_installed("scoringRules")
   set.seed(42L)
   fc <- make_mock_forecast(n_series = 2L, h = 3L, ndraws = 40L)
   univariate <- c("crps", "drps", "sis", "logs", "dss",
@@ -115,6 +119,7 @@ test_that("Every scorer routes without error and returns the expected shape", {
 
 
 test_that("qs uses quantile_level and twcrps uses lower/upper", {
+  skip_if_not_installed("scoringRules")
   set.seed(11L)
   fc <- make_mock_forecast(n_series = 1L, h = 3L, ndraws = 80L)
   s_median <- score(fc, "qs", quantile_level = 0.5)$s1$score
@@ -166,6 +171,7 @@ test_that("Missing forecasts / test_observations errors crisply", {
 
 
 test_that("Empty per-series forecasts produce empty per-series df", {
+  skip_if_not_installed("scoringRules")
   fc <- make_mock_forecast(n_series = 2L, h = 3L)
   fc$forecasts[["s1"]] <- matrix(NA_real_, nrow = 30L, ncol = 0L)
   fc$test_observations[["s1"]] <- numeric(0L)
@@ -192,6 +198,7 @@ test_that("Multivariate scoring on inconsistent horizons errors", {
 
 
 test_that("series forecast at their own times are summed by time", {
+  skip_if_not_installed("scoringRules")
   fc <- make_mock_forecast(n_series = 2L, h = 3L)
   # Both series hold three forecasts. They share only time 12
   fc$test_times <- list(s1 = c(11, 12, 15), s2 = c(12, 13, 14))
@@ -213,6 +220,7 @@ test_that("series forecast at their own times are summed by time", {
 # ----- Routing parity vs direct kernel calls ----------------------
 
 test_that("joint scores equal their kernels, on the log scale too", {
+  skip_if_not_installed("scoringRules")
   set.seed(99L)
   fc <- make_mock_forecast(n_series = 2L, h = 3L, ndraws = 40L)
   truths <- do.call(rbind, fc$test_observations)
@@ -234,6 +242,7 @@ test_that("joint scores equal their kernels, on the log scale too", {
 
 
 test_that("variogram weights follow the scored series", {
+  skip_if_not_installed("scoringRules")
   fc <- make_mock_forecast(n_series = 3L, h = 3L)
   fc$forecasts$s1 <- matrix(NA_real_, nrow = 30L, ncol = 0L)
   fc$test_observations$s1 <- numeric(0L)
@@ -250,6 +259,7 @@ test_that("variogram weights follow the scored series", {
 })
 
 test_that("print() of a score shows each series' mean score", {
+  skip_if_not_installed("scoringRules")
   fc <- make_mock_forecast(n_series = 2L, h = 4L)
   sc <- score(fc, score = "crps")
   expect_s3_class(sc, "mvgam_score")

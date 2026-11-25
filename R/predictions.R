@@ -689,8 +689,8 @@ trend_row_units <- function(object, newdata) {
     fitted <- data.frame(.time = times)
     new <- row_placement(object, newdata)[".time"]
   } else {
-    fitted <- tidyr::expand_grid(.time = times,
-                                 .series = fitted_series_levels(object))
+    fitted <- cross_grid(.time = times,
+                         .series = fitted_series_levels(object))
     new <- row_placement(object, newdata)
   }
   if (nrow(fitted) != nrow(object$trend_model$data)) {

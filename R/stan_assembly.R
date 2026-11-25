@@ -4851,18 +4851,16 @@ generate_var_trend_stanvars <- function(trend_specs, data_info,
 
   var_parameters_stanvar <- brms::stanvar(
     name = "var_parameters",
-    scode = glue::glue("
-      {var_specific_params}
-
-      // Means and precisions of the raw coefficient priors,
-      // [1] for the diagonal and [2] for the off-diagonal elements
-      array[2] vector[N_lags_trend] Amu_trend;
-      array[2] vector<lower=0>[N_lags_trend] Aomega_trend;
-
-      // The states before the first occasion, and with an MA term
-      // the MA error, under their joint stationary law
-      vector[{init_dim_expr}] init_trend;
-    "),
+    scode = paste0(
+      var_specific_params, "\n\n",
+      "// Means and precisions of the raw coefficient priors,\n",
+      "// [1] for the diagonal and [2] for the off-diagonal elements\n",
+      "array[2] vector[N_lags_trend] Amu_trend;\n",
+      "array[2] vector<lower=0>[N_lags_trend] Aomega_trend;\n\n",
+      "// The states before the first occasion, and with an MA term\n",
+      "// the MA error, under their joint stationary law\n",
+      "vector[", init_dim_expr, "] init_trend;"
+    ),
     block = "parameters"
   )
 
@@ -4877,15 +4875,14 @@ generate_var_trend_stanvars <- function(trend_specs, data_info,
     }
     brms::stanvar(
       name = "var_ma_parameters",
-      scode = glue::glue("
-      // Raw MA matrices, mapped to the invertible Theta_trend
-      {raw_ma}
-
-      // Means and precisions of the raw MA coefficient priors,
-      // [1] for the diagonal and [2] for the off-diagonal elements
-      array[2] vector[{ma_lags}] Dmu_trend;
-      array[2] vector<lower=0>[{ma_lags}] Domega_trend;
-      "),
+      scode = paste0(
+        "// Raw MA matrices, mapped to the invertible Theta_trend\n",
+        raw_ma, "\n\n",
+        "// Means and precisions of the raw MA coefficient priors,\n",
+        "// [1] for the diagonal and [2] for the off-diagonal elements\n",
+        "array[2] vector[", ma_lags, "] Dmu_trend;\n",
+        "array[2] vector<lower=0>[", ma_lags, "] Domega_trend;"
+      ),
       block = "parameters"
     )
   }
@@ -5144,28 +5141,22 @@ generate_var_trend_stanvars <- function(trend_specs, data_info,
 
   var_model_stanvar <- brms::stanvar(
     name = "var_model",
-    scode = glue::glue("
-      // The states before the first occasion, at their joint
-      // stationary law
-      init_trend ~ multi_normal_cholesky(mu_init_trend,
-                                         cholesky_decompose(Omega_trend));
-
-      // The conditional mean of every state
-      matrix[N_time_trend, N_lv_trend] mu_lv_trend
-        = rep_matrix(0.0, N_time_trend, N_lv_trend);
-{var_mean_scode}
-
-      // Each state's density given its conditional mean
-      {state_density}
-
-      {var_priors_block}
-
-      {varma_ma_priors}
-
-      {omega_prior}
-
-      {var_hyperpriors}
-    "),
+    scode = paste0(
+      "// The states before the first occasion, at their joint\n",
+      "// stationary law\n",
+      "init_trend ~ multi_normal_cholesky(mu_init_trend,\n",
+      "                                   cholesky_decompose(Omega_trend));\n\n",
+      "// The conditional mean of every state\n",
+      "matrix[N_time_trend, N_lv_trend] mu_lv_trend\n",
+      "  = rep_matrix(0.0, N_time_trend, N_lv_trend);\n",
+      var_mean_scode, "\n\n",
+      "// Each state's density given its conditional mean\n",
+      state_density, "\n\n",
+      var_priors_block, "\n\n",
+      varma_ma_priors, "\n\n",
+      omega_prior, "\n\n",
+      var_hyperpriors
+    ),
     block = "model"
   )
 

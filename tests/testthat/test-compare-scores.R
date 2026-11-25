@@ -66,6 +66,7 @@ make_mock_lfo <- function(elpds, eval_timepoints = NULL,
 # ---- compare_scores --------------------------------------------
 
 test_that("compare_scores returns a tidy long-format frame for crps", {
+  skip_if_not_installed("scoringRules")
   fc1 <- make_mock_forecast(seed = 1L)
   fc2 <- make_mock_forecast(seed = 2L)
   out <- compare_scores(fc1, fc2, score = "crps")
@@ -81,6 +82,7 @@ test_that("compare_scores returns a tidy long-format frame for crps", {
 
 
 test_that("compare_scores honours model_names", {
+  skip_if_not_installed("scoringRules")
   fc1 <- make_mock_forecast(seed = 1L)
   fc2 <- make_mock_forecast(seed = 2L)
   out <- compare_scores(fc1, fc2, score = "crps",
@@ -91,6 +93,7 @@ test_that("compare_scores honours model_names", {
 
 
 test_that("compare_scores forwards score_args to score()", {
+  skip_if_not_installed("scoringRules")
   # An observation one SD from the centre of its predictive
   # distribution separates a 0.9 interval from a 0.5 one.
   fc1 <- make_mock_forecast(seed = 1L, obs_offset = 1)
@@ -106,6 +109,7 @@ test_that("compare_scores forwards score_args to score()", {
 
 
 test_that("compare_scores carries multivariate scores in all_series", {
+  skip_if_not_installed("scoringRules")
   fc1 <- make_mock_forecast(seed = 1L)
   fc2 <- make_mock_forecast(seed = 2L)
   out <- compare_scores(fc1, fc2, score = "energy")
@@ -229,6 +233,7 @@ test_that("ensemble takes one set of draws across series and slots", {
 
 
 test_that("summary.mvgam_compare_scores joint -> wide horizon x model", {
+  skip_if_not_installed("scoringRules")
   fc1 <- make_mock_forecast(seed = 1L)
   fc2 <- make_mock_forecast(seed = 2L)
   out <- compare_scores(fc1, fc2, score = "energy")
@@ -242,6 +247,7 @@ test_that("summary.mvgam_compare_scores joint -> wide horizon x model", {
 
 test_that(
   "summary.mvgam_compare_scores univariate -> series + horizon x model", {
+  skip_if_not_installed("scoringRules")
   fc1 <- make_mock_forecast(seed = 1L)
   fc2 <- make_mock_forecast(seed = 2L)
   out <- compare_scores(fc1, fc2, score = "crps")
@@ -254,6 +260,7 @@ test_that(
 
 
 test_that("plot.mvgam_compare_scores facets a univariate score by series", {
+  skip_if_not_installed("scoringRules")
   fc1 <- make_mock_forecast(seed = 1L)
   fc2 <- make_mock_forecast(seed = 2L)
   out <- compare_scores(fc1, fc2, score = "crps")
@@ -265,6 +272,7 @@ test_that("plot.mvgam_compare_scores facets a univariate score by series", {
 
 
 test_that("plot.mvgam_compare_scores joint score gets one panel", {
+  skip_if_not_installed("scoringRules")
   fc1 <- make_mock_forecast(seed = 1L)
   fc2 <- make_mock_forecast(seed = 2L)
   out <- compare_scores(fc1, fc2, score = "energy")
@@ -275,6 +283,7 @@ test_that("plot.mvgam_compare_scores joint score gets one panel", {
 
 
 test_that("plot.mvgam_compare_scores honours facet = FALSE", {
+  skip_if_not_installed("scoringRules")
   fc1 <- make_mock_forecast(seed = 1L)
   fc2 <- make_mock_forecast(seed = 2L)
   out <- compare_scores(fc1, fc2, score = "crps")
@@ -284,6 +293,7 @@ test_that("plot.mvgam_compare_scores honours facet = FALSE", {
 
 
 test_that("plot.mvgam_compare_scores relative pivot drops the baseline", {
+  skip_if_not_installed("scoringRules")
   fc1 <- make_mock_forecast(seed = 1L)
   fc2 <- make_mock_forecast(seed = 2L)
   out <- compare_scores(fc1, fc2, score = "crps")
@@ -335,6 +345,7 @@ test_that("print.mvgam_forecast handles hindcast-only fits", {
 })
 
 test_that("print() of compare_scores ranks the models by mean score", {
+  skip_if_not_installed("scoringRules")
   fcs <- list(make_mock_forecast(seed = 1L), make_mock_forecast(seed = 2L))
   totals <- vapply(fcs, function(f) {
     mean(score(f, score = "crps")$all_series$score)

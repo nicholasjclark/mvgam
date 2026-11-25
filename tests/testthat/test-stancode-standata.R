@@ -1304,6 +1304,7 @@ test_that("silent = 2 keeps brms's announcements quiet", {
 
 
 test_that("closure-unit + threads still emits mvgam reduce_sum, no brms wrapper", {
+  skip_if_not_installed("V8")
   # Regression guard for the second threading bug: brms's
   # `partial_log_lik_lpmf` cannot see the transformed-data args
   # mvgam's closure-unit lpmfs need (`visit_idx`, `log_n_lookup`),

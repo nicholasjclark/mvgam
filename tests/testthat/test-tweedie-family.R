@@ -245,4 +245,11 @@ test_that("sample_from_family() accepts every dpar the registry can emit for it"
     dpars <- get_family_dpars(fam_name)
     expect_true(all(dpars %in% formals_avail))
   }
+  # A Frechet draw has the fitted mean. Its sampler once called
+  # arguments its source package does not take. Every draw failed.
+  set.seed(4L)
+  draws <- sample_from_family("frechet", ndraws = 20000L,
+                              epred = matrix(2, 20000L, 1L),
+                              shape = matrix(6, 20000L, 1L))
+  expect_equal(mean(draws), 2, tolerance = 0.02)
 })

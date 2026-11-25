@@ -26,7 +26,7 @@ expand_factor_axis <- function(n_lv, ...) {
   factor_col <- stats::setNames(
     list(factor(seq_len(n_lv))), factor_axis_column
   )
-  tidyr::expand_grid(..., !!!factor_col)
+  do.call(cross_grid, c(list(...), factor_col))
 }
 
 #' Vary a trend effect along the trend's axis

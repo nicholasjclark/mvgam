@@ -90,7 +90,7 @@ test_that("ordinal_probs keeps every draw and observation apart", {
 
 test_that("ordinal_log_lik reads the observed level's probability", {
   probs <- ordinal_case(brms::hurdle_cumulative(), hu = 0.2)
-  probs <- abind::abind(probs, probs, probs, along = 2L)
+  probs <- probs[, rep(1L, 3L), , drop = FALSE]
   ll <- ordinal_log_lik(probs, c(0, 3, NA))
   expect_equal(ll[1L, 1L], log(0.2))
   expect_equal(ll[1L, 2L], log(unname(probs[1L, 2L, "3"])))
@@ -102,7 +102,7 @@ test_that("ordinal_log_lik reads the observed level's probability", {
 
 test_that("ordinal_pit_bounds gives the interval each level fills", {
   probs <- ordinal_case(brms::hurdle_cumulative(), hu = 0.2)
-  probs <- abind::abind(probs, probs, probs, along = 2L)
+  probs <- probs[, rep(1L, 3L), , drop = FALSE]
   p <- as.numeric(probs[1L, 1L, ])
   bounds <- ordinal_pit_bounds(probs, c(0, 2, NA))
   # Level 0 is the hurdle, the lowest category.

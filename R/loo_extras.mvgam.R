@@ -450,7 +450,7 @@ mvgam_loo_E_loo <- function(object, posterior_fn,
     out <- apply(preds, 3L, mvgam_E_loo_normalise,
                   psis_object = psis_object, type = type,
                   probs = probs, simplify = FALSE)
-    return(abind::abind(out, rev.along = 0L))
+    return(do.call(bind_slices, out))
   }
   mvgam_E_loo_normalise(preds, psis_object, type, probs)
 }

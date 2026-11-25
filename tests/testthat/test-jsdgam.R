@@ -403,6 +403,7 @@ test_that("jsdgam_phylo_to_dist errors when species missing from matrix", {
 })
 
 test_that("jsdgam_phylo_to_dist reads a phylo and returns named distances", {
+  skip_if_not_installed("ape")
   # A tree built by hand needs no 'ape' and has known distances.
   # `((a,b),(c,d))` with every branch 0.5 puts each pair within a clade
   # at 1 and each pair across the clades at 2.

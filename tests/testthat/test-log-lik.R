@@ -317,7 +317,7 @@ test_that("a family with no distribution function is refused", {
 
 
 test_that("a family with no quantile function samples by rejection", {
-  # extraDistr has no beta-binomial quantile function. The COM-binomial
+  # brms has no beta-binomial quantile function. The COM-binomial
   # and Tweedie kernels have none either. `truncated_dist_draws()`
   # samples by rejection when `dist_fun()` returns `NULL`.
   for (dist in c("bbinom", "cmb", "com_poisson", "tweedie")) {
@@ -331,7 +331,7 @@ test_that("a family with no quantile function samples by rejection", {
   }
   spec <- list(
     dist = "bbinom",
-    args = function(j) list(size = 10, alpha = 2, beta = 2)
+    args = function(j) list(size = 10, mu = 0.5, phi = 4)
   )
   expect_null(
     mvgam:::truncated_dist_draws(spec, matrix(TRUE, 2L, 2L), 0, 10, TRUE)
@@ -350,7 +350,7 @@ test_that("a package distribution function passes a missing value through", {
   # distribution function and the Tweedie density raised an error
   # instead. One missing response then stopped every residual of a fit.
   args <- list(
-    bbinom = list(size = 5, alpha = 2, beta = 2),
+    bbinom = list(size = 5, mu = 0.5, phi = 4),
     cmb = list(mu = 0.4, nu = 1.5, size = 5),
     com_poisson = list(mu = 3, shape = 1.2),
     beta_nb = list(mu = 2, shape = 2, mtail = 3),

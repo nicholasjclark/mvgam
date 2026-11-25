@@ -134,7 +134,7 @@ tidy.mvgam <- function(x, effects = "all", robust = FALSE,
   spec <- tidy_spec(obj_vars, user_map)
   spec <- dplyr::filter(spec, .effects_filter(effect, effects))
 
-  out <- purrr::map_dfr(
+  out <- dplyr::bind_rows(lapply(
     seq_len(nrow(spec)),
     function(i) {
       params <- spec$params[[i]]
@@ -154,7 +154,7 @@ tidy.mvgam <- function(x, effects = "all", robust = FALSE,
         ess = ess
       )
     }
-  )
+  ))
 
   # A request matching no parameter keeps the table's columns. An
   # example is `effects = "ran_vals"` on a fit without smooths or
@@ -451,10 +451,8 @@ augment.mvgam <- function(x, robust = FALSE, conf.int = TRUE,
 
   obs_data <- x$data
   obs_data$.observed <- obs_data[[response_column(x, resp)]]
-  obs_data <- purrr::discard_at(
-    obs_data,
-    c("index..orig..order", "index..time..index")
-  )
+  obs_data <- obs_data[setdiff(names(obs_data),
+                               c("index..orig..order", "index..time..index"))]
 
   a <- (1 - conf.level) / 2
   probs <- c(a, 1 - a)

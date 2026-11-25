@@ -10,7 +10,7 @@ mvgam(
   data = NULL,
   newdata = NULL,
   loadings_prior = NULL,
-  backend = getOption("brms.backend", "cmdstanr"),
+  backend = default_backend(),
   combine = TRUE,
   family = gaussian(),
   threads = NULL,
@@ -59,7 +59,8 @@ phylogeny. Most models leave it \code{NULL}. The section 'Structured
 loadings priors' of \code{\link[=mvgam]{mvgam()}} describes its fields.}
 
 \item{backend}{\code{"cmdstanr"} or \code{"rstan"}. Defaults to
-\code{getOption("brms.backend", "cmdstanr")}.}
+\code{getOption("brms.backend")} when it is set. Otherwise cmdstanr
+when it is installed and rstan when it is not.}
 
 \item{combine}{Logical. With imputed \code{data}, \code{TRUE} (default) pools
 the imputation fits into one and \code{FALSE} returns them as a list.}

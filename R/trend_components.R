@@ -338,7 +338,7 @@ latent_part_specs <- function(object) {
   components <- additive_paths(trend_components(object))
   n_lv <- detect_factor_n_lv(object,
                              as.integer(object$standata$N_series_trend))
-  specs <- as.data.frame(tidyr::expand_grid(
+  specs <- as.data.frame(cross_grid(
     part = if (length(components)) components else "state",
     factor = if (is.null(n_lv)) NA_integer_ else seq_len(n_lv)
   ))

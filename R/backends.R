@@ -691,6 +691,22 @@ compiled_model <- function(x) {
   out
 }
 
+#' The Stan backend a fit takes when the call names none
+#'
+#' The `brms.backend` option when it is set, as in brms. Otherwise
+#' cmdstanr when it is installed and rstan, which mvgam imports, when
+#' it is not.
+#'
+#' @param cmdstanr_installed Logical. Whether cmdstanr is installed.
+#' @return `"cmdstanr"` or `"rstan"`, or the option's value
+#' @noRd
+default_backend <- function(
+    cmdstanr_installed = requireNamespace("cmdstanr", quietly = TRUE)) {
+  checkmate::assert_flag(cmdstanr_installed)
+  getOption("brms.backend") %||%
+    if (cmdstanr_installed) "cmdstanr" else "rstan"
+}
+
 #' Supported Stan backends
 #'
 #' @description

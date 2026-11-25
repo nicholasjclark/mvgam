@@ -785,6 +785,7 @@ detection_stancode <- function(key) {
 }
 
 test_that("every detection family dispatches its units through reduce_sum", {
+  skip_if_not_installed("V8")
   for (key in names(detection_cases)) {
     case <- detection_cases[[key]]
     sc <- detection_stancode(key)
@@ -827,6 +828,7 @@ test_that("every detection family dispatches its units through reduce_sum", {
 
 test_that(
   "stancode under nmix() includes the lpdf signature and data decls", {
+  skip_if_not_installed("V8")
   sc <- detection_stancode("nmix")
   expect_match(sc, "real nmix_lpmf\\(\\s*array\\[\\] int y,", fixed = FALSE)
   # Log-space ratio recurrence: per-unit baseline at K_min_g plus
@@ -858,6 +860,7 @@ test_that(
 })
 
 test_that("stancode under occ() marginalises the binary state", {
+  skip_if_not_installed("V8")
   sc <- detection_stancode("occ")
   # The wrapper hoists logit(mu) -> logit_psi and logit(p) -> logit_p
   # once, and each reduce_sum chunk reuses those vectors.
@@ -882,6 +885,7 @@ test_that("stancode under occ() marginalises the binary state", {
 
 test_that(
   "stancode under nmix('royle_nichols') marginalises abundance", {
+  skip_if_not_installed("V8")
   sc <- detection_stancode("royle_nichols")
   # The wrapper hoists log(mu) -> log_mu and log1m(p) -> log_1m_r.
   expect_match(sc, "vector[num_elements(mu)] log_mu = log(mu);",
@@ -947,6 +951,7 @@ test_that(
 
 test_that(
   "stancode under nmix('poisson_poisson') factors the visit sum", {
+  skip_if_not_installed("V8")
   sc <- detection_stancode("poisson_poisson")
   # The wrapper hoists log(mu) -> log_mu and log(p) -> log_p once.
   # The partial sum also takes the raw p, whose visit sum k * sum(p_v)

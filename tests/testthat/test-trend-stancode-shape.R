@@ -139,6 +139,7 @@ nu_monitored <- function(tf) {
 }
 
 test_that("df = Inf leaves the generated Stan code unchanged", {
+  skip_if_not_installed("cmdstanr")
   # The default must be byte-identical to the Gaussian model, otherwise
   # every existing fit changes.
   gauss <- tdf_code(~ AR(p = 1))
@@ -152,6 +153,7 @@ test_that("df = Inf leaves the generated Stan code unchanged", {
 })
 
 test_that("df is honoured across every trend type that has innovations", {
+  skip_if_not_installed("cmdstanr")
   # get_prior() takes the monitor list and stancode() the stanvar
   # generator. Both have to name `nu_trend`, under the registry default.
   default <- mvgam:::common_trend_priors$nu_trend$default
@@ -167,6 +169,7 @@ test_that("df is honoured across every trend type that has innovations", {
 })
 
 test_that("a fixed df needs no estimated parameter", {
+  skip_if_not_installed("cmdstanr")
   sc <- tdf_code(~ AR(p = 1, df = 7))
   expect_true(grepl("multi_student_t_cholesky_lpdf", sc, fixed = TRUE))
   expect_true(grepl("| 7,", sc, fixed = TRUE))
