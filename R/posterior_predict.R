@@ -102,11 +102,79 @@ apply_truncation <- function(samples, lb, ub, ntrys, ndraws, nobs,
 }
 
 
+#' Beta-binomial mass and distribution functions
+#'
+#' In the mean-precision parameterisation of the Stan likelihood, with
+#' Beta shapes `mu * phi` and `(1 - mu) * phi`. The arguments recycle
+#' to the longest. A missing argument gives a missing value. The
+#' distribution function sums the masses of the requested tail on the
+#' log scale. A far tail then keeps its precision, which `1 - p` would
+#' lose.
+#'
+#' @param x,q Counts
+#' @param size Trial counts
+#' @param mu Per-trial probability
+#' @param phi Precision
+#' @param log,log.p Logical. Return the log of the value?
+#' @param lower.tail Logical. `P(Y <= q)` when `TRUE`, `P(Y > q)`
+#'   otherwise.
+#' @return Numeric vector
+#' @noRd
+dbeta_binomial_mvgam <- function(x, size, mu, phi, log = FALSE) {
+  checkmate::assert_flag(log)
+  a <- recycle_args(x = x, size = size, mu = mu, phi = phi)
+  ld <- rep(-Inf, length(a$x))
+  ld[is.na(a$x) | is.na(a$size) | is.na(a$mu) | is.na(a$phi)] <- NA_real_
+  ok <- !is.na(ld) & a$x >= 0 & a$x <= a$size & a$x == floor(a$x)
+  x <- a$x[ok]
+  size <- a$size[ok]
+  shape1 <- a$mu[ok] * a$phi[ok]
+  shape2 <- (1 - a$mu[ok]) * a$phi[ok]
+  ld[ok] <- lchoose(size, x) + lbeta(x + shape1, size - x + shape2) -
+    lbeta(shape1, shape2)
+  if (log) ld else exp(ld)
+}
+
+
+#' @rdname dbeta_binomial_mvgam
+#' @noRd
+pbeta_binomial_mvgam <- function(q, size, mu, phi, lower.tail = TRUE,
+                                 log.p = FALSE) {
+  checkmate::assert_flag(lower.tail)
+  checkmate::assert_flag(log.p)
+  a <- recycle_args(q = q, size = size, mu = mu, phi = phi)
+  lp <- vapply(seq_along(a$q), function(i) {
+    if (anyNA(c(a$q[i], a$size[i], a$mu[i], a$phi[i]))) return(NA_real_)
+    k <- floor(a$q[i])
+    from <- if (lower.tail) 0 else max(k + 1, 0)
+    to <- if (lower.tail) min(k, a$size[i]) else a$size[i]
+    if (to < from) return(-Inf)
+    log_sum_exp(dbeta_binomial_mvgam(from:to, a$size[i], a$mu[i],
+                                     a$phi[i], log = TRUE))
+  }, numeric(1L))
+  if (log.p) lp else exp(lp)
+}
+
+
+#' Recycle arguments to a common length
+#'
+#' As the distribution functions of base R do. A zero-length argument
+#' gives zero-length vectors.
+#'
+#' @param ... Named vectors
+#' @return Named list of vectors of one length
+#' @noRd
+recycle_args <- function(...) {
+  args <- list(...)
+  n <- if (any(lengths(args) == 0L)) 0L else max(lengths(args))
+  lapply(args, rep_len, length.out = n)
+}
+
+
 #' Draw beta-binomial variates in the mean-precision parameterisation
 #'
-#' brms and mvgam parameterise the family by a per-trial probability
-#' and a precision. The draw goes through the two Beta shapes these
-#' imply. Converting in one place keeps the two samplers that need it
+#' The family takes a per-trial probability and a precision. The draw
+#' goes through the two Beta shapes these imply. Converting in one place keeps the two samplers that need it
 #' agreeing with `dbeta_binomial()` and with the Stan likelihood.
 #'
 #' @param n Number of variates

@@ -20,20 +20,29 @@ cross_grid <- function(...) {
 #'
 #' R stores an array with its last dimension varying slowest. Binding
 #' along that dimension then concatenates the values. A matrix enters
-#' as one slice.
+#' as one slice, named by its argument name. An array's slices keep
+#' their names.
 #'
 #' @param ... Matrices or three-dimensional arrays sharing their first
 #'   two dimensions
-#' @return A three-dimensional array, its slices in argument order
+#' @return A three-dimensional array, its slices in argument order.
+#'   The third dimension is named when any slice is.
 #' @noRd
 bind_slices <- function(...) {
   parts <- list(...)
   checkmate::assert_list(parts, min.len = 1L)
   lead <- dim(parts[[1L]])[1:2]
-  n_slices <- vapply(parts, function(p) {
+  arg_names <- names(parts) %||% character(length(parts))
+  slice_names <- unlist(Map(function(p, nm) {
     checkmate::assert_true(length(dim(p)) %in% 2:3)
     checkmate::assert_true(identical(dim(p)[1:2], lead))
-    length(p) / prod(lead)
-  }, numeric(1L))
-  array(unlist(parts, use.names = FALSE), c(lead, sum(n_slices)))
+    if (length(dim(p)) == 2L) return(nm)
+    dimnames(p)[[3L]] %||% character(dim(p)[3L])
+  }, parts, arg_names), use.names = FALSE)
+  out <- array(unlist(parts, use.names = FALSE),
+               c(lead, length(slice_names)))
+  if (any(nzchar(slice_names))) {
+    dimnames(out) <- list(NULL, NULL, slice_names)
+  }
+  out
 }

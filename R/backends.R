@@ -693,7 +693,7 @@ compiled_model <- function(x) {
 
 #' The Stan backend a fit takes when the call names none
 #'
-#' The `brms.backend` option when it is set, as in brms. Otherwise
+#' The `brms.backend` option when it is set. Otherwise
 #' cmdstanr when it is installed and rstan, which mvgam imports, when
 #' it is not.
 #'

@@ -317,7 +317,7 @@ test_that("a family with no distribution function is refused", {
 
 
 test_that("a family with no quantile function samples by rejection", {
-  # brms has no beta-binomial quantile function. The COM-binomial
+  # The beta-binomial has no quantile function here. The COM-binomial
   # and Tweedie kernels have none either. `truncated_dist_draws()`
   # samples by rejection when `dist_fun()` returns `NULL`.
   for (dist in c("bbinom", "cmb", "com_poisson", "tweedie")) {
@@ -336,6 +336,10 @@ test_that("a family with no quantile function samples by rejection", {
   expect_null(
     mvgam:::truncated_dist_draws(spec, matrix(TRUE, 2L, 2L), 0, 10, TRUE)
   )
+  # A count below the support has no mass below it. A symmetric
+  # beta-binomial puts half its mass at or below the middle.
+  expect_equal(mvgam:::pbeta_binomial_mvgam(c(-1, 2, 5), 5, 0.5, 4),
+               c(0, 0.5, 1))
   # A mean 40 SDs below the bound puts F(0) within rounding of 1. The
   # draws still land above the bound.
   normal <- list(dist = "norm", args = function(j) list(mean = -40, sd = 1))

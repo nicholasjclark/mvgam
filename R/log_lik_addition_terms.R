@@ -179,8 +179,8 @@ family_dist_spec <- function(family_name, link, linpred, family_pars,
 
 #' The density, distribution or quantile function of a distribution
 #'
-#' Most come from base R. `bbinom` and `asym_laplace` come from brms. `cmb`, `com_poisson`, `beta_nb` and
-#' `tweedie` use the package's own kernels.
+#' Most come from base R. `bbinom`, `cmb`, `com_poisson`, `beta_nb`
+#' and `tweedie` use the package's own kernels.
 #'
 #' @param dist Character distribution name from `family_dist_spec()`
 #' @param kind Character function kind, `"d"`, `"p"` or `"q"`
@@ -192,10 +192,10 @@ dist_fun <- function(dist, kind = c("d", "p", "q")) {
   kind <- match.arg(kind)
   switch(
     dist,
-    # brms has no beta-binomial quantile function. `NULL` sends the
-    # truncation sampler to rejection sampling.
-    bbinom = switch(kind, d = brms::dbeta_binomial,
-                    p = brms::pbeta_binomial, q = NULL),
+    # The beta-binomial has no quantile function here. `NULL` sends
+    # the truncation sampler to rejection sampling.
+    bbinom = switch(kind, d = dbeta_binomial_mvgam,
+                    p = pbeta_binomial_mvgam, q = NULL),
     # A COM-binomial, a COM-Poisson, a beta negative binomial and a
     # Tweedie have no quantile function here. `NULL` tells a caller
     # asking for one to take rejection sampling.
