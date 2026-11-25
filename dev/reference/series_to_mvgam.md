@@ -161,13 +161,13 @@ wide <- data.frame(
   site_b = rpois(28, 8)
 )
 head(series_to_mvgam(wide))
-#>   series time y       date season
-#> 1 site_a    1 0 2024-01-01      5
-#> 2 site_b    1 4 2024-01-01      5
-#> 3 site_a    2 4 2024-01-02      6
-#> 4 site_b    2 6 2024-01-02      6
-#> 5 site_a    3 7 2024-01-03      7
-#> 6 site_b    3 9 2024-01-03      7
+#>   series time  y       date season
+#> 1 site_a    1  5 2024-01-01      5
+#> 2 site_b    1  8 2024-01-01      5
+#> 3 site_a    2  7 2024-01-02      6
+#> 4 site_b    2 10 2024-01-02      6
+#> 5 site_a    3  4 2024-01-03      7
+#> 6 site_b    3  8 2024-01-03      7
 
 # Next: fit the training data, for example with
 # mvgam(y ~ s(season, bs = "cc"), trend_formula = ~ AR(),

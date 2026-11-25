@@ -211,8 +211,8 @@ mod <- mvgam(y ~ s(season, bs = "cc", k = 6),
               trend_formula = ~ CAR(),
               data    = simdat$data_train,
               family  = negbinomial(),
-              chains  = 2, silent = 2)
-#> Warning: 46 of 2000 (2.0%) transitions ended with a divergence.
+              chains  = 2, seed = 1, silent = 2)
+#> Warning: 4 of 2000 (0.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 
 # Neighbouring times share information through the trend. Folds of
@@ -221,9 +221,9 @@ mod <- mvgam(y ~ s(season, bs = "cc", k = 6),
 blocks <- cut(simdat$data_train$time, breaks = 4L, labels = FALSE)
 k <- kfold(mod, folds = blocks)
 #> kfold: refitting 4 fold(s) ...
-#> Warning: 48 of 2000 (2.0%) transitions ended with a divergence.
+#> Warning: 14 of 2000 (1.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
-#> Warning: 17 of 2000 (1.0%) transitions ended with a divergence.
+#> Warning: 11 of 2000 (1.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 #> Warning: 160 of 2000 (8.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
@@ -231,21 +231,21 @@ k <- kfold(mod, folds = blocks)
 #> See https://mc-stan.org/misc/warnings for details.
 k
 #> mvgam k-fold cross-validation
-#>   elpd_kfold : -258.66 (SE 16.81)
-#>   kfoldic    : 517.32 (SE 33.63)
+#>   elpd_kfold : -258.94 (SE 16.98)
+#>   kfoldic    : 517.88 (SE 33.97)
 #>   groups     : 4 (fold)
 #>   refits     : 4 of 4 folds
-#>   Pareto k   : max 1.21, median 1.07, threshold 0.70 (adaptive)
+#>   Pareto k   : max 1.46, median 1.28, threshold 0.70 (adaptive)
 #> 
 #> Lowest ELPD (share of the total):
-#>   2                    -70.26 (27.2%)
-#>   1                    -68.77 (26.6%)
+#>   2                    -70.80 (27.3%)
+#>   1                    -68.50 (26.5%)
 #>   4                    -67.46 (26.1%)
 #> 
 #> Largest change from PSIS to refit:
-#>   1                    -63.05 -> -68.77
-#>   4                    -63.27 -> -67.46
-#>   2                    -66.24 -> -70.26
+#>   1                    -62.95 -> -68.50
+#>   2                    -65.49 -> -70.80
+#>   4                    -63.42 -> -67.46
 
 # The ELPD and Pareto k of each block
 plot(k)

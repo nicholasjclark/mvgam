@@ -93,15 +93,15 @@ simdat <- sim_mvgam(family = poisson(), n_series = 1L,
                     n_timepoints = 60L, trend_model = AR())
 mod <- mvgam(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1),
              data = simdat$data_train, family = poisson(),
-             chains = 2, silent = 2)
-#> Warning: 111 of 2000 (6.0%) transitions ended with a divergence.
+             chains = 2, seed = 2, silent = 2)
+#> Warning: 27 of 2000 (1.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 
 # Average change in the expected count per unit of x
 avg_slopes(mod, variables = "x", type = "expected")
 #> 
 #>  Estimate 2.5 % 97.5 %
-#>      3.96     2   8.45
+#>       4.1     2   7.58
 #> 
 #> Term: x
 #> Type: expected
@@ -114,7 +114,7 @@ avg_slopes(mod, variables = "x", type = "expected",
 #> Warning: These arguments are not known to be supported for models of class `mvgam`: process_error. All arguments are still passed to the model-specific prediction function, but users are encouraged to check if the argument is indeed supported by their modeling package. Please file a request on Github if you believe that an unknown argument should be added to the `marginaleffects` white list of known arguments, in order to avoid raising this warning: https://github.com/vincentarelbundock/marginaleffects/issues
 #> 
 #>  Estimate 2.5 % 97.5 %
-#>      4.55  2.21   10.8
+#>      4.69  2.25   9.68
 #> 
 #> Term: x
 #> Type: expected

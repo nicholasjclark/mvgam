@@ -184,7 +184,7 @@ models. <em>Statistics and Computing</em>, 34:143.
 <span class="r-in"><span>  chains         <span class="op">=</span> <span class="fl">2L</span>,</span></span>
 <span class="r-in"><span>  silent         <span class="op">=</span> <span class="fl">2</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 1 of 2 chains had an E-BFMI less than 0.3.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 2 of 2 chains had an E-BFMI less than 0.3.</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> See https://mc-stan.org/misc/warnings for details.</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># The species terms are contrasts with the first species. `Intercept`</span></span></span>
@@ -203,25 +203,25 @@ models. <em>Statistics and Computing</em>, 34:143.
 <span class="r-out co"><span class="r-pr">#&gt;</span> == Observation Model ==</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Regression Coefficients:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>                Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Intercept         -1.39      3.93    -9.67     6.84 1.01     1585      854</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> env               -0.45      7.34    -8.08     7.92 1.00     1199      373</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> seriessp_2         1.76      0.18     1.39     2.12 1.00      918     1256</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> seriessp_3         2.43      0.28     1.87     2.96 1.00      851     1161</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> env:seriessp_2    -0.04      0.15    -0.33     0.25 1.00     1131     1234</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> env:seriessp_3     1.24      0.23     0.79     1.70 1.00      912      976</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Intercept         -1.42      4.21    -9.46     6.87 1.00     1977      796</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> env                0.05      3.87    -7.48     8.72 1.00     2594      921</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> seriessp_2         1.76      0.19     1.40     2.15 1.00      578     1155</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> seriessp_3         2.42      0.29     1.85     2.98 1.00      617     1092</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> env:seriessp_2    -0.04      0.15    -0.35     0.25 1.00      779     1045</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> env:seriessp_3     1.26      0.24     0.79     1.73 1.00      690     1057</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Further Distributional Parameters:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>     Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> phi    33.33     13.64    16.40    67.37 1.02      141      367</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> phi    36.43     14.93    17.98    75.91 1.02      167      370</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> == Trend Model ==</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Factor Loadings:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>                 Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Z_tilde[sp_1,1]     0.98      0.13     0.76     1.28 1.01      340      864</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Z_tilde[sp_2,1]    -0.06      0.07    -0.21     0.06 1.01      581     1044</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Z_tilde[sp_3,1]    -0.92      0.12    -1.17    -0.72 1.00      600     1160</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Z_tilde[sp_2,2]     0.19      0.10     0.01     0.37 1.02      254      577</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Z_tilde[sp_3,2]    -0.19      0.10    -0.37    -0.01 1.02      254      577</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Z_tilde[sp_1,1]     1.00      0.13     0.76     1.27 1.01      436     1121</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Z_tilde[sp_2,1]    -0.07      0.07    -0.22     0.06 1.00      394     1227</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Z_tilde[sp_3,1]    -0.93      0.11    -1.16    -0.73 1.00      698     1073</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Z_tilde[sp_2,2]     0.21      0.10     0.02     0.39 1.02      196      564</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Z_tilde[sp_3,2]    -0.21      0.10    -0.39    -0.02 1.02      196      564</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Draws were sampled using sampling(NUTS). For each parameter, Bulk_ESS</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> and Tail_ESS are effective sample size measures, and Rhat is the potential</span>
