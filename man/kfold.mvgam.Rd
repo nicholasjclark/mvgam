@@ -132,7 +132,7 @@ mod <- mvgam(y ~ s(season, bs = "cc", k = 6),
               trend_formula = ~ CAR(),
               data    = simdat$data_train,
               family  = negbinomial(),
-              chains  = 2, silent = 2)
+              chains  = 2, seed = 1, silent = 2)
 
 # Neighbouring times share information through the trend. Folds of
 # contiguous time blocks hold each block out whole. Folds that PSIS

@@ -112,7 +112,7 @@
 #'               trend_formula = ~ CAR(),
 #'               data    = simdat$data_train,
 #'               family  = negbinomial(),
-#'               chains  = 2, silent = 2)
+#'               chains  = 2, seed = 1, silent = 2)
 #'
 #' # Neighbouring times share information through the trend. Folds of
 #' # contiguous time blocks hold each block out whole. Folds that PSIS
@@ -672,12 +672,12 @@ plot.mvgam_kfold <- function(x, ...) {
              probs = 0.15, worse_above = FALSE),
     pareto_k_panel(group, as.numeric(x$pareto_k), x$pareto_k_threshold)
   )
+  # A row-wise fit has one group per row. Labels that would overlap
+  # are dropped.
   cv_diagnostic_plot(long) +
     ggplot2::labs(x = if (is.null(x$group)) "row" else
       paste(x$group, collapse = " x ")) +
-    ggplot2::theme(
-      axis.text.x = ggplot2::element_text(angle = 45, hjust = 1)
-    )
+    ggplot2::scale_x_discrete(guide = ggplot2::guide_axis(check.overlap = TRUE))
 }
 
 

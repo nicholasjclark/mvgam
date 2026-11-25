@@ -181,6 +181,8 @@ test_that("plot.mvgam_kfold() returns a ggplot with two facets", {
   # One panel for the ELPD and one for the Pareto k
   built <- ggplot2::ggplot_build(p)
   expect_equal(NROW(built$layout$layout), 2L)
+  # Group labels stay level. Overlapping ones are dropped.
+  expect_true(p$scales$get_scales("x")$guide$params$check.overlap)
 })
 
 test_that("kfold scores groups coarser than rows with a missing response", {

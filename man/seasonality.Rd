@@ -141,8 +141,9 @@ mod <- mvgam(
   y ~ 1,
   trend_formula = ~ LLT(season = 12, harmonics = 3),
   data = air$data_train,
-  family = poisson(),
+  family = negbinomial(),
   chains = 2,
+  seed = 1,
   silent = 2
 )
 
