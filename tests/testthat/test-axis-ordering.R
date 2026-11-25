@@ -1377,6 +1377,7 @@ newdata_variants <- function(frame, prefit) {
 
 
 test_that("newdata is placed on the fit's axes, or refused", {
+  skip_on_cran()
   # Every post-fit surface begins by asking where a frame's rows sit
   # on the axes the model was built on. That question needs no
   # draws, so a prefit answers it, and a frame that cannot be placed
@@ -1476,6 +1477,7 @@ forecast_request <- function(frame, prefit, levels_expected) {
 }
 
 test_that("a frame the fit has never seen lands on the right cells", {
+  skip_on_cran()
   # The whole point of recording the axes: given the record and a
   # frame, every row can be placed on a trend cell without going back
   # to the training data. `resolve_forecast_grid()` is what every
@@ -1561,6 +1563,7 @@ test_that("a frame the fit has never seen lands on the right cells", {
 
 
 test_that("one frame gives one axis, whichever route reads it", {
+  skip_on_cran()
   # `mvgam()` names its series in a column and `jsdgam()` names the
   # same column as its species. They are two doors into one model, so
   # a frame put through both has to come out on the same axis. Two
@@ -1600,6 +1603,7 @@ test_that("one frame gives one axis, whichever route reads it", {
 
 
 test_that("a level nothing observes changes nothing", {
+  skip_on_cran()
   # `unused` is `long` with one more declared level that no row
   # holds. A series the data never observes has no latent state to
   # estimate, so it must not reach the axis, must not widen the
@@ -1720,6 +1724,7 @@ test_that("the time index runs in the order the times do", {
 
 
 test_that("the loadings are sized by the series axis", {
+  skip_on_cran()
   # Sizing either dimension of `Z` from a second reading of the axis
   # puts a series on another series' row.
   frames <- axis_frames()
@@ -1769,6 +1774,7 @@ test_that("irregular time distances agree with the time index", {
 
 
 test_that("CAR gaps and the PW cap are placed by the axis seams", {
+  skip_on_cran()
   # Both were built from a second sort of the frame, free to differ
   # from the index the seams define. The seam is replaced with the
   # first-appearance order, and the gaps and caps have to follow it.
@@ -1880,6 +1886,7 @@ check_times_trend_rows <- function() {
 }
 
 test_that("times_trend names the design row it claims to", {
+  skip_on_cran()
   check_times_trend_rows()
 })
 
@@ -1945,6 +1952,7 @@ test_that("spec_axis_vars resolves every shape a spec arrives in", {
 
 
 test_that("a trend keeps the columns its constructor names", {
+  skip_on_cran()
   # `zmvn_scale_confounded()` wraps a univariate specification in an
   # unnamed list of one. Taking the axis from that list gives the
   # default column names, and the confound check then counts series

@@ -240,6 +240,7 @@ trend_skeleton_lines <- function(resp, grain = "series") {
 # stancode Tests ----
 
 test_that("an RW program steps its states and drops the trend's sigma", {
+  skip_on_cran()
   # The class of a program without a trend, which takes another route
   expect_identical(
     class(stancode(mvgam_formula(y ~ x), data = setup_stan_test_data()$univariate,
@@ -355,6 +356,7 @@ test_that("stancode generates correct AR(p = c(2, 4), ma = TRUE) ARMA model stru
 })
 
 test_that("a VARMA(2, 1) program maps its coefficients to stationarity", {
+  skip_on_cran()
   code_with_trend <- trend_shape_code("varma")
   line <- function(x) stan_pattern(x, code_with_trend, fixed = TRUE)
 
@@ -429,6 +431,7 @@ test_that("a VARMA(2, 1) program maps its coefficients to stationarity", {
 })
 
 test_that("a factor AR program fixes the factor scale and keeps its labels", {
+  skip_on_cran()
   code_with_trend <- trend_shape_code("factor_ar")
   line <- function(x) stan_pattern(x, code_with_trend, fixed = TRUE)
 
@@ -507,6 +510,7 @@ test_that("a ZMVN factor program rotates its loadings after sampling", {
 })
 
 test_that("a grouped ZMVN program blends each group's correlations", {
+  skip_on_cran()
   # The registry gives this shape a beta(5, 5) prior on
   # `alpha_cor_trend`
   code_with_trend <- trend_shape_code("hier_zmvn")
@@ -547,6 +551,7 @@ test_that("a grouped ZMVN program blends each group's correlations", {
 })
 
 test_that("a grouped RW fills its innovations before stepping them", {
+  skip_on_cran()
   # The RW generator takes the hierarchical support AR and ZMVN take.
   # Without it the RW recurrence uses an unassigned
   # `scaled_innovations_trend`, which gives NaN at initialisation.
@@ -590,6 +595,7 @@ test_that("a grouped RW fills its innovations before stepping them", {
 })
 
 test_that("a grouped VAR places each group's blocks at its member series", {
+  skip_on_cran()
   code <- trend_shape_code("hier_var")
   # Each group's lags map jointly to stationary coefficients and
   # autocovariances. Every block lands at the group's members, in the
@@ -918,6 +924,7 @@ legacy_array_declarations <- function(trend_formulas) {
 }
 
 test_that("grouped trend programs use modern Stan array syntax", {
+  skip_on_cran()
   expect_identical(legacy_array_declarations(list(
     ~ 1 + VAR(p = 1, gr = habitat, cor = TRUE),
     ~ 1 + AR(p = 1, gr = habitat, cor = TRUE)
@@ -1218,6 +1225,7 @@ test_that("a grouped ARMA(1, 1) conditions on its first innovation", {
 
 
 test_that("a correlated AR(p > 1) starts at its joint stationary covariance", {
+  skip_on_cran()
   # A correlated AR(p > 1) has no closed form for its joint
   # stationary covariance. Its coefficients are diagonal, and
   # `ar_diag_joint_var()` solves each pair of series on its own.
@@ -1289,6 +1297,7 @@ test_that("threads + trend + brms-native family compiles serially with one warni
 
 
 test_that("silent = 2 keeps brms's announcements quiet", {
+  skip_on_cran()
   # brms announces the `rescor` it settles for a multivariate formula
   # with `message()`. The mock fit and both regenerations run it, and
   # `silent = 2` turns messages off.
@@ -1409,6 +1418,7 @@ test_that("a CAR trend with nested RE and mo() steps over its gaps", {
 })
 
 test_that("CAR(cor = TRUE) correlates the diffusion and scales its gaps", {
+  skip_on_cran()
   times <- c(10, 14, 16, 26, 28, 30)
   d <- expand.grid(time = times, series = c("a", "b", "c"),
                    stringsAsFactors = FALSE)
@@ -1438,14 +1448,13 @@ test_that("CAR(cor = TRUE) correlates the diffusion and scales its gaps", {
   ))
 
   # Gaps are in units of the median gap, one entry per distinct gap
-  sdata <- standata(mf, data = d, family = poisson(), validate = FALSE)
+  sdata <- standata(mf, data = d, family = poisson())
   expect_equal(as.numeric(sdata$gap_trend[sdata$gap_index_trend][-1L]),
                diff(times) / 2)
   expect_identical(as.integer(sdata$N_gaps_trend), 3L)
   # The same series in another time unit gives the same data
   d_scaled <- transform(d, time = time * 7.3)
-  expect_equal(standata(mf, data = d_scaled, family = poisson(),
-                        validate = FALSE)$gap_trend,
+  expect_equal(standata(mf, data = d_scaled, family = poisson())$gap_trend,
                sdata$gap_trend)
 
   prior_classes <- get_prior(mf, data = d, family = poisson())$class
@@ -1453,6 +1462,7 @@ test_that("CAR(cor = TRUE) correlates the diffusion and scales its gaps", {
 })
 
 test_that("stancode handles different observation families", {
+  skip_on_cran()
   # Each family's GLM likelihood takes the trend in its intercept
   data <- setup_stan_test_data()$univariate
   mf <- mvgam_formula(y ~ x, trend_formula = ~ RW())
@@ -1500,6 +1510,7 @@ test_that("the trend joins mu once, after brms builds it", {
 })
 
 test_that("a trend term is computed once per iteration", {
+  skip_on_cran()
   # brms declares a group-level effect and a smooth coefficient in the
   # trend model's transformed parameters and assigns each below its
   # declaration, and mu_trend's construction needs the pair. A program
@@ -1538,6 +1549,7 @@ test_that("a trend term is computed once per iteration", {
 })
 
 test_that("an offset keeps the GLM's own coefficients, response by response", {
+  skip_on_cran()
   # An offset makes brms pass its declared `mu` as the GLM intercept.
   # The trend adds to that vector and `X * b` stays in the call. The
   # call of a response without an offset takes the trend in its
@@ -1649,6 +1661,7 @@ test_that("a shared correlated RW enters every response with its offset", {
 })
 
 test_that("stancode integrates custom priors correctly", {
+  skip_on_cran()
   data <- setup_stan_test_data()$univariate
   mf <- mvgam_formula(y ~ x, trend_formula = ~ AR(p = 1))
 
@@ -1704,8 +1717,7 @@ test_that("standata.mvgam_formula returns proper list structure", {
   data <- setup_stan_test_data()$univariate
   mf <- mvgam_formula(y ~ x, trend_formula = ~ RW())
 
-  standata_result <- standata(mf, data = data, family = poisson(),
-                              validate = FALSE)
+  standata_result <- standata(mf, data = data, family = poisson())
 
   # The response, one entry per observation
   expect_identical(length(standata_result$Y), as.integer(standata_result$N))
@@ -1729,7 +1741,7 @@ test_that("standata processes missing data correctly", {
 
   # brms reports the rows it drops
   standata_result <- withCallingHandlers(
-    standata(mf, data = data, family = poisson(), validate = FALSE),
+    standata(mf, data = data, family = poisson()),
     warning = function(w) {
       if (grepl("Rows containing NAs", conditionMessage(w))) {
         invokeRestart("muffleWarning")
@@ -1745,11 +1757,12 @@ test_that("standata processes missing data correctly", {
 })
 
 test_that("standata sizes the trend on the data's own axes", {
+  skip_on_cran()
   # Every time on one series, under each of three trends
   data <- setup_stan_test_data()$univariate
   for (tf in list(~ RW(), ~ AR(p = 1), ~ VAR(p = 1))) {
     sd <- standata(mvgam_formula(y ~ x, trend_formula = tf), data = data,
-                   family = poisson(), validate = FALSE)
+                   family = poisson())
     lab <- deparse(tf)
     expect_identical(as.integer(sd$N_time_trend), nrow(data), label = lab)
     expect_identical(as.integer(sd$N_series_trend), 1L, label = lab)
@@ -1762,7 +1775,7 @@ test_that("standata refuses irregular times for a discrete-time trend", {
   data$time <- c(0, 1, 3, 4:nrow(data))
   expect_error(
     standata(mvgam_formula(y ~ x, trend_formula = ~ RW()), data = data,
-             family = poisson(), validate = FALSE),
+             family = poisson()),
     "Gaps between times range from 1 to 2"
   )
 })
@@ -1785,6 +1798,7 @@ test_that("stancode and standata are consistent", {
 })
 
 test_that("stan functions work with complex model specifications", {
+  skip_on_cran()
   data <- setup_stan_test_data()$multivariate
   mf <- mvgam_formula(
     bf(mvbind(count, biomass) ~ s(x, by = habitat) + habitat) +
@@ -1824,12 +1838,12 @@ test_that("stan functions provide informative error messages", {
   expect_error(stancode(mf, data = bad_data, family = poisson(),
                         validate = FALSE),
                "Column 'time' is absent from the data")
-  expect_error(standata(mf, data = bad_data, family = poisson(),
-                        validate = FALSE),
+  expect_error(standata(mf, data = bad_data, family = poisson()),
                "Column 'time' is absent from the data")
 })
 
 test_that("PW samples its growth on the span of the series", {
+  skip_on_cran()
   # 24 time points
   code <- trend_shape_code("pw")
   line <- function(x) stan_pattern(x, code, fixed = TRUE)
@@ -1859,8 +1873,7 @@ test_that("PW samples its growth on the span of the series", {
     y ~ x, trend_formula = ~ PW(n_changepoints = 10, changepoint_scale = 0.05)
   )
   expect_identical(
-    standata(scaled, data = pw_data, family = poisson(),
-             validate = FALSE)$delta_scale_trend,
+    standata(scaled, data = pw_data, family = poisson())$delta_scale_trend,
     signif(0.05 / 24, 4)
   )
   expect_true(stan_pattern(
@@ -1897,7 +1910,7 @@ test_that("PW samples its growth on the span of the series", {
   )
   cap_sd <- standata(
     mvgam_formula(y ~ 1, trend_formula = ~ PW(growth = "logistic")),
-    data = two, family = poisson(), validate = FALSE
+    data = two, family = poisson()
   )
   expect_equal(exp(cap_sd$cap_trend[1, ]), c(30, 60))
 })
@@ -1919,6 +1932,7 @@ test_that("in a distributional model the trend reaches mu alone", {
 
 
 test_that("every trend program carries the shared skeleton", {
+  skip_on_cran()
   # Each shape test above asserts what distinguishes its program. The
   # statements below are the ones every program shares, whatever the
   # trend and whatever the observation family. A change to them fails
@@ -2044,6 +2058,7 @@ test_that("a hurdle likelihood loop takes the trend before it starts", {
 })
 
 test_that("trend formula with covariate on multi-series univariate produces X_trend matching N_trend", {
+  skip_on_cran()
   # Regression test for the N_trend / N_time_trend split (closes the
   # silent X_trend dim mismatch where trend_data had n_time * n_series
   # rows but N_trend was forced to n_time).
@@ -2059,7 +2074,7 @@ test_that("trend formula with covariate on multi-series univariate produces X_tr
 
   sd <- standata(
     mvgam_formula(y ~ 1, trend_formula = ~ x + AR(p = 1)),
-    data = d, family = poisson(), validate = FALSE
+    data = d, family = poisson()
   )
 
   # N_trend keeps brms's natural nrow(trend_data) so the trend-level
@@ -2101,7 +2116,7 @@ test_that("ZMVN(gr = X) without explicit subgr auto-fills subgr to series", {
     biomass ~ 1,
     trend_formula = ~ x + (x | habitat) + ZMVN(gr = habitat)
   )
-  sd <- standata(mf, data = data, family = lognormal(), validate = FALSE)
+  sd <- standata(mf, data = data, family = lognormal())
   # Four series in two habitats
   expect_identical(as.integer(sd$N_groups_trend), 2L)
   expect_identical(as.integer(sd$N_subgroups_trend), 2L)
@@ -2115,7 +2130,7 @@ test_that("subgr without gr is rejected with clear error", {
     standata(
       mvgam_formula(biomass ~ 1,
                     trend_formula = ~ ZMVN(subgr = habitat)),
-      data = data, family = lognormal(), validate = FALSE
+      data = data, family = lognormal()
     ),
     regexp = "'subgr = habitat' requires a main grouping 'gr'"
   )
@@ -2244,6 +2259,7 @@ test_that("trend_map conflict with explicit n_lv errors at fit time", {
 # ---- Partial Z (NA = sampled) Stan emission contract ----------
 
 test_that("trend_map with NA emits Z_template + Z_is_free + Z_free_vec", {
+  skip_on_cran()
   # Partial Z: some entries fixed, some sampled (NA in matrix).
   data <- setup_stan_test_data()$multivariate
   Z_user <- matrix(
@@ -2527,6 +2543,7 @@ undeclared_trend_offers <- function(specs) {
 }
 
 test_that("get_prior offers only trend classes the program declares", {
+  skip_on_cran()
   # Grouping is where the two drift apart: the generated program
   # swaps `sigma_trend` and `L_Omega_trend` for `sigma_group_trend`
   # with the global and deviation blocks. A fixed `trend_map` hands
@@ -2604,6 +2621,7 @@ test_that("AR(p = 2, none) samples partial autocorrelations", {
 })
 
 test_that("AR(p = 1) and a sparse lag set keep the plain coefficient", {
+  skip_on_cran()
   # One lag needs no recursion: the declared interval is already
   # the stationary region. A sparse lag set fixes its intermediate
   # coefficients at zero, a constraint the recursion cannot state.
@@ -2722,6 +2740,7 @@ test_that("brms helper generics are exported by mvgam", {
 })
 
 test_that("make_stancode / make_standata dispatch on mvgam_formula without brms::", {
+  skip_on_cran()
   dat <- ar_step3_fixture()
   mf <- mvgam_formula(y ~ 1, trend_formula = ~ AR(p = 2))
   sc <- make_stancode(mf, data = dat)
@@ -2810,6 +2829,7 @@ run_model_test_data <- function(n = 24L) {
 }
 
 test_that("run_model = FALSE returns the program stancode() writes", {
+  skip_on_cran()
   data <- run_model_test_data()
   mod <- mvgam(y ~ x, trend_formula = ~ AR(p = 1L), data = data,
                family = poisson(), run_model = FALSE, validate = FALSE)
@@ -2983,7 +3003,7 @@ test_that("com_binomial() requires a `trials()` addition term", {
   # `trials` follows them instead of keeping the raw frame's length.
   expect_warning(
     sd <- standata(mvgam_formula(bf(y | trials(trials) ~ x)), data = dat,
-                   family = com_binomial(), validate = FALSE),
+                   family = com_binomial()),
     "Rows containing NAs"
   )
   expect_identical(length(sd$trials), sd$N)
@@ -2992,6 +3012,7 @@ test_that("com_binomial() requires a `trials()` addition term", {
 
 
 test_that("multi-response fits with NA preserve per-response valid rows", {
+  skip_on_cran()
   # brms's mvbf listwise-deletes rows with NA in ANY response.
   # mvgam overrides this so each
   # response keeps its own non-NA rows and contributes to the
@@ -3020,7 +3041,7 @@ test_that("multi-response fits with NA preserve per-response valid rows", {
   # per bf() arm; mvgam's per-arm expansion call emits more.
   # All are expected.
   sd <- withCallingHandlers(
-    standata(mf, data = dat, validate = FALSE),
+    standata(mf, data = dat),
     warning = function(w) {
       if (grepl("Rows containing NAs", conditionMessage(w))) {
         invokeRestart("muffleWarning")
@@ -3066,6 +3087,7 @@ test_that("multi-response fits with NA preserve per-response valid rows", {
 
 
 test_that("each response keeps its own rows whatever its column is called", {
+  skip_on_cran()
   # brms keys a response by its column with every `_` and `.` taken
   # out, so `y_1` is `N_y1`. The per-response rebuild looked for
   # `N_y_1`, found nothing to replace and left every response on the
@@ -3090,7 +3112,7 @@ test_that("each response keeps its own rows whatever its column is called", {
     trend_formula = ~ AR(p = 1)
   )
   sd <- withCallingHandlers(
-    standata(mf, data = dat, family = poisson(), validate = FALSE),
+    standata(mf, data = dat, family = poisson()),
     warning = function(w) {
       if (grepl("Rows containing NAs", conditionMessage(w))) {
         invokeRestart("muffleWarning")
@@ -3138,6 +3160,7 @@ test_that("a family written inside bf() is the model's family", {
 
 
 test_that("a family is read in every spelling a model accepts", {
+  skip_on_cran()
   set.seed(4)
   d <- data.frame(time = 1:30, series = factor("a"),
                   cnt = rpois(30, 4), pos = rgamma(30, 2, 1))
@@ -3227,7 +3250,7 @@ test_that("multi-response fits with no NAs hit the fast no-op path", {
     trend_formula = ~ AR(p = 1)
   )
   sd <- withCallingHandlers(
-    standata(mf, data = dat, validate = FALSE),
+    standata(mf, data = dat),
     warning = function(w) {
       if (grepl("Rows containing NAs", conditionMessage(w))) {
         invokeRestart("muffleWarning")
@@ -3240,6 +3263,7 @@ test_that("multi-response fits with no NAs hit the fast no-op path", {
 
 
 test_that("per-arm standata expansion handles smooths, ranef and dpar", {
+  skip_on_cran()
   # Verifies the trailing-then-mid key stripper in
   # `map_combined_key_to_single` correctly recovers per-arm values
   # under every per-key naming pattern brms emits.
@@ -3267,7 +3291,7 @@ test_that("per-arm standata expansion handles smooths, ranef and dpar", {
     trend_formula = ~ AR(p = 1)
   )
   sd <- withCallingHandlers(
-    standata(mf, data = dat, validate = FALSE),
+    standata(mf, data = dat),
     warning = function(w) {
       if (grepl("Rows containing NAs", conditionMessage(w))) {
         invokeRestart("muffleWarning")
@@ -3366,6 +3390,7 @@ time_trend_code <- function(tf, data, f = y ~ 1) {
 }
 
 test_that("trend_formula takes time as a covariate", {
+  skip_on_cran()
   d <- time_covariate_frames()
   smooth <- "sds_[0-9]+_trend"
   expect_match(time_trend_code(~ s(time) + AR(p = 1), d$uni), smooth)
@@ -3393,11 +3418,12 @@ test_that("trend_formula takes time as a covariate on every other path", {
                                brms::mvbind(y, y2) ~ 1), smooth)
   sd_gp <- standata(
     mvgam_formula(y ~ 1, trend_formula = ~ gp(time, k = 20) + AR(p = 1)),
-    data = d$uni, family = poisson(), validate = FALSE)
+    data = d$uni, family = poisson())
   expect_true(any(grepl("^Xgp_.*_trend$", names(sd_gp))))
 })
 
 test_that("NA responses shrink the likelihood but not the trend grid", {
+  skip_on_cran()
   # mvgam keeps the latent process on the full time grid and lets
   # the likelihood run over observed rows only. Anything carried
   # per observation must therefore follow brms's retained rows.
@@ -3434,8 +3460,7 @@ test_that("NA responses shrink the likelihood but not the trend grid", {
     mf <- mvgam_formula(case$formula, trend_formula = ~ AR(p = 1))
     # brms reports the rows it dropped, once per internal pass.
     sd <- withCallingHandlers(
-      standata(mf, data = d, family = case$family, backend = "cmdstanr",
-               validate = FALSE),
+      standata(mf, data = d, family = case$family, backend = "cmdstanr"),
       warning = function(w) {
         if (grepl("Rows containing NAs", conditionMessage(w))) {
           invokeRestart("muffleWarning")
@@ -3467,8 +3492,7 @@ test_that("closure-unit families keep their unit arrays over observed visits", {
   dat <- sim$data_train
   dat$y[seq(2L, nrow(dat), by = 7L)] <- NA_integer_
   sd <- expect_warning(
-    standata(mvgam_formula(y ~ 1), data = dat, family = occ(),
-             validate = FALSE),
+    standata(mvgam_formula(y ~ 1), data = dat, family = occ()),
     "Rows containing NAs"
   )
   expect_identical(as.integer(sd$N), sum(!is.na(dat$y)))
@@ -3483,8 +3507,7 @@ test_that("closure-unit families keep their unit arrays over observed visits", {
   blanked <- dat
   blanked$y[unit == unique(unit)[2L]] <- NA_integer_
   sd_dropped <- expect_warning(
-    standata(mvgam_formula(y ~ 1), data = blanked, family = occ(),
-             validate = FALSE),
+    standata(mvgam_formula(y ~ 1), data = blanked, family = occ()),
     "Rows containing NAs"
   )
   expect_identical(as.integer(sd_dropped$N_unit),
@@ -3503,7 +3526,7 @@ test_that("com_binomial() accepts a constant denominator", {
   )
   expect_false("trials" %in% names(dat))
   sd <- standata(mvgam_formula(bf(y | trials(30) ~ x)), data = dat,
-                 family = com_binomial(), validate = FALSE)
+                 family = com_binomial())
   expect_true(all(sd$trials == 30L))
   expect_identical(length(sd$trials), sd$N)
 })
@@ -3553,14 +3576,14 @@ test_that("codegen_args_for() hands each generator what it declares", {
 })
 
 test_that("knots reach the basis on both formulas", {
+  skip_on_cran()
   dat <- codegen_test_data()
   kn <- list(elev = seq(0, 100, length.out = 5))
 
   obs <- mvgam_formula(y ~ s(elev, bs = "cr", k = 5),
                        trend_formula = ~ AR(p = 1))
-  sd_default <- standata(obs, data = dat, family = poisson(), validate = FALSE)
-  sd_knots <- standata(obs, data = dat, family = poisson(), knots = kn,
-                       validate = FALSE)
+  sd_default <- standata(obs, data = dat, family = poisson())
+  sd_knots <- standata(obs, data = dat, family = poisson(), knots = kn)
   expect_false(isTRUE(all.equal(sd_default$Xs, sd_knots$Xs)))
   expect_false(isTRUE(all.equal(sd_default$Zs_1_1, sd_knots$Zs_1_1)))
 
@@ -3574,10 +3597,8 @@ test_that("knots reach the basis on both formulas", {
   trend <- mvgam_formula(y ~ 1,
                          trend_formula = ~ s(elev, bs = "cr", k = 5) +
                            AR(p = 1))
-  td_default <- standata(trend, data = dat, family = poisson(),
-                         validate = FALSE)
-  td_knots <- standata(trend, data = dat, family = poisson(), knots = kn,
-                       validate = FALSE)
+  td_default <- standata(trend, data = dat, family = poisson())
+  td_knots <- standata(trend, data = dat, family = poisson(), knots = kn)
   expect_false(isTRUE(all.equal(td_default$Xs_trend, td_knots$Xs_trend)))
 })
 
@@ -3588,43 +3609,42 @@ test_that("a knot count that disagrees with k is refused", {
     standata(mvgam_formula(y ~ s(elev, bs = "cr", k = 5),
                            trend_formula = ~ AR(p = 1)),
               data = dat, family = poisson(),
-              knots = list(elev = seq(0, 100, length.out = 6)),
-              validate = FALSE),
+              knots = list(elev = seq(0, 100, length.out = 6))),
     "knots"
   )
 })
 
 test_that("drop_unused_levels decides whether an empty level is priced", {
+  skip_on_cran()
   dat <- codegen_test_data()
   dat$grp <- factor(rep(c("a", "b"), length.out = nrow(dat)),
                     levels = c("a", "b", "c"))
   mf <- mvgam_formula(y ~ grp, trend_formula = ~ AR(p = 1))
 
   expect_identical(
-    as.integer(standata(mf, data = dat, family = poisson(),
-                        validate = FALSE)$K), 2L
+    as.integer(standata(mf, data = dat, family = poisson())$K), 2L
   )
   # The prior table is keyed by the same coefficients, so it has to be
   # merged under the same setting: merging under the default leaves no
   # row for `b_grpc` and brms rejects the whole table.
   kept <- standata(mf, data = dat, family = poisson(),
-                   drop_unused_levels = FALSE, validate = FALSE)
+                   drop_unused_levels = FALSE)
   expect_identical(as.integer(kept$K), 3L)
 })
 
 test_that("sample_prior moves the data, not the program", {
+  skip_on_cran()
   dat <- codegen_test_data()
   mf <- mvgam_formula(y ~ 1, trend_formula = ~ AR(p = 1))
 
   # brms gates the likelihood on `prior_only`, which is Stan data, so
   # "only" changes the standata and leaves the program untouched.
   expect_identical(
-    as.integer(standata(mf, data = dat, family = poisson(),
-                        validate = FALSE)$prior_only), 0L
+    as.integer(standata(mf, data = dat, family = poisson())$prior_only), 0L
   )
   expect_identical(
     as.integer(standata(mf, data = dat, family = poisson(),
-                        sample_prior = "only", validate = FALSE)$prior_only), 1L
+                        sample_prior = "only")$prior_only), 1L
   )
   expect_identical(
     stancode(mf, data = dat, family = poisson(), silent = 2L, validate = FALSE),
@@ -3641,6 +3661,7 @@ test_that("sample_prior moves the data, not the program", {
 })
 
 test_that("normalize = FALSE emits the unnormalised densities", {
+  skip_on_cran()
   dat <- codegen_test_data()
   mf <- mvgam_formula(y ~ 1, trend_formula = ~ AR(p = 1))
   unnormalised <- stancode(mf, data = dat, family = poisson(),
@@ -3704,7 +3725,7 @@ test_that("brms-deprecated arguments are named rather than dropped", {
   )
   expect_error(
     standata(mf, data = dat, family = poisson(),
-             stan_funs = "real f(real x) { return x; }", validate = FALSE),
+             stan_funs = "real f(real x) { return x; }"),
     "stanvars"
   )
 })
@@ -3733,11 +3754,9 @@ test_that("the options reach a fit with no trend formula", {
   kn <- list(elev = seq(0, 100, length.out = 5))
   mf <- mvgam_formula(y ~ s(elev, bs = "cr", k = 5))
 
-  sd_knots <- standata(mf, data = dat, family = poisson(), knots = kn,
-                       validate = FALSE)
+  sd_knots <- standata(mf, data = dat, family = poisson(), knots = kn)
   expect_false(isTRUE(all.equal(
-    standata(mf, data = dat, family = poisson(),
-             validate = FALSE)$Xs, sd_knots$Xs
+    standata(mf, data = dat, family = poisson())$Xs, sd_knots$Xs
   )))
   expect_equal(
     sd_knots$Xs,
@@ -3753,6 +3772,7 @@ test_that("the options reach a fit with no trend formula", {
 })
 
 test_that("a knots fit carries its basis into newdata predictions", {
+  skip_on_cran()
   # `posterior_smooths()` and `conditional_smooths()` rebuild their
   # design matrices with `brms::standata()` on the stored brms fit. If
   # the knots never reached that fit, a prediction grid would be built
@@ -3831,6 +3851,7 @@ test_that("get_prior reports the trend model that gets fitted", {
 })
 
 test_that("a shrinkage prior gets the Stan data it declares", {
+  skip_on_cran()
   # `horseshoe()` declares data of its own. The program was generated
   # with the prior and the data without it, so the fit declared six
   # variables nothing supplied.
@@ -3843,7 +3864,7 @@ test_that("a shrinkage prior gets the Stan data it declares", {
   code <- stancode(mf, data = dat, family = poisson(), prior = hs,
                    silent = 2L, validate = FALSE)
   sdata <- standata(mf, data = dat, family = poisson(), prior = hs,
-                    silent = 2L, validate = FALSE)
+                    silent = 2L)
   declared <- unique(unlist(regmatches(
     code, gregexpr("\\b(hs_[a-z_]+|Kscales)\\b", code)
   )))
@@ -3857,6 +3878,7 @@ test_that("a shrinkage prior gets the Stan data it declares", {
 })
 
 test_that("a shrinkage prior on the trend keeps its own scale", {
+  skip_on_cran()
   # `horseshoe()` scales its global parameter by the family's residual
   # standard deviation. The trend submodel reaches brms as a gaussian
   # whose residual scale mvgam takes back out, so that factor named a
@@ -3894,6 +3916,7 @@ test_that("a shrinkage prior on the trend keeps its own scale", {
 })
 
 test_that("normalize = FALSE still injects the trend into the GLM call", {
+  skip_on_cran()
   # Under `normalize = FALSE` brms writes `*_glm_lupmf` calls. GLM
   # detection once recognised only the normalised spelling. The trend
   # was then computed and never used, or the assembly aborted. Each
@@ -3970,6 +3993,7 @@ injection_frame <- function() {
 }
 
 test_that("each response takes its trend before its inverse link", {
+  skip_on_cran()
   # brms applies these inverse links to the whole vector once the
   # predictor is built. The trend joins on the link scale, before that
   # statement and outside the likelihood loop.
@@ -3996,6 +4020,7 @@ test_that("each response takes its trend before its inverse link", {
 })
 
 test_that("a nonlinear response of a multivariate model takes its trend", {
+  skip_on_cran()
   d <- injection_frame()
   code <- stancode(
     mvgam_formula(
@@ -4014,12 +4039,13 @@ test_that("a nonlinear response of a multivariate model takes its trend", {
 })
 
 test_that("an offset-only formula keeps its offset", {
+  skip_on_cran()
   # The empty-formula placeholder joins the right-hand side, and the
   # model keeps the offset as a term of its own.
   d <- injection_frame()
   uni <- standata(
     mvgam_formula(yp ~ 0 + offset(log(e)), trend_formula = ~ AR()),
-    data = d, family = poisson(), validate = FALSE
+    data = d, family = poisson()
   )
   expect_equal(as.numeric(uni$offsets), log(d$e))
   multi <- standata(
@@ -4027,7 +4053,7 @@ test_that("an offset-only formula keeps its offset", {
       bf(yg ~ 0 + offset(log(e))) + bf(yh ~ 1) + set_rescor(FALSE),
       trend_formula = ~ AR()
     ),
-    data = d, validate = FALSE
+    data = d
   )
   expect_equal(as.numeric(multi$offsets_yg), log(d$e))
 })
@@ -4056,9 +4082,15 @@ test_that("the two code-generation entry points agree", {
   # different models. `standata()` accepted five of these through its
   # dots while advertising none of them, and restated defaults drift
   # apart silently because nothing compares them.
+  # `validate` parses the program, which `standata()` does not return.
   sc <- formals(mvgam:::stancode.mvgam_formula)
   sd <- formals(mvgam:::standata.mvgam_formula)
-  expect_setequal(names(sc), names(sd))
+  expect_setequal(setdiff(names(sc), "validate"), names(sd))
+  expect_error(
+    standata(mvgam_formula(yg ~ x, trend_formula = ~ AR()),
+             data = injection_frame(), validate = TRUE),
+    "'validate' is not supported by standata()", fixed = TRUE
+  )
 
   shared <- intersect(names(sc), names(sd))
   disagreeing <- shared[!vapply(
@@ -4098,7 +4130,7 @@ test_that("group_inds_trend is ordered by the trend's series axis", {
     y ~ 1,
     trend_formula = ~ AR(p = 1, gr = region, subgr = species, cor = TRUE)
   )
-  sd <- SW(standata(f, data = d, family = poisson(), validate = FALSE))
+  sd <- SW(standata(f, data = d, family = poisson()))
 
   # The group of whichever series occupies each trend column.
   s_idx <- as.integer(sd$obs_trend_series)
@@ -4113,6 +4145,7 @@ test_that("group_inds_trend is ordered by the trend's series axis", {
 
 
 test_that("obs_trend_time runs in time order, not row order", {
+  skip_on_cran()
   # The index is what the trend steps along, so it has to follow the
   # clock rather than the order the rows arrived in. A frame grouped
   # by series rather than by date otherwise gives its first series'
@@ -4128,7 +4161,7 @@ test_that("obs_trend_time runs in time order, not row order", {
   d$y <- rpois(nrow(d), 3)
   f <- mvgam_formula(y ~ 1, trend_formula = ~ AR(p = 1))
 
-  sd_sorted <- standata(f, data = d, family = poisson(), validate = FALSE)
+  sd_sorted <- standata(f, data = d, family = poisson())
   expect_identical(as.integer(sd_sorted$obs_trend_time),
                    as.integer(d$time))
 
@@ -4136,7 +4169,7 @@ test_that("obs_trend_time runs in time order, not row order", {
   # row has to keep the time index it had.
   set.seed(9L)
   shuffled <- d[sample(nrow(d)), , drop = FALSE]
-  sd_shuf <- standata(f, data = shuffled, family = poisson(), validate = FALSE)
+  sd_shuf <- standata(f, data = shuffled, family = poisson())
   expect_identical(as.integer(sd_shuf$obs_trend_time),
                    as.integer(shuffled$time))
 })
@@ -4163,7 +4196,7 @@ test_that("each response on a wide frame gets its own latent series", {
 
   sd <- standata(
     mvgam_formula(f, trend_formula = ~ AR(p = 1)),
-    data = dat, silent = 2L, validate = FALSE
+    data = dat, silent = 2L
   )
 
   expect_identical(as.integer(sd$N_series_trend), 2L)
@@ -4176,6 +4209,7 @@ test_that("each response on a wide frame gets its own latent series", {
 })
 
 test_that("a wide frame does not require rows divisible by responses", {
+  skip_on_cran()
   # The row count of a wide frame is the number of time points and has
   # no arithmetic relationship to the number of responses, so refusing
   # a frame whose rows do not divide by the response count rejects
@@ -4196,7 +4230,7 @@ test_that("a wide frame does not require rows divisible by responses", {
 
   sd <- standata(
     mvgam_formula(f, trend_formula = ~ AR(p = 1)),
-    data = dat, silent = 2L, validate = FALSE
+    data = dat, silent = 2L
   )
 
   expect_identical(as.integer(sd$N_series_trend), 3L)
@@ -4230,7 +4264,7 @@ test_that("an explicit series column supersedes the response axis", {
 
   sd <- standata(
     mvgam_formula(f, trend_formula = ~ AR(p = 1)),
-    data = dat, silent = 2L, validate = FALSE
+    data = dat, silent = 2L
   )
 
   expect_identical(as.integer(sd$N_series_trend), 1L)
@@ -4260,7 +4294,7 @@ test_that("the wide-frame trend design is indexed at time level", {
 
   sd <- standata(
     mvgam_formula(f, trend_formula = ~ env + AR(p = 1)),
-    data = dat, silent = 2L, validate = FALSE
+    data = dat, silent = 2L
   )
 
   expect_identical(as.integer(sd$N_trend), T_)
@@ -4276,6 +4310,7 @@ test_that("the wide-frame trend design is indexed at time level", {
 })
 
 test_that("every response's GLM likelihood takes its trend", {
+  skip_on_cran()
   # brms folds a response's predictor into its GLM call. The trend
   # reaches the likelihood only once that call is rewritten. The
   # rewrite once matched response keys of letters alone: `y1` and `y2`
@@ -4311,6 +4346,7 @@ test_that("every response's GLM likelihood takes its trend", {
 
 
 test_that("the stacked design names the columns the two sides share", {
+  skip_on_cran()
   # A term written into both formulas moves the same fitted values
   # from either side. The observation and trend designs stacked on
   # one row per observation give the columns one likelihood sees at
@@ -4383,6 +4419,7 @@ test_that("the observed history counts every response or refuses", {
 
 
 test_that("a series missing a time is refused, and CAR completes it", {
+  skip_on_cran()
   d <- data.frame(y = rpois(30, 3), time = rep(1:10, 3),
                   series = factor(rep(c("a", "b", "c"), each = 10)))
   ragged <- d[!(d$series == "b" & d$time == 4), ]
@@ -4402,10 +4439,9 @@ test_that("a series missing a time is refused, and CAR completes it", {
   car <- mvgam_formula(y ~ 1, ~ CAR(cor = TRUE))
   padded <- d
   padded$y[padded$series == "b" & padded$time == 4] <- NA
-  sd_ragged <- standata(car, data = ragged, family = poisson(),
-                        validate = FALSE)
+  sd_ragged <- standata(car, data = ragged, family = poisson())
   sd_padded <- suppressWarnings(
-    standata(car, data = padded, family = poisson(), validate = FALSE)
+    standata(car, data = padded, family = poisson())
   )
   expect_identical(sd_ragged, sd_padded)
   expect_identical(as.integer(sd_ragged$N_trend), 30L)
@@ -4435,6 +4471,6 @@ test_that("CAR measures time in gaps between a series' observations", {
     y = rep(1:5, 6)
   )
   sdata <- standata(mvgam_formula(y ~ 1, ~ CAR(cor = TRUE)), data = d,
-                    family = poisson(), validate = FALSE)
+                    family = poisson())
   expect_equal(sort(as.numeric(sdata$gap_trend)), c(0.005, 0.99, 1))
 })

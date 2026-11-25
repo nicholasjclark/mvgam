@@ -996,8 +996,7 @@ test_that(
   ))
   d$cap <- 600L
   mf <- mvgam_formula(y ~ 1)
-  sd <- standata(mf, data = d, family = nmix("poisson_poisson"),
-                 validate = FALSE)
+  sd <- standata(mf, data = d, family = nmix("poisson_poisson"))
   expect_identical(as.integer(sd$Y_max), c(0L, 5L, 100L, 500L))
   # k_start_ppm[g] = max(1, Y_max[g] - 7 * ceil(sqrt(Y_max[g]))): a
   # floor of 1 up to Y_max = 49, then 100 - 70 and 500 - 161
@@ -1069,7 +1068,7 @@ test_that(
   "standata under nmix() carries the closure-unit array values", {
   d <- make_nmix_data(n_unit = 5, n_visit = 2, seed = 7)
   mf <- mvgam_formula(y ~ elev)
-  sd <- standata(mf, data = d, family = nmix(), validate = FALSE)
+  sd <- standata(mf, data = d, family = nmix())
   arrs <- build_closure_unit_arrays(d, response_var = "y")
   expect_identical(as.integer(sd$N_unit), arrs$N_unit)
   expect_identical(as.integer(sd$n_rep),  arrs$n_rep)
@@ -1085,8 +1084,8 @@ test_that(
   d_pred <- d_fit
   d_pred$cap <- 99L
   mf <- mvgam_formula(y ~ elev)
-  sd_fit  <- standata(mf, data = d_fit,  family = nmix(), validate = FALSE)
-  sd_pred <- standata(mf, data = d_pred, family = nmix(), validate = FALSE)
+  sd_fit  <- standata(mf, data = d_fit,  family = nmix())
+  sd_pred <- standata(mf, data = d_pred, family = nmix())
   expect_identical(as.integer(sd_fit$K_max),  rep(20L, 4))
   expect_identical(as.integer(sd_pred$K_max), rep(99L, 4))
   # Visit structure is identical; only K_max responds to the
@@ -1360,9 +1359,8 @@ test_that(
   )
   d$y <- 0L
   mf <- mvgam_formula(y ~ 1)
-  sd_single <- standata(mf, data = d, family = occ(), validate = FALSE)
-  sd_multi  <- standata(mf, data = d, family = occ(multi_season = TRUE),
-                        validate = FALSE)
+  sd_single <- standata(mf, data = d, family = occ())
+  sd_multi  <- standata(mf, data = d, family = occ(multi_season = TRUE))
   # Single-season: closure units = (series, time) = 2 * 2 = 4.
   expect_identical(as.integer(sd_single$N_unit), 4L)
   # Multi-season: closure units = (series, site, time) = 12.
@@ -1378,7 +1376,7 @@ test_that("occ(multi_season = TRUE) rejects data without a 'site' column", {
   )
   mf <- mvgam_formula(y ~ 1)
   expect_error(
-    standata(mf, data = d, family = occ(multi_season = TRUE), validate = FALSE),
+    standata(mf, data = d, family = occ(multi_season = TRUE)),
     "'site'"
   )
 })

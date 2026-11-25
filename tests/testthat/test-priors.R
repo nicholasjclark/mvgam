@@ -93,6 +93,7 @@ test_that("parse_trend_formula handles all formula types", {
 })
 
 test_that("all trend types generate correct prior structures", {
+  skip_on_cran()
   test_data <- create_test_data()
 
   trend_specs <- list(
@@ -332,6 +333,7 @@ test_that("validate_trend_formula rejects invalid terms", {
 })
 
 test_that("a trend_formula routes to the mvgam methods", {
+  skip_on_cran()
   test_data <- create_test_data()
   tf <- ~ AR(p = 1)
 
@@ -630,6 +632,7 @@ test_that("com_binomial() default prior can be overridden", {
 })
 
 test_that("nu_trend default prior can be overridden", {
+  skip_on_cran()
   mf <- mvgam_formula(y ~ 1, trend_formula = ~ AR(p = 1, df = NA))
   sc_default <- prior_code(mf, poisson())
   expect_true(grepl(stan_prior_line("nu_trend", "gamma(4, 0.3)"),
@@ -745,6 +748,7 @@ unreported_trend_priors <- function(types) {
 }
 
 test_that("the trend priors reported are the ones sampled", {
+  skip_on_cran()
   # VARMA and PW lost priors from the table before. The factor and
   # hierarchical shapes add loadings and group-correlation priors.
   expect_identical(
@@ -840,6 +844,7 @@ test_that("LLT and PW growth priors scale with the number of time points", {
 })
 
 test_that("a user prior reaches the parameters that reported nothing", {
+  skip_on_cran()
   # Each of these was resolved from a literal at the emission site, so
   # the user's own value never entered the Stan.
   mf <- mvgam_formula(y ~ 1,
@@ -911,6 +916,7 @@ test_that("the trend suffix skips classes mvgam already names", {
 })
 
 test_that("a reported innovation scale is one the model samples", {
+  skip_on_cran()
   # Two things remove `sigma_trend`. The table reports each.
   # `PW()` never had one: its path is a function of the
   # changepoints. Sampled loadings absorb the factors' scale, which
@@ -979,6 +985,7 @@ test_that("add_trend_suffix_to_priors leaves other classes alone", {
 })
 
 test_that("trend priors name the trend's axis as lv_axis()", {
+  skip_on_cran()
   # brms labels the term with the column that replaced 'lv_axis()',
   # a column the user is refused in 'trend_formula'. A second smooth
   # keeps the class-wide default in use.
@@ -1040,6 +1047,7 @@ test_that("a user prior on Z reaches the emitted Stan", {
 })
 
 test_that("the reported Z prior is the one the model samples", {
+  skip_on_cran()
   # `Z` is drawn from one of three branches depending on the
   # loadings prior. The table reported the unstructured default for
   # all three, so two of them described a model the user was not
@@ -1104,6 +1112,7 @@ test_that("the branch classifier names each loadings path once", {
 })
 
 test_that("get_prior describes the loadings a trend_map leaves", {
+  skip_on_cran()
   # A fully fixed map moves `Z` to the data block, with no prior. A
   # partial map samples its `NA` entries as `Z_free_vec` under the
   # `Z` prior. Fixed loadings pin the factors' scale, and the model

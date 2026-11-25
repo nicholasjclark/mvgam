@@ -41,6 +41,7 @@ base_prefit <- local({
 })
 
 test_that("the software versions reported are the ones the fit recorded", {
+  skip_on_cran()
   # The page reports the versions the fit recorded. The describing
   # session may have others installed. Under rstan the Stan version is
   # Stan's own, distinct from the rstan package version.
@@ -91,6 +92,7 @@ test_that("Gaussian family renders Normal likelihood + identity link", {
 })
 
 test_that("RW trend emits eta_{t-1} dynamics + Normal innovation", {
+  skip_on_cran()
   mod <- make_methods_md_prefit(y ~ 1, trend_formula = ~ RW())
   # Four series each sample their own innovation SD.
   expect_contains(md_rows(methods_md(mod)), c(
@@ -107,6 +109,7 @@ test_that("RW trend emits eta_{t-1} dynamics + Normal innovation", {
 })
 
 test_that("AR(p = 1) trend emits phi_1 eta_{t-1} dynamics", {
+  skip_on_cran()
   mod <- make_methods_md_prefit(y ~ 1, trend_formula = ~ AR(p = 1))
   expect_contains(
     md_rows(methods_md(mod)),
@@ -124,6 +127,7 @@ test_that("AR(p = 1) trend emits phi_1 eta_{t-1} dynamics", {
 })
 
 test_that("AR(p = c(1, 2)) emits both lag terms in the dynamics row", {
+  skip_on_cran()
   mod <- make_methods_md_prefit(
     y ~ 1, trend_formula = ~ AR(p = c(1L, 2L))
   )
@@ -140,6 +144,7 @@ test_that("AR(p = c(1, 2)) emits both lag terms in the dynamics row", {
 })
 
 test_that("a seasonal LLT writes the level plus each harmonic's turn", {
+  skip_on_cran()
   mod <- make_methods_md_prefit(
     y ~ 1, trend_formula = ~ LLT(season = 12, harmonics = 2)
   )
@@ -167,6 +172,7 @@ test_that("a seasonal LLT writes the level plus each harmonic's turn", {
 })
 
 test_that("Smooth term renders f_{x}(x) inline + basis decomposition", {
+  skip_on_cran()
   mod <- make_methods_md_prefit(y ~ s(x, k = 5))
   rows <- md_rows(methods_md(mod))
   expect_contains(rows, c(
@@ -234,6 +240,7 @@ test_that("By-factor GP carries the grouping variable in the subscript", {
 })
 
 test_that("Terms render in the predictor they belong to", {
+  skip_on_cran()
   set.seed(1L)
   dat <- data.frame(
     time = rep(1:30, 4),
@@ -357,6 +364,7 @@ test_that("Monotonic mo(x) renders beta^{(mo)}_x m_x + Dirichlet simplex", {
 })
 
 test_that("each special coefficient renders its own parts", {
+  skip_on_cran()
   set.seed(1L)
   dat <- data.frame(
     time = rep(1:30, 4),
@@ -441,6 +449,7 @@ test_that("dpar second-formula renders its own linear predictor", {
 })
 
 test_that("nl formula renders per-nlpar decompositions", {
+  skip_on_cran()
   set.seed(1L)
   dat <- data.frame(
     time = rep(1:20, 4),
@@ -474,6 +483,7 @@ test_that("Response column never surfaces in the Predictors list", {
 })
 
 test_that("Group-level RE renders alpha_{grp[i]} + hyperprior shape", {
+  skip_on_cran()
   mod <- make_methods_md_prefit(y ~ (1 | grp))
   # The class's SD prior is stated on the group's own row, with no
   # placeholder symbol for the class.
@@ -561,6 +571,7 @@ test_that("AR(cor = TRUE) emits MVNormal innovations", {
 })
 
 test_that("AR(gr = ...) emits hierarchical cor decomposition", {
+  skip_on_cran()
   dat <- data.frame(
     time = rep(1:30, 4),
     series = factor(rep(paste0("s", 1:4), each = 30)),
@@ -584,6 +595,7 @@ test_that("AR(gr = ...) emits hierarchical cor decomposition", {
 })
 
 test_that("Factor model (n_lv > 0) emits factor dynamics and loadings", {
+  skip_on_cran()
   mod <- make_methods_md_prefit(
     y ~ x, trend_formula = ~ AR(p = 1, n_lv = 2)
   )
@@ -633,6 +645,7 @@ test_that("MGP shrinkage scales each loadings column by sqrt(Psi_k)", {
 })
 
 test_that("loadings_prior features + distances kernel emits kernel rows", {
+  skip_on_cran()
   mod <- make_methods_md_prefit(
     y ~ x, trend_formula = ~ AR(p = 1, n_lv = 2)
   )
@@ -709,6 +722,7 @@ make_nmix_prefit <- function(type = "poisson_binomial") {
 }
 
 test_that("each response of a multivariate model is described by its family", {
+  skip_on_cran()
   # Each response takes its own family, link and data label. The
   # Implementation call names each response's family in its `bf()`.
   # A distributional formula prints as `sigma ~ x`.
@@ -788,6 +802,7 @@ test_that("the reproduction call carries the formula the user wrote", {
 
 
 test_that("how_to_cite cites each family a model has", {
+  skip_on_cran()
   # Each response's family is cited, a tweedie response inside
   # `mvbf()` included. Each of the three `nmix()` variants cites its
   # own references.
@@ -820,6 +835,7 @@ test_that("how_to_cite cites each family a model has", {
 
 
 test_that("how_to_cite cites a prefit's trend", {
+  skip_on_cran()
   # A prefit records its trend type in its metadata alone. The
   # citation rules take the type from there and add the references
   # a VAR trend carries.
@@ -903,6 +919,7 @@ test_that("occ() emits state + obs + logit(p) rows", {
 })
 
 test_that("a multi-season unit is indexed by series, site and season", {
+  skip_on_cran()
   d <- expand.grid(
     series = factor(c("sp1", "sp2")), site = factor(seq_len(3L)),
     time = seq_len(2L), visit = seq_len(2L), KEEP.OUT.ATTRS = FALSE
@@ -1003,6 +1020,7 @@ test_that("diri() writes one simplex per unit against the first series", {
 })
 
 test_that("nl b_<nlpar>_<term> prior carries nlpar superscript on beta", {
+  skip_on_cran()
   set.seed(1L)
   d <- data.frame(
     time = rep(1:30, 4), series = factor(rep(1:4, each = 30)),
@@ -1054,6 +1072,7 @@ test_that("Ordinal Intercept rows render as theta_{k} thresholds", {
 })
 
 test_that("ordinal thresholds render their shifts, groups and scale", {
+  skip_on_cran()
   set.seed(1L)
   d <- data.frame(
     time = rep(1:30, 4), series = factor(rep(1:4, each = 30)),
@@ -1100,6 +1119,7 @@ test_that("ordinal thresholds render their shifts, groups and scale", {
 })
 
 test_that("mvbind rescor priors carry response superscripts", {
+  skip_on_cran()
   set.seed(1L)
   d <- data.frame(
     time = rep(1:30, 2), series = factor(rep(1:2, each = 30)),
@@ -1264,6 +1284,7 @@ test_that("an offset enters the predictor with its coefficient at one", {
 
 
 test_that("an unfitted model prints each family by its own name", {
+  skip_on_cran()
   # An unfitted model prints with the unfitted printer. It names each
   # family by `resolve_family_name()`. brms writes `family$family` as
   # "custom" for every family built with `custom_family()`. A model

@@ -603,7 +603,7 @@ brms_threading_case <- function(threads, family, mv_spec) {
 #'   add to the program, merged with the code mvgam writes for the
 #'   trend.
 #' @param validate Logical. `TRUE` (the default) checks the program
-#'   with the Stan parser.
+#'   with the Stan parser. `stancode()` alone takes it.
 #' @param ... For an [mvgam_formula()], other arguments of [mvgam()].
 #'   A name [mvgam()] does not take is refused. For an `mvgam` model,
 #'   unused. Anything passed is refused.
@@ -743,14 +743,21 @@ standata.mvgam_formula <- function(object, data, family = gaussian(),
                                    backend = "rstan",
                                    threads = 1L,
                                    normalize = TRUE, save_model = NULL,
-                                   silent = 1L, stanvars = NULL,
-                                   validate = TRUE, ...) {
+                                   silent = 1L, stanvars = NULL, ...) {
   reject_removed_args(list(...), fn = "standata")
+  # `standata()` returns the data alone. The parse checks only the
+  # program.
+  if ("validate" %in% names(list(...))) {
+    stop(insight::format_error(c(
+      "Argument 'validate' is not supported by standata().",
+      i = "Use stancode(validate = TRUE) to parse the program."
+    )), call. = FALSE)
+  }
   refuse_unread_dots(list(...), mvgam_dots_args(), "standata")
   standata <- mvgam_formula_component(
     "standata", object, data, family, prior, data2, sample_prior,
     knots, drop_unused_levels, backend, threads, normalize,
-    save_model, silent, stanvars, validate, ...
+    save_model, silent, stanvars, validate = FALSE, ...
   )
 
   if (!is.list(standata) || length(standata) == 0L) {

@@ -144,7 +144,7 @@ test_that(
   d <- make_occ_data()
   mf <- mvgam_formula(bf(y ~ elev, p ~ tod))
   sc <- as.character(stancode(mf, data = d, family = occ(), validate = FALSE))
-  sd <- standata(mf, data = d, family = occ(), validate = FALSE)
+  sd <- standata(mf, data = d, family = occ())
   # The vector density and the overload brms calls for a scalar p
   expect_match(
     sc, "real occ_lpmf\\(\\s*array\\[\\] int y,\\s*vector mu,\\s*vector p,"

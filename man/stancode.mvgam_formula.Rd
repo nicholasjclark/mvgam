@@ -42,7 +42,6 @@
   save_model = NULL,
   silent = 1L,
   stanvars = NULL,
-  validate = TRUE,
   ...
 )
 
@@ -123,7 +122,7 @@ add to the program, merged with the code mvgam writes for the
 trend.}
 
 \item{validate}{Logical. \code{TRUE} (the default) checks the program
-with the Stan parser.}
+with the Stan parser. \code{stancode()} alone takes it.}
 
 \item{...}{For an \code{\link[=mvgam_formula]{mvgam_formula()}}, other arguments of \code{\link[=mvgam]{mvgam()}}.
 A name \code{\link[=mvgam]{mvgam()}} does not take is refused. For an \code{mvgam} model,

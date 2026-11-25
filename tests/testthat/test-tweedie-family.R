@@ -33,9 +33,8 @@ test_that("standata under tweedie() carries M with the requested value", {
     series = factor(rep("s1", 50))
   )
   mf <- mvgam_formula(y ~ 1)
-  sd_default <- standata(mf, data = dat, family = tweedie(), validate = FALSE)
-  sd_custom <- standata(mf, data = dat, family = tweedie(M = 75L),
-                        validate = FALSE)
+  sd_default <- standata(mf, data = dat, family = tweedie())
+  sd_custom <- standata(mf, data = dat, family = tweedie(M = 75L))
   expect_equal(sd_default$M, 30L)
   expect_equal(sd_custom$M, 75L)
 })
