@@ -13,7 +13,6 @@ mvgam now builds its models through 'brms'. The observation model takes the full
 * Renamed arguments: `incl_autocor` (was `trend_state`), `process_error` (was `resample_innovations`), `centred` (was `noncentred`)
 * Parameter names follow 'brms', as do `summary()`, `coef()`, `fixef()`. Trend parameters are indexed by series name, as in `sigma_trend[DM]`
 * Posterior summaries by default from `irf()`, `fevd()`, `stability()`. Pass `summary = FALSE` for draws
-* `mvgam_forecast` objects store `train_times` and `test_times` as per-series lists
 * mvgam no longer re-exports `te()` and `ti()`. `series_to_mvgam()` no longer takes `xts` input
 * `sim_mvgam()` is built around named scenarios. `series_to_mvgam()` returns one data frame unless `h` or `train_prop` is given
 
@@ -33,7 +32,6 @@ mvgam now builds its models through 'brms'. The observation model takes the full
 
 ## Changed defaults
 * The `posterior_*()` methods and `fitted()` default to `process_error = FALSE`, matching `predict()`
-* `conditional_effects()` defaults to `type = "expected"`
 * Predictions with `incl_autocor = TRUE` refuse times outside the fitted times. Use `forecast()`
 * Trend scale priors follow the response's spread on the link scale, as 'brms' defaults do
 
@@ -42,11 +40,33 @@ mvgam now builds its models through 'brms'. The observation model takes the full
 
 ## Bug fixes
 * Binomial predictions with varying trial counts stay within each observation's total (thanks to @jbogomolovas2)
-* `CAR()` process variance scales with the time lag (#107)
 * `ensemble()` combines `hindcast()` results
 * `update()` works when a trend argument came from a variable
-* Fixes to the Brier and variogram scores and to scores of forecasts with one test observation
-* Fixes to offsets with `gp()` terms, piecewise trend predictions, by-factor Gaussian Process predictions and residual plots with missing values (thanks to @StefanoMezzini)
+* Fixes to the Brier and variogram scores
+* Fixes to by-factor Gaussian Process predictions and to residual plots with missing values (thanks to @StefanoMezzini)
+
+# mvgam 1.1.594
+
+## New functionalities
+* Restructured `summary.mvgam()` to now return an object of class `mvgam_summary` that can be re-used for later purposes, or that can be printed with `print.mvgam_summary()` (#119)
+* Added a new function `ordinate.jsdgam()` to plot two-dimensional ordinations of site and species scores from latent factor models estimated in `jsdgam()`
+* `residual_cor()` now supports models fitted with `mvgam()` in which latent factors were used or in which correlated dynamic processes were used
+* Added a `summary.mvgam_forecast()` function to compute and return prediction intervals of posterior hindcasts and forecasts in a `data.frame` format. This will make it easier for users to create their own custom plots of hindcast and forecast distributions (#108)
+* Added a `mvgam_use_cases` help file to provide links to online resources that discuss how to use 'mvgam' in practice
+
+## Changing defaults
+* The `forecast()` method is now imported from 'generics' to help avoid conflict issues with other forecasting packages
+* Deprecated the `incl_dynamics` argument in the `loo()` and `loo_compare()` functions to ensure better consistency in log-likelihood and resulting LOO estimates from models with different observation families
+* Changed default `type` in `conditional_effects()` to `expected` to match behaviour of 'brms'
+
+## Bug fixes
+* Bug fix to ensure forecast scores are properly computed when plotting objects of class `mvgam_forecast` if only a single out-of-sample observation was included in `newdata` (#111)
+* Bug fix to ensure offsets supplied with `offset(...)` in formulae are correctly incorporated when using `gp()` terms
+* Bug fix to ensure piecewise trends are correctly predicted when using `process_error = TRUE` in `predict()`
+* Bug fix to ensure variance of continuous time autoregressive processes (using `CAR()`) scales appropriately with time lags (#107)
+
+## Deprecations
+* Altered the structure of objects of class `mvgam_forecast` so that the `train_times` and `test_times` slots now contain lists of length `n_series`. This allows for continuous time data to be better handled, where some series may have been sampled at different timepoints
 
 # mvgam 1.1.51
 
