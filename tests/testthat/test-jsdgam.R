@@ -431,6 +431,7 @@ test_that("jsdgam_phylo_to_dist reads a phylo and returns named distances", {
 })
 
 test_that("jsdgam_phylo_to_dist rejects bad object types", {
+  skip_if_not_installed("ape")
   expect_error(
     mvgam:::jsdgam_phylo_to_dist("not_a_phylo", species_4()),
     "must be an 'ape::phylo' object or a numeric"

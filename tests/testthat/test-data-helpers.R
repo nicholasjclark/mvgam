@@ -323,6 +323,7 @@ test_that("an msts gives one season column per period", {
 })
 
 test_that("a tsibble fills its gaps and keeps keys and covariates", {
+  skip_if_not_installed("tsibble")
   month <- tsibble::yearmonth("2020 Nov") + c(0:4, 7:9)
   x <- tsibble::tsibble(
     month = rep(month, 2L),
@@ -354,6 +355,7 @@ test_that("a wide data.frame pivots with series in column order", {
 })
 
 test_that("series_to_mvgam() refuses a calendar month held as a Date", {
+  skip_if_not_installed("tsibble")
   x <- tsibble::tsibble(
     date = seq(as.Date("2020-01-01"), by = "month", length.out = 6L),
     y = 1:6, index = "date"

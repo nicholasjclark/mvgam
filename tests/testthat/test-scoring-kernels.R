@@ -145,6 +145,7 @@ test_that("Brier scores the forecast probability", {
 # ----- Energy -----------------------------------------------------
 
 test_that("Energy score at each horizon is es_sample over the series", {
+  skip_if_not_installed("scoringRules")
   set.seed(6L)
   truths <- matrix(c(0, 1, 0.5, 1.5,
                      -1, 0), nrow = 2L, ncol = 3L)

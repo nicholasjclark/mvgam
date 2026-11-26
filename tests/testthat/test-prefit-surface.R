@@ -119,6 +119,7 @@ test_that("a VAR prefit names its trend and the posterior it needs", {
 })
 
 test_that("mvgam_multiple gives one prefit when run_model is FALSE", {
+  skip_if_not_installed("mice")
   set.seed(9)
   mk <- function() {
     data.frame(
