@@ -166,7 +166,7 @@ mod <- mvgam(
   chains = 2,
   silent = 2
 )
-#> Warning: 34 of 2000 (2.0%) transitions ended with a divergence.
+#> Warning: 12 of 2000 (1.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 
 # The covariate's share against the shared factors', by series
@@ -188,15 +188,15 @@ summary(vp)
 #> # A tibble: 10 × 5
 #>    series    source         Q50   Q2.5 Q97.5
 #>    <chr>     <chr>        <dbl>  <dbl> <dbl>
-#>  1 series_1  environment  0.464 0.351  0.571
-#>  2 series_1  associations 0.536 0.429  0.649
-#>  3 series_2  environment  0.683 0.520  0.874
-#>  4 series_2  associations 0.317 0.126  0.480
-#>  5 series_3  environment  0.585 0.464  0.719
-#>  6 series_3  associations 0.415 0.281  0.536
-#>  7 series_4  environment  0.817 0.658  0.945
-#>  8 series_4  associations 0.183 0.0551 0.342
-#>  9 Community environment  0.603 0.525  0.672
-#> 10 Community associations 0.397 0.328  0.475
+#>  1 series_1  environment  0.461 0.352  0.573
+#>  2 series_1  associations 0.539 0.427  0.648
+#>  3 series_2  environment  0.681 0.524  0.878
+#>  4 series_2  associations 0.319 0.122  0.476
+#>  5 series_3  environment  0.583 0.464  0.715
+#>  6 series_3  associations 0.417 0.285  0.536
+#>  7 series_4  environment  0.816 0.654  0.950
+#>  8 series_4  associations 0.184 0.0499 0.346
+#>  9 Community environment  0.602 0.520  0.679
+#> 10 Community associations 0.398 0.321  0.480
 # }
 ```

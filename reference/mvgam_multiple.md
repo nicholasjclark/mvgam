@@ -124,8 +124,6 @@ fit_pooled <- mvgam_multiple(
   chains = 2,
   silent = 2
 )
-#> Warning: 2 of 2000 (0.0%) transitions ended with a divergence.
-#> See https://mc-stan.org/misc/warnings for details.
 
 # The summary adds the convergence of each imputation fit
 summary(fit_pooled)
@@ -140,17 +138,17 @@ summary(fit_pooled)
 #> == Observation Model ==
 #> Regression Coefficients:
 #>           Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> Intercept     1.66      0.16     1.35     1.96 1.01     2019     2344
-#> x             0.36      0.14     0.08     0.63 1.00     2115     3302
+#> Intercept     1.68      0.19     1.29     2.05 1.00     2219     2704
+#> x             0.31      0.13     0.06     0.56 1.00     2404     3075
 #> 
 #> == Trend Model ==
 #> Trend Specific Parameters:
 #>                       Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS
-#> sigma_trend[series_1]     0.64      0.12     0.43     0.90 1.00     1856
-#> ar1_trend[series_1]       0.16      0.22    -0.29     0.58 1.00     1292
+#> sigma_trend[series_1]     0.71      0.12     0.51     0.97 1.00     1993
+#> ar1_trend[series_1]       0.32      0.18    -0.05     0.67 1.01     1492
 #>                       Tail_ESS
-#> sigma_trend[series_1]     2648
-#> ar1_trend[series_1]       2126
+#> sigma_trend[series_1]     3168
+#> ar1_trend[series_1]       2614
 #> 
 #> Draws were sampled using sampling(NUTS). For each parameter, Bulk_ESS
 #> and Tail_ESS are effective sample size measures, and Rhat is the potential
@@ -166,9 +164,9 @@ summary(fit_pooled)
 #> Multiple imputation: 3 fits of 2000 draws each, pooled.
 #> Rhat is each parameter's largest and each ESS its sum over the fits.
 #>    Imputation Max_Rhat Min_Bulk_ESS Min_Tail_ESS
-#>             1    1.008          392          592
-#>             2    1.010          464          586
-#>             3    1.006          435          789
+#>             1    1.006          460          736
+#>             2    1.013          453          849
+#>             3    1.005          580          810
 
 # Next, `combine = FALSE` returns the three fits as a list
 # }

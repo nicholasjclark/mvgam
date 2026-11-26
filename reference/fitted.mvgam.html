@@ -40,7 +40,7 @@ fitted.brmsfit()."><meta property="og:image" content="https://nicholasjclark.git
 <div class="row">
   <main id="main" class="col-md-9"><div class="page-header">
       <img src="../logo.png" class="logo" alt=""><h1>Expected values of an mvgam model</h1>
-      <small class="dont-index">Source: <a href="https://github.com/nicholasjclark/mvgam/blob/feature/brms-integration/R/fitted.R" class="external-link"><code>R/fitted.R</code></a></small>
+      <small class="dont-index">Source: <a href="https://github.com/nicholasjclark/mvgam/blob/master/R/fitted.R" class="external-link"><code>R/fitted.R</code></a></small>
       <div class="d-none name"><code>fitted.mvgam.Rd</code></div>
     </div>
 
@@ -259,29 +259,29 @@ data. <code><a href="hindcast.mvgam.html">hindcast.mvgam()</a></code> returns th
 <span class="r-in"><span>              data    <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span>,</span></span>
 <span class="r-in"><span>              family  <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>              chains  <span class="op">=</span> <span class="fl">2</span>, silent <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 6 of 2000 (0.0%) transitions ended with a divergence.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 8 of 2000 (0.0%) transitions ended with a divergence.</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> See https://mc-stan.org/misc/warnings for details.</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Expected counts at the training observations: the posterior mean,</span></span></span>
 <span class="r-in"><span><span class="co"># error and 95% interval of each</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/fitted.values.html" class="external-link">fitted</a></span><span class="op">(</span><span class="va">mod</span><span class="op">)</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>       Estimate Est.Error      Q2.5     Q97.5</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1,]  2.223737 0.9477626 0.8486628  4.491238</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [2,] 12.808111 3.1392839 7.5683598 19.977327</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [3,]  6.045821 1.7710659 3.0109481  9.929735</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [4,]  4.262490 1.5088783 1.8504264  7.726131</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [5,]  3.800956 1.4581922 1.6701827  7.255567</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [6,]  5.190124 1.7354164 2.3797211  9.204851</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1,]  2.207691 0.9305772 0.8131356  4.356372</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [2,] 12.806451 3.1122830 7.7217967 19.707841</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [3,]  6.127995 1.9555336 3.0394862 10.796605</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [4,]  4.241297 1.4620235 1.9037317  7.469520</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [5,]  3.772397 1.4009699 1.6568997  7.155324</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [6,]  5.159103 1.6707835 2.5723385  9.010794</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># The covariate effects alone, without the inferred trend state</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/fitted.values.html" class="external-link">fitted</a></span><span class="op">(</span><span class="va">mod</span>, incl_autocor <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>       Estimate Est.Error     Q2.5     Q97.5</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1,]  2.165650 0.4821792 1.352597  3.255625</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [2,] 12.343084 2.4764360 8.436601 17.836260</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [3,]  8.271064 1.4216585 5.969851 11.404572</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [4,]  8.896158 1.6756305 6.172135 12.736609</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [5,]  4.655090 1.0732052 2.914190  7.026666</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [6,]  6.572999 1.7855436 3.725610 10.837790</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1,]  2.177799 0.5039981 1.372165  3.272027</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [2,] 12.494874 2.4463183 8.440001 17.895871</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [3,]  8.342220 1.4506820 5.900834 11.324902</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [4,]  9.012999 1.7507995 6.182665 13.173352</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [5,]  4.651361 1.0722233 2.871433  7.028278</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [6,]  6.649075 1.8835325 3.792182 11.233647</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># One row per posterior draw and one column per observation</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/dim.html" class="external-link">dim</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/fitted.values.html" class="external-link">fitted</a></span><span class="op">(</span><span class="va">mod</span>, summary <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span><span class="op">)</span></span></span>

@@ -38,7 +38,7 @@ lfo_cv.mvgam() and kfold.mvgam() score models from it."><meta property="og:image
 <div class="row">
   <main id="main" class="col-md-9"><div class="page-header">
       <img src="../logo.png" class="logo" alt=""><h1>Pointwise log-likelihoods from a fitted mvgam model</h1>
-      <small class="dont-index">Source: <a href="https://github.com/nicholasjclark/mvgam/blob/feature/brms-integration/R/log_lik.mvgam.R" class="external-link"><code>R/log_lik.mvgam.R</code></a></small>
+      <small class="dont-index">Source: <a href="https://github.com/nicholasjclark/mvgam/blob/master/R/log_lik.mvgam.R" class="external-link"><code>R/log_lik.mvgam.R</code></a></small>
       <div class="d-none name"><code>log_lik.mvgam.Rd</code></div>
     </div>
 
@@ -181,7 +181,7 @@ compares models by cross-validation.</p>
 <span class="r-in"><span>              data    <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span>,</span></span>
 <span class="r-in"><span>              family  <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>              chains  <span class="op">=</span> <span class="fl">2</span>, silent <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 6 of 2000 (0.0%) transitions ended with a divergence.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 8 of 2000 (0.0%) transitions ended with a divergence.</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> See https://mc-stan.org/misc/warnings for details.</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># One row per draw, one column per observation</span></span></span>
@@ -194,7 +194,7 @@ compares models by cross-validation.</p>
 <span class="r-in"><span><span class="va">ll_fixed</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://mc-stan.org/rstantools/reference/log_lik.html" class="external-link">log_lik</a></span><span class="op">(</span><span class="va">mod</span>, incl_autocor <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>with_trend <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/colSums.html" class="external-link">rowSums</a></span><span class="op">(</span><span class="va">ll</span><span class="op">)</span><span class="op">)</span>, without <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/colSums.html" class="external-link">rowSums</a></span><span class="op">(</span><span class="va">ll_fixed</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> with_trend    without </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  -197.0617  -301.6807 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  -197.6027  -301.2529 </span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Next, loo() estimates the ELPD from these densities</span></span></span>
 <span class="r-in"><span><span class="co"># }</span></span></span>

@@ -54,7 +54,7 @@ model. loo.mvgam() explains the ELPD and the Pareto k diagnostic."><meta propert
 <div class="row">
   <main id="main" class="col-md-9"><div class="page-header">
       <img src="../logo.png" class="logo" alt=""><h1>Approximate leave-future-out cross-validation of fitted mvgam objects</h1>
-      <small class="dont-index">Source: <a href="https://github.com/nicholasjclark/mvgam/blob/feature/brms-integration/R/lfo_cv.mvgam.R" class="external-link"><code>R/lfo_cv.mvgam.R</code></a></small>
+      <small class="dont-index">Source: <a href="https://github.com/nicholasjclark/mvgam/blob/master/R/lfo_cv.mvgam.R" class="external-link"><code>R/lfo_cv.mvgam.R</code></a></small>
       <div class="d-none name"><code>lfo_cv.mvgam.Rd</code></div>
     </div>
 
@@ -256,21 +256,21 @@ stacking weights.</p>
 <span class="r-in"><span>  family  <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>  chains  <span class="op">=</span> <span class="fl">2</span>, seed <span class="op">=</span> <span class="fl">1</span>, silent <span class="op">=</span> <span class="fl">2</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 24 of 2000 (1.0%) transitions ended with a divergence.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 19 of 2000 (1.0%) transitions ended with a divergence.</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> See https://mc-stan.org/misc/warnings for details.</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Forecasts one time step after each origin from t = 60, scored by</span></span></span>
 <span class="r-in"><span><span class="co"># ELPD and CRPS. The model is refitted only where the Pareto k is high.</span></span></span>
 <span class="r-in"><span><span class="va">lfo</span> <span class="op">&lt;-</span> <span class="fu">lfo_cv</span><span class="op">(</span><span class="va">mod</span>, min_t <span class="op">=</span> <span class="fl">60L</span>, score <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"elpd"</span>, <span class="st">"crps"</span><span class="op">)</span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 39 of 2000 (2.0%) transitions ended with a divergence.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 15 of 2000 (1.0%) transitions ended with a divergence.</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> See https://mc-stan.org/misc/warnings for details.</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 67 of 2000 (3.0%) transitions ended with a divergence.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 16 of 2000 (1.0%) transitions ended with a divergence.</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> See https://mc-stan.org/misc/warnings for details.</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 9 of 2000 (0.0%) transitions ended with a divergence.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 157 of 2000 (8.0%) transitions ended with a divergence.</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> See https://mc-stan.org/misc/warnings for details.</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 14 of 2000 (1.0%) transitions ended with a divergence.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 24 of 2000 (1.0%) transitions ended with a divergence.</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> See https://mc-stan.org/misc/warnings for details.</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 32 of 2000 (2.0%) transitions ended with a divergence.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 17 of 2000 (1.0%) transitions ended with a divergence.</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> See https://mc-stan.org/misc/warnings for details.</span>
 <span class="r-in"><span><span class="va">lfo</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Approximate leave-future-out cross-validation</span>
@@ -278,8 +278,8 @@ stacking weights.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   pareto_k_threshold : 0.697 (adaptive)</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   evaluation points  : 30</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   refits             : 5</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   ELPD               : sum = -78.98, mean = -2.63</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   crps               : sum = 59.89, mean = 2</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   ELPD               : sum = -79.08, mean = -2.64</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   crps               : sum = 60.89, mean = 2.03</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Pareto k, ELPD and CRPS at each origin. Points past the dashed</span></span></span>
 <span class="r-in"><span><span class="co"># line are highlighted</span></span></span>
@@ -291,16 +291,16 @@ stacking weights.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #949494;"># A tibble: 30 × 6</span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>    eval_time refit_here pareto_k n_obs  elpd  crps</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>        <span style="color: #949494; font-style: italic;">&lt;int&gt;</span> <span style="color: #949494; font-style: italic;">&lt;lgl&gt;</span>         <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> <span style="color: #949494; font-style: italic;">&lt;int&gt;</span> <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 1</span>        61 TRUE        <span style="color: #BB0000;">NA</span>          1 -<span style="color: #BB0000;">2.51</span> 1.52 </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 2</span>        62 FALSE       -<span style="color: #BB0000;">1.56</span>       1 -<span style="color: #BB0000;">1.71</span> 0.551</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 3</span>        63 FALSE       -<span style="color: #BB0000;">0.880</span>      1 -<span style="color: #BB0000;">2.48</span> 1.34 </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 4</span>        64 FALSE       -<span style="color: #BB0000;">0.586</span>      1 -<span style="color: #BB0000;">2.43</span> 1.02 </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 5</span>        65 FALSE       -<span style="color: #BB0000;">0.286</span>      1 -<span style="color: #BB0000;">1.68</span> 1.05 </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 6</span>        66 FALSE       -<span style="color: #BB0000;">0.060</span><span style="color: #BB0000; text-decoration: underline;">9</span>     1 -<span style="color: #BB0000;">2.40</span> 1.33 </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 7</span>        67 FALSE       -<span style="color: #BB0000;">0.047</span><span style="color: #BB0000; text-decoration: underline;">3</span>     1 -<span style="color: #BB0000;">2.81</span> 3.16 </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 8</span>        68 FALSE        0.326      1 -<span style="color: #BB0000;">2.82</span> 1.63 </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 9</span>        69 FALSE        0.628      1 -<span style="color: #BB0000;">2.69</span> 2.91 </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">10</span>        70 TRUE         0.795      1 -<span style="color: #BB0000;">2.86</span> 2.75 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 1</span>        61 TRUE        <span style="color: #BB0000;">NA</span>          1 -<span style="color: #BB0000;">2.52</span> 1.52 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 2</span>        62 FALSE       -<span style="color: #BB0000;">1.71</span>       1 -<span style="color: #BB0000;">1.68</span> 0.616</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 3</span>        63 FALSE       -<span style="color: #BB0000;">0.825</span>      1 -<span style="color: #BB0000;">2.47</span> 1.41 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 4</span>        64 FALSE       -<span style="color: #BB0000;">0.583</span>      1 -<span style="color: #BB0000;">2.42</span> 0.996</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 5</span>        65 FALSE       -<span style="color: #BB0000;">0.337</span>      1 -<span style="color: #BB0000;">1.66</span> 0.964</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 6</span>        66 FALSE       -<span style="color: #BB0000;">0.153</span>      1 -<span style="color: #BB0000;">2.49</span> 1.82 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 7</span>        67 FALSE        0.089<span style="text-decoration: underline;">2</span>     1 -<span style="color: #BB0000;">2.85</span> 3.38 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 8</span>        68 FALSE        0.574      1 -<span style="color: #BB0000;">2.96</span> 2.16 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 9</span>        69 FALSE        0.689      1 -<span style="color: #BB0000;">2.68</span> 2.51 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">10</span>        70 TRUE         0.741      1 -<span style="color: #BB0000;">2.86</span> 2.81 </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #949494;"># ℹ 20 more rows</span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Next, rank models by their forecasts with loo_compare()</span></span></span>

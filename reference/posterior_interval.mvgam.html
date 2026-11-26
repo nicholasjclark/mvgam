@@ -36,7 +36,7 @@ parameters are chosen as in as.matrix.mvgam()."><meta property="og:image" conten
 <div class="row">
   <main id="main" class="col-md-9"><div class="page-header">
       <img src="../logo.png" class="logo" alt=""><h1>Posterior credible intervals on a fitted <span class="pkg">mvgam</span> model</h1>
-      <small class="dont-index">Source: <a href="https://github.com/nicholasjclark/mvgam/blob/feature/brms-integration/R/brms_wrappers.mvgam.R" class="external-link"><code>R/brms_wrappers.mvgam.R</code></a></small>
+      <small class="dont-index">Source: <a href="https://github.com/nicholasjclark/mvgam/blob/master/R/brms_wrappers.mvgam.R" class="external-link"><code>R/brms_wrappers.mvgam.R</code></a></small>
       <div class="d-none name"><code>posterior_interval.mvgam.Rd</code></div>
     </div>
 
@@ -131,15 +131,15 @@ diagnostics.</p>
 <span class="r-in"><span><span class="va">mod</span> <span class="op">&lt;-</span> <span class="fu"><a href="mvgam.html">mvgam</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="fu">s</span><span class="op">(</span><span class="va">x</span>, k <span class="op">=</span> <span class="fl">5</span><span class="op">)</span>, trend_formula <span class="op">=</span> <span class="op">~</span> <span class="fu"><a href="trend_constructors.html">AR</a></span><span class="op">(</span>p <span class="op">=</span> <span class="fl">1</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>             data <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span>, family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>             chains <span class="op">=</span> <span class="fl">2</span>, silent <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 6 of 2000 (0.0%) transitions ended with a divergence.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 8 of 2000 (0.0%) transitions ended with a divergence.</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> See https://mc-stan.org/misc/warnings for details.</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># 90 percent intervals of the autoregression and its innovation SD</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://mc-stan.org/rstantools/reference/posterior_interval.html" class="external-link">posterior_interval</a></span><span class="op">(</span><span class="va">mod</span>, variable <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"ar1_trend"</span>, <span class="st">"sigma_trend"</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>                   prob <span class="op">=</span> <span class="fl">0.9</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>                              5%       95%</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> ar1_trend[series_1]   0.3159997 0.7854880</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> sigma_trend[series_1] 0.3562363 0.6006447</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ar1_trend[series_1]   0.3124826 0.7833867</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sigma_trend[series_1] 0.3536349 0.5918526</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Next: summary() reports these with convergence diagnostics</span></span></span>
 <span class="r-in"><span><span class="co"># }</span></span></span>

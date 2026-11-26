@@ -46,7 +46,7 @@ set_coef(). Their output leaves every result unchanged."><meta property="og:imag
 <div class="row">
   <main id="main" class="col-md-9"><div class="page-header">
       <img src="../logo.png" class="logo" alt=""><h1>marginaleffects methods for mvgam objects</h1>
-      <small class="dont-index">Source: <a href="https://github.com/nicholasjclark/mvgam/blob/feature/brms-integration/R/marginaleffects.mvgam.R" class="external-link"><code>R/marginaleffects.mvgam.R</code></a></small>
+      <small class="dont-index">Source: <a href="https://github.com/nicholasjclark/mvgam/blob/master/R/marginaleffects.mvgam.R" class="external-link"><code>R/marginaleffects.mvgam.R</code></a></small>
       <div class="d-none name"><code>mvgam_marginaleffects.Rd</code></div>
     </div>
 
@@ -130,14 +130,14 @@ Python. <em>Journal of Statistical Software</em>, 111(9):1-32.
 <span class="r-in"><span><span class="va">mod</span> <span class="op">&lt;-</span> <span class="fu"><a href="mvgam.html">mvgam</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="fu">s</span><span class="op">(</span><span class="va">x</span>, k <span class="op">=</span> <span class="fl">5</span><span class="op">)</span>, trend_formula <span class="op">=</span> <span class="op">~</span> <span class="fu"><a href="trend_constructors.html">AR</a></span><span class="op">(</span>p <span class="op">=</span> <span class="fl">1</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>             data <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span>, family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>             chains <span class="op">=</span> <span class="fl">2</span>, seed <span class="op">=</span> <span class="fl">2</span>, silent <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 11 of 2000 (1.0%) transitions ended with a divergence.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 27 of 2000 (1.0%) transitions ended with a divergence.</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> See https://mc-stan.org/misc/warnings for details.</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Average change in the expected count per unit of x</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/pkg/marginaleffects/man/slopes.html" class="external-link">avg_slopes</a></span><span class="op">(</span><span class="va">mod</span>, variables <span class="op">=</span> <span class="st">"x"</span>, type <span class="op">=</span> <span class="st">"expected"</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  Estimate 2.5 % 97.5 %</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>      4.19   2.5   7.17</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>       4.1     2   7.58</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Term: x</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Type: expected</span>
@@ -150,7 +150,7 @@ Python. <em>Journal of Statistical Software</em>, 111(9):1-32.
 <span class="r-wrn co"><span class="r-pr">#&gt;</span> <span class="warning">Warning: </span>These arguments are not known to be supported for models of class `mvgam`: process_error. All arguments are still passed to the model-specific prediction function, but users are encouraged to check if the argument is indeed supported by their modeling package. Please file a request on Github if you believe that an unknown argument should be added to the `marginaleffects` white list of known arguments, in order to avoid raising this warning: https://github.com/vincentarelbundock/marginaleffects/issues</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  Estimate 2.5 % 97.5 %</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>       4.6  2.77   8.51</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>      4.69  2.25   9.68</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Term: x</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Type: expected</span>

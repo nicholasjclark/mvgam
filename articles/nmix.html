@@ -68,7 +68,7 @@ Clark</h4>
             
             <h4 data-toc-skip class="date">2026-11-26</h4>
       
-      <small class="dont-index">Source: <a href="https://github.com/nicholasjclark/mvgam/blob/feature/brms-integration/vignettes/articles/nmix.Rmd" class="external-link"><code>vignettes/articles/nmix.Rmd</code></a></small>
+      <small class="dont-index">Source: <a href="https://github.com/nicholasjclark/mvgam/blob/master/vignettes/articles/nmix.Rmd" class="external-link"><code>vignettes/articles/nmix.Rmd</code></a></small>
       <div class="d-none name"><code>nmix.Rmd</code></div>
     </div>
 
@@ -240,46 +240,46 @@ state:</p>
 <span><span class="co">#&gt; == Observation Model ==</span></span>
 <span><span class="co">#&gt; Regression Coefficients:</span></span>
 <span><span class="co">#&gt;              Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS</span></span>
-<span><span class="co">#&gt; Intercept        3.52      0.15     3.26     3.81 1.00     1678     1860</span></span>
-<span><span class="co">#&gt; p_Intercept      0.55      0.24     0.09     1.00 1.00     1899     2180</span></span>
-<span><span class="co">#&gt; seriessp_2      -0.92      0.21    -1.35    -0.51 1.00     1783     1832</span></span>
-<span><span class="co">#&gt; seriessp_3      -0.39      0.26    -0.92     0.10 1.00     2085     1849</span></span>
-<span><span class="co">#&gt; seriessp_4      -1.16      0.24    -1.61    -0.63 1.00     1388     1801</span></span>
-<span><span class="co">#&gt; p_seriessp_2     0.42      0.27    -0.11     0.92 1.00     2986     2437</span></span>
-<span><span class="co">#&gt; p_seriessp_3    -0.98      0.28    -1.51    -0.42 1.00     2421     2216</span></span>
-<span><span class="co">#&gt; p_seriessp_4    -0.09      0.34    -0.81     0.53 1.00     1674     1902</span></span>
-<span><span class="co">#&gt; p_wind          -1.37      0.12    -1.61    -1.15 1.00     2229     2844</span></span>
+<span><span class="co">#&gt; Intercept        3.53      0.15     3.26     3.84 1.00     1541     1690</span></span>
+<span><span class="co">#&gt; p_Intercept      0.54      0.24     0.08     1.00 1.00     2513     2664</span></span>
+<span><span class="co">#&gt; seriessp_2      -0.92      0.24    -1.37    -0.45 1.00     1130     1121</span></span>
+<span><span class="co">#&gt; seriessp_3      -0.40      0.26    -0.90     0.07 1.00     1755     2096</span></span>
+<span><span class="co">#&gt; seriessp_4      -1.17      0.25    -1.63    -0.68 1.01     1537     1985</span></span>
+<span><span class="co">#&gt; p_seriessp_2     0.42      0.28    -0.13     0.95 1.00     2584     2782</span></span>
+<span><span class="co">#&gt; p_seriessp_3    -0.98      0.29    -1.52    -0.39 1.00     2439     2348</span></span>
+<span><span class="co">#&gt; p_seriessp_4    -0.09      0.34    -0.80     0.52 1.00     2364     2717</span></span>
+<span><span class="co">#&gt; p_wind          -1.37      0.12    -1.62    -1.14 1.00     2962     2871</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; == Trend Model ==</span></span>
 <span><span class="co">#&gt; Smoothing Spline Hyperparameters:</span></span>
 <span><span class="co">#&gt;                        Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS</span></span>
-<span><span class="co">#&gt; sds(stempseriessp_1_1)     1.47      1.20     0.06     4.73 1.00      707</span></span>
-<span><span class="co">#&gt; sds(stempseriessp_2_1)     3.94      1.77     1.60     8.64 1.00     1262</span></span>
-<span><span class="co">#&gt; sds(stempseriessp_3_1)     1.06      1.06     0.04     3.89 1.00     1010</span></span>
-<span><span class="co">#&gt; sds(stempseriessp_4_1)     1.21      1.11     0.05     4.19 1.00     1613</span></span>
+<span><span class="co">#&gt; sds(stempseriessp_1_1)     1.43      1.26     0.05     4.55 1.01      907</span></span>
+<span><span class="co">#&gt; sds(stempseriessp_2_1)     3.95      1.74     1.74     8.51 1.00     2404</span></span>
+<span><span class="co">#&gt; sds(stempseriessp_3_1)     1.02      1.03     0.02     3.89 1.00     1546</span></span>
+<span><span class="co">#&gt; sds(stempseriessp_4_1)     1.21      1.06     0.05     3.93 1.00     1477</span></span>
 <span><span class="co">#&gt;                        Tail_ESS</span></span>
-<span><span class="co">#&gt; sds(stempseriessp_1_1)      568</span></span>
-<span><span class="co">#&gt; sds(stempseriessp_2_1)      733</span></span>
-<span><span class="co">#&gt; sds(stempseriessp_3_1)      548</span></span>
-<span><span class="co">#&gt; sds(stempseriessp_4_1)     1633</span></span>
+<span><span class="co">#&gt; sds(stempseriessp_1_1)      604</span></span>
+<span><span class="co">#&gt; sds(stempseriessp_2_1)     3029</span></span>
+<span><span class="co">#&gt; sds(stempseriessp_3_1)     1684</span></span>
+<span><span class="co">#&gt; sds(stempseriessp_4_1)     1150</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Regression Coefficients:</span></span>
 <span><span class="co">#&gt;                    Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS</span></span>
-<span><span class="co">#&gt; stemp:seriessp_1_1     1.55      1.91    -2.80     4.56 1.00      702      446</span></span>
-<span><span class="co">#&gt; stemp:seriessp_2_1     2.22      3.00    -3.67     8.09 1.00     2338     2499</span></span>
-<span><span class="co">#&gt; stemp:seriessp_3_1    -3.11      1.66    -6.73     0.19 1.01      964      512</span></span>
-<span><span class="co">#&gt; stemp:seriessp_4_1    -1.13      1.59    -4.04     2.37 1.00     1879     1588</span></span>
+<span><span class="co">#&gt; stemp:seriessp_1_1     1.59      1.89    -2.87     4.44 1.01      857      596</span></span>
+<span><span class="co">#&gt; stemp:seriessp_2_1     2.05      3.00    -3.82     7.81 1.00     1598     2227</span></span>
+<span><span class="co">#&gt; stemp:seriessp_3_1    -2.99      1.53    -6.09     0.40 1.00     1529     1199</span></span>
+<span><span class="co">#&gt; stemp:seriessp_4_1    -1.11      1.66    -4.16     2.70 1.00     2026     2238</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Trend Specific Parameters:</span></span>
 <span><span class="co">#&gt;                   Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS</span></span>
-<span><span class="co">#&gt; sigma_trend[sp_1]     0.22      0.07     0.11     0.38 1.00     1768     2594</span></span>
-<span><span class="co">#&gt; sigma_trend[sp_2]     0.24      0.08     0.12     0.42 1.00     2070     1713</span></span>
-<span><span class="co">#&gt; sigma_trend[sp_3]     0.26      0.08     0.13     0.45 1.00     1634     1139</span></span>
-<span><span class="co">#&gt; sigma_trend[sp_4]     0.23      0.08     0.12     0.43 1.00     2495     1523</span></span>
-<span><span class="co">#&gt; ar1_trend[sp_1]       0.05      0.37    -0.63     0.78 1.00     1616     1601</span></span>
-<span><span class="co">#&gt; ar1_trend[sp_2]       0.19      0.38    -0.56     0.85 1.00     1173      709</span></span>
-<span><span class="co">#&gt; ar1_trend[sp_3]       0.17      0.35    -0.52     0.85 1.00     1154      853</span></span>
-<span><span class="co">#&gt; ar1_trend[sp_4]       0.06      0.35    -0.62     0.72 1.00     2530     2186</span></span>
+<span><span class="co">#&gt; sigma_trend[sp_1]     0.22      0.07     0.11     0.37 1.00     1785     2664</span></span>
+<span><span class="co">#&gt; sigma_trend[sp_2]     0.24      0.08     0.12     0.43 1.00     1640      749</span></span>
+<span><span class="co">#&gt; sigma_trend[sp_3]     0.26      0.08     0.13     0.45 1.00     1783     1517</span></span>
+<span><span class="co">#&gt; sigma_trend[sp_4]     0.23      0.08     0.12     0.42 1.00     2857     2355</span></span>
+<span><span class="co">#&gt; ar1_trend[sp_1]       0.05      0.37    -0.62     0.79 1.00     1511     1748</span></span>
+<span><span class="co">#&gt; ar1_trend[sp_2]       0.19      0.39    -0.56     0.90 1.00     1354      992</span></span>
+<span><span class="co">#&gt; ar1_trend[sp_3]       0.20      0.35    -0.50     0.84 1.00     1666     1833</span></span>
+<span><span class="co">#&gt; ar1_trend[sp_4]       0.06      0.36    -0.64     0.77 1.00     2075      933</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Draws were sampled using sampling(NUTS). For each parameter, Bulk_ESS</span></span>
 <span><span class="co">#&gt; and Tail_ESS are effective sample size measures, and Rhat is the potential</span></span>
@@ -292,7 +292,7 @@ state:</p>
 <span><span class="co">#&gt;   - `lfo_cv(fit)`: leave-future-out model comparison</span></span>
 <span><span class="co">#&gt;   - `conditional_effects(fit)`: covariate effects</span></span>
 <span><span class="co">#&gt; Use `how_to_cite(fit)` for a methods paragraph and `methods_md(fit)` for its equations.</span></span></code></pre></div>
-<p>The wind coefficient <code>p_wind</code> is -1.37 [-1.61, -1.15] on
+<p>The wind coefficient <code>p_wind</code> is -1.37 [-1.62, -1.14] on
 the logit scale, against the simulated value of
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>−</mi><mn>1.5</mn></mrow><annotation encoding="application/x-tex">-1.5</annotation></semantics></math>.</p>
 </div>
@@ -395,9 +395,9 @@ calculation on counts replicated from the posterior:</p>
 <span><span class="co">#&gt;   Statistic:        chi-squared</span></span>
 <span><span class="co">#&gt;   Aggregation:      closure unit</span></span>
 <span><span class="co">#&gt;   Posterior draws:  500</span></span>
-<span><span class="co">#&gt;   Bayesian p-value: 0.644</span></span></code></pre></div>
+<span><span class="co">#&gt;   Bayesian p-value: 0.562</span></span></code></pre></div>
 <p>A Bayesian p-value near 0 would mean the replicates rarely reach the
-discrepancy of the observed counts. The value here, 0.64, gives no sign
+discrepancy of the observed counts. The value here, 0.56, gives no sign
 of lack of fit. <code><a href="../reference/latent_N_saturation.html">latent_N_saturation()</a></code> reports the posterior
 probability that
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>N</mi><annotation encoding="application/x-tex">N</annotation></semantics></math>
@@ -405,9 +405,9 @@ reaches the cap in each unit:</p>
 <div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">sat</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/latent_N_saturation.html">latent_N_saturation</a></span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/Extremes.html" class="external-link">max</a></span><span class="op">(</span><span class="va">sat</span><span class="op">$</span><span class="va">p_saturated</span><span class="op">)</span></span>
-<span><span class="co">#&gt; [1] 0.032</span></span></code></pre></div>
+<span><span class="co">#&gt; [1] 0.026</span></span></code></pre></div>
 <p>The largest probability any unit gives to reaching the cap of 80 is
-0.032.</p>
+0.026.</p>
 </div>
 <div class="section level2">
 <h2 id="other-observation-processes">Other observation processes<a class="anchor" aria-label="anchor" href="#other-observation-processes"></a>

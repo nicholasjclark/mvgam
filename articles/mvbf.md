@@ -152,7 +152,7 @@ intervals.](mvbf_files/figure-html/effects-1.png)
 Expected biomass by month and camera detection probability by deployment
 days, with 95% credible intervals.
 
-The fitted biomass curve peaks in month 10. The deployment slope is 0.08
+The fitted biomass curve peaks in month 3. The deployment slope is 0.08
 \[-0.04, 0.21\] on the logit scale, against the 0.05 used to simulate
 the data.
 
@@ -209,14 +209,14 @@ recovery <- t(vapply(fits, function(fit) {
 }, numeric(2)))
 round(recovery, 2)
 #>               RMSE Interval width
-#> Joint         0.26           1.25
+#> Joint         0.26           1.24
 #> Counts alone  0.33           1.34
-#> Biomass alone 0.45           1.74
+#> Biomass alone 0.41           1.77
 #> Camera alone  0.56           4.39
 ```
 
 Ordered by root mean squared error against the simulated state, the fits
-rank joint (0.26), counts alone (0.33), biomass alone (0.45), and camera
+rank joint (0.26), counts alone (0.33), biomass alone (0.41), and camera
 alone (0.56). Intervals are narrowest in the joint fit and widest in the
 camera alone fit. A single binary record per month constrains abundance
 weakly.

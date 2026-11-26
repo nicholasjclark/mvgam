@@ -68,7 +68,7 @@ Clark</h4>
             
             <h4 data-toc-skip class="date">2026-11-26</h4>
       
-      <small class="dont-index">Source: <a href="https://github.com/nicholasjclark/mvgam/blob/feature/brms-integration/vignettes/articles/idm.Rmd" class="external-link"><code>vignettes/articles/idm.Rmd</code></a></small>
+      <small class="dont-index">Source: <a href="https://github.com/nicholasjclark/mvgam/blob/master/vignettes/articles/idm.Rmd" class="external-link"><code>vignettes/articles/idm.Rmd</code></a></small>
       <div class="d-none name"><code>idm.Rmd</code></div>
     </div>
 
@@ -239,28 +239,28 @@ observations of each data source:</p>
 <span><span class="co">#&gt; == Observation Model ==</span></span>
 <span><span class="co">#&gt; Regression Coefficients:</span></span>
 <span><span class="co">#&gt;                 Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS</span></span>
-<span><span class="co">#&gt; count_Intercept     1.03      0.14     0.75     1.29 1.00     4804     2963</span></span>
-<span><span class="co">#&gt; pa_Intercept       -0.23      0.15    -0.53     0.04 1.00     6576     2665</span></span>
-<span><span class="co">#&gt; po_Intercept        0.33      0.10     0.11     0.53 1.00     4059     2815</span></span>
+<span><span class="co">#&gt; count_Intercept     1.03      0.14     0.75     1.30 1.00     3238     2497</span></span>
+<span><span class="co">#&gt; pa_Intercept       -0.23      0.15    -0.55     0.07 1.00     3562     2607</span></span>
+<span><span class="co">#&gt; po_Intercept        0.33      0.10     0.12     0.52 1.00     2565     1997</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; == Trend Model ==</span></span>
 <span><span class="co">#&gt; Smoothing Spline Hyperparameters:</span></span>
 <span><span class="co">#&gt;             Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS</span></span>
-<span><span class="co">#&gt; sds(senv_1)     2.01      1.10     0.53     4.69 1.00     2230     2659</span></span>
+<span><span class="co">#&gt; sds(senv_1)     1.98      1.15     0.45     4.91 1.00     1434     1491</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Regression Coefficients:</span></span>
 <span><span class="co">#&gt;        Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS</span></span>
-<span><span class="co">#&gt; senv_1    -0.77      3.46    -8.42     5.26 1.00     2339     1224</span></span>
+<span><span class="co">#&gt; senv_1    -0.81      3.52    -9.17     5.17 1.00     1469     1588</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Trend Specific Parameters:</span></span>
 <span><span class="co">#&gt;                       Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS</span></span>
-<span><span class="co">#&gt; sigma_trend[species1]     0.34      0.09     0.17     0.53 1.00     1532</span></span>
-<span><span class="co">#&gt; ar1_trend[species1]       0.13      0.25    -0.36     0.60 1.00     2066</span></span>
-<span><span class="co">#&gt; ar12_trend[species1]     -0.10      0.30    -0.67     0.48 1.00     1718</span></span>
+<span><span class="co">#&gt; sigma_trend[species1]     0.34      0.09     0.17     0.54 1.00     1294</span></span>
+<span><span class="co">#&gt; ar1_trend[species1]       0.12      0.24    -0.38     0.57 1.00     1417</span></span>
+<span><span class="co">#&gt; ar12_trend[species1]     -0.10      0.30    -0.67     0.46 1.00     1050</span></span>
 <span><span class="co">#&gt;                       Tail_ESS</span></span>
-<span><span class="co">#&gt; sigma_trend[species1]     1612</span></span>
-<span><span class="co">#&gt; ar1_trend[species1]       2297</span></span>
-<span><span class="co">#&gt; ar12_trend[species1]      2551</span></span>
+<span><span class="co">#&gt; sigma_trend[species1]     2131</span></span>
+<span><span class="co">#&gt; ar1_trend[species1]       2084</span></span>
+<span><span class="co">#&gt; ar12_trend[species1]      1557</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Draws were sampled using sampling(NUTS). For each parameter, Bulk_ESS</span></span>
 <span><span class="co">#&gt; and Tail_ESS are effective sample size measures, and Rhat is the potential</span></span>
@@ -293,8 +293,8 @@ intervals:</p>
 <span><span class="va">constants</span></span>
 <span><span class="co">#&gt; Hypothesis Tests for class :</span></span>
 <span><span class="co">#&gt;     Hypothesis Estimate Est.Error CI.Lower CI.Upper Evid.Ratio Post.Prob Star</span></span>
-<span><span class="co">#&gt; 1     log area    -1.26      0.19    -1.63    -0.88         NA        NA    *</span></span>
-<span><span class="co">#&gt; 2 log thinning    -0.70      0.15    -1.01    -0.40         NA        NA    *</span></span>
+<span><span class="co">#&gt; 1     log area    -1.26      0.20    -1.64    -0.88         NA        NA    *</span></span>
+<span><span class="co">#&gt; 2 log thinning    -0.69      0.16    -1.01    -0.38         NA        NA    *</span></span>
 <span><span class="co">#&gt; ---</span></span>
 <span><span class="co">#&gt; 'CI': 90%-CI for one-sided and 95%-CI for two-sided hypotheses.</span></span>
 <span><span class="co">#&gt; '*': For one-sided hypotheses, the posterior probability exceeds 95%;</span></span>
@@ -384,7 +384,7 @@ model.
 <p>After month 24, the counts-alone model has no data on abundance. Its
 estimates come only from the autoregression and the environmental index.
 Its intervals grow wider over time. Across the 72 unsurveyed months, its
-95% intervals have a median width of 16.1 individuals. The joint model
+95% intervals have a median width of 13.9 individuals. The joint model
 still has sightings and occupancy records in those months. Its intervals
 have a median width of 4.8 individuals.</p>
 <p>The extra data also sharpen the estimated response to env. To compare

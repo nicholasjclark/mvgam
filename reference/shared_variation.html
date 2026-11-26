@@ -46,7 +46,7 @@ covariance between pairs of series."><meta property="og:image" content="https://
 <div class="row">
   <main id="main" class="col-md-9"><div class="page-header">
       <img src="../logo.png" class="logo" alt=""><h1>Posterior summary of the factor-implied shared variation matrix</h1>
-      <small class="dont-index">Source: <a href="https://github.com/nicholasjclark/mvgam/blob/feature/brms-integration/R/shared_variation.R" class="external-link"><code>R/shared_variation.R</code></a></small>
+      <small class="dont-index">Source: <a href="https://github.com/nicholasjclark/mvgam/blob/master/R/shared_variation.R" class="external-link"><code>R/shared_variation.R</code></a></small>
       <div class="d-none name"><code>shared_variation.Rd</code></div>
     </div>
 
@@ -201,6 +201,8 @@ interprets both for a community of species.</p>
 <span class="r-in"><span>  chains         <span class="op">=</span> <span class="fl">2</span>,</span></span>
 <span class="r-in"><span>  silent         <span class="op">=</span> <span class="fl">2</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 2 of 2000 (0.0%) transitions ended with a divergence.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> See https://mc-stan.org/misc/warnings for details.</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># The species-by-species covariance the two factors induce</span></span></span>
 <span class="r-in"><span><span class="va">sv</span> <span class="op">&lt;-</span> <span class="fu">shared_variation</span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span></span>
@@ -211,12 +213,12 @@ interprets both for a community of species.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Diagonal (captured variance per series):</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>      Estimate  Q2.5 Q97.5</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> sp_1    1.476 0.022 6.409</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> sp_2    2.387 0.121 8.210</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> sp_3    1.369 0.036 6.063</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> sp_4    2.052 0.052 8.125</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> sp_5    2.954 0.177 9.148</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> sp_6    1.702 0.039 6.539</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sp_1    1.641 0.030 6.800</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sp_2    2.329 0.070 8.256</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sp_3    1.377 0.033 5.811</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sp_4    1.931 0.046 7.625</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sp_5    2.932 0.146 9.444</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sp_6    1.815 0.042 6.798</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> plot() draws the full matrix as a heatmap.</span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">sv</span><span class="op">)</span></span></span>

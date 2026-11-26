@@ -42,7 +42,7 @@ such as temperature raising one species and lowering another."><meta property="o
 <div class="row">
   <main id="main" class="col-md-9"><div class="page-header">
       <img src="../logo.png" class="logo" alt=""><h1>Vary a trend effect along the trend's axis</h1>
-      <small class="dont-index">Source: <a href="https://github.com/nicholasjclark/mvgam/blob/feature/brms-integration/R/lv_axis.R" class="external-link"><code>R/lv_axis.R</code></a></small>
+      <small class="dont-index">Source: <a href="https://github.com/nicholasjclark/mvgam/blob/master/R/lv_axis.R" class="external-link"><code>R/lv_axis.R</code></a></small>
       <div class="d-none name"><code>lv_axis.Rd</code></div>
     </div>
 
@@ -148,8 +148,6 @@ per-factor trait and covariate effects.</p>
 <span class="r-in"><span>  chains        <span class="op">=</span> <span class="fl">2</span>,</span></span>
 <span class="r-in"><span>  silent        <span class="op">=</span> <span class="fl">2</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 7 of 2000 (0.0%) transitions ended with a divergence.</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> See https://mc-stan.org/misc/warnings for details.</span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  Family: beta </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   Links: mu = logit; phi = log </span>
@@ -163,38 +161,38 @@ per-factor trait and covariate effects.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> == Observation Model ==</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Regression Coefficients:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>           Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Intercept     0.22      0.21    -0.30     0.59 1.00      553      352</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Intercept     0.23      0.20    -0.23     0.59 1.00      607      419</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Further Distributional Parameters:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>     Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> phi     3.23      0.52     2.33     4.38 1.00      721     1184</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> phi     3.22      0.54     2.33     4.45 1.00      667      991</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> == Trend Model ==</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Regression Coefficients:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>                       Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> season:seriesseries_1     0.90      0.24     0.42     1.37 1.00     2019</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> season:seriesseries_2     0.44      0.28    -0.13     0.99 1.00     1262</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> season:seriesseries_3    -0.76      0.28    -1.33    -0.21 1.01      580</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> season:seriesseries_1     0.90      0.25     0.42     1.40 1.00     1961</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> season:seriesseries_2     0.45      0.28    -0.09     1.01 1.00     1612</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> season:seriesseries_3    -0.77      0.28    -1.33    -0.20 1.00     1466</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>                       Tail_ESS</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> season:seriesseries_1     1702</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> season:seriesseries_2     1141</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> season:seriesseries_3      503</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> season:seriesseries_1     1293</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> season:seriesseries_2     1357</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> season:seriesseries_3      976</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Trend Specific Parameters:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>                       Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> sigma_trend[series_1]     0.45      0.19     0.16     0.88 1.00      686</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> sigma_trend[series_2]     0.45      0.17     0.21     0.87 1.00      725</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> sigma_trend[series_3]     0.42      0.14     0.21     0.78 1.00      724</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> ar1_trend[series_1]       0.03      0.46    -0.78     0.91 1.00      395</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> ar1_trend[series_2]       0.84      0.17     0.41     0.99 1.01      206</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> ar1_trend[series_3]       0.90      0.10     0.64     0.99 1.00      787</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sigma_trend[series_1]     0.45      0.20     0.16     0.91 1.00      502</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sigma_trend[series_2]     0.46      0.17     0.22     0.87 1.00      834</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sigma_trend[series_3]     0.42      0.14     0.21     0.76 1.00      787</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ar1_trend[series_1]       0.01      0.44    -0.77     0.88 1.00      447</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ar1_trend[series_2]       0.83      0.17     0.36     0.98 1.00      549</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ar1_trend[series_3]       0.90      0.08     0.68     0.99 1.00      963</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>                       Tail_ESS</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> sigma_trend[series_1]     1109</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> sigma_trend[series_2]      994</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> sigma_trend[series_3]     1073</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> ar1_trend[series_1]        422</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> ar1_trend[series_2]         91</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> ar1_trend[series_3]        898</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sigma_trend[series_1]     1266</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sigma_trend[series_2]     1215</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sigma_trend[series_3]     1283</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ar1_trend[series_1]        328</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ar1_trend[series_2]        628</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ar1_trend[series_3]       1148</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Draws were sampled using sampling(NUTS). For each parameter, Bulk_ESS</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> and Tail_ESS are effective sample size measures, and Rhat is the potential</span>

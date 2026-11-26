@@ -24,7 +24,7 @@
 ## Citation
 
 Source:
-[`inst/CITATION`](https://github.com/nicholasjclark/mvgam/blob/feature/brms-integration/inst/CITATION)
+[`inst/CITATION`](https://github.com/nicholasjclark/mvgam/blob/master/inst/CITATION)
 
 Clark & Wells (2023). Dynamic Generalized Additive Models (DGAMs) for
 forecasting discrete ecological time series. Methods in Ecology and

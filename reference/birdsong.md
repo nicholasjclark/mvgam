@@ -93,7 +93,7 @@ mod <- mvgam(
   family = poisson(),
   chains = 2, silent = 2
 )
-#> Warning: 7 of 2000 (0.0%) transitions ended with a divergence.
+#> Warning: 6 of 2000 (0.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 summary(mod)
 #>  Family: poisson 
@@ -108,36 +108,36 @@ summary(mod)
 #> == Observation Model ==
 #> Smoothing Spline Hyperparameters:
 #>                      Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS
-#> sds(sweek_in_year_1)     0.50      0.21     0.22     1.03 1.00      331
-#> sds(sspecies_1)          0.54      0.32     0.17     1.42 1.00      599
+#> sds(sweek_in_year_1)     0.55      0.24     0.25     1.15 1.01      234
+#> sds(sspecies_1)          0.54      0.34     0.18     1.50 1.00      536
 #>                      Tail_ESS
-#> sds(sweek_in_year_1)      367
-#> sds(sspecies_1)           792
+#> sds(sweek_in_year_1)      321
+#> sds(sspecies_1)           696
 #> 
 #> Regression Coefficients:
 #>           Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> Intercept     1.41      0.28     0.78     1.96 1.00      581      675
+#> Intercept     1.46      0.29     0.90     2.16 1.00      436      533
 #> 
 #> == Trend Model ==
 #> Trend Specific Parameters:
 #>                      Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS
-#> sigma_trend[warbler]     0.32      0.06     0.22     0.44 1.00      875
-#> sigma_trend[thrush]      0.43      0.09     0.26     0.62 1.00      890
-#> sigma_trend[wren]        0.38      0.06     0.26     0.51 1.00     1058
-#> sigma_trend[finch]       0.33      0.06     0.21     0.47 1.00      930
-#> ar1_trend[warbler]       0.60      0.12     0.34     0.80 1.00      752
-#> ar1_trend[thrush]        0.42      0.23    -0.06     0.81 1.01      479
-#> ar1_trend[wren]          0.50      0.14     0.19     0.76 1.00      857
-#> ar1_trend[finch]         0.47      0.21    -0.01     0.80 1.00      722
+#> sigma_trend[warbler]     0.32      0.05     0.22     0.44 1.00      780
+#> sigma_trend[thrush]      0.43      0.09     0.26     0.63 1.00      602
+#> sigma_trend[wren]        0.38      0.06     0.27     0.51 1.00      812
+#> sigma_trend[finch]       0.32      0.06     0.21     0.45 1.00      990
+#> ar1_trend[warbler]       0.59      0.12     0.34     0.80 1.00      592
+#> ar1_trend[thrush]        0.38      0.23    -0.10     0.78 1.00      454
+#> ar1_trend[wren]          0.50      0.15     0.17     0.75 1.00      470
+#> ar1_trend[finch]         0.46      0.22    -0.03     0.81 1.00      555
 #>                      Tail_ESS
-#> sigma_trend[warbler]     1150
-#> sigma_trend[thrush]       898
-#> sigma_trend[wren]        1307
-#> sigma_trend[finch]       1107
-#> ar1_trend[warbler]       1008
-#> ar1_trend[thrush]         600
-#> ar1_trend[wren]          1043
-#> ar1_trend[finch]         1150
+#> sigma_trend[warbler]     1177
+#> sigma_trend[thrush]       784
+#> sigma_trend[wren]        1263
+#> sigma_trend[finch]       1230
+#> ar1_trend[warbler]        775
+#> ar1_trend[thrush]         776
+#> ar1_trend[wren]           722
+#> ar1_trend[finch]          798
 #> 
 #> Draws were sampled using sampling(NUTS). For each parameter, Bulk_ESS
 #> and Tail_ESS are effective sample size measures, and Rhat is the potential

@@ -40,7 +40,7 @@ same list and fits the same models."><meta property="og:image" content="https://
 <div class="row">
   <main id="main" class="col-md-9"><div class="page-header">
       <img src="../logo.png" class="logo" alt=""><h1>Fit mvgam models to multiply imputed datasets</h1>
-      <small class="dont-index">Source: <a href="https://github.com/nicholasjclark/mvgam/blob/feature/brms-integration/R/mvgam_core.R" class="external-link"><code>R/mvgam_core.R</code></a></small>
+      <small class="dont-index">Source: <a href="https://github.com/nicholasjclark/mvgam/blob/master/R/mvgam_core.R" class="external-link"><code>R/mvgam_core.R</code></a></small>
       <div class="d-none name"><code>mvgam_multiple.Rd</code></div>
     </div>
 
@@ -163,8 +163,6 @@ imputation fits. It also tabulates the convergence of each fit.</p>
 <span class="r-in"><span>  chains <span class="op">=</span> <span class="fl">2</span>,</span></span>
 <span class="r-in"><span>  silent <span class="op">=</span> <span class="fl">2</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 2 of 2000 (0.0%) transitions ended with a divergence.</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> See https://mc-stan.org/misc/warnings for details.</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># The summary adds the convergence of each imputation fit</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">fit_pooled</span><span class="op">)</span></span></span>
@@ -179,17 +177,17 @@ imputation fits. It also tabulates the convergence of each fit.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> == Observation Model ==</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Regression Coefficients:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>           Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Intercept     1.66      0.16     1.35     1.96 1.01     2019     2344</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> x             0.36      0.14     0.08     0.63 1.00     2115     3302</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Intercept     1.68      0.19     1.29     2.05 1.00     2219     2704</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> x             0.31      0.13     0.06     0.56 1.00     2404     3075</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> == Trend Model ==</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Trend Specific Parameters:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>                       Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> sigma_trend[series_1]     0.64      0.12     0.43     0.90 1.00     1856</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> ar1_trend[series_1]       0.16      0.22    -0.29     0.58 1.00     1292</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sigma_trend[series_1]     0.71      0.12     0.51     0.97 1.00     1993</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ar1_trend[series_1]       0.32      0.18    -0.05     0.67 1.01     1492</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>                       Tail_ESS</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> sigma_trend[series_1]     2648</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> ar1_trend[series_1]       2126</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sigma_trend[series_1]     3168</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ar1_trend[series_1]       2614</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Draws were sampled using sampling(NUTS). For each parameter, Bulk_ESS</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> and Tail_ESS are effective sample size measures, and Rhat is the potential</span>
@@ -205,9 +203,9 @@ imputation fits. It also tabulates the convergence of each fit.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Multiple imputation: 3 fits of 2000 draws each, pooled.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Rhat is each parameter's largest and each ESS its sum over the fits.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>    Imputation Max_Rhat Min_Bulk_ESS Min_Tail_ESS</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>             1    1.008          392          592</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>             2    1.010          464          586</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>             3    1.006          435          789</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>             1    1.006          460          736</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>             2    1.013          453          849</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>             3    1.005          580          810</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Next, `combine = FALSE` returns the three fits as a list</span></span></span>
 <span class="r-in"><span><span class="co"># }</span></span></span>

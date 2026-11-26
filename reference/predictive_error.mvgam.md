@@ -121,7 +121,7 @@ simdat <- sim_mvgam(family = poisson(), n_series = 1L,
 mod <- mvgam(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1),
              data = simdat$data_train, family = poisson(),
              chains = 2, silent = 2)
-#> Warning: 6 of 2000 (0.0%) transitions ended with a divergence.
+#> Warning: 8 of 2000 (0.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 
 # Observed minus predicted counts, one row per draw
@@ -133,9 +133,9 @@ dim(err)
 mae <- colMeans(abs(err))
 simdat$data_train[order(mae, decreasing = TRUE)[1:3], c("time", "y")]
 #>    time  y
+#> 84   84 23
 #> 89   89 28
 #> 71   71 30
-#> 65   65 26
 
 # Next: residuals(mod) returns randomised quantile residuals
 # }

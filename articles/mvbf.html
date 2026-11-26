@@ -68,7 +68,7 @@ Clark</h4>
             
             <h4 data-toc-skip class="date">2026-11-26</h4>
       
-      <small class="dont-index">Source: <a href="https://github.com/nicholasjclark/mvgam/blob/feature/brms-integration/vignettes/articles/mvbf.Rmd" class="external-link"><code>vignettes/articles/mvbf.Rmd</code></a></small>
+      <small class="dont-index">Source: <a href="https://github.com/nicholasjclark/mvgam/blob/master/vignettes/articles/mvbf.Rmd" class="external-link"><code>vignettes/articles/mvbf.Rmd</code></a></small>
       <div class="d-none name"><code>mvbf.Rmd</code></div>
     </div>
 
@@ -202,7 +202,7 @@ Expected biomass by month and camera detection probability by deployment
 days, with 95% credible intervals.
 </p>
 </div>
-<p>The fitted biomass curve peaks in month 10. The deployment slope is
+<p>The fitted biomass curve peaks in month 3. The deployment slope is
 0.08 [-0.04, 0.21] on the logit scale, against the 0.05 used to simulate
 the data.</p>
 </div>
@@ -251,12 +251,12 @@ state.
 <span><span class="op">}</span>, <span class="fu"><a href="https://rdrr.io/r/base/numeric.html" class="external-link">numeric</a></span><span class="op">(</span><span class="fl">2</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="va">recovery</span>, <span class="fl">2</span><span class="op">)</span></span>
 <span><span class="co">#&gt;               RMSE Interval width</span></span>
-<span><span class="co">#&gt; Joint         0.26           1.25</span></span>
+<span><span class="co">#&gt; Joint         0.26           1.24</span></span>
 <span><span class="co">#&gt; Counts alone  0.33           1.34</span></span>
-<span><span class="co">#&gt; Biomass alone 0.45           1.74</span></span>
+<span><span class="co">#&gt; Biomass alone 0.41           1.77</span></span>
 <span><span class="co">#&gt; Camera alone  0.56           4.39</span></span></code></pre></div>
 <p>Ordered by root mean squared error against the simulated state, the
-fits rank joint (0.26), counts alone (0.33), biomass alone (0.45), and
+fits rank joint (0.26), counts alone (0.33), biomass alone (0.41), and
 camera alone (0.56). Intervals are narrowest in the joint fit and widest
 in the camera alone fit. A single binary record per month constrains
 abundance weakly.</p>

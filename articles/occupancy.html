@@ -68,7 +68,7 @@ Clark</h4>
             
             <h4 data-toc-skip class="date">2026-11-26</h4>
       
-      <small class="dont-index">Source: <a href="https://github.com/nicholasjclark/mvgam/blob/feature/brms-integration/vignettes/articles/occupancy.Rmd" class="external-link"><code>vignettes/articles/occupancy.Rmd</code></a></small>
+      <small class="dont-index">Source: <a href="https://github.com/nicholasjclark/mvgam/blob/master/vignettes/articles/occupancy.Rmd" class="external-link"><code>vignettes/articles/occupancy.Rmd</code></a></small>
       <div class="d-none name"><code>occupancy.Rmd</code></div>
     </div>
 
@@ -290,23 +290,23 @@ process:</p>
 <span><span class="co">#&gt; == Observation Model ==</span></span>
 <span><span class="co">#&gt; Smoothing Spline Hyperparameters:</span></span>
 <span><span class="co">#&gt;                Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS</span></span>
-<span><span class="co">#&gt; sds(sforest_1)     2.17      1.90     0.08     6.98 1.01      632      552</span></span>
+<span><span class="co">#&gt; sds(sforest_1)     2.04      1.75     0.07     6.68 1.00     1337      908</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Regression Coefficients:</span></span>
 <span><span class="co">#&gt;             Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS</span></span>
-<span><span class="co">#&gt; Intercept      -0.42      0.28    -1.02     0.15 1.00     1110     1165</span></span>
-<span><span class="co">#&gt; p_Intercept     0.60      0.19     0.22     0.96 1.00     1596     2525</span></span>
-<span><span class="co">#&gt; p_rain         -1.95      0.32    -2.59    -1.32 1.00     1767     2029</span></span>
-<span><span class="co">#&gt; sforest_1       8.32      4.28    -3.46    14.67 1.02      196       53</span></span>
+<span><span class="co">#&gt; Intercept      -0.42      0.28    -0.99     0.09 1.00     1412     1312</span></span>
+<span><span class="co">#&gt; p_Intercept     0.60      0.19     0.22     0.96 1.00     4286     2731</span></span>
+<span><span class="co">#&gt; p_rain         -1.96      0.32    -2.61    -1.34 1.00     3839     2969</span></span>
+<span><span class="co">#&gt; sforest_1       8.86      3.62     0.38    14.92 1.00     1240      631</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; == Trend Model ==</span></span>
 <span><span class="co">#&gt; Trend Specific Parameters:</span></span>
 <span><span class="co">#&gt;                       Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS</span></span>
-<span><span class="co">#&gt; sigma_trend[species1]     0.37      0.17     0.14     0.81 1.02      299</span></span>
-<span><span class="co">#&gt; ar1_trend[species1]       0.09      0.41    -0.69     0.86 1.00     1101</span></span>
+<span><span class="co">#&gt; sigma_trend[species1]     0.38      0.17     0.14     0.78 1.00     1804</span></span>
+<span><span class="co">#&gt; ar1_trend[species1]       0.06      0.40    -0.71     0.81 1.00     1566</span></span>
 <span><span class="co">#&gt;                       Tail_ESS</span></span>
-<span><span class="co">#&gt; sigma_trend[species1]      138</span></span>
-<span><span class="co">#&gt; ar1_trend[species1]        660</span></span>
+<span><span class="co">#&gt; sigma_trend[species1]     1925</span></span>
+<span><span class="co">#&gt; ar1_trend[species1]       1378</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Draws were sampled using sampling(NUTS). For each parameter, Bulk_ESS</span></span>
 <span><span class="co">#&gt; and Tail_ESS are effective sample size measures, and Rhat is the potential</span></span>
@@ -320,7 +320,7 @@ process:</p>
 <span><span class="co">#&gt;   - `conditional_effects(fit)`: covariate effects</span></span>
 <span><span class="co">#&gt; Use `how_to_cite(fit)` for a methods paragraph and `methods_md(fit)` for its equations.</span></span></code></pre></div>
 <p>The estimated effect of rain on detection (<code>p_rain</code>) is
--1.95 [-2.59, -1.32] on the logit scale, which is close to the true
+-1.96 [-2.61, -1.34] on the logit scale, which is close to the true
 simulated value of
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>−</mi><mn>2</mn></mrow><annotation encoding="application/x-tex">-2</annotation></semantics></math>.</p>
 </div>
@@ -438,8 +438,8 @@ Expected proportion of sites occupied over the training seasons and the
 two held-out seasons. Points show the true proportion.
 </p>
 </div>
-<p>The forecast proportions of sites occupied are 0.45 [0.27, 0.60] and
-0.45 [0.26, 0.61] for the two held-out seasons, compared to true
+<p>The forecast proportions of sites occupied are 0.45 [0.27, 0.62] and
+0.44 [0.27, 0.62] for the two held-out seasons, compared to true
 proportions of 0.57 and 0.45. The forecast intervals are much wider than
 the hindcast intervals because no detections from these seasons enter
 the model. If we instead want forecasts of the detections themselves,
@@ -465,8 +465,8 @@ ones:</p>
 <span><span class="co">#&gt;   Statistic:        chi-squared</span></span>
 <span><span class="co">#&gt;   Aggregation:      closure unit</span></span>
 <span><span class="co">#&gt;   Posterior draws:  500</span></span>
-<span><span class="co">#&gt;   Bayesian p-value: 0.500</span></span></code></pre></div>
-<p>The value here, 0.50, gives no sign of lack of fit. We can also
+<span><span class="co">#&gt;   Bayesian p-value: 0.508</span></span></code></pre></div>
+<p>The value here, 0.51, gives no sign of lack of fit. We can also
 inspect randomised quantile residuals, which <code>mvgam</code> computes
 for each site in each season from its total detections:</p>
 <div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
