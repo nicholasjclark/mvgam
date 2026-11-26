@@ -29,6 +29,7 @@ mvgam now builds its models through 'brms'. The observation model takes the full
 * Checks of a model and its data before fitting or prediction: `mvgam_formula()`, `mvgam_data()`, `check_newdata()`
 * `methods_md()` writes a model description. `bibtex()` extracts the citation
 * Fits with 'cmdstanr' 1.0, which drops `cmdstan_model(compile = FALSE)`
+* `pp_check()` given a `group` draws the type's `_grouped` variant, one panel per group (#49)
 
 ## Changed defaults
 * The `posterior_*()` methods and `fitted()` default to `process_error = FALSE`, matching `predict()`

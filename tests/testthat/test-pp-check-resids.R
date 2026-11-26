@@ -92,3 +92,19 @@ test_that("a residual panel keeps its statistic as title under a series", {
   expect_identical(labelled$labels$title, "ACF")
   expect_identical(labelled$labels$subtitle, "Residuals for sp_2")
 })
+
+test_that("a group switches a check to its grouped variant", {
+  valid <- sub("^ppc_", "", bayesplot::available_ppc(""))
+  expect_identical(grouped_ppc_type("dens_overlay", valid),
+                   "dens_overlay_grouped")
+  expect_identical(grouped_ppc_type("rootogram", valid), "rootogram_grouped")
+  expect_identical(grouped_ppc_type("ribbon_grouped", valid), "ribbon_grouped")
+  expect_identical(grouped_ppc_type("fit_stat", valid, exempt = "fit_stat"),
+                   "fit_stat")
+  expect_identical(
+    grouped_ppc_type("resid_hist", c(valid, "resid_hist", "resid_hist_grouped")),
+    "resid_hist_grouped"
+  )
+  expect_error(grouped_ppc_type("loo_pit_qq", valid),
+               "draws a single panel", fixed = TRUE)
+})

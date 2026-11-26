@@ -94,8 +94,11 @@
 #' The \code{\link[bayesplot:PPC-overview]{PPC}} documentation of
 #' \pkg{bayesplot} describes each `ppc_*` type. A check restricted to
 #' one series or covariate slice takes `newdata` filtered to those
-#' rows. The `_grouped` types take `group = "series"` to draw one panel
-#' per series.
+#' rows. A `group`, such as `group = "series"`, draws one panel per
+#' group through the `_grouped` variant of the type, so
+#' `pp_check(fit, type = "dens_overlay", group = "series")` draws
+#' `"dens_overlay_grouped"`. A type without that variant refuses
+#' `group`.
 #'
 #' @section Multi-response families:
 #'   `diri()`, `multi()`, `categ()`, `mvn()` and `mvt()` record several
@@ -306,6 +309,11 @@ pp_check.mvgam <- function(
       i = paste0("Valid types: ",
                  paste0("'", sort(valid_types), "'", collapse = ", "), ".")
     )), call. = FALSE)
+  }
+
+  if (!is.null(group)) {
+    type <- grouped_ppc_type(type, valid_types,
+                             exempt = c("fit_stat", resid_diagnostic))
   }
 
   # The bayesplot kernel that draws this type. `fit_stat` and the
@@ -808,6 +816,36 @@ pp_check_mv_category <- function(object, newdata) {
   droplevels(series)
 }
 
+
+
+#' The type that draws a `group` as one panel per group
+#'
+#' A `group` from the caller needs a `_grouped` type. A type without
+#' that suffix switches to its `_grouped` variant. A type with no such
+#' variant is refused.
+#'
+#' @param type The resolved check type
+#' @param valid_types The types this prefix offers
+#' @param exempt Types that take `group` without the suffix
+#' @return The type to draw
+#' @noRd
+grouped_ppc_type <- function(type, valid_types, exempt = character(0L)) {
+  checkmate::assert_string(type)
+  checkmate::assert_character(valid_types)
+  if (endsWith(type, "_grouped") || type %in% exempt) {
+    return(type)
+  }
+  grouped_type <- paste0(type, "_grouped")
+  if (!grouped_type %in% valid_types) {
+    grouped_types <- sort(valid_types[endsWith(valid_types, "_grouped")])
+    stop(insight::format_error(c(
+      paste0("Type '", type, "' draws a single panel and ignores 'group'."),
+      i = paste0("Types with a panel per group: ",
+                 paste0("'", grouped_types, "'", collapse = ", "), ".")
+    )), call. = FALSE)
+  }
+  grouped_type
+}
 
 # Why `pp_check()` refuses a `group` or `x` that varies within a unit
 PP_CHECK_UNIT_REASON <- "A closure-unit check plots one value per unit."

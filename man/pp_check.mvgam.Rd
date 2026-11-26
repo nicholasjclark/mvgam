@@ -123,8 +123,11 @@ such a series.
 The \code{\link[bayesplot:PPC-overview]{PPC}} documentation of
 \pkg{bayesplot} describes each \verb{ppc_*} type. A check restricted to
 one series or covariate slice takes \code{newdata} filtered to those
-rows. The \verb{_grouped} types take \code{group = "series"} to draw one panel
-per series.
+rows. A \code{group}, such as \code{group = "series"}, draws one panel per
+group through the \verb{_grouped} variant of the type, so
+\code{pp_check(fit, type = "dens_overlay", group = "series")} draws
+\code{"dens_overlay_grouped"}. A type without that variant refuses
+\code{group}.
 }
 \section{Multi-response families}{
 

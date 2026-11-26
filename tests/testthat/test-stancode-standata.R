@@ -3708,7 +3708,10 @@ test_that("save_model refuses a directory that does not exist", {
               data = dat, family = poisson(),
               save_model = file.path(tempdir(), "no_such_dir", "m.stan"),
               validate = FALSE),
-    "not exist"
+    # The first line precedes the path, which can be long enough on
+    # Windows to wrap any later text
+    "Cannot write the Stan program to 'save_model'",
+    fixed = TRUE
   )
 })
 
