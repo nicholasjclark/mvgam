@@ -57,7 +57,7 @@ using: `devtools::install_github("nicholasjclark/mvgam")`. You will also
 need a working version of `Stan` installed (along with either `rstan`
 and/or `cmdstanr`). Please refer to installation links for `Stan` with
 `rstan` <a href="https://mc-stan.org/users/interfaces/rstan"
-target="_blank">here</a>, or for `Stan` with `cmdstandr`
+target="_blank">here</a>, or for `Stan` with `cmdstanr`
 <a href="https://mc-stan.org/cmdstanr/" target="_blank">here</a>.
 
 ## Cheatsheet
