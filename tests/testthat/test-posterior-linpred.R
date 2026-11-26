@@ -1202,3 +1202,18 @@ test_that("the prediction entry points share one new-level default", {
     expect_identical(eval(formals(fn)$sample_new_levels), "uncertainty")
   }
 })
+
+test_that("a mo() variable is held within its fitted range", {
+  fit <- structure(
+    list(formula = brms::bf(y ~ mo(time) + x),
+         data = data.frame(y = 1:5, time = 1:5, x = rnorm(5))),
+    class = "brmsfit"
+  )
+  expect_identical(mo_variables(fit$formula), "time")
+  newdata <- data.frame(time = c(0, 3, 6, 9, NA), x = c(-9, 0, 0, 0, 9))
+  out <- clamp_mo_values(newdata, fit)
+  expect_identical(out$time, c(1, 3, 5, 5, NA))
+  # Variables outside mo() keep their values
+  expect_identical(out$x, newdata$x)
+  expect_identical(clamp_mo_values(newdata[2L, ], fit), newdata[2L, ])
+})

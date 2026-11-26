@@ -212,6 +212,7 @@ prepare_linpred_data <- function(draws, brmsfit, newdata,
   # of `me(gr = )` may hold different measured values, as a grid sweeping
   # the variable does. The data holds each row's value. `me_value()`
   # places the rows on their levels.
+  filled <- clamp_mo_values(filled, brmsfit)
   per_row <- brmsfit
   per_row$formula <- ungroup_me_terms(brmsfit$formula)
   # The names of the rewritten terms' coefficients change with them.
@@ -489,6 +490,59 @@ fitted_row_index <- function(newdata, data, cols = names(data)) {
 #' @noRd
 unit_rows <- function(prep) {
   fitted_row_index(prep$units$new, prep$units$fitted)
+}
+
+
+#' The variables the `mo()` terms of a model take
+#'
+#' @param formula The model's `brmsformula`
+#' @return Character vector of variable names, possibly empty
+#' @noRd
+mo_variables <- function(formula) {
+  calls <- unlist(lapply(model_predictors(formula), function(p) {
+    sp <- p$pred[["sp"]]
+    if (!inherits(sp, "formula")) return(NULL)
+    find_calls(rlang::f_rhs(sp), "mo")
+  }))
+  unique(unlist(lapply(calls, function(cl) all.vars(str2lang(cl)[[2L]]))))
+}
+
+
+#' Hold each numeric `mo()` variable within its fitted range
+#'
+#' A monotonic effect has one step per unit from the smallest fitted
+#' value to the largest. brms refuses a value past either end, which
+#' stops `forecast()` on a `mo(time)` term. Beyond the fitted range the
+#' term keeps the effect of the nearest end, adding no step the data
+#' did not estimate. `inform_once()` reports the clamp. brms still
+#' checks the levels of an ordered factor.
+#'
+#' @param newdata The prediction data
+#' @param brmsfit The fitted component, whose data set the range
+#' @return `newdata`, with each such variable clamped to its range
+#' @noRd
+clamp_mo_values <- function(newdata, brmsfit) {
+  clamped <- character(0L)
+  for (v in intersect(mo_variables(brmsfit$formula), names(newdata))) {
+    fitted <- brmsfit$data[[v]]
+    x <- newdata[[v]]
+    if (!is.numeric(x) || !is.numeric(fitted)) next
+    limits <- range(fitted, na.rm = TRUE)
+    outside <- !is.na(x) & (x < limits[1L] | x > limits[2L])
+    if (any(outside)) {
+      newdata[[v]] <- pmin(pmax(x, limits[1L]), limits[2L])
+      clamped <- c(clamped, v)
+    }
+  }
+  if (length(clamped)) {
+    inform_once(c(
+      paste0("Beyond its fitted range, a 'mo()' term keeps the effect ",
+             "at the nearest end."),
+      i = paste0("Held within range: ",
+                 paste0("'", clamped, "'", collapse = ", "), ".")
+    ), id = "mvgam_mo_clamped")
+  }
+  newdata
 }
 
 

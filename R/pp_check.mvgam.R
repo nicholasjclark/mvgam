@@ -97,8 +97,10 @@
 #' rows. A `group`, such as `group = "series"`, draws one panel per
 #' group through the `_grouped` variant of the type, so
 #' `pp_check(fit, type = "dens_overlay", group = "series")` draws
-#' `"dens_overlay_grouped"`. A type without that variant refuses
-#' `group`.
+#' `"dens_overlay_grouped"`. `"fit_stat"` sums the units of each group.
+#' The single-series residual types (`"resid_qq"`, `"resid_vs_fitted"`,
+#' `"resid_acf"`, `"resid_pacf"`, `"resid_variogram"`) ignore `group`.
+#' Any other type without a grouped variant refuses it.
 #'
 #' @section Multi-response families:
 #'   `diri()`, `multi()`, `categ()`, `mvn()` and `mvt()` record several
@@ -830,8 +832,6 @@ pp_check_mv_category <- function(object, newdata) {
 #' @return The type to draw
 #' @noRd
 grouped_ppc_type <- function(type, valid_types, exempt = character(0L)) {
-  checkmate::assert_string(type)
-  checkmate::assert_character(valid_types)
   if (endsWith(type, "_grouped") || type %in% exempt) {
     return(type)
   }

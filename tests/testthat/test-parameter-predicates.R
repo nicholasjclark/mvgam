@@ -436,7 +436,8 @@ test_that("every family and loadings-prior parameter has a kind", {
              "theta_dist_phylo", "Psi_diag[1]")
   expect_true(all(mvgam_par_kind(prior) == "loadings_prior"))
   working <- c("varrho_inv[1]", "Z_cols[1,1]", "L_Phi_loadings[1,1]",
-               "zme_1[1,1]", "Lme_1_trend[1,1]")
+               "zme_1[1,1]", "Lme_1_trend[1,1]",
+               "rgp_1_trend[1]", "gp_pred_1_trend[3]")
   expect_true(all(mvgam_par_kind(working) == "internal"))
   # A trend-side measurement-error term is no trend dynamics
   expect_identical(mvgam_par_kind(c("meanme_1_trend[1]", "sdme_1[1]")),

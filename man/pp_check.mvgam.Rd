@@ -126,8 +126,10 @@ one series or covariate slice takes \code{newdata} filtered to those
 rows. A \code{group}, such as \code{group = "series"}, draws one panel per
 group through the \verb{_grouped} variant of the type, so
 \code{pp_check(fit, type = "dens_overlay", group = "series")} draws
-\code{"dens_overlay_grouped"}. A type without that variant refuses
-\code{group}.
+\code{"dens_overlay_grouped"}. \code{"fit_stat"} sums the units of each group.
+The single-series residual types (\code{"resid_qq"}, \code{"resid_vs_fitted"},
+\code{"resid_acf"}, \code{"resid_pacf"}, \code{"resid_variogram"}) ignore \code{group}.
+Any other type without a grouped variant refuses it.
 }
 \section{Multi-response families}{
 

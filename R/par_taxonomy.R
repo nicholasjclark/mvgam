@@ -345,6 +345,10 @@ MVGAM_PAR_CLASS_ORDER <- c("bs", "bsp", "bcs", "sd", "cor", "sdgp",
 #' with `_trend` after the id. The lower-case `cor_<id>` vector is a
 #' different parameter. It is aliased and kept. The third alternation
 #' matches the measurement-error workspace `zme_<id>` and `Lme_<id>`.
+#' The fourth matches the working arrays of a trend `gp()` term. The
+#' scaled basis coefficients are `rgp_<k>_trend`. The GP at each
+#' distinct input is `gp_pred_<k>_trend`. Both hold one value per
+#' time point.
 #'
 #' @format Character string holding a regular expression
 #' @noRd
@@ -355,7 +359,8 @@ MVGAM_PAR_INTERNAL_PATTERN <- paste0(
   "Z_cols|Z_raw|varrho_inv|Phi_loadings|L_Phi_loadings|",
   "sigma_slope_raw_trend|sigma_season_raw_trend)\\[",
   "|^(z|L|Cor)_[0-9]+(_[0-9]+)*(_trend)?\\[",
-  "|^(zme|Lme)_[0-9]+(_trend)?\\["
+  "|^(zme|Lme)_[0-9]+(_trend)?\\[",
+  "|^(rgp|gp_pred)_[0-9]+(_trend)?\\["
 )
 
 #' Name pattern of the measurement-error hyperparameters
