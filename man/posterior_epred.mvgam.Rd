@@ -180,7 +180,7 @@ posterior_epred(mod_site, newdata = new_site, allow_new_levels = TRUE,
 \code{\link[=posterior_linpred.mvgam]{posterior_linpred.mvgam()}} returns the predictor on the
 link scale. \code{\link[=hindcast.mvgam]{hindcast.mvgam()}} and \code{\link[=forecast.mvgam]{forecast.mvgam()}} take the
 trend from its fitted state, in and beyond the training times. The
-\href{https://nicholasjclark.github.io/mvgam/dev/articles/forecast_evaluation.html}{forecast evaluation article}
+\href{https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html}{forecast evaluation article}
 scores predictions of held-out times.
 
 Other predictions: 

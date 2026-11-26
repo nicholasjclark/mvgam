@@ -119,7 +119,7 @@ if (requireNamespace("tsibble", quietly = TRUE)) {
 }
 \seealso{
 The
-\href{https://nicholasjclark.github.io/mvgam/dev/articles/data.html}{data article} covers the long format
+\href{https://nicholasjclark.github.io/mvgam/articles/data.html}{data article} covers the long format
 and its conversion in more depth. \code{\link[=LLT]{LLT()}} takes the same periods
 for a season that drifts.
 

@@ -167,7 +167,7 @@ Learning Research}, 25(72):1-58.
 leave-future-out ELPD. \code{\link[=loo_model_weights.mvgam_lfo]{loo_model_weights.mvgam_lfo()}} weights
 them. \code{\link[=loo.mvgam]{loo.mvgam()}} approximates leave-one-out cross-validation.
 \code{\link[=kfold.mvgam]{kfold.mvgam()}} runs grouped k-fold cross-validation. The
-\href{https://nicholasjclark.github.io/mvgam/dev/articles/forecast_evaluation.html}{forecast evaluation article}
+\href{https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html}{forecast evaluation article}
 runs \code{lfo_cv()} on rodent counts, with its Pareto k refits and
 stacking weights.
 

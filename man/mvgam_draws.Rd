@@ -91,7 +91,7 @@ of the \verb{posterior::draws_*} classes. Parameters take their brms
 names, such as \code{b_x} and \code{sd_grp__Intercept}. A trend parameter
 indexed by series takes the series name, as in
 \code{sigma_trend[series_1]}. The
-\href{https://nicholasjclark.github.io/mvgam/dev/articles/idm.html}{integrated data model article} contrasts
+\href{https://nicholasjclark.github.io/mvgam/articles/idm.html}{integrated data model article} contrasts
 intercepts drawn with \code{as_draws_df()}.
 }
 \examples{

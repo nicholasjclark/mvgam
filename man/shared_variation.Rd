@@ -128,7 +128,7 @@ models. \emph{Statistics and Computing}, 34:143.
 \code{\link[=residual_cor]{residual_cor()}} for the implied correlation matrix,
 \code{cov2cor(Delta)}. Under \code{\link[=mvn]{mvn()}} and \code{\link[=mvt]{mvt()}} it adds each series'
 residual variance to the diagonal of \code{Delta} first. The
-\href{https://nicholasjclark.github.io/mvgam/dev/articles/jsdgam.html}{joint species distribution article}
+\href{https://nicholasjclark.github.io/mvgam/articles/jsdgam.html}{joint species distribution article}
 interprets both for a community of species.
 
 Other latent dynamics: 

@@ -182,9 +182,9 @@ Ecology and Evolution}, 9, 2102-2114.
 \seealso{
 \code{\link[=occ]{occ()}} for the related joint-occupancy family and
 \code{\link[=pp_check.mvgam]{pp_check.mvgam()}} for closure-unit goodness-of-fit checks. The
-\href{https://nicholasjclark.github.io/mvgam/dev/articles/nmix.html}{N-mixture article} fits N-mixture and
+\href{https://nicholasjclark.github.io/mvgam/articles/nmix.html}{N-mixture article} fits N-mixture and
 occupancy models from data preparation to inference. The
-\href{https://nicholasjclark.github.io/mvgam/dev/articles/data.html}{data article} sets out the row layout
+\href{https://nicholasjclark.github.io/mvgam/articles/data.html}{data article} sets out the row layout
 that \code{nmix()} expects.
 
 Other observation families: 

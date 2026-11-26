@@ -12,8 +12,8 @@ and counts whose dispersion a negative binomial cannot reach.
 
 Pass a family as you would to \code{brms::brm()} or \code{stats::glm()}, for
 example \code{mvgam(y ~ x, trend_formula = ~ AR(p = 1), family = nmix())}.
-The \href{https://nicholasjclark.github.io/mvgam/dev/articles/nmix.html}{N-mixture article} fits \code{\link[=nmix]{nmix()}}.
-The \href{https://nicholasjclark.github.io/mvgam/dev/articles/jsdgam.html}{JSDM article} fits a joint species
+The \href{https://nicholasjclark.github.io/mvgam/articles/nmix.html}{N-mixture article} fits \code{\link[=nmix]{nmix()}}.
+The \href{https://nicholasjclark.github.io/mvgam/articles/jsdgam.html}{JSDM article} fits a joint species
 distribution model.
 }
 \section{Families mvgam adds}{

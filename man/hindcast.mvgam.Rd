@@ -141,10 +141,10 @@ plot(hindcast(mod_llt, type = "trend", component = "slope"))
 \code{\link[=forecast.mvgam]{forecast.mvgam()}} extrapolates the fitted state.
 \code{\link[=posterior_predict.mvgam]{posterior_predict.mvgam()}} and \code{\link[=posterior_epred.mvgam]{posterior_epred.mvgam()}} predict
 from the covariate part of the model. The
-\href{https://nicholasjclark.github.io/mvgam/dev/articles/mvbf.html}{multivariate article} compares
+\href{https://nicholasjclark.github.io/mvgam/articles/mvbf.html}{multivariate article} compares
 \code{type = "trend"} hindcasts of one latent state from a joint model
 and from each data source alone. The
-\href{https://nicholasjclark.github.io/mvgam/dev/articles/nmix.html}{N-mixture article} summarises
+\href{https://nicholasjclark.github.io/mvgam/articles/nmix.html}{N-mixture article} summarises
 \code{type = "latent_state"} hindcasts of abundance.
 
 Other predictions: 

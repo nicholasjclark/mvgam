@@ -109,8 +109,8 @@ get_prior(
 \seealso{
 \code{\link[=jsdgam]{jsdgam()}} fits per-factor effects across species.
 \code{\link[=conditional_effects.mvgam]{conditional_effects.mvgam()}} plots the effect on each series. The
-\href{https://nicholasjclark.github.io/mvgam/dev/articles/dfm.html}{dynamic factor vignette} fits factor
-models. The \href{https://nicholasjclark.github.io/mvgam/dev/articles/jsdgam.html}{JSDM article} fits
+\href{https://nicholasjclark.github.io/mvgam/articles/dfm.html}{dynamic factor vignette} fits factor
+models. The \href{https://nicholasjclark.github.io/mvgam/articles/jsdgam.html}{JSDM article} fits
 per-factor trait and covariate effects.
 
 Other trend models: 

@@ -166,7 +166,7 @@ model evaluation using leave-one-out cross-validation and WAIC.
 \code{\link[=lfo_cv.mvgam]{lfo_cv.mvgam()}} scores forecasts from rolling origins.
 \code{\link[=summary.mvgam_kfold]{summary.mvgam_kfold()}} and \code{\link[=plot.mvgam_kfold]{plot.mvgam_kfold()}} report each group.
 The
-\href{https://nicholasjclark.github.io/mvgam/dev/articles/forecast_evaluation.html}{forecast evaluation article}
+\href{https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html}{forecast evaluation article}
 compares models by cross-validation.
 
 Other model comparison: 

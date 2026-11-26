@@ -159,7 +159,7 @@ distributions for the covariance matrix in latent factor models.
 \seealso{
 \code{\link[=mvgam_formula]{mvgam_formula()}}, \code{\link[brms:set_prior]{brms::prior()}} and
 \code{\link[brms:set_prior]{brms::set_prior()}}. The
-\href{https://nicholasjclark.github.io/mvgam/dev/articles/hierarchical_var.html}{hierarchical VAR article}
+\href{https://nicholasjclark.github.io/mvgam/articles/hierarchical_var.html}{hierarchical VAR article}
 sets priors on the observation error and the trend correlations.
 
 Other priors: 

@@ -360,10 +360,10 @@ covariates. \code{\link[=community]{community()}} gives richness, diversity and
 co-occurrence. \code{\link[=lv_axis]{lv_axis()}} gives each factor its own covariate
 effect. \code{\link[=how_to_cite]{how_to_cite()}} drafts a methods paragraph for the fit and
 \code{\link[=methods_md]{methods_md()}} writes its equations.
-The \href{https://nicholasjclark.github.io/mvgam/dev/articles/jsdgam.html}{JSDM article} fits a negative
+The \href{https://nicholasjclark.github.io/mvgam/articles/jsdgam.html}{JSDM article} fits a negative
 binomial model with a trait-informed loadings prior, ordination
 biplots and multiplicative gamma process shrinkage. The
-\href{https://nicholasjclark.github.io/mvgam/dev/cheatsheets/jsdgam_cheatsheet.pdf}{JSDM cheatsheet} summarises the
+\href{https://nicholasjclark.github.io/mvgam/cheatsheets/jsdgam_cheatsheet.pdf}{JSDM cheatsheet} summarises the
 functions on one page.
 
 Other model fitting: 

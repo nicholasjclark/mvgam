@@ -1,10 +1,7 @@
 url: https://nicholasjclark.github.io/mvgam/
 
-# The 2.0 site builds into /dev/ and the CRAN 1.x site stays at the
-# root. Switch to `mode: release` when 2.0 reaches CRAN, along with the
-# site address `MVGAM_SITE_URL` (R/utils-docs.R).
 development:
-  mode: devel
+  mode: release
 
 authors:
   Nicholas J Clark:

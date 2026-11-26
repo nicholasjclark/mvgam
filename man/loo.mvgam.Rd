@@ -160,7 +160,7 @@ comparison. \emph{Bayesian Analysis}. \doi{10.1214/25-BA1569}
 time axis. \code{\link[=kfold.mvgam]{kfold.mvgam()}} runs grouped k-fold cross-validation.
 \code{\link[=loo_model_weights.mvgam]{loo_model_weights.mvgam()}} weights models by their predictions.
 The
-\href{https://nicholasjclark.github.io/mvgam/dev/articles/forecast_evaluation.html}{forecast evaluation article}
+\href{https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html}{forecast evaluation article}
 compares models by approximate and exact cross-validation.
 
 Other model comparison: 

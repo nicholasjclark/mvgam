@@ -201,8 +201,8 @@ assessment of model fitness via realized discrepancies.
 \code{\link[=residuals.mvgam]{residuals.mvgam()}} returns the residuals the residual types
 plot. \code{\link[=CAR]{CAR()}} models series observed at unevenly spaced times.
 \code{\link[=loo.mvgam]{loo.mvgam()}} scores the fit. The
-\href{https://nicholasjclark.github.io/mvgam/dev/articles/mvgam_overview.html}{overview article} explains a
-rootogram. The \href{https://nicholasjclark.github.io/mvgam/dev/articles/nmix.html}{N-mixture article} runs
+\href{https://nicholasjclark.github.io/mvgam/articles/mvgam_overview.html}{overview article} explains a
+rootogram. The \href{https://nicholasjclark.github.io/mvgam/articles/nmix.html}{N-mixture article} runs
 the discrepancy check.
 
 Other model checking: 

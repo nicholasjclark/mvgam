@@ -152,7 +152,7 @@ quantities. \emph{Monthly Weather Review}, 143(4), 1321-1334.
 \code{\link[=forecast.mvgam]{forecast.mvgam()}} produces the forecast.
 \code{\link[=compare_scores]{compare_scores()}} scores several forecasts with one rule.
 \code{\link[=ensemble.mvgam_forecast]{ensemble.mvgam_forecast()}} combines forecasts. The
-\href{https://nicholasjclark.github.io/mvgam/dev/articles/forecast_evaluation.html}{forecast evaluation article}
+\href{https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html}{forecast evaluation article}
 compares models by their scores at each horizon.
 
 Other forecasting: 

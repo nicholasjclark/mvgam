@@ -119,9 +119,9 @@ in linear multivariate models. Economics Letters 58, 17-29.
 }
 \seealso{
 \code{\link[=fevd]{fevd()}} and \code{\link[=stability]{stability()}} summarise the same VAR dynamics.
-The \href{https://nicholasjclark.github.io/mvgam/dev/articles/var.html}{VAR article} runs \code{irf()} on a
+The \href{https://nicholasjclark.github.io/mvgam/articles/var.html}{VAR article} runs \code{irf()} on a
 plankton community. The
-\href{https://nicholasjclark.github.io/mvgam/dev/articles/hierarchical_var.html}{hierarchical VAR article}
+\href{https://nicholasjclark.github.io/mvgam/articles/hierarchical_var.html}{hierarchical VAR article}
 runs it on each group of a hierarchical VAR.
 
 Other latent dynamics: 

@@ -156,7 +156,7 @@ plot(f_true ~ x, data = simdat$true_smooths$`s(x)`, type = "l")
 \code{\link[=mvgam]{mvgam()}} fits the simulated data. \code{\link[=sim_closure_unit_data]{sim_closure_unit_data()}}
 simulates occupancy and N-mixture data. \code{\link[=sim_jsdgam]{sim_jsdgam()}} simulates
 site-by-species data. The
-\href{https://nicholasjclark.github.io/mvgam/dev/articles/mvgam_overview.html}{overview article} fits a
+\href{https://nicholasjclark.github.io/mvgam/articles/mvgam_overview.html}{overview article} fits a
 model to data from \code{sim_mvgam()}.
 
 Other simulation: 

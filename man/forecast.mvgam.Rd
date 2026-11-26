@@ -168,7 +168,7 @@ from the covariate part of the model. \code{forecast()}
 extrapolates the fitted latent state. \code{\link[=score.mvgam_forecast]{score.mvgam_forecast()}}
 scores a forecast against held-out data.
 \code{\link[=forecast_uncertainty]{forecast_uncertainty()}} splits its variance by source. The
-\href{https://nicholasjclark.github.io/mvgam/dev/articles/forecast_evaluation.html}{forecast evaluation article}
+\href{https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html}{forecast evaluation article}
 scores, compares and combines the forecasts of three models of
 rodent counts.
 

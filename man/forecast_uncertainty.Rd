@@ -244,7 +244,7 @@ framework. Ecological Applications 27(7), 2048-2060.
 \code{\link[=forecast.mvgam]{forecast.mvgam()}} for \code{coef_uncertainty} and
 \code{trend_uncertainty}, \code{\link[=fevd]{fevd()}} for the sources of a VAR's forecast
 errors, \code{\link[=variance_partition]{variance_partition()}} for the fitted predictor. The
-\href{https://nicholasjclark.github.io/mvgam/dev/articles/forecast_evaluation.html}{forecast evaluation article}
+\href{https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html}{forecast evaluation article}
 runs \code{forecast_uncertainty()} on rodent captures.
 
 Other forecasting: 

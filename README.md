@@ -39,8 +39,10 @@ The models it fits include:
   series</a>
 - <a href="https://nicholasjclark.github.io/mvgam/articles/dfm.html"
   target="_blank">Dynamic factor models</a>
+- <a href="https://nicholasjclark.github.io/mvgam/articles/occupancy.html"
+  target="_blank">Hierarchical occupancy models</a>
 - <a href="https://nicholasjclark.github.io/mvgam/articles/nmix.html"
-  target="_blank">Hierarchical N-mixture and occupancy models</a>
+  target="_blank">Hierarchical N-mixture models</a>
 - <a href="https://www.youtube.com/watch?v=2POK_FVwCHk"
   target="_blank">Hierarchical generalized additive models</a>
 - <a href="https://nicholasjclark.github.io/mvgam/articles/jsdgam.html"
@@ -81,10 +83,10 @@ target="_blank"><code>cmdstanr</code></a>.
 ## Cheatsheet
 
 [![`mvgam` usage
-cheatsheet](https://nicholasjclark.github.io/mvgam/dev/cheatsheets/mvgam_cheatsheet.png)](https://nicholasjclark.github.io/mvgam/dev/cheatsheets/mvgam_cheatsheet.pdf)
+cheatsheet](https://nicholasjclark.github.io/mvgam/cheatsheets/mvgam_cheatsheet.png)](https://nicholasjclark.github.io/mvgam/cheatsheets/mvgam_cheatsheet.pdf)
 
 [![`jsdgam` cheatsheet for joint species distribution
-models](https://nicholasjclark.github.io/mvgam/dev/cheatsheets/jsdgam_cheatsheet.png)](https://nicholasjclark.github.io/mvgam/dev/cheatsheets/jsdgam_cheatsheet.pdf)
+models](https://nicholasjclark.github.io/mvgam/cheatsheets/jsdgam_cheatsheet.png)](https://nicholasjclark.github.io/mvgam/cheatsheets/jsdgam_cheatsheet.pdf)
 
 ## A state-space model of rodent captures
 
@@ -132,7 +134,7 @@ mod <- mvgam(
   family = poisson(),
   chains = 4, cores = 4, silent = 2
 )
-#> Warning: 94 of 4000 (2.0%) transitions ended with a divergence.
+#> Warning: 125 of 4000 (3.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 summary(mod)
 #>  Family: poisson 
@@ -147,44 +149,44 @@ summary(mod)
 #> == Observation Model ==
 #> Regression Coefficients:
 #>           Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> Intercept     2.87      0.30     2.27     3.46 1.00     1631     1549
-#> seriesDO     -2.46      0.62    -3.95    -1.33 1.01     1111      996
-#> seriesPB     -3.03      0.97    -5.17    -1.04 1.00     1177      986
-#> seriesPP     -2.19      0.52    -3.29    -1.18 1.00     1633     1527
+#> Intercept     2.86      0.28     2.28     3.45 1.00     2393     1869
+#> seriesDO     -2.44      0.56    -3.64    -1.41 1.00     1886     1278
+#> seriesPB     -3.07      1.15    -5.68    -0.99 1.00      903      358
+#> seriesPP     -2.15      0.49    -3.17    -1.18 1.00     2200     1474
 #> 
 #> == Trend Model ==
 #> Smoothing Spline Hyperparameters:
 #>                         Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS
-#> sds(smintempseriesDM_1)     0.64      0.68     0.02     2.47 1.00     1933
-#> sds(smintempseriesDO_1)     1.21      1.15     0.04     4.20 1.00     1973
-#> sds(smintempseriesPB_1)     2.77      2.01     0.18     7.64 1.00     1987
-#> sds(smintempseriesPP_1)     1.52      1.31     0.05     4.96 1.00     2466
-#> sds(sndvi_ma12_1)           0.91      0.87     0.03     3.25 1.00     2266
+#> sds(smintempseriesDM_1)     0.67      0.72     0.02     2.64 1.00     2697
+#> sds(smintempseriesDO_1)     1.23      1.15     0.05     4.31 1.00     2605
+#> sds(smintempseriesPB_1)     2.81      1.95     0.19     7.67 1.00     2514
+#> sds(smintempseriesPP_1)     1.54      1.37     0.06     5.04 1.00     2867
+#> sds(sndvi_ma12_1)           0.92      0.88     0.03     3.14 1.00     2757
 #>                         Tail_ESS
-#> sds(smintempseriesDM_1)     1986
-#> sds(smintempseriesDO_1)     1864
-#> sds(smintempseriesPB_1)     1983
-#> sds(smintempseriesPP_1)     2146
-#> sds(sndvi_ma12_1)           2297
+#> sds(smintempseriesDM_1)     2193
+#> sds(smintempseriesDO_1)     2408
+#> sds(smintempseriesPB_1)     1945
+#> sds(smintempseriesPP_1)     2679
+#> sds(sndvi_ma12_1)           2470
 #> 
 #> Regression Coefficients:
 #>                     Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> smintemp:seriesDM_1    -0.78      0.96    -2.77     1.11 1.00     2465     2408
-#> smintemp:seriesDO_1    -0.21      2.11    -4.61     4.09 1.00     2519     2598
-#> smintemp:seriesPB_1     1.39      4.14    -8.08     8.07 1.00     2006     2143
-#> smintemp:seriesPP_1     5.47      2.85     0.52    11.76 1.00     2221     2253
-#> sndvi_ma12_1            0.94      1.14    -1.36     3.28 1.00     2318     2356
+#> smintemp:seriesDM_1    -0.81      0.98    -2.86     1.32 1.00     3235     2463
+#> smintemp:seriesDO_1    -0.27      2.28    -5.33     4.12 1.00     2816     2193
+#> smintemp:seriesPB_1     1.37      4.00    -7.81     7.99 1.00     3325     2923
+#> smintemp:seriesPP_1     5.47      2.92     0.83    12.20 1.00     2837     2347
+#> sndvi_ma12_1            0.99      1.18    -1.37     3.48 1.00     2986     2583
 #> 
 #> Trend Specific Parameters:
 #>                 Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> sigma_trend[DM]     0.17      0.05     0.10     0.27 1.00     1800     2143
-#> sigma_trend[DO]     0.31      0.15     0.06     0.63 1.00      834      501
-#> sigma_trend[PB]     0.54      0.17     0.27     0.92 1.00     1985     2398
-#> sigma_trend[PP]     0.78      0.17     0.50     1.14 1.00     1614     2666
-#> ar1_trend[DM]       0.88      0.08     0.70     0.99 1.00     1394     1405
-#> ar1_trend[DO]       0.71      0.33    -0.25     0.99 1.01      746      896
-#> ar1_trend[PB]       0.89      0.07     0.72     0.99 1.00     1500     1679
-#> ar1_trend[PP]       0.67      0.12     0.39     0.88 1.00     1541     1848
+#> sigma_trend[DM]     0.20      0.04     0.13     0.30 1.00     2018     1154
+#> sigma_trend[DO]     0.34      0.12     0.16     0.62 1.00     2674     3208
+#> sigma_trend[PB]     0.51      0.16     0.26     0.86 1.00     2372     3217
+#> sigma_trend[PP]     0.74      0.16     0.48     1.09 1.00     1777     3036
+#> ar1_trend[DM]       0.86      0.08     0.66     0.98 1.00     1612     1688
+#> ar1_trend[DO]       0.73      0.27    -0.05     0.99 1.00     1350     1732
+#> ar1_trend[PB]       0.90      0.07     0.74     0.99 1.00      908      261
+#> ar1_trend[PP]       0.68      0.12     0.42     0.88 1.00     2010     1809
 #> 
 #> Draws were sampled using sampling(NUTS). For each parameter, Bulk_ESS
 #> and Tail_ESS are effective sample size measures, and Rhat is the potential
@@ -331,6 +333,12 @@ A fitted model combines published methods: an observation family, a
 trend model, priors and a sampler. `how_to_cite()` drafts a methods
 paragraph for the model and lists the references for each part:
 
+<details>
+<summary>
+The methods paragraph and references <code>how_to_cite(mod)</code>
+drafts
+</summary>
+
 ``` r
 how_to_cite(mod)
 #> Methods text skeleton
@@ -386,6 +394,8 @@ how_to_cite(mod)
 #> 
 #> Use `bibtex(x)` for a BibTeX block ready for your .bib file.
 ```
+
+</details>
 
 `bibtex()` writes those references to a `.bib` file. `methods_md()`
 writes the model as Markdown equations with a glossary of symbols and
@@ -467,7 +477,7 @@ $$
 \alpha &\sim \text{StudentT}(3, 0.9, 2.5) \\
 \sigma^{(s, \eta)}_{\mathrm{mintemp}} &\sim \text{StudentT}(3, 0, 2.5) \\
 \sigma^{(s, \eta)}_{\mathrm{ndvi\_ma12}} &\sim \text{StudentT}(3, 0, 2.5) \\
-\sigma_{\eta,i} &\sim \text{Exponential}(2) \\
+\sigma_{\eta,i} &\sim \text{InvGamma}(3, 1.07) \\
 \boldsymbol{\Omega} &\sim \text{LKJCorr}(2) \\
 \phi_{i,1} &\sim \text{Normal}(0, 0.5)
 \end{aligned}
@@ -569,6 +579,8 @@ mod_beta <- mvgam(
   family = Beta(),
   chains = 4, cores = 4, silent = 2
 )
+#> Warning: 32 of 4000 (1.0%) transitions ended with a divergence.
+#> See https://mc-stan.org/misc/warnings for details.
 #> Warning: 4 of 4 chains had an E-BFMI less than 0.3.
 #> See https://mc-stan.org/misc/warnings for details.
 ```
@@ -590,41 +602,41 @@ summary(mod_beta)
 #> == Observation Model ==
 #> Smoothing Spline Hyperparameters:
 #>                         Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS
-#> sds(sxseriesseries_1_1)     4.69      2.39     1.70    10.62 1.00     1908
-#> sds(sxseriesseries_2_1)     5.95      2.45     2.60    12.23 1.00     1182
-#> sds(sxseriesseries_3_1)     8.94      3.75     3.81    18.08 1.00     1315
+#> sds(sxseriesseries_1_1)     4.81      2.31     1.73    10.50 1.04       91
+#> sds(sxseriesseries_2_1)     6.03      2.48     2.56    11.88 1.02      514
+#> sds(sxseriesseries_3_1)     8.88      3.43     3.99    17.29 1.07     1330
 #>                         Tail_ESS
-#> sds(sxseriesseries_1_1)     2365
-#> sds(sxseriesseries_2_1)     2506
-#> sds(sxseriesseries_3_1)     1931
+#> sds(sxseriesseries_1_1)     2473
+#> sds(sxseriesseries_2_1)     2357
+#> sds(sxseriesseries_3_1)     2012
 #> 
 #> Regression Coefficients:
 #>                     Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> Intercept               0.18      0.17    -0.12     0.55 1.01      803     1907
-#> sx:seriesseries_1_1    10.07      7.18    -1.10    26.61 1.00     1468     1722
-#> sx:seriesseries_2_1    13.94      5.30     4.17    24.89 1.01     1005     1906
-#> sx:seriesseries_3_1    22.74      6.62     9.75    35.87 1.00     1252     1672
+#> Intercept               0.19      0.16    -0.13     0.51 1.01      878     1997
+#> sx:seriesseries_1_1    10.67      7.38    -1.09    25.07 1.07       44      161
+#> sx:seriesseries_2_1    14.80      6.18     3.90    26.87 1.07       41       71
+#> sx:seriesseries_3_1    23.44      7.20    10.27    37.19 1.08       36       78
 #> 
 #> Further Distributional Parameters:
 #>     Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> phi    11.83      6.41     5.15    30.45 1.09       43      162
+#> phi    11.86      7.84     5.27    35.93 1.15       19       17
 #> 
 #> == Trend Model ==
 #> Trend Specific Parameters:
 #>                       Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS
-#> sigma_trend[series_1]     0.78      0.22     0.35     1.22 1.05       67
-#> sigma_trend[series_2]     0.86      0.21     0.48     1.29 1.06       79
-#> sigma_trend[series_3]     0.49      0.21     0.05     0.88 1.07       65
-#> ar1_trend[series_1]       0.54      0.20     0.13     0.89 1.01      396
-#> ar1_trend[series_2]       0.69      0.12     0.44     0.90 1.01      489
-#> ar1_trend[series_3]       0.52      0.28    -0.27     0.90 1.01      684
+#> sigma_trend[series_1]     0.74      0.22     0.34     1.15 1.09       34
+#> sigma_trend[series_2]     0.81      0.21     0.45     1.22 1.09       34
+#> sigma_trend[series_3]     0.47      0.17     0.18     0.80 1.09       32
+#> ar1_trend[series_1]       0.57      0.20     0.17     0.91 1.05       86
+#> ar1_trend[series_2]       0.72      0.11     0.47     0.91 1.01      695
+#> ar1_trend[series_3]       0.55      0.26    -0.10     0.92 1.03      251
 #>                       Tail_ESS
-#> sigma_trend[series_1]      373
-#> sigma_trend[series_2]      436
-#> sigma_trend[series_3]      476
-#> ar1_trend[series_1]       1174
-#> ar1_trend[series_2]       1721
-#> ar1_trend[series_3]        513
+#> sigma_trend[series_1]      437
+#> sigma_trend[series_2]      461
+#> sigma_trend[series_3]      469
+#> ar1_trend[series_1]       1029
+#> ar1_trend[series_2]       1834
+#> ar1_trend[series_3]       1243
 #> 
 #> Draws were sampled using sampling(NUTS). For each parameter, Bulk_ESS
 #> and Tail_ESS are effective sample size measures, and Rhat is the potential

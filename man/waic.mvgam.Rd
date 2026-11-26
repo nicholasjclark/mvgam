@@ -83,7 +83,7 @@ and WAIC. \emph{Statistics and Computing}, 27:1413-1432.
 \seealso{
 \code{\link[=loo.mvgam]{loo.mvgam()}} estimates the same ELPD by PSIS.
 \code{\link[=lfo_cv.mvgam]{lfo_cv.mvgam()}} scores forecasts from rolling origins. The
-\href{https://nicholasjclark.github.io/mvgam/dev/articles/forecast_evaluation.html}{forecast evaluation article}
+\href{https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html}{forecast evaluation article}
 compares models by approximate and exact cross-validation.
 
 Other model comparison: 

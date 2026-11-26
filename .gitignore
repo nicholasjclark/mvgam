@@ -50,3 +50,5 @@ README_cache/
 cran_checks/
 **/_problems/
 **/testthat-problems.rds
+misc/figure/
+misc/cache/

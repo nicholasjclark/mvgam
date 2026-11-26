@@ -34,6 +34,6 @@ mvgam_data(portal_data, y = "captures", family = poisson())
 \seealso{
 \code{\link[=mvgam]{mvgam()}} for a state-space model of these counts and
 \code{\link[=mvgam_data]{mvgam_data()}} to check the data. The
-\href{https://nicholasjclark.github.io/mvgam/dev/articles/mvgam_overview.html}{overview article} fits one.
+\href{https://nicholasjclark.github.io/mvgam/articles/mvgam_overview.html}{overview article} fits one.
 }
 \keyword{datasets}

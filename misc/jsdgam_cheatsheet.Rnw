@@ -1,7 +1,7 @@
 \documentclass[final,9pt,fleqn]{beamer}
 \input{BeamOptions.tex}
 
-\setbeamertemplate{footline}{\hfill {\footnotesize \href{https://creativecommons.org/licenses/by-sa/4.0/}{CC BY-SA 4.0} $\circ$ Nicholas J. Clark $\circ$ Learn more at \href{https://nicholasjclark.github.io/mvgam/dev/articles/jsdgam.html}{the JSDM article} $\circ$ package version $2.0.0$ $\circ$ updated: \today} \hspace {0.1in} \vspace{0.1in}}
+\setbeamertemplate{footline}{\hfill {\footnotesize \href{https://creativecommons.org/licenses/by-sa/4.0/}{CC BY-SA 4.0} $\circ$ Nicholas J. Clark $\circ$ Learn more at \href{https://nicholasjclark.github.io/mvgam/articles/jsdgam.html}{the JSDM article} $\circ$ package version $2.0.0$ $\circ$ updated: \today} \hspace {0.1in} \vspace{0.1in}}
 
 \begin{document}
 
@@ -75,7 +75,7 @@ Usage: \texttt{\color{Orchid} jsdgam(formula, factor\_formula, data, family, n\_
 \begin{itemize}
 \item Presence-absence: \texttt{\color{Orchid} binomial()}, \texttt{\color{Orchid} bernoulli()}
 \item Counts: \texttt{\color{Orchid} poisson()}, \texttt{\color{Orchid} negbinomial()}, \texttt{\color{Orchid} beta\_nb()}
-\item Imperfect detection: \texttt{\color{Orchid} occ()}, \texttt{\color{Orchid} nmix()} (\href{https://nicholasjclark.github.io/mvgam/dev/articles/nmix.html}{N-mixture article})
+\item Imperfect detection: \texttt{\color{Orchid} occ()}, \texttt{\color{Orchid} nmix()} (\href{https://nicholasjclark.github.io/mvgam/articles/nmix.html}{N-mixture article})
 \item Compositions: \texttt{\color{Orchid} diri()}, \texttt{\color{Orchid} multi()}, \texttt{\color{Orchid} categ()}
 \item Continuous: \texttt{\color{Orchid} mvn()}, \texttt{\color{Orchid} mvt()}
 \end{itemize}
@@ -213,7 +213,7 @@ print(loo_compare(mod, mod_con), p_worse = FALSE)
 \texttt{\color{Orchid} how\_to\_cite(mod)} drafts a methods paragraph with its references. \texttt{\color{Orchid} methods\_md(mod)} writes the model's equations and priors
 
 \medskip
-The \href{https://nicholasjclark.github.io/mvgam/dev/articles/jsdgam.html}{JSDM article} fits ant counts with traits, constrained ordination and factor shrinkage. The \href{https://nicholasjclark.github.io/mvgam/dev/cheatsheets/mvgam_cheatsheet.pdf}{mvgam cheatsheet} covers time-series models
+The \href{https://nicholasjclark.github.io/mvgam/articles/jsdgam.html}{JSDM article} fits ant counts with traits, constrained ordination and factor shrinkage. The \href{https://nicholasjclark.github.io/mvgam/cheatsheets/mvgam_cheatsheet.pdf}{mvgam cheatsheet} covers time-series models
 
 \end{block}
 \end{column}

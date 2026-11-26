@@ -6,6 +6,9 @@ This is a major release that rebuilds the package on 'brms'. Observation models 
 ## Test environments
 * Local: Ubuntu 24.04, R 4.6.2, with `--as-cran`
 * Local: Ubuntu 24.04, R 4.6.2, with `_R_CHECK_DEPENDS_ONLY_=true`
+* win-builder: R-release and R-devel
+* GitHub Actions: macOS (R-release), Windows (R-release and R 4.2), Ubuntu (R-release and R-devel)
+* Valgrind memcheck of the compiled trend code, with no errors and no definite leaks
 
 ## R CMD check results
 * There were no ERRORs or WARNINGs.

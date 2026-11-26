@@ -180,7 +180,7 @@ ggplot(simdat$data_train, aes(time, log1p(y))) +
 \code{\link[=posterior_predict.mvgam]{posterior_predict.mvgam()}} returns predictive draws.
 \code{\link[=hindcast.mvgam]{hindcast.mvgam()}} and \code{\link[=forecast.mvgam]{forecast.mvgam()}} take the trend from its
 fitted state. The
-\href{https://nicholasjclark.github.io/mvgam/dev/articles/forecast_evaluation.html}{forecast evaluation article}
+\href{https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html}{forecast evaluation article}
 scores predictions of held-out times.
 
 Other predictions: 

@@ -53,7 +53,7 @@ is estimated as part of the latent state. Forecasts carry that
 structure forward. Stan fits the model. The fitted object works
 with the post-processing tools of four packages: `brms`,
 `marginaleffects`, `loo`, `bayesplot`. The
-[cheatsheet](https://nicholasjclark.github.io/mvgam/dev/cheatsheets/mvgam_cheatsheet.pdf)
+[cheatsheet](https://nicholasjclark.github.io/mvgam/cheatsheets/mvgam_cheatsheet.pdf)
 summarises the main functions on one page.
 
 ![A state-space model. The latent process $X$ (written $\eta$ below) evolves from one time to the next. Each observation $Y$ depends on the process at its own time. Where an observation is missing, as at time 2, the process is still estimated.](SS_model.svg){width=85%}

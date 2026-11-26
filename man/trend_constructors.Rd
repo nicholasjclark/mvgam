@@ -528,13 +528,13 @@ Clark NJ, Ernest SKM, Senyondo H, Simonis J, White EP, Yenni GM and Karunarathna
 default priors. \code{\link[=residual_cor]{residual_cor()}}, \code{\link[=irf]{irf()}}, \code{\link[=fevd]{fevd()}} and
 \code{\link[=stability]{stability()}} interpret fitted latent dynamics. \code{\link[=forecast]{forecast()}}
 propagates them forward. The
-\href{https://nicholasjclark.github.io/mvgam/dev/articles/mvgam_overview.html}{overview vignette} compares
-the trend types. The \href{https://nicholasjclark.github.io/mvgam/dev/articles/var.html}{VAR article}
+\href{https://nicholasjclark.github.io/mvgam/articles/mvgam_overview.html}{overview vignette} compares
+the trend types. The \href{https://nicholasjclark.github.io/mvgam/articles/var.html}{VAR article}
 interprets a fitted \code{VAR()} with \code{irf()}, \code{fevd()} and
 \code{stability()}. The
-\href{https://nicholasjclark.github.io/mvgam/dev/articles/hierarchical_var.html}{hierarchical VAR article}
+\href{https://nicholasjclark.github.io/mvgam/articles/hierarchical_var.html}{hierarchical VAR article}
 fits \code{gr} and \code{subgr}. The
-\href{https://nicholasjclark.github.io/mvgam/dev/articles/dfm.html}{dynamic factor vignette} fits \code{n_lv} and
+\href{https://nicholasjclark.github.io/mvgam/articles/dfm.html}{dynamic factor vignette} fits \code{n_lv} and
 \code{trend_map}.
 
 Other trend models: 

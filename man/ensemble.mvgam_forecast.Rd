@@ -101,7 +101,7 @@ plot(scores, relative = "GAM")
 \code{\link[=loo_model_weights.mvgam_lfo]{loo_model_weights.mvgam_lfo()}} computes weights from forecast
 performance. \code{\link[=pp_average.mvgam]{pp_average.mvgam()}} averages predictions in place of
 forecasts. The
-\href{https://nicholasjclark.github.io/mvgam/dev/articles/forecast_evaluation.html}{forecast evaluation article}
+\href{https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html}{forecast evaluation article}
 weights an ensemble by leave-future-out stacking weights.
 
 Other forecasting: 

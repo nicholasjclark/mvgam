@@ -138,7 +138,7 @@ head(pp_average(mod, mod_lin, method = "posterior_epred"))
 \seealso{
 \code{\link[=loo_model_weights.mvgam]{loo_model_weights.mvgam()}} computes the weights.
 \code{\link[=ensemble]{ensemble()}} averages forecasts. The
-\href{https://nicholasjclark.github.io/mvgam/dev/articles/forecast_evaluation.html}{forecast evaluation article}
+\href{https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html}{forecast evaluation article}
 weights and combines competing models.
 
 Other model comparison: 

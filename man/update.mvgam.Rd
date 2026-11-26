@@ -119,7 +119,7 @@ longer <- update(mod, iter = 3000, recompile = FALSE)
 \seealso{
 \code{\link[=loo.mvgam]{loo.mvgam()}} and \code{\link[=loo_compare.mvgam]{loo_compare.mvgam()}} compare a refit with the
 original. \code{\link[=stancode.mvgam]{stancode.mvgam()}} shows the compiled model. The
-\href{https://nicholasjclark.github.io/mvgam/dev/articles/forecast_evaluation.html}{forecast evaluation article}
+\href{https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html}{forecast evaluation article}
 compares competing models by their forecasts.
 
 Other model fitting: 

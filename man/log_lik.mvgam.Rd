@@ -110,7 +110,7 @@ c(with_trend = mean(rowSums(ll)), without = mean(rowSums(ll_fixed)))
 \code{\link[=loo.mvgam]{loo.mvgam()}} and \code{\link[=waic.mvgam]{waic.mvgam()}} estimate the ELPD from this
 matrix. \code{\link[=hindcast.mvgam]{hindcast.mvgam()}} returns the latent states it conditions
 on. The
-\href{https://nicholasjclark.github.io/mvgam/dev/articles/forecast_evaluation.html}{forecast evaluation article}
+\href{https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html}{forecast evaluation article}
 compares models by cross-validation.
 
 Other model comparison: 

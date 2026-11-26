@@ -1,7 +1,5 @@
-# The package website. The 2.0 site builds into /dev/ and the CRAN 1.x
-# site holds the root. The address moves to the root when 2.0 reaches
-# CRAN, when the site's development mode switches to release.
-MVGAM_SITE_URL <- "https://nicholasjclark.github.io/mvgam/dev/"
+# The package website
+MVGAM_SITE_URL <- "https://nicholasjclark.github.io/mvgam/"
 
 
 #' A link to an article on the package website

@@ -148,7 +148,7 @@ values as a data frame. \code{\link[marginaleffects:slopes]{marginaleffects::avg
 \code{\link[marginaleffects:comparisons]{marginaleffects::avg_comparisons()}} summarise effects as numbers.
 \code{\link[=posterior_epred.mvgam]{posterior_epred.mvgam()}} computes the expected values the panels
 draw. \code{\link[=pp_check.mvgam]{pp_check.mvgam()}} checks the fit against the data. The
-\href{https://nicholasjclark.github.io/mvgam/dev/articles/mvgam_overview.html}{overview vignette} interprets
+\href{https://nicholasjclark.github.io/mvgam/articles/mvgam_overview.html}{overview vignette} interprets
 effects in both formulas.
 
 Other predictions: 

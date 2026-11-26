@@ -139,7 +139,7 @@ distributions for the covariance matrix in latent factor models.
 path. \code{\link[=residual_cor]{residual_cor()}} gives the correlations among series the
 factors imply. \code{\link[=community]{community()}} gives how often species occur together.
 The
-\href{https://nicholasjclark.github.io/mvgam/dev/articles/jsdgam.html}{JSDM article} interprets a biplot
+\href{https://nicholasjclark.github.io/mvgam/articles/jsdgam.html}{JSDM article} interprets a biplot
 of species loadings.
 
 Other latent dynamics: 

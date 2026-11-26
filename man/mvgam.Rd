@@ -202,7 +202,7 @@ trend. With an \code{AR(p = 1)} trend:
 Here \eqn{g} is the link, \eqn{\eta} the predictor from \code{formula},
 \eqn{\eta^{(z)}} the predictor from \code{trend_formula} and
 \eqn{\epsilon} the trend's innovation at each time. The
-\href{https://nicholasjclark.github.io/mvgam/dev/articles/mvgam_overview.html}{overview article} walks through
+\href{https://nicholasjclark.github.io/mvgam/articles/mvgam_overview.html}{overview article} walks through
 a full analysis.
 }
 \section{Structured loadings priors}{
@@ -396,16 +396,16 @@ Bayesian Gaussian processes for probabilistic programming.
 those of brms. \code{\link[=how_to_cite]{how_to_cite()}} writes a methods paragraph for a
 fitted model. \code{\link[=methods_md]{methods_md()}} writes its equations. \code{\link[=jsdgam]{jsdgam()}} fits
 joint species distribution models. The
-\href{https://nicholasjclark.github.io/mvgam/dev/articles/mvgam_overview.html}{overview vignette} introduces
-the package. The \href{https://nicholasjclark.github.io/mvgam/dev/articles/data.html}{data vignette} sets out
+\href{https://nicholasjclark.github.io/mvgam/articles/mvgam_overview.html}{overview vignette} introduces
+the package. The \href{https://nicholasjclark.github.io/mvgam/articles/data.html}{data vignette} sets out
 the data format. The
-\href{https://nicholasjclark.github.io/mvgam/dev/articles/forecast_evaluation.html}{forecast evaluation article}
+\href{https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html}{forecast evaluation article}
 scores and compares forecasts. The
-\href{https://nicholasjclark.github.io/mvgam/dev/articles/mvbf.html}{multivariate formula article} fits
+\href{https://nicholasjclark.github.io/mvgam/articles/mvbf.html}{multivariate formula article} fits
 several responses at once. The
-\href{https://nicholasjclark.github.io/mvgam/dev/articles/idm.html}{integrated distribution model article}
+\href{https://nicholasjclark.github.io/mvgam/articles/idm.html}{integrated distribution model article}
 ties several observation families to one latent process. The
-\href{https://nicholasjclark.github.io/mvgam/dev/cheatsheets/mvgam_cheatsheet.pdf}{cheatsheet} summarises the main
+\href{https://nicholasjclark.github.io/mvgam/cheatsheets/mvgam_cheatsheet.pdf}{cheatsheet} summarises the main
 functions on one page.
 
 Other model fitting: 

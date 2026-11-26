@@ -229,9 +229,9 @@ models. \emph{Statistics and Computing}, 34:143.
 \code{\link[=jsdgam]{jsdgam()}} fits \code{ZMVN()} factors across species.
 \code{\link[=residual_cor]{residual_cor()}} and \code{\link[=ordinate]{ordinate()}} interpret the fitted
 correlations. The
-\href{https://nicholasjclark.github.io/mvgam/dev/articles/dfm.html}{dynamic factor vignette} builds factor
+\href{https://nicholasjclark.github.io/mvgam/articles/dfm.html}{dynamic factor vignette} builds factor
 models with a partial \code{trend_map}. The
-\href{https://nicholasjclark.github.io/mvgam/dev/articles/idm.html}{integrated distribution model article}
+\href{https://nicholasjclark.github.io/mvgam/articles/idm.html}{integrated distribution model article}
 shares one latent process across several observation families.
 
 Other trend models: 

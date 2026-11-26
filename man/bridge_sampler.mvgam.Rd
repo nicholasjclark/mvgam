@@ -95,7 +95,7 @@ constants. \emph{Journal of Statistical Software}. 92(10).
 }
 \seealso{
 \code{\link[=loo.mvgam]{loo.mvgam()}}, \code{\link[=lfo_cv.mvgam]{lfo_cv.mvgam()}}. The
-\href{https://nicholasjclark.github.io/mvgam/dev/articles/forecast_evaluation.html}{forecast evaluation article}
+\href{https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html}{forecast evaluation article}
 compares models by their forecasts.
 
 Other model comparison: 

@@ -168,7 +168,7 @@ correlations are net of.
 \code{\link[=summary.mvgam_residcor]{summary.mvgam_residcor()}} lists the pairs. \code{\link[=ordinate]{ordinate()}} draws the
 loadings as a biplot. The example of \link{trend_constructors} takes
 the correlations of a \code{CAR(cor = TRUE)} trend. The
-\href{https://nicholasjclark.github.io/mvgam/dev/articles/jsdgam.html}{joint species distribution article}
+\href{https://nicholasjclark.github.io/mvgam/articles/jsdgam.html}{joint species distribution article}
 interprets species correlations from a factor model.
 
 Other latent dynamics: 
