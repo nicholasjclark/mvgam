@@ -2,3 +2,9 @@ table.ref-index{
     overflow-x: visible;
     overflow-y: auto;
 }
+
+/* The README links a video thumbnail for GitHub, which strips the
+   iframe the site plays */
+.github-only {
+    display: none;
+}

@@ -1,0 +1,126 @@
+# Group-level (random) effects of a fitted mvgam model
+
+Posterior draws of each level's deviation for every group-level term of
+the observation formula, summarised or raw. Each element is named
+`r_<group>[<level>,<coef>]`, as
+[`variables.mvgam()`](https://nicholasjclark.github.io/mvgam/reference/index-mvgam.md)
+lists it.
+
+## Usage
+
+``` r
+# S3 method for class 'mvgam'
+ranef(
+  object,
+  summary = TRUE,
+  robust = FALSE,
+  probs = c(0.025, 0.975),
+  pars = NULL,
+  groups = NULL,
+  ...
+)
+```
+
+## Arguments
+
+- object:
+
+  A fitted `mvgam` object.
+
+- summary:
+
+  Logical. `TRUE` (the default) summarises each coefficient's draws.
+  `FALSE` returns the draws.
+
+- robust:
+
+  Logical. If `FALSE` (the default), uses mean and standard deviation
+  for summaries. If `TRUE`, uses median and median absolute deviation
+  (MAD).
+
+- probs:
+
+  Two probabilities for the lower and upper bounds of the credible
+  interval. Default `c(0.025, 0.975)`, a 95% interval.
+
+- pars:
+
+  Optional character vector of coefficient names, such as `"Intercept"`.
+  `NULL` (the default) keeps every coefficient.
+
+- groups:
+
+  Optional character vector of grouping factors. `NULL` (the default)
+  keeps every factor.
+
+- ...:
+
+  Unused. Anything passed here is refused.
+
+## Value
+
+A named list with one 3D array per grouping factor. With
+`summary = TRUE` the dimensions are levels, statistics and coefficients.
+The statistics are `Estimate`, `Est.Error` and one quantile per element
+of `probs`. With `summary = FALSE` the dimensions are draws, levels and
+coefficients, and the array carries an `nchains` attribute. A grouping
+factor of a distributional parameter or of one response of several is
+keyed `<group>__<parameter>`.
+
+## Details
+
+A group-level term in `trend_formula` is named with the `_trend` suffix,
+as `r_g_trend[a,Intercept]`.
+[`as_draws.mvgam()`](https://nicholasjclark.github.io/mvgam/reference/mvgam_draws.md)
+returns its draws.
+
+## See also
+
+[`VarCorr.mvgam()`](https://nicholasjclark.github.io/mvgam/reference/VarCorr.mvgam.md)
+summarises the standard deviations and correlations.
+[`fixef.mvgam()`](https://nicholasjclark.github.io/mvgam/reference/mvgam_diagnostics.md)
+summarises the population-level effects.
+
+Other posterior summaries:
+[`VarCorr.mvgam()`](https://nicholasjclark.github.io/mvgam/reference/VarCorr.mvgam.md),
+[`bibtex()`](https://nicholasjclark.github.io/mvgam/reference/bibtex.md),
+[`how_to_cite.mvgam()`](https://nicholasjclark.github.io/mvgam/reference/how_to_cite.mvgam.md),
+[`hypothesis.mvgam()`](https://nicholasjclark.github.io/mvgam/reference/hypothesis.mvgam.md),
+[`index-mvgam`](https://nicholasjclark.github.io/mvgam/reference/index-mvgam.md),
+[`mcmc_plot.mvgam()`](https://nicholasjclark.github.io/mvgam/reference/mcmc_plot.mvgam.md),
+[`methods_md()`](https://nicholasjclark.github.io/mvgam/reference/methods_md.md),
+[`mvgam_draws`](https://nicholasjclark.github.io/mvgam/reference/mvgam_draws.md),
+[`pairs.mvgam()`](https://nicholasjclark.github.io/mvgam/reference/pairs.mvgam.md),
+[`posterior_interval.mvgam()`](https://nicholasjclark.github.io/mvgam/reference/posterior_interval.mvgam.md),
+[`smooths.mvgam()`](https://nicholasjclark.github.io/mvgam/reference/smooths.mvgam.md),
+[`summary.mvgam()`](https://nicholasjclark.github.io/mvgam/reference/summary.mvgam.md)
+
+## Author
+
+Nicholas J Clark
+
+## Examples
+
+``` r
+# \dontrun{
+set.seed(14)
+simdat <- sim_mvgam(family = poisson(), n_series = 4L,
+                    n_timepoints = 120L, trend_model = AR())
+mod <- mvgam(y ~ s(x, k = 5) + (1 | series),
+             trend_formula = ~ AR(p = 1),
+             data = simdat$data_train, family = poisson(),
+             chains = 2, silent = 2)
+#> Warning: 192 of 2000 (10.0%) transitions ended with a divergence.
+#> See https://mc-stan.org/misc/warnings for details.
+
+# Each series' intercept deviation, one row per series
+ranef(mod)$series[, , "Intercept"]
+#>             Estimate Est.Error       Q2.5     Q97.5
+#> series_1  0.01480113 0.1353201 -0.3027386 0.3219071
+#> series_2 -0.02923905 0.1363329 -0.3435093 0.2557055
+#> series_3 -0.06737114 0.1460554 -0.4145857 0.2007312
+#> series_4  0.07008153 0.1458857 -0.1828345 0.4213476
+
+# Next: VarCorr() gives the standard deviation of these deviations
+# }
+```
