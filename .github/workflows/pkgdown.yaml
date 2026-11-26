@@ -23,7 +23,7 @@ jobs:
       R_KEEP_PKG_SOURCE: yes
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - uses: r-lib/actions/setup-pandoc@v2
       - uses: r-lib/actions/setup-r@v2
@@ -45,8 +45,6 @@ jobs:
               ggrepel
               ggpp
               ggarrow
-              corpcor
-              splines2
               scoringRules
               matrixStats
               xts
@@ -54,14 +52,34 @@ jobs:
               rmarkdown
               stan-dev/cmdstanr
               usethis
+              ape
+              mvabund
+              future
+              bridgesampling
+              V8
+              WDI
+              tsibble
 
       - name: Build Cmdstan and install development brms version
         run: |
           cmdstanr::check_cmdstan_toolchain(fix = TRUE)
           cmdstanr::install_cmdstan()
           remotes::install_github('paul-buerkner/brms')
-          remotes::install_version("pkgdown", version = "2.0.9")
+          remotes::install_version("pkgdown", version = "2.2.0")
         shell: Rscript {0}
+
+      # pkgdown renders every top-level .md file. CLAUDE.md holds
+      # development instructions for the repository.
+      - name: Keep development notes off the site
+        run: rm -f CLAUDE.md
+
+      # misc/ holds the cheatsheet sources and their PDFs. pkgdown copies
+      # pkgdown/assets/ into the site root, which serves them at
+      # cheatsheets/.
+      - name: Copy the cheatsheets into the site
+        run: |
+          mkdir -p pkgdown/assets/cheatsheets
+          cp misc/*_cheatsheet.pdf misc/*_cheatsheet.png pkgdown/assets/cheatsheets/
 
       - name: Build site
         run: pkgdown::build_site_github_pages(lazy = TRUE, run_dont_run = TRUE, new_process = FALSE, install = FALSE)

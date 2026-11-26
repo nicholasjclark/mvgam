@@ -1,61 +1,60 @@
 #' `mvgam_forecast` object description
 #'
 #' A \code{mvgam_forecast} object returned by function \code{\link{hindcast}}
-#' or \code{\link{forecast}}. Run `methods(class = "mvgam_forecast")` to see
-#' an overview of available methods.
+#' or \code{\link[generics]{forecast}}. Run
+#' `methods(class = "mvgam_forecast")` to see an overview of available
+#' methods.
 #'
 #' @details A `mvgam_forecast` object contains the following elements:
 #'
 #' \itemize{
-#'   \item `call` the original observation model formula
-#'
-#'   \item `trend_call` If a `trend_formula was supplied`, the original trend
-#'     model formula is returned. Otherwise `NULL`
-#'
-#'   \item `family` \code{character} description of the observation distribution
+#'   \item `family` \code{character} description of the observation
+#'     distribution.
 #'
 #'   \item `family_pars` \code{list} containing draws of family-specific
-#'     parameters (i.e. shape, scale or overdispersion parameters). Only
-#'     returned if `type = link`. Otherwise `NULL`
+#'     parameters (e.g. shape, scale, overdispersion). Only returned when
+#'     `type = "link"`; otherwise `NULL`.
 #'
-#'   \item `trend_model` \code{character} description of the latent trend model
+#'   \item `type` The type of predictions included
+#'     (`"link"`, `"response"`, `"expected"`, or `"trend"`).
 #'
-#'   \item `drift` Logical specifying whether a drift term was used in the
-#'     trend model
+#'   \item `series_names` Factor of series names, taken from
+#'     `levels(data$series)` in the original model fit.
 #'
-#'   \item `use_lv` Logical flag indicating whether latent dynamic factors were
-#'     used in the model
+#'   \item `train_observations`, `train_times` Lists of length `n_series`
+#'     holding the training responses and the time of each hindcast
+#'     column. A closure-unit family's `"expected"` and `"response"`
+#'     hindcasts have one column per visit. Their times repeat.
 #'
-#'   \item `fit_engine` `Character` describing the fit engine, either as `stan`
-#'     or `jags`
+#'   \item `test_observations`, `test_times` If `forecast()` produced the
+#'     object, the corresponding test response vectors and time grids.
+#'     `NULL` otherwise (e.g. from `hindcast()`).
 #'
-#'   \item `type` The type of predictions included (either `link`, `response`
-#'     or `trend`)
+#'   \item `hindcasts` Named list of posterior hindcast draw matrices, one
+#'     `(ndraws x n_train)` matrix per series.
 #'
-#'   \item `series_names` Names of the time series, taken from
-#'     `levels(data$series)` in the original model fit
+#'   \item `forecasts` Named list of posterior forecast draw matrices when
+#'     produced by `forecast()`, otherwise `NULL`.
 #'
-#'   \item `train_observations` A `list` of training observation vectors of
-#'     length `n_series`
+#'   \item `site_units` `TRUE` when the fit came from [jsdgam()]. Its
+#'     units are sites, which `plot()` refuses to draw along a time
+#'     axis.
 #'
-#'   \item `train_times` A `list` of the unique training times of length
-#'     `n_series`
-#'
-#'   \item `test_observations` If the \code{\link{forecast}} function was used,
-#'     a `list` of test observation vectors of length `n_series`. Otherwise
-#'     `NULL`
-#'
-#'   \item `test_times` If the \code{\link{forecast}} function was used, a
-#'     `list` of the unique testing (validation) times of length `n_series`.
-#'     Otherwise `NULL`
-#'
-#'   \item `hindcasts` A `list` of posterior hindcast distributions of length
-#'     `n_series`.
-#'
-#'   \item `forecasts` If the \code{\link{forecast}} function was used, a
-#'     `list` of posterior forecast distributions of length `n_series`.
-#'     Otherwise `NULL`
+#'   \item `component` The state components of the trend the draws hold,
+#'     such as `"slope"`, or `NULL` for the summed trend. Set through
+#'     the `component` argument of [hindcast.mvgam()] and
+#'     [forecast.mvgam()].
 #' }
+#'
+#' @section Methods:
+#' `print()` gives the family, the number of series, the sizes of the
+#' training and forecast windows and the number of draws. `summary()`
+#' returns a long tibble with one row per series and time: the median
+#' and the two quantiles of `probs`, the observed value for
+#' `type = "response"` and the prediction type. Trend components add a
+#' `component` column, their names joined by `" + "`. A multivariate
+#' fit on a long frame adds a leading `resp` column. [plot.mvgam_forecast()]
+#' draws the object.
 #'
 #' @seealso [mvgam], [hindcast.mvgam], [forecast.mvgam]
 #'
@@ -64,118 +63,154 @@
 #' @name mvgam_forecast-class
 NULL
 
-#' @title Posterior summary of hindcast and forecast objects
-#'
-#' @description This function takes an \code{mvgam_forecast} object and
-#'   calculates a posterior summary of the hindcast and forecast distributions
-#'   of each series, along with any true values that were included in `data`
-#'   and `newdata` if `type = 'response'` was used in the call to
-#'   \code{hindcast()} or \code{function()}
-#'
-#' @param object an object of class `mvgam_forecast` obtained using either the
-#'   \code{hindcast()} or \code{function()} function. This object will contain
-#'   draws from the posterior distribution of hindcasts and forecasts.
-#'
-#' @param probs The upper and lower percentiles to be computed by the
-#'   `quantile` function, in addition to the median
-#'
-#' @param ... ignored
-#'
-#' @return A long-format `tibble` / `data.frame` reporting the posterior median,
-#'   upper and lower percentiles of the predictions for each series at each of
-#'   the timepoints that were originally supplied in `data` and, optionally,
-#'   in `newdata`.
-#'
+#' @param object An `mvgam_forecast` object.
+#' @param probs The lower and upper quantiles reported with the median.
+#'   Defaults to `c(0.025, 0.975)`.
+#' @rdname mvgam_forecast-class
 #' @method summary mvgam_forecast
-#'
-#' @seealso \code{\link{forecast.mvgam}}, \code{\link{plot.mvgam_forecast}}
-#'
-#' @author Nicholas J Clark
-#'
 #' @export
-summary.mvgam_forecast = function(object, probs = c(0.025, 0.975), ...) {
-  if (length(probs) != 2L) {
-    stop("argument 'probs' must be a vector of length 2", call. = FALSE)
+summary.mvgam_forecast <- function(object, probs = c(0.025, 0.975), ...) {
+  rlang::check_dots_empty()
+  parts <- forecast_parts(object)
+  if (is_forecast_list(parts)) {
+    out <- do.call(rbind, lapply(names(parts), function(r) {
+      cbind(resp = r, summary(parts[[r]], probs = probs))
+    }))
+    return(tibble::as_tibble(out))
   }
-  validate_proportional(min(probs))
-  validate_proportional(max(probs))
-
-  n_series <- length(object$series_names)
-  type <- object$type
-
-  # Extract predictions and truths (if type = 'response')
-  fc_preds <- do.call(
-    rbind,
-    lapply(1:n_series, function(x) {
-      s_name <- object$series_names[x]
-      preds <- cbind(
-        object$hindcasts[[which(names(object$hindcasts) == s_name)]],
-        object$forecasts[[which(names(object$forecasts) == s_name)]]
-      )
-
-      # Calculate quantiles of the forecast distribution
-      cred <- sapply(
-        1:NCOL(preds),
-        function(n) quantile(preds[, n], probs = probs, na.rm = TRUE)
-      )
-      meds <- apply(preds, 2, median)
-
-      # Put into a long "tidy" dataframe
-      if (type == 'response') {
-        df <- data.frame(
-          series = s_name,
-          time = c(
-            object$train_times[[which(names(object$hindcasts) == s_name)]],
-            object$test_times[[which(names(object$hindcasts) == s_name)]]
-          ),
-          pred_median = meds,
-          pred_Qlower = cred[1, ],
-          pred_Qupper = cred[2, ],
-          truth = c(
-            object$train_observations[[s_name]],
-            object$test_observations[[s_name]]
-          ),
-          type = 'response'
-        )
-        colnames(df) <- c(
-          'series',
-          'time',
-          'predQ50',
-          paste0('predQ', 100 * min(probs)),
-          paste0('predQ', 100 * max(probs)),
-          'truth',
-          'type'
-        )
-        rownames(df) <- NULL
-      } else {
-        df <- data.frame(
-          series = s_name,
-          time = c(
-            object$train_times[[which(names(object$hindcasts) == s_name)]],
-            object$test_times[[which(names(object$hindcasts) == s_name)]]
-          ),
-          predQ50 = meds,
-          predQlower = cred[1, ],
-          predQupper = cred[2, ],
-          type = type
-        )
-        colnames(df) <- c(
-          'series',
-          'time',
-          'predQ50',
-          paste0('predQ', 100 * min(probs)),
-          paste0('predQ', 100 * max(probs)),
-          'type'
-        )
-        rownames(df) <- NULL
-      }
-      df
-    })
-  ) %>%
-    dplyr::mutate(
-      series = factor(series, levels = object$series_names)
+  object <- parts
+  fc_preds <- do.call(rbind, lapply(object$series_names, function(s_name) {
+    # The time vectors are listed in the order of the hindcasts.
+    pos <- match(s_name, names(object$hindcasts))
+    preds <- cbind(object$hindcasts[[pos]], object$forecasts[[s_name]])
+    df <- data.frame(
+      series = s_name,
+      time = c(object$train_times[[pos]], object$test_times[[pos]]),
+      median_interval_cols(preds, probs, "pred")
     )
-  class(fc_preds) <- c("tbl_df", "tbl", "data.frame")
+    if (identical(object$type, "response")) {
+      df$truth <- c(object$train_observations[[s_name]],
+                    object$test_observations[[s_name]])
+    }
+    df$type <- object$type
+    if (!is.null(object$component)) {
+      df$component <- component_label(object$component)
+    }
+    df
+  }))
+  fc_preds$series <- factor(fc_preds$series, levels = object$series_names)
+  tibble::as_tibble(fc_preds)
+}
 
-  return(fc_preds)
+
+#' The forecasts a method acts on
+#'
+#' A multivariate fit's forecast is a wrapper holding one forecast per
+#' response. Its own slots are empty. On a wide frame the responses are
+#' the series. The wrapper then becomes one forecast over them. On a
+#' long frame every response shares its series' latent state. A
+#' trend-scale wrapper repeats that state once per response and becomes
+#' its first element. Other scales differ by response. Each element
+#' remains its response's forecast.
+#'
+#' @param x An `mvgam_forecast` object
+#' @return An `mvgam_forecast` object, or the long wrapper as a named
+#'   list of `mvgam_forecast` objects
+#' @noRd
+forecast_parts <- function(x) {
+  checkmate::assert_class(x, "mvgam_forecast")
+  if (isTRUE(attr(x, "response_keyed"))) {
+    return(response_axis_forecast(x))
+  }
+  if (!isTRUE(attr(x, "mv_wrapper"))) {
+    return(x)
+  }
+  if (identical(x[[1L]]$type, "trend")) {
+    return(x[[1L]])
+  }
+  lapply(unclass(x), identity)
+}
+
+
+#' Whether `forecast_parts()` returned one forecast per response
+#'
+#' @param parts The value of `forecast_parts()`
+#' @return A single logical
+#' @noRd
+is_forecast_list <- function(parts) !inherits(parts, "mvgam_forecast")
+
+
+#' @param x An `mvgam_forecast` object.
+#' @param ... Unused. Anything passed here is refused.
+#' @rdname mvgam_forecast-class
+#' @method print mvgam_forecast
+#' @export
+print.mvgam_forecast <- function(x, ...) {
+  parts <- forecast_parts(x)
+  if (is_forecast_list(parts)) {
+    for (r in names(parts)) {
+      cat("Response '", r, "'\n", sep = "")
+      print(parts[[r]])
+    }
+    return(invisible(x))
+  }
+  x_in <- x
+  x <- parts
+  n_series <- length(x$series_names)
+  # The count is of occasions, one count per series. A closure-unit
+  # hindcast has one column per visit and several visits on each
+  # occasion. Series observed or forecast at their own times hold
+  # different numbers. The header then prints their range.
+  n_occasions <- function(draws, times) {
+    if (length(draws) == 0L) return(0L)
+    counts <- if (is.null(times)) {
+      vapply(draws, ncol, integer(1L))
+    } else {
+      vapply(times, function(t) length(unique(t)), integer(1L))
+    }
+    range(counts)
+  }
+  count_label <- function(n) {
+    if (length(unique(n)) == 1L) {
+      return(paste0(n[1L], " timepoints"))
+    }
+    paste0(n[1L], " to ", n[2L], " timepoints per series")
+  }
+  n_train <- n_occasions(x$hindcasts, x$train_times)
+  n_test <- n_occasions(x$forecasts, x$test_times)
+  n_draws <- if (!is.null(x$hindcasts) && length(x$hindcasts) > 0L) {
+    nrow(x$hindcasts[[1L]])
+  } else if (!is.null(x$forecasts) && length(x$forecasts) > 0L) {
+    nrow(x$forecasts[[1L]])
+  } else {
+    0L
+  }
+  ensemble_w <- attr(x, "weights", exact = TRUE)
+  scale <- paste0("type '", x$type %||% "response", "'",
+                  if (!is.null(x$component)) {
+                    paste0(", component '", component_label(x$component),
+                           "'")
+                  })
+  lines <- c(
+    paste0("mvgam_forecast (", scale, ")"),
+    paste0("  family:    ",
+           paste(unique(x$family %||% "unknown"), collapse = ", ")),
+    paste0("  series:    ", n_series),
+    paste0("  hindcast:  ", count_label(n_train)),
+    paste0("  forecast:  ",
+           if (all(n_test == 0L)) "0 (hindcast only)" else
+             count_label(n_test)),
+    paste0("  draws:     ", n_draws)
+  )
+  if (!is.null(ensemble_w)) {
+    lines <- c(
+      lines,
+      paste0("  ensemble:  ", length(ensemble_w),
+             " components (weights ",
+             paste(sprintf("%.2f", as.numeric(ensemble_w)),
+                   collapse = ", "), ")")
+    )
+  }
+  cat(lines, sep = "\n")
+  invisible(x_in)
 }

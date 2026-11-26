@@ -2,32 +2,85 @@
 % Please edit documentation in R/mvgam_irf-class.R
 \name{mvgam_irf-class}
 \alias{mvgam_irf-class}
+\alias{summary.mvgam_irf}
+\alias{plot.mvgam_irf}
 \title{\code{mvgam_irf} object description}
+\usage{
+\method{summary}{mvgam_irf}(object, probs = c(0.025, 0.975), ...)
+
+\method{plot}{mvgam_irf}(x, series = 1, responses = NULL, ...)
+}
+\arguments{
+\item{object}{An \code{mvgam_irf} object from \code{irf(summary = FALSE)}.}
+
+\item{probs}{The lower and upper percentiles of the interval.
+Defaults to \code{c(0.025, 0.975)}.}
+
+\item{...}{Unused. Anything passed here is refused.}
+
+\item{x}{An \code{mvgam_irf} object.}
+
+\item{series}{Position or name of the process given the shock.}
+
+\item{responses}{Optional positions or names of the processes drawn
+as response panels. Defaults to every process.}
+}
 \description{
-A \code{mvgam_irf} object returned by function \code{\link{irf}}.
-Run \code{methods(class = "mvgam_irf")} to see an overview of available methods.
+The objects returned by \code{\link[=irf]{irf()}}. Run \code{methods(class = "mvgam_irf")}
+and \code{methods(class = "mvgam_irf_summary")} to see an overview of
+available methods.
 }
 \details{
-Generalized or Orthogonalized Impulse Response Functions can be
-computed using the posterior estimates of Vector Autoregressive parameters.
-This function generates a positive "shock" for a target process at time
-\code{t = 0} and then calculates how each of the remaining processes in the
-latent VAR are expected to respond over the forecast horizon \code{h}. The
-function computes IRFs for all processes in the object and returns them in
-an array that can be plotted using the S3 \code{plot} function. To inspect
-community-level metrics of stability using latent VAR processes, you can
-use the related \code{\link[=stability]{stability()}} function.
+Generalized or Orthogonalized Impulse Response Functions
+are computed from the posterior estimates of Vector Autoregressive
+parameters. \code{\link[=irf]{irf()}} applies a positive shock of one standard
+deviation to one process and calculates how each process in the
+latent VAR responds over \code{h} horizons, for every process in turn.
+Horizon 1 is the time step of the shock. \code{\link[=stability]{stability()}} computes
+community-level metrics of stability from the same parameters.
 
-A \code{mvgam_irf} object contains a \code{list} of posterior impulse response
-functions, each stored as its own \code{list}
+A shock response is a \code{K} by \code{K} matrix per horizon per posterior
+draw. On a wide panel the draws run to hundreds of megabytes,
+where a median and an interval are what a reader uses. \code{\link[=irf]{irf()}}
+returns the summary by default. The two forms carry different
+classes:
+\itemize{
+\item \code{mvgam_irf_summary}, the default. A long-format \code{tibble}
+inheriting from \code{mvgam_var_surface_summary}, with one row per
+shock-response pair per horizon. \code{shock} names the pair as
+\code{"<from> -> <to>"}, taking the model's own series names where
+the latent processes are the series and \code{"Process_k"} where a
+factor VAR's processes are latent factors instead. \code{horizon}
+counts from 1, the time step of the shock. Three further
+columns hold the posterior median and the interval bounds,
+named for the percentiles asked for: \code{irfQ50}, \code{irfQ2.5} and
+\code{irfQ97.5} by default. An
+\code{irf_type} attribute records whether the responses are
+orthogonalised.
+\item \code{mvgam_irf}, returned under \code{summary = FALSE}. A \code{list} with one
+element per posterior draw, each itself a \code{list} holding one
+\code{h} by \code{K} matrix of responses per shocked process. Pass it to
+\code{summary()} to reach the form above.
 }
+
+Both forms take \code{ndraws} and \code{draw_ids}. A subset of the posterior
+shortens the computation.
+}
+\section{Methods}{
+
+\code{summary()} turns the draws into the \code{mvgam_irf_summary} above, at
+the percentiles \code{probs} sets. \code{plot()} draws the response of each
+process to a shock to \code{series}, with its median and interval by
+horizon. A summary plots through \code{\link[=plot.mvgam_var_surface_summary]{plot.mvgam_var_surface_summary()}}.
+}
+
 \references{
-PH Pesaran & Shin Yongcheol (1998).
-Generalized impulse response analysis in linear multivariate models.
-Economics Letters 58: 17–29.
+Pesaran HH and Shin Y (1998). Generalized impulse
+response analysis in linear multivariate models. Economics Letters
+58, 17-29. \doi{10.1016/S0165-1765(97)00214-0}
 }
 \seealso{
-\link{mvgam}, \link{VAR}
+\link{mvgam}, \link{VAR}, \link{irf}, \link{stability}
 }
 \author{
 Nicholas J Clark

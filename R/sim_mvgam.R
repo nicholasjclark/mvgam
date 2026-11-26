@@ -1,620 +1,989 @@
-#' Simulate a set of time series for modelling in \pkg{mvgam}
+#' Simulate `mvgam`-shaped time-series data with known truth
 #'
-#' This function simulates sets of time series data for fitting a
-#' multivariate GAM that includes shared seasonality and dependence on
-#' State-Space latent dynamic factors. Random dependencies among series,
-#' i.e. correlations in their long-term trends, are included in the form of
-#' correlated loadings on the latent dynamic factors
+#' Simulates training and test data from one of seven
+#' observation-side recipes (`type`) combined with a latent trend
+#' (`trend_model`). The recipes cover smooths, Gaussian processes and
+#' random effects. Every generative quantity is returned for recovery
+#' checks.
 #'
-#' @importFrom stats rnorm rbeta rpois rlnorm rgamma cor cov2cor cov ts
-#' @importFrom brms lognormal
+#' @param type Integer in `1:7` selecting the observation-side
+#'   recipe. See *Details*.
+#' @param family The observation family: `gaussian()` (the default),
+#'   `student()`, `poisson()`, `negbinomial()`, `bernoulli()`,
+#'   `binomial()`, `Beta()`, `Gamma()`, [tweedie()], [beta_nb()] or
+#'   [com_binomial()], or the matching `brms::brmsfamily()`.
+#' @param n_series Integer number of series. Defaults to `1L`.
+#' @param n_timepoints Integer number of time points per series.
+#'   Defaults to `80L`.
+#' @param trend_model A trend constructor such as `AR(p = 1)`,
+#'   `AR(p = c(1, 12))`, `VAR(cor = TRUE)`, `CAR()`, `ZMVN()` or
+#'   `PW()`. `NULL` (the default) takes the type's own trend. `"None"`
+#'   simulates no trend. To fit the simulated data, name the same
+#'   trend inside `trend_formula`, as in `mvgam(y ~ s(x), trend_formula =
+#'   ~ AR())`. [mvgam()] refuses a `trend_model` argument.
+#' @param prop_trend Share of the link-scale variance given to the
+#'   trend, in `[0, 1]`. `NULL` takes the type's default: 0.2 for type
+#'   5, 0.6 for types 2, 3, 4 and 7, and 0.5 for types 1 and 6.
+#' @param proportional_train Share of the time points kept in
+#'   `data_train`, between 0.1 and 1. The remaining, later time points
+#'   form `data_test`. Defaults to `0.75`.
+#' @param prop_missing Share of the training responses set to `NA`,
+#'   between 0 and 0.5. Defaults to `0`.
+#' @param family_pars Optional named list of family parameters:
+#'   `sigma` and `nu` (gaussian, student), `size` (negative binomial),
+#'   `trials` (binomial, com_binomial), `phi` (beta, tweedie), `shape`
+#'   (gamma, beta_nb), `power` (tweedie), `mtail` (beta_nb) and `nu`
+#'   (com_binomial dispersion). Unset entries take defaults.
+#' @param seed Optional integer seed. The session's random state is
+#'   restored when the call returns.
 #'
-#' @param T \code{integer}. Number of observations (timepoints)
+#' @details
+#' \describe{
+#'   \item{`type = 1`}{`y ~ s(x)` with an `RW()` trend.}
+#'   \item{`type = 2`}{`y ~ s(x) + s(z)` with an `AR(p = 1)` trend
+#'     whose coefficient is 0.7.}
+#'   \item{`type = 3`}{`y ~ s(x) + (1 | grp)` with an `AR(p = 1)`
+#'     trend whose coefficient is 0.7. The random intercept has five
+#'     levels.}
+#'   \item{`type = 4`}{`y ~ gp(x)` with an `AR(p = 1)` trend whose
+#'     coefficient is 0.7.}
+#'   \item{`type = 5`}{`y ~ x` with `trend_formula = ~ s(z)` and an
+#'     `AR(p = 1)` trend whose coefficient is 0.6. The smallest
+#'     `prop_trend` default keeps the autoregression separable from the
+#'     smooth.}
+#'   \item{`type = 6`}{`y ~ s(season, bs = "cc")` with a `CAR()` trend
+#'     on irregular gaps drawn from `Uniform(1, 6)`. The autocorrelation
+#'     over the median gap is 0.7.}
+#'   \item{`type = 7`}{`y ~ s(x)` with a sparse `AR(p = c(1, 12))`
+#'     trend whose coefficients are 0.55 and 0.40. The covariate is not
+#'     periodic. All of the seasonal recurrence comes from the lag-12
+#'     coefficient.}
+#' }
 #'
-#' @param n_series \code{integer}. Number of discrete time series
+#' Covariates are drawn independently for each row. Series are
+#' independent unless the trend correlates them, as `VAR()`, `ZMVN()`
+#' and `cor = TRUE` do. The trend and the observation-side terms are
+#' each centred, then rescaled to their shares of a link-scale standard
+#' deviation that keeps the response in a plausible range for the
+#' family.
 #'
-#' @param seasonality \code{character}. Either \code{shared}, meaning that
-#'   all series share the exact same seasonal pattern, or
-#'   \code{hierarchical}, meaning that there is a global seasonality but
-#'   each series' pattern can deviate slightly
-#'
-#' @param use_lv \code{logical}. If \code{TRUE}, use dynamic factors to
-#'   estimate series' latent trends in a reduced dimension format. If
-#'   \code{FALSE}, estimate independent latent trends for each series
-#'
-#' @param n_lv \code{integer}. Number of latent dynamic factors for
-#'   generating the series' trends. Defaults to `0`, meaning that dynamics
-#'   are estimated independently for each series
-#'
-#' @param trend_model \code{character} specifying the time series dynamics
-#'   for the latent trend. Options are:
-#'   \itemize{
-#'     \item `None` (no latent trend component; i.e. the GAM component is
-#'     all that contributes to the linear predictor, and the observation
-#'     process is the only source of error; similarly to what is estimated
-#'     by \code{\link[mgcv]{gam}})
-#'     \item `RW` (random walk with possible drift)
-#'     \item `AR1` (with possible drift)
-#'     \item `AR2` (with possible drift)
-#'     \item `AR3` (with possible drift)
-#'     \item `VAR1` (contemporaneously uncorrelated VAR1)
-#'     \item `VAR1cor` (contemporaneously correlated VAR1)
-#'     \item `GP` (Gaussian Process with squared exponential kernel)
+#' @return A list of class `"mvgam_sim"`:
+#'   \describe{
+#'     \item{`data_train`, `data_test`}{Long data frames with columns
+#'       `y`, `series`, `time`, the recipe's covariates and, for
+#'       binomial families, `trials`. `data_test` is `NULL` when
+#'       `proportional_train = 1`.}
+#'     \item{`family`, `trend_model`, `type`}{The simulation settings.}
+#'     \item{`true_betas`}{Named population-level coefficients.}
+#'     \item{`true_smooths`}{Named list of data frames holding each
+#'       true smooth on a grid of its covariate, in column `f_true`.}
+#'     \item{`true_trend`}{`[n_timepoints, n_series]` matrix of the
+#'       latent trend.}
+#'     \item{`true_trend_sigma`}{Standard deviation of `true_trend`.}
+#'     \item{`true_sigma_obs`}{The family's scale or dispersion, or
+#'       `NA` for a family without one.}
 #'   }
-#'   See [mvgam_trends] for more details
+#'   `summary()` returns the design and these true parameters as an
+#'   `mvgam_sim_summary` list, with the number of series, time points,
+#'   training and test rows and the names of the true smooths.
+#'   `print()` shows that summary.
 #'
-#' @param drift \code{logical}, simulate a drift term for each trend
+#' @author Nicholas J Clark
 #'
-#' @param prop_trend \code{numeric}. Relative importance of the trend for
-#'   each series. Should be between \code{0} and \code{1}
-#'
-#' @param trend_rel Deprecated. Use `prop_trend` instead
-#'
-#' @param freq \code{integer}. The seasonal frequency of the series
-#'
-#' @param family \code{family} specifying the exponential observation
-#'   family for the series. Currently supported families are: `nb()`,
-#'   `poisson()`, `bernoulli()`, `tweedie()`, `gaussian()`, `betar()`,
-#'   `lognormal()`, `student()` and `Gamma()`
-#'
-#' @param phi \code{vector} of dispersion parameters for the series
-#'   (i.e. `size` for `nb()` or `phi` for `betar()`). If
-#'   \code{length(phi) < n_series}, the first element of `phi` will be
-#'   replicated `n_series` times. Defaults to \code{5} for `nb()` and
-#'   `tweedie()`; \code{10} for `betar()`
-#'
-#' @param shape \code{vector} of shape parameters for the series
-#'   (i.e. `shape` for `gamma()`). If \code{length(shape) < n_series},
-#'   the first element of `shape` will be replicated `n_series` times.
-#'   Defaults to \code{10}
-#'
-#' @param sigma \code{vector} of scale parameters for the series
-#'   (i.e. `sd` for `gaussian()` or `student()`, `log(sd)` for
-#'   `lognormal()`). If \code{length(sigma) < n_series}, the first element
-#'   of `sigma` will be replicated `n_series` times. Defaults to
-#'   \code{0.5} for `gaussian()` and `student()`; \code{0.2} for
-#'   `lognormal()`
-#'
-#' @param nu \code{vector} of degrees of freedom parameters for the series
-#'   (i.e. `nu` for `student()`). If \code{length(nu) < n_series}, the
-#'   first element of `nu` will be replicated `n_series` times. Defaults
-#'   to \code{3}
-#'
-#' @param mu \code{vector} of location parameters for the series. If
-#'   \code{length(mu) < n_series}, the first element of `mu` will be
-#'   replicated `n_series` times. Defaults to small random values between
-#'   `-0.5` and `0.5` on the link scale
-#'
-#' @param prop_missing \code{numeric} stating proportion of observations
-#'   that are missing. Should be between \code{0} and \code{0.8}, inclusive
-#'
-#' @param prop_train \code{numeric} stating the proportion of data to use
-#'   for training. Should be between \code{0.2} and \code{1}
-#'
-#' @return A \code{list} object containing outputs needed for
-#'   \code{\link{mvgam}}, including 'data_train' and 'data_test', as well
-#'   as some additional information about the simulated seasonality and
-#'   trend dependencies
-#'
-#' @references Clark, N. J. and Wells, K. (2022). Dynamic generalised
-#'   additive models (DGAMs) for forecasting discrete ecological time
-#'   series. \emph{Methods in Ecology and Evolution}, 13(11), 2388-2404.
-#'   \doi{10.1111/2041-210X.13974}
+#' @seealso [mvgam()] fits the simulated data. [sim_closure_unit_data()]
+#'   simulates occupancy and N-mixture data. [sim_jsdgam()] simulates
+#'   site-by-species data. The
+#'   `r mvgam_article("mvgam_overview", "overview article")` fits a
+#'   model to data from `sim_mvgam()`.
 #'
 #' @examples
-#' # Simulate series with observations bounded at 0 and 1 (Beta responses)
-#' sim_data <- sim_mvgam(
-#'   family = betar(),
-#'   trend_model = RW(),
-#'   prop_trend = 0.6
+#' # Three Poisson series with an AR(1) latent trend
+#' simdat <- sim_mvgam(
+#'   family       = poisson(),
+#'   n_series     = 3L,
+#'   n_timepoints = 120L,
+#'   trend_model  = AR(),
+#'   seed         = 0L
 #' )
-#' plot_mvgam_series(data = sim_data$data_train, series = 'all')
+#' head(simdat$data_train)
+#' simdat
 #'
-#' # Now simulate series with overdispersed discrete observations
-#' sim_data <- sim_mvgam(
-#'   family = nb(),
-#'   trend_model = RW(),
-#'   prop_trend = 0.6,
-#'   phi = 10
-#' )
-#' plot_mvgam_series(data = sim_data$data_train, series = 'all')
+#' # The true smooth of x
+#' plot(f_true ~ x, data = simdat$true_smooths$`s(x)`, type = "l")
 #'
+#' # Next: mvgam(y ~ s(x), trend_formula = ~ AR(),
+#' #   data = simdat$data_train, family = poisson())
+#'
+#' @family simulation
 #' @export
-sim_mvgam = function(
-  T = 100,
-  n_series = 3,
-  seasonality = 'shared',
-  use_lv = FALSE,
-  n_lv = 0,
-  trend_model = RW(),
-  drift = FALSE,
-  prop_trend = 0.2,
-  trend_rel,
-  freq = 12,
-  family = poisson(),
-  phi,
-  shape,
-  sigma,
-  nu,
-  mu,
-  prop_missing = 0,
-  prop_train = 0.85
-) {
-  # Validate the family argument
-  family <- validate_family(family)
-  family_char <- match.arg(
-    arg = family$family,
-    choices = c(
-      'negative binomial',
-      "poisson",
-      "bernoulli",
-      "tweedie",
-      "beta",
-      "gaussian",
-      "lognormal",
-      "student",
-      "Gamma"
-    )
+sim_mvgam <- function(type = 1L,
+                      family = gaussian(),
+                      n_series = 1L,
+                      n_timepoints = 80L,
+                      trend_model = NULL,
+                      prop_trend = NULL,
+                      proportional_train = 0.75,
+                      prop_missing = 0,
+                      family_pars = list(),
+                      seed = NULL) {
+  checkmate::assert_int(type, lower = 1L, upper = 7L)
+  checkmate::assert_int(n_series, lower = 1L)
+  checkmate::assert_int(n_timepoints, lower = 5L)
+  checkmate::assert_number(proportional_train, lower = 0.1, upper = 1)
+  checkmate::assert_number(prop_missing, lower = 0, upper = 0.5)
+  checkmate::assert_list(family_pars)
+  checkmate::assert(
+    checkmate::check_null(trend_model),
+    checkmate::check_class(trend_model, "mvgam_trend"),
+    checkmate::check_choice(trend_model, "None"),
+    .var.name = "trend_model"
   )
+  checkmate::assert_number(prop_trend, lower = 0, upper = 1,
+                           null.ok = TRUE)
+  family <- validate_family(family)
+  fam_name <- resolve_family_name(family)
 
-  # Validate the trend arguments
-  trend_model <- validate_trend_model(trend_model, drift = drift, warn = FALSE)
-  if (trend_model %in% c('VAR1', 'VAR1cor')) {
-    use_lv <- FALSE
-  }
+  local_seed(seed)
 
-  if (trend_model %in% c('RWcor', 'AR1cor', 'AR2cor', 'AR3cor')) {
-    warning(paste0(
-      'Simulation of correlated AR or RW trends not yet supported.\n',
-      'Reverting to uncorrelated trends'
-    ))
-  }
+  spec <- sim_type_spec(type)
+  trend_model <- trend_model %||% spec$default_trend
+  prop_trend <- prop_trend %||% spec$default_prop_trend
 
-  if (missing(trend_rel)) {
-    trend_rel <- prop_trend
-  }
-  validate_proportional(trend_rel)
+  series_fac <- factor(
+    rep(paste0("series_", seq_len(n_series)), each = n_timepoints),
+    levels = paste0("series_", seq_len(n_series))
+  )
+  time_int <- rep(seq_len(n_timepoints), times = n_series)
+  built <- spec$build_data(n_timepoints = n_timepoints,
+                           n_series = n_series)
 
-  # Check n_series
-  validate_pos_integer(n_series)
-
-  # Check prop_missing
-  validate_proportional(prop_missing)
-
-  # Check n_lv
-  if (n_lv == 0) {
-    use_lv <- FALSE
-    n_lv <- n_series
-  } else {
-    validate_pos_integer(n_lv)
-    use_lv <- TRUE
-  }
-
-  if (use_lv) {
-    if (n_lv > n_series) {
-      warning(
-        'Argument "n_lv" cannot be greater than n_series; changing n_lv to match n_series'
-      )
-      n_lv <- n_series
-    }
-  }
-
-  # Check seasonality
-  if (!seasonality %in% c('shared', 'hierarchical')) {
-    stop('seasonality must be either shared or hierarchical')
-  }
-
-  # Check family-specific parameters
-  if (missing(phi)) {
-    if (family_char == 'beta') {
-      phi <- rep(10, n_series)
-    } else {
-      phi <- rep(5, n_series)
-    }
-  }
-
-  if (any(phi <= 0)) {
-    stop('Argument "phi" must be a non-negative real number', call. = FALSE)
-  }
-
-  if (missing(shape)) {
-    shape <- rep(1, n_series)
-  }
-
-  if (any(shape <= 0)) {
-    stop('Argument "shape" must be a non-negative real number', call. = FALSE)
-  }
-
-  if (missing(sigma)) {
-    if (family_char == 'lognormal') {
-      sigma <- rep(0.2, n_series)
-    } else {
-      sigma <- rep(0.5, n_series)
-    }
-  }
-
-  if (any(sigma <= 0)) {
-    stop('Argument "sigma" must be a non-negative real number', call. = FALSE)
-  }
-
-  if (missing(nu)) {
-    nu <- rep(3, n_series)
-  }
-
-  if (any(nu <= 0)) {
-    stop('Argument "nu" must be a non-negative real number', call. = FALSE)
-  }
-
-  if (missing(mu)) {
-    mu <- sample(seq(-0.5, 0.5), n_series, TRUE)
-  }
-
-  if (length(phi) < n_series) {
-    phi <- rep(phi[1], n_series)
-  }
-
-  if (length(shape) < n_series) {
-    shape <- rep(shape[1], n_series)
-  }
-
-  if (length(sigma) < n_series) {
-    sigma <- rep(sigma[1], n_series)
-  }
-
-  if (length(nu) < n_series) {
-    nu <- rep(nu[1], n_series)
-  }
-
-  if (length(mu) < n_series) {
-    mu <- rep(mu[1], n_series)
-  }
-
-  # Check data splitting
-  if (missing(prop_train)) {
-    prop_train <- 0.75
-  }
-  if (prop_train < 0.2 || prop_train > 1) {
-    stop(
-      'Argument "prop_train" must be a proportion ranging from 0.2 to 1, inclusive',
-      call. = FALSE
+  total_link_sd <- link_scale_budget(fam_name)
+  trend_params <- fill_multivariate_trend_defaults(
+    trend_model,
+    c(spec$trend_params, list(sigma = trend_sigma(prop_trend))),
+    n_series
+  )
+  trend_mat <- if (is_pw_trend(trend_model)) {
+    # A piecewise trend is deterministic given (k, m, delta, t_change)
+    trend_params <- fill_pw_trend_defaults(
+      trend_model, trend_params, n_series, n_timepoints
     )
-  }
-
-  # Set trend parameters
-  if (trend_model %in% c('RW', 'RWcor')) {
-    ar1s <- rep(1, n_lv)
-    ar2s <- rep(0, n_lv)
-    ar3s <- rep(0, n_lv)
-  }
-
-  if (trend_model %in% c('AR1', 'AR1cor')) {
-    ar1s <- rnorm(n_lv, sd = 0.5)
-    ar2s <- rep(0, n_lv)
-    ar3s <- rep(0, n_lv)
-  }
-
-  if (trend_model %in% c('AR2', 'AR2cor')) {
-    ar1s <- rnorm(n_lv, sd = 0.5)
-    ar2s <- rnorm(n_lv, sd = 0.5)
-    ar3s <- rep(0, n_lv)
-  }
-
-  if (trend_model %in% c('AR3', 'AR3cor')) {
-    ar1s <- rnorm(n_lv, sd = 0.5)
-    ar2s <- rnorm(n_lv, sd = 0.5)
-    ar3s <- rnorm(n_lv, sd = 0.5)
-  }
-
-  if (trend_model %in% c('RW', 'AR1', 'AR2', 'AR3', 'VAR1', 'VAR1cor')) {
-    # Sample trend drift terms so they are (hopefully) not too correlated
-    if (drift) {
-      trend_alphas <- rnorm(n_lv, sd = 0.5)
-    } else {
-      trend_alphas <- rep(0, n_lv)
-    }
-
-    # Simulate latent trends
-    if (!trend_model %in% c('VAR1', 'VAR1cor')) {
-      trends <- do.call(
-        cbind,
-        lapply(seq_len(n_lv), function(x) {
-          sim_ar3(
-            drift = 0,
-            ar1 = ar1s[x],
-            ar2 = ar2s[x],
-            ar3 = ar3s[x],
-            tau = 1,
-            last_trends = rnorm(3),
-            h = T
-          ) +
-            trend_alphas[x] * 1:T
-        })
-      )
-    }
-
-    if (trend_model %in% c('VAR1', 'VAR1cor')) {
-      if (trend_model == 'VAR1') {
-        # Simulate the Sigma matrix (contemporaneously uncorrelated)
-        Sigma <- matrix(0, n_lv, n_lv)
-        sigma <- runif(n_lv, 0.4, 1.2)
-        diag(Sigma) <- sigma
-      }
-
-      if (trend_model == 'VAR1cor') {
-        # Use the LKJ distribution to sample correlation matrices
-        # with nice properties
-        # Sample trend SD parameters and construct Sigma
-        sigma <- runif(n_lv, 0.4, 1.2)
-        Sigma <- outer(sigma, sigma) * lkj_corr(n_series = n_lv)
-      }
-
-      # Create a stationary VAR coefficient matrix
-      A <- stationary_VAR_phi(p = 1, n_series = n_lv)[[1]]
-
-      # Simulate the VAR trends
-      trends <- sim_var1(
-        drift = trend_alphas,
-        A = A,
-        Sigma = Sigma,
-        last_trends = mvnfast::rmvn(n = 1, mu = rep(0, n_lv), sigma = Sigma),
-        h = T
-      )
-    }
-  }
-
-  if (trend_model == 'GP') {
-    # Sample alpha and rho parameters
-    trend_alphas <- runif(n_lv, 0.75, 1.25)
-    trend_rhos <- runif(n_lv, 3, 8)
-
-    # Generate latent GP trends
-    trends <- do.call(
-      cbind,
-      lapply(seq_len(n_lv), function(lv) {
-        Sigma <- trend_alphas[lv]^2 *
-          exp(-0.5 * ((outer(1:T, 1:T, "-") / trend_rhos[lv])^2)) +
-          diag(1e-9, T)
-        mvnfast::rmvn(1, mu = rep(0, T), sigma = Sigma)[1, ]
-      })
-    )
-  }
-
-  if (use_lv) {
-    Sigma <- random_Sigma(n_series)
-    loadings <- as.matrix(matrix(
-      mvnfast::rmvn(n = n_lv, mu = rep(0, n_series), sigma = Sigma),
-      ncol = n_series
-    ))
-  } else {
-    # Else use independent trend loadings
-    loadings <- diag(n_lv)
-  }
-
-  # Simulate the global seasonal pattern
-  glob_season <- periodic_gp(T, period = freq, rho = runif(1, 0.5, 1.2))
-
-  # Simulate observed series as dependent on seasonality and trend
-  obs_trends <- matrix(NA, nrow = T, ncol = n_series)
-  for (s in 1:n_series) {
-    obs_trends[, s] <- as.vector(scale(as.vector(loadings[, s] %*% t(trends))))
-  }
-
-  obs_ys <- c(unlist(lapply(seq_len(n_series), function(x) {
-    if (seasonality == 'shared') {
-      dynamics <- (glob_season * (1 - trend_rel)) +
-        (obs_trends[, x] * trend_rel)
-    } else {
-      yseason <- as.vector(scale(stats::stl(
-        ts(rnorm(T, glob_season, sd = 2), frequency = freq),
-        'periodic'
-      )$time.series[, 1]))
-      dynamics <- (yseason * (1 - trend_rel)) +
-        (obs_trends[, x] * trend_rel)
-    }
-
-    if (family_char == 'negative binomial') {
-      out <- rnbinom(
-        length(dynamics),
-        size = phi[x],
-        mu = exp(mu[x] + dynamics)
-      )
-    }
-
-    if (family_char == 'poisson') {
-      out <- rpois(length(dynamics), lambda = exp(mu[x] + dynamics))
-    }
-
-    if (family_char == 'bernoulli') {
-      out <- rbinom(length(dynamics), size = 1, prob = plogis(mu[x] + dynamics))
-    }
-
-    if (family_char == 'tweedie') {
-      out <- rpois(
-        n = length(dynamics),
-        lambda = tweedie::rtweedie(
-          length(dynamics),
-          mu = exp(mu[x] + dynamics),
-          power = 1.5,
-          phi = phi[x]
-        )
-      )
-    }
-
-    if (family_char == 'gaussian') {
-      out <- rnorm(length(dynamics), mean = mu[x] + dynamics, sd = sigma[x])
-    }
-
-    if (family_char == 'student') {
-      out <- rstudent_t(
-        n = length(dynamics),
-        df = nu[x],
-        mu = mu[x] + dynamics,
-        sigma = sigma[x]
-      )
-    }
-
-    if (family_char == 'lognormal') {
-      out <- rlnorm(
-        length(dynamics),
-        meanlog = mu[x] + (dynamics * 0.3),
-        sdlog = sigma[x]
-      )
-    }
-
-    if (family_char == 'Gamma') {
-      out <- rgamma(
-        length(dynamics),
-        rate = shape[x] / exp(mu[x] + dynamics),
-        shape = shape[x]
-      )
-    }
-
-    if (family_char == 'beta') {
-      shape_pars <- beta_shapes(mu = plogis(mu[x] + dynamics), phi = phi[x])
-      out <- rbeta(
-        length(dynamics),
-        shape1 = shape_pars$shape1,
-        shape2 = shape_pars$shape2
-      )
-    }
-
-    out[is.infinite(out)] <- NA
-    if (prop_missing > 0) {
-      out[sample(seq(1, length(out)), floor(length(out) * prop_missing))] <- NA
-    }
-    out
-  })))
-
-  # Return simulated data in the format that is ready for mvgam analysis
-  sim_data = data.frame(
-    y = obs_ys,
-    season = rep(rep(seq(1, freq), ceiling(T / freq))[1:T], n_series),
-    year = rep(sort(rep(seq(1, ceiling(T / freq)), freq))[1:T], n_series),
-    series = as.factor(paste0('series_', sort(rep(seq(1, n_series), T))))
-  ) %>%
-    dplyr::group_by(series) %>%
-    dplyr::arrange(year, season) %>%
-    dplyr::mutate(time = 1:dplyr::n()) %>%
-    dplyr::ungroup()
-
-  data_train <- sim_data %>%
-    dplyr::filter(time <= floor(max(sim_data$time) * prop_train)) %>%
-    dplyr::ungroup() %>%
-    dplyr::group_by(series) %>%
-    dplyr::arrange(time)
-
-  data_test <- sim_data %>%
-    dplyr::filter(time > max(data_train$time)) %>%
-    dplyr::ungroup() %>%
-    dplyr::group_by(series) %>%
-    dplyr::arrange(time)
-
-  if (!use_lv) {
-    if (trend_model %in% c('RW', 'AR1', 'AR2', 'AR3')) {
-      trend_params = list(ar1 = ar1s, ar2 = ar2s, ar3 = ar3s)
-    }
-
-    if (trend_model %in% c('VAR1', 'VAR1cor')) {
-      trend_params = list(var1 = A, Sigma = Sigma)
-    }
-
-    if (trend_model == 'GP') {
-      trend_params = list(alpha = trend_alphas, rho = trend_rhos)
-    }
-
-    out <- list(
-      data_train = data.frame(data_train),
-      data_test = data.frame(data_test),
-      true_corrs = cov2cor(cov(obs_trends)),
-      true_trends = obs_trends,
-      global_seasonality = glob_season,
-      trend_params = trend_params
-    )
-  } else {
-    out <- list(
-      data_train = data.frame(data_train),
-      data_test = data.frame(data_test),
-      true_corrs = cov2cor(cov(obs_trends)),
-      true_trends = obs_trends,
-      global_seasonality = glob_season
-    )
-  }
-
-  return(out)
-}
-
-#' Simulate a fixed seasonal pattern
-#' @noRd
-sim_seasonal = function(T, freq = 12) {
-  beta1 <- runif(1, 0.2, 0.6)
-  beta2 <- runif(1, -0.5, 0.5)
-  cov1 <- sin(2 * pi * (1:T) / freq)
-  cov2 <- cos(2 * pi * (1:T) / freq)
-  rnorm(T, mean = beta1 * cov1 + beta2 * cov2, sd = 0.1)
-}
-
-#' Simulate from a periodic GP
-#' @noRd
-periodic_gp <- function(T, period = 12, rho = 1) {
-  time <- 1:T
-  cov_matrix = array(0, c(length(time), length(time)))
-  for (i in 1:length(time)) {
-    cov_matrix[i, i] = 1 + 0.00000001
-    if (i < length(time)) {
-      for (j in (i + 1):length(time)) {
-        covariance = exp(
-          -2 * (sin(pi * abs(time[i] - time[j]) / period)^2) / (rho^2)
-        )
-        cov_matrix[i, j] = covariance
-        cov_matrix[j, i] = covariance
-      }
-    }
-  }
-  chol_cov <- t(chol(cov_matrix))
-  values <- as.vector(scale(chol_cov %*% rnorm(length(time))))
-  return(values)
-}
-
-#' Simulate from the LKJ distribution
-#' @noRd
-lkj_corr <- function(n_series, eta = 0.8) {
-  alpha <- eta + (n_series - 2) / 2
-  r12 <- 2 * rbeta(1, alpha, alpha) - 1
-  R <- matrix(0, n_series, n_series)
-  R[1, 1] <- 1
-  R[1, 2] <- r12
-  R[2, 2] <- sqrt(1 - r12^2)
-  if (n_series > 2) {
-    for (m in 2:(n_series - 1)) {
-      alpha <- alpha - 0.5
-      y <- rbeta(1, m / 2, alpha)
-      z <- rnorm(m, 0, 1)
-      z <- z / sqrt(crossprod(z)[1])
-      R[1:m, m + 1] <- sqrt(y) * z
-      R[m + 1, m + 1] <- sqrt(1 - y)
-    }
-  }
-  return(crossprod(R))
-}
-
-#' Generate a random covariance matrix
-#' @noRd
-random_Sigma = function(N) {
-  L_Omega <- matrix(0, N, N)
-  L_Omega[1, 1] <- 1
-  for (i in 2:N) {
-    bound <- 1
-    for (j in 1:(i - 1)) {
-      is_sparse <- rbinom(1, 1, 0.6)
-      if (is_sparse) {
-        L_Omega[i, j] <- runif(1, -0.05, 0.05)
+    pw_trendC(
+      t = as.numeric(seq_len(n_timepoints)),
+      k = as.numeric(trend_params$k),
+      m = as.numeric(trend_params$m),
+      delta = trend_params$delta,
+      t_change = as.numeric(trend_params$t_change),
+      cap = if (pw_is_logistic(trend_model)) {
+        trend_params$cap
       } else {
-        L_Omega[i, j] <- runif(1, -sqrt(bound), sqrt(bound))
-      }
-      bound <- bound - L_Omega[i, j]^2
-    }
-    L_Omega[i, i] <- sqrt(bound)
+        matrix(0, 0L, 0L)
+      },
+      growth_type = pw_growth(trend_model)
+    )
+  } else {
+    # A type with irregular times supplies the gaps its trend runs over
+    propagate_trend(
+      trend_model = trend_model,
+      params = trend_params,
+      h = n_timepoints,
+      n_series = n_series,
+      time = built$trend_time
+    )
   }
-  Sigma <- L_Omega %*% t(L_Omega)
-  return(Sigma)
+
+  # A propagator's state components describe the unscaled path. The
+  # rescale below would leave them out of step with the true trend.
+  attr(trend_mat, "components") <- NULL
+
+  # Both components are centred. The mean of eta is then the family's
+  # intercept. Each is rescaled to its share of the link-scale
+  # variance. A scalar rescale keeps the shape of the trend: a random
+  # walk keeps its growing variance and an autoregression its
+  # autocorrelation.
+  trend_mat <- (trend_mat - mean(trend_mat)) *
+    sd_rescale_factor(trend_mat, total_link_sd * sqrt(prop_trend))
+  obs_centred <- built$obs_contrib - mean(built$obs_contrib)
+  obs_scale <- sd_rescale_factor(obs_centred,
+                                 total_link_sd * sqrt(1 - prop_trend))
+  obs_contrib <- obs_centred * obs_scale
+  # The recorded truths take the same centring and scale as the data
+  built$true_smooths <- lapply(built$true_smooths, function(df) {
+    df$f_true <- (df$f_true - mean(df$f_true)) * obs_scale
+    df
+  })
+  built$true_betas <- built$true_betas * obs_scale
+
+  eta <- intercept_for_family(fam_name) + obs_contrib +
+    as.numeric(trend_mat)
+  obs_pars <- sim_family_pars(family, family_pars, prop_trend,
+                              stats::sd(eta))
+  data_long <- data.frame(
+    y = sim_family_rng(eta, family, obs_pars),
+    series = series_fac,
+    time = built$time_long %||% time_int
+  )
+  for (nm in names(built$covariates)) {
+    data_long[[nm]] <- built$covariates[[nm]]
+  }
+  if (fam_name %in% c("binomial", "com_binomial")) {
+    data_long$trials <- obs_pars$trials
+  }
+
+  split <- split_train_test(data_long, n_timepoints, proportional_train)
+  if (prop_missing > 0) {
+    n_train <- nrow(split$train)
+    split$train$y[sample.int(n_train,
+                             floor(prop_missing * n_train))] <- NA
+  }
+
+  structure(
+    list(
+      data_train = split$train,
+      data_test = split$test,
+      family = family,
+      trend_model = trend_model,
+      type = type,
+      true_betas = built$true_betas,
+      true_smooths = built$true_smooths,
+      true_trend = trend_mat,
+      true_trend_sigma = stats::sd(as.numeric(trend_mat)),
+      true_sigma_obs = obs_pars$sigma %||% obs_pars$phi %||%
+        obs_pars$size %||% obs_pars$shape %||% NA_real_
+    ),
+    class = c("mvgam_sim", "list")
+  )
+}
+
+
+#' @param object An `mvgam_sim` object.
+#' @param ... Unused. Anything passed here is refused.
+#' @rdname sim_mvgam
+#' @method summary mvgam_sim
+#' @export
+summary.mvgam_sim <- function(object, ...) {
+  checkmate::assert_class(object, "mvgam_sim")
+  rlang::check_dots_empty()
+  # `trend_model = "None"` simulates no trend and is stored as given.
+  trend_label <- if (inherits(object$trend_model, "mvgam_trend")) {
+    object$trend_model$trend
+  } else {
+    "None"
+  }
+  smooths <- object$true_smooths %||% list()
+  structure(
+    list(
+      type = object$type,
+      family = resolve_family_name(object$family),
+      trend = trend_label,
+      n_series = NCOL(object$true_trend),
+      n_timepoints = NROW(object$true_trend),
+      n_train = NROW(object$data_train),
+      n_test = if (is.null(object$data_test)) 0L else NROW(object$data_test),
+      true_betas = object$true_betas,
+      n_smooths = length(smooths),
+      smooth_names = names(smooths),
+      true_trend_sigma = object$true_trend_sigma,
+      true_sigma_obs = object$true_sigma_obs
+    ),
+    class = "mvgam_sim_summary"
+  )
+}
+
+
+#' @param x An `mvgam_sim` object or its summary.
+#' @param digits Integer number of significant digits. Defaults to 3.
+#' @rdname sim_mvgam
+#' @method print mvgam_sim_summary
+#' @export
+print.mvgam_sim_summary <- function(x, digits = 3L, ...) {
+  checkmate::assert_class(x, "mvgam_sim_summary")
+  checkmate::assert_int(digits, lower = 0L)
+  cat("Simulated mvgam dataset (sim_mvgam type ", x$type, ")\n",
+      sep = "")
+  cat("  Family       : ", x$family, "\n", sep = "")
+  cat("  Trend        : ", x$trend, "\n", sep = "")
+  cat("  Series       : ", x$n_series, "\n", sep = "")
+  cat("  Timepoints   : ", x$n_timepoints, "\n", sep = "")
+  cat("  Rows         : ", x$n_train, " train, ", x$n_test, " test\n",
+      sep = "")
+  cat("\nTrue generative parameters\n")
+  if (length(x$true_betas) > 0L) {
+    cat("  Population coefficients:\n")
+    for (nm in names(x$true_betas)) {
+      cat("    ", nm, " = ",
+          format(round(x$true_betas[[nm]], digits), nsmall = digits),
+          "\n", sep = "")
+    }
+  } else {
+    cat("  Population coefficients: (none)\n")
+  }
+  if (x$n_smooths > 0L) {
+    cat("  Smooth functions (", x$n_smooths, "): ",
+        paste(x$smooth_names, collapse = ", "), "\n", sep = "")
+  }
+  cat("  Latent trend SD: ",
+      format(round(x$true_trend_sigma, digits), nsmall = digits),
+      "\n", sep = "")
+  cat("  Obs noise / dispersion: ",
+      if (is.na(x$true_sigma_obs)) "NA" else
+        format(round(x$true_sigma_obs, digits), nsmall = digits),
+      "\n", sep = "")
+  invisible(x)
+}
+
+
+#' @rdname sim_mvgam
+#' @method print mvgam_sim
+#' @export
+print.mvgam_sim <- function(x, ...) {
+  print(summary(x), ...)
+}
+
+
+#' The specification of a `sim_mvgam()` recipe
+#'
+#' Each type supplies its default trend and `prop_trend` and the trend
+#' parameters other than `sigma`. Its `build_data(n_timepoints,
+#' n_series)` function returns the `covariates`, the observation-side
+#' contribution `obs_contrib`, `true_betas` and `true_smooths`. A type
+#' with irregular times adds `time_long` and the `trend_time` gaps.
+#'
+#' @param type Integer recipe number
+#' @return List describing the recipe
+#' @noRd
+sim_type_spec <- function(type) {
+  list(spec_type_1, spec_type_2, spec_type_3, spec_type_4, spec_type_5,
+       spec_type_6, spec_type_7)[[type]]()
+}
+
+
+#' The true smooth of a simulated basis on a covariate grid
+#'
+#' @param sm List returned by `sim_smooth()`
+#' @param var Character name of the covariate
+#' @param grid Numeric covariate values
+#' @return Data frame with the covariate column and `f_true`
+#' @noRd
+smooth_truth <- function(sm, var, grid = seq(-2, 2, length.out = 100L)) {
+  out <- data.frame(grid, sim_smooth_on_grid(sm$basis, sm$coefs, grid))
+  names(out) <- c(var, "f_true")
+  out
+}
+
+
+#' Recipe 1 of `sim_mvgam()`: one smooth with a random walk trend
+#'
+#' Simulates `y ~ s(x)` with an `RW()` trend. By default the trend
+#' takes half the link-scale variance.
+#'
+#' @return List of the recipe's `default_trend`, `default_prop_trend`,
+#'   `trend_params` and `build_data`, in the form `sim_type_spec()`
+#'   describes
+#' @noRd
+spec_type_1 <- function() {
+  list(
+    default_trend = RW(),
+    default_prop_trend = 0.5,
+    trend_params = list(),
+    build_data = function(n_timepoints, n_series) {
+      x <- stats::runif(n_timepoints * n_series, -2, 2)
+      sm <- sim_smooth(x, k = 8L, bs = "tp", scale = 0.6)
+      list(
+        covariates = list(x = x),
+        obs_contrib = sm$f,
+        true_betas = numeric(),
+        true_smooths = list(`s(x)` = smooth_truth(sm, "x"))
+      )
+    }
+  )
+}
+
+
+#' Recipe 2 of `sim_mvgam()`: two smooths with an AR(1) trend
+#'
+#' Simulates `y ~ s(x) + s(z)` with an `AR(p = 1)` trend.
+#'
+#' @return List of the recipe's `default_trend`, `default_prop_trend`,
+#'   `trend_params` and `build_data`, in the form `sim_type_spec()`
+#'   describes
+#' @noRd
+spec_type_2 <- function() {
+  list(
+    default_trend = AR(p = 1),
+    # With less of the variance in the trend, the smooths absorb the
+    # serial signal and the AR coefficient is poorly identified
+    default_prop_trend = 0.6,
+    trend_params = list(ar = 0.7),
+    build_data = function(n_timepoints, n_series) {
+      total_n <- n_timepoints * n_series
+      x <- stats::runif(total_n, -2, 2)
+      z <- stats::runif(total_n, -2, 2)
+      sm_x <- sim_smooth(x, k = 8L, scale = 0.5)
+      sm_z <- sim_smooth(z, k = 8L, scale = 0.5)
+      list(
+        covariates = list(x = x, z = z),
+        obs_contrib = sm_x$f + sm_z$f,
+        true_betas = numeric(),
+        true_smooths = list(
+          `s(x)` = smooth_truth(sm_x, "x"),
+          `s(z)` = smooth_truth(sm_z, "z")
+        )
+      )
+    }
+  )
+}
+
+
+#' Recipe 3 of `sim_mvgam()`: a smooth and a random intercept
+#'
+#' Simulates `y ~ s(x) + (1 | grp)` with an `AR(p = 1)` trend. The
+#' recorded `true_betas` are the group-level intercepts.
+#'
+#' @return List of the recipe's `default_trend`, `default_prop_trend`,
+#'   `trend_params` and `build_data`, in the form `sim_type_spec()`
+#'   describes
+#' @noRd
+spec_type_3 <- function() {
+  list(
+    default_trend = AR(p = 1),
+    default_prop_trend = 0.6,
+    trend_params = list(ar = 0.7),
+    build_data = function(n_timepoints, n_series) {
+      total_n <- n_timepoints * n_series
+      x <- stats::runif(total_n, -2, 2)
+      grp <- sim_grp(total_n, n_levels = 5L)
+      sm_x <- sim_smooth(x, k = 8L, scale = 0.5)
+      re <- sim_re(grp, sigma = 0.6)
+      list(
+        covariates = list(x = x, grp = grp),
+        obs_contrib = sm_x$f + re$values,
+        true_betas = re$coefs,
+        true_smooths = list(`s(x)` = smooth_truth(sm_x, "x"))
+      )
+    }
+  )
+}
+
+
+#' Recipe 4 of `sim_mvgam()`: a Gaussian process with an AR(1) trend
+#'
+#' Simulates `y ~ gp(x)` with an `AR(p = 1)` trend.
+#'
+#' @return List of the recipe's `default_trend`, `default_prop_trend`,
+#'   `trend_params` and `build_data`, in the form `sim_type_spec()`
+#'   describes
+#' @noRd
+spec_type_4 <- function() {
+  list(
+    default_trend = AR(p = 1),
+    default_prop_trend = 0.6,
+    trend_params = list(ar = 0.7),
+    build_data = function(n_timepoints, n_series) {
+      total_n <- n_timepoints * n_series
+      x <- stats::runif(total_n, -2, 2)
+      grid <- seq(-2, 2, length.out = 100L)
+      # One draw at the data and the grid. The recorded truth is then
+      # the function that generated the data.
+      f <- sim_gp_cov(c(x, grid), alpha = 1, rho = 0.5)
+      list(
+        covariates = list(x = x),
+        obs_contrib = f[seq_len(total_n)],
+        true_betas = numeric(),
+        true_smooths = list(
+          `gp(x)` = data.frame(x = grid, f_true = f[-seq_len(total_n)])
+        )
+      )
+    }
+  )
+}
+
+
+#' Recipe 5 of `sim_mvgam()`: a smooth in the trend formula
+#'
+#' Simulates `y ~ x` with `trend_formula = ~ s(z)` and an `AR(p = 1)`
+#' trend. The slope of `x` is 1.
+#'
+#' @return List of the recipe's `default_trend`, `default_prop_trend`,
+#'   `trend_params` and `build_data`, in the form `sim_type_spec()`
+#'   describes
+#' @noRd
+spec_type_5 <- function() {
+  list(
+    default_trend = AR(p = 1),
+    default_prop_trend = 0.2,
+    trend_params = list(ar = 0.6),
+    build_data = function(n_timepoints, n_series) {
+      total_n <- n_timepoints * n_series
+      x <- stats::runif(total_n, -1, 1)
+      z <- stats::runif(total_n, -2, 2)
+      beta_x <- 1
+      sm_z <- sim_smooth(z, k = 8L, scale = 0.6)
+      list(
+        covariates = list(x = x, z = z),
+        # A trend_formula effect adds to the linear predictor through
+        # the state's mean
+        obs_contrib = beta_x * x + sm_z$f,
+        true_betas = c(b_x = beta_x),
+        true_smooths = list(`s(z)` = smooth_truth(sm_z, "z"))
+      )
+    }
+  )
+}
+
+
+#' Recipe 6 of `sim_mvgam()`: a cyclic smooth with a CAR trend
+#'
+#' Simulates `y ~ s(season, bs = "cc")` with a `CAR()` trend on
+#' irregular gaps. Its `build_data()` also returns `time_long` and the
+#' `trend_time` gaps.
+#'
+#' @return List of the recipe's `default_trend`, `default_prop_trend`,
+#'   `trend_params` and `build_data`, in the form `sim_type_spec()`
+#'   describes
+#' @noRd
+spec_type_6 <- function() {
+  list(
+    default_trend = CAR(),
+    default_prop_trend = 0.5,
+    trend_params = list(phi = 0.7),
+    build_data = function(n_timepoints, n_series) {
+      # One gap sequence, shared by every series, sets the recorded
+      # times, the season derived from them and the spacing the CAR
+      # trend runs over
+      gaps <- c(0, stats::runif(n_timepoints - 1L, 1, 6))
+      times <- cumsum(gaps)
+      time_long <- rep(times, n_series)
+      season <- (time_long %% 12) + 1
+      sm <- sim_smooth(season, k = 6L, bs = "cc", scale = 0.5)
+      list(
+        covariates = list(season = season),
+        obs_contrib = sm$f,
+        true_betas = numeric(),
+        true_smooths = list(
+          `s(season)` = smooth_truth(sm, "season",
+                                     seq(1, 12, length.out = 100L))
+        ),
+        time_long = time_long,
+        # In units of the median gap, as a fit measures them
+        trend_time = car_scaled_gaps(
+          gaps, car_time_scale(list(values = times))
+        )
+      )
+    }
+  )
+}
+
+
+#' Recipe 7 of `sim_mvgam()`: one smooth with a sparse AR trend
+#'
+#' Simulates `y ~ s(x)` with an `AR(p = c(1, 12))` trend, lags 1 and 12
+#' only.
+#'
+#' @return List of the recipe's `default_trend`, `default_prop_trend`,
+#'   `trend_params` and `build_data`, in the form `sim_type_spec()`
+#'   describes
+#' @noRd
+spec_type_7 <- function() {
+  list(
+    default_trend = AR(p = c(1L, 12L)),
+    # On monthly data a lag-12 autoregression is itself an annual
+    # cycle. A periodic covariate would compete with it. The covariate
+    # here is not periodic.
+    default_prop_trend = 0.6,
+    # The coefficients sum to 0.95. The state recurs visibly each year
+    # and stays stationary.
+    trend_params = list(ar = c(0.55, 0.40)),
+    build_data = function(n_timepoints, n_series) {
+      x <- stats::runif(n_timepoints * n_series, -2, 2)
+      sm <- sim_smooth(x, k = 8L, bs = "tp", scale = 0.9)
+      list(
+        covariates = list(x = x),
+        obs_contrib = sm$f,
+        true_betas = numeric(),
+        true_smooths = list(`s(x)` = smooth_truth(sm, "x"))
+      )
+    }
+  )
+}
+
+
+# ------------------------------------------------------------------
+# Shared building blocks
+# ------------------------------------------------------------------
+
+
+#' The link-scale intercept a simulation uses for a family
+#'
+#' Each value places the inverse-link mean in a plausible response
+#' range, such as a Poisson mean near 5 or a probability near 0.5.
+#'
+#' @param fam_name Character family name from `resolve_family_name()`
+#' @return Numeric scalar intercept on the link scale
+#' @noRd
+intercept_for_family <- function(fam_name) {
+  checkmate::assert_string(fam_name)
+  switch(
+    fam_name,
+    "gaussian" = 0,
+    "student" = 0,
+    "gamma" = log(2),     # log link: mean ~ 2
+    "poisson" = log(5),    # log link: mean ~ 5
+    "negbinomial" = log(5),
+    "binomial" = 0,        # logit link: probability ~ 0.5
+    "bernoulli" = 0,
+    "beta" = 0,            # logit link: mean ~ 0.5
+    "tweedie" = log(2),    # log link: mean ~ 2 (CP with zeros)
+    "beta_nb" = log(5),    # log link: mean ~ 5
+    "com_binomial" = 0,    # logit link: probability ~ 0.5
+    0
+  )
+}
+
+
+#' The innovation SD a simulation type passes to `propagate_trend()`
+#'
+#' Derived from the trend's share of the link-scale variance, clamped to
+#' `[0.01, 0.99]`. `sim_mvgam()` rescales every simulated trend to its
+#' target SD after propagation. This value sets only the starting
+#' amplitude.
+#'
+#' @param prop_trend Numeric share of link-scale variance given to the
+#'   trend
+#' @return Positive numeric scalar
+#' @noRd
+trend_sigma <- function(prop_trend) {
+  checkmate::assert_number(prop_trend)
+  prop_trend <- max(min(prop_trend, 0.99), 0.01)
+  sqrt(prop_trend / (1 - prop_trend))
+}
+
+
+#' Whether a simulation trend is a piecewise `PW()` trend
+#'
+#' A piecewise trend is deterministic given `k`, `m`, `delta` and
+#' `t_change`. Its simulation evaluates the kernel directly and skips
+#' `propagate_trend()`.
+#'
+#' @param trend_model Trend constructor object, a character trend name or
+#'   `NULL`
+#' @return Logical scalar
+#' @noRd
+is_pw_trend <- function(trend_model) {
+  checkmate::assert(
+    checkmate::check_null(trend_model),
+    checkmate::check_character(trend_model),
+    checkmate::check_list(trend_model)
+  )
+  if (is.null(trend_model)) return(FALSE)
+  t <- if (is.character(trend_model)) {
+    trend_model
+  } else {
+    trend_model$trend
+  }
+  identical(t, "PW")
+}
+
+
+#' Default parameters for a simulated piecewise trend
+#'
+#' Fills each of `k`, `m`, `delta`, `t_change` and, for logistic growth,
+#' `cap` that `params` leaves unset.
+#' * `k` is 0.02 per unit time, a gentle linear growth.
+#' * `m` is 0.5, placing the logistic curve near half its capacity at
+#'   the start.
+#' * `delta` alternates in sign across changepoints with magnitudes near
+#'   0.05. The magnitude grows with the series index to give each series
+#'   a distinct path.
+#' * `t_change` spaces changepoints evenly over the first
+#'   `changepoint_range` share of the horizon. The default of 0.8 leaves
+#'   the last fifth free of changepoints before forecasting.
+#' * `cap` is a constant ceiling of three times `exp(m[1])`, keeping the
+#'   logistic output away from saturation.
+#'
+#' @param trend_model `PW()` trend object holding `n_changepoints`,
+#'   `changepoint_range` and `growth`
+#' @param params Named list of user-supplied trend parameters
+#' @param n_series Integer number of series
+#' @param n_timepoints Integer number of time points
+#' @return `params` with every missing piecewise parameter filled
+#' @noRd
+fill_pw_trend_defaults <- function(trend_model, params,
+                                      n_series, n_timepoints) {
+  checkmate::assert_list(trend_model)
+  checkmate::assert_list(params, null.ok = TRUE)
+  checkmate::assert_int(n_series, lower = 1L)
+  checkmate::assert_int(n_timepoints, lower = 1L)
+  n_change <- as.integer(trend_model$n_changepoints %||% 5L)
+  range_prop <- as.numeric(
+    trend_model$changepoint_range %||% 0.8
+  )
+  last_cp <- max(1.0, range_prop * n_timepoints)
+  if (is.null(params$t_change)) {
+    params$t_change <- seq.int(
+      from = max(2L, floor(0.05 * n_timepoints)),
+      to = floor(last_cp),
+      length.out = n_change
+    )
+  }
+  if (is.null(params$k)) {
+    params$k <- rep(0.02, n_series)
+  }
+  if (is.null(params$m)) {
+    params$m <- rep(0.5, n_series)
+  }
+  if (is.null(params$delta)) {
+    params$delta <- outer(0.05 * (-1)^seq_len(n_change),
+                          1 + 0.1 * (seq_len(n_series) - 1L))
+  }
+  if (pw_is_logistic(trend_model) && is.null(params$cap)) {
+    params$cap <- matrix(
+      exp(params$m[1L]) * 3,
+      nrow = n_timepoints, ncol = n_series
+    )
+  }
+  params
+}
+
+
+#' Trend-specific default parameters for a simulation
+#'
+#' The simulation types supply `sigma` and sometimes `ar`, enough for
+#' univariate RW, AR, CAR and ZMVN trends. This fills the parameters
+#' other trend constructors need when `params` leaves them unset.
+#' * An `AR(p)` trend with a scalar `ar` gets a geometric taper over `p`
+#'   lags, `ar[l] = ar[1] * 0.3^(l - 1)`.
+#' * A `VAR` trend gets a lag-1 transition matrix with 0.5 on the
+#'   diagonal. The off-diagonal entries share 0.30 over the other
+#'   series, which keeps every row sum below 1 for stability.
+#' * A `VAR`, `ZMVN` or `cor = TRUE` trend gets a `Sigma` with
+#'   correlation 0.5 between every pair of series.
+#'
+#' @param trend_model Trend constructor object, a character trend name or
+#'   `NULL`
+#' @param params Named list of trend parameters from the simulation type
+#' @param n_series Integer number of series
+#' @return `params` with the trend-specific defaults filled
+#' @noRd
+fill_multivariate_trend_defaults <- function(trend_model,
+                                                params, n_series) {
+  checkmate::assert(
+    checkmate::check_null(trend_model),
+    checkmate::check_character(trend_model),
+    checkmate::check_list(trend_model)
+  )
+  checkmate::assert_list(params, null.ok = TRUE)
+  checkmate::assert_int(n_series, lower = 1L)
+  if (is.null(trend_model) || is.character(trend_model)) {
+    return(params)
+  }
+  trend_type <- trend_model$trend
+  if (is.null(trend_type)) return(params)
+  cor_trend <- isTRUE(trend_model$cor)
+
+  # A type's scalar AR coefficient tapers over the lags of a user's
+  # AR(p > 1). The taper sums to under 1.43 times the first lag.
+  if (identical(trend_type, "AR") && !is.null(params$ar) &&
+        !is.null(trend_model$p)) {
+    p_req <- if (length(trend_model$p) == 1L) {
+      as.integer(trend_model$p)
+    } else {
+      length(trend_model$p)
+    }
+    if (length(params$ar) < p_req) {
+      params$ar <- params$ar[1L] * 0.3^(seq_len(p_req) - 1L)
+    }
+  }
+
+  # VAR transition matrix.
+  if (identical(trend_type, "VAR") && is.null(params$A)) {
+    n_lags <- as.integer(trend_model$p %||% 1L)
+    if (n_lags > 1L) {
+      warn_once(
+        c(
+          "The simulated VAR(p > 1) trend has dynamics at lag 1 only.",
+          i = "Coefficients at lags 2 and above are zero."
+        ),
+        "mvgam_sim_var_default_p_gt_1"
+      )
+    }
+    # Row sums below 1 are sufficient for stability
+    off_diag <- 0.30 / max(1L, n_series - 1L)
+    A_cube <- array(0, dim = c(n_series, n_series, n_lags))
+    A_cube[, , 1L] <- 0.5 * diag(n_series) +
+      off_diag * (1 - diag(n_series))
+    params$A <- A_cube
+  }
+
+  # A correlated trend takes a Sigma with correlation 0.5
+  needs_sigma <- (identical(trend_type, "VAR") ||
+                    cor_trend ||
+                    identical(trend_type, "ZMVN")) &&
+    is.null(params$Sigma)
+  if (needs_sigma && !is.null(params$sigma)) {
+    sigma_vec <- as.numeric(params$sigma)
+    if (length(sigma_vec) == 1L) {
+      sigma_vec <- rep(sigma_vec, n_series)
+    }
+    rho <- 0.5
+    cor_mat <- rho * matrix(1, n_series, n_series) +
+      (1 - rho) * diag(n_series)
+    params$Sigma <- diag(sigma_vec) %*% cor_mat %*%
+      diag(sigma_vec)
+  }
+  params
+}
+
+
+#' The total link-scale SD a simulation allows for a family
+#'
+#' Bounds the linear predictor to keep the simulated response in a
+#' recoverable range. Log-link families get 0.8 and logit-link families
+#' get 1.5, which spans probabilities near 0.10 to 0.90. Identity-link
+#' and other families get 1.
+#'
+#' @param fam_name Character family name from `resolve_family_name()`
+#' @return Positive numeric scalar
+#' @noRd
+link_scale_budget <- function(fam_name) {
+  checkmate::assert_string(fam_name)
+  switch(
+    fam_name,
+    "gaussian" = 1.0,
+    "student" = 1.0,
+    "gamma" = 0.8,
+    "poisson" = 0.8,
+    "negbinomial" = 0.8,
+    "binomial" = 1.5,
+    "bernoulli" = 1.5,
+    "beta" = 1.5,
+    "tweedie" = 0.8,
+    "beta_nb" = 0.8,
+    "com_binomial" = 1.5,
+    1.0
+  )
+}
+
+
+#' The scalar that rescales a vector to a target SD
+#'
+#' A scalar lets the caller apply one factor to several linked objects,
+#' such as the observation contribution and its ground-truth smooths.
+#' A constant or non-finite input returns 0 to keep NaN out of the
+#' simulation.
+#'
+#' @param x Numeric vector or matrix to rescale
+#' @param target_sd Non-negative target sample SD
+#' @return Numeric scalar factor
+#' @noRd
+sd_rescale_factor <- function(x, target_sd) {
+  checkmate::assert_numeric(x)
+  checkmate::assert_number(target_sd, lower = 0)
+  current <- stats::sd(as.numeric(x))
+  if (!is.finite(current) || current < 1e-8) {
+    return(0)
+  }
+  target_sd / current
+}
+
+
+#' Family dispersion parameters for a simulation
+#'
+#' User values in `family_pars` win. A Gaussian or Student-t `sigma`
+#' defaults to the observation share of the link-scale SD, with a floor
+#' of 0.1. Other families get fixed defaults.
+#'
+#' @param family Family object of the simulated model
+#' @param family_pars Named list of user-supplied family parameters
+#' @param prop_trend Numeric share of link-scale variance given to the
+#'   trend
+#' @param eta_sd Numeric SD of the simulated linear predictor
+#' @return Named list of family parameters for `sim_family_rng()`
+#' @noRd
+sim_family_pars <- function(family, family_pars, prop_trend,
+                              eta_sd) {
+  checkmate::assert_list(family)
+  checkmate::assert_list(family_pars)
+  checkmate::assert_number(prop_trend)
+  checkmate::assert_number(eta_sd, na.ok = TRUE)
+  fam_name <- resolve_family_name(family)
+  noise_sigma <- max(eta_sd * sqrt(1 - prop_trend), 0.1)
+  switch(
+    fam_name,
+    "gaussian" = list(sigma = family_pars$sigma %||% noise_sigma),
+    "student" = list(
+      sigma = family_pars$sigma %||% noise_sigma,
+      nu = family_pars$nu %||% 4
+    ),
+    "poisson" = list(),
+    "negbinomial" = list(size = family_pars$size %||% 10),
+    "binomial" = list(trials = family_pars$trials %||% 10L),
+    "bernoulli" = list(trials = 1L),
+    "beta" = list(phi = family_pars$phi %||% 10),
+    "gamma" = list(shape = family_pars$shape %||% 5),
+    "tweedie" = list(
+      phi   = family_pars$phi   %||% 1,
+      power = family_pars$power %||% 1.5
+    ),
+    "beta_nb" = list(
+      shape = family_pars$shape %||% 2,
+      mtail = family_pars$mtail %||% 2
+    ),
+    "com_binomial" = list(
+      trials = family_pars$trials %||% 10L,
+      nu     = family_pars$nu     %||% 1
+    ),
+    list()
+  )
+}
+
+
+#' A simulated smooth evaluated on a grid
+#'
+#' Fills the ground-truth `true_smooths` slot by evaluating the basis at
+#' new covariate values with `mgcv::PredictMat()`.
+#'
+#' @param basis mgcv smooth object from `sim_smooth()`
+#' @param coefs Numeric vector of spline coefficients
+#' @param grid_x Numeric vector of covariate values
+#' @return Numeric vector with the smooth at each value of `grid_x`
+#' @noRd
+sim_smooth_on_grid <- function(basis, coefs, grid_x) {
+  checkmate::assert_list(basis)
+  checkmate::assert_numeric(coefs, min.len = 1L)
+  checkmate::assert_numeric(grid_x, min.len = 1L)
+  newdata <- stats::setNames(
+    list(grid_x), basis$term[1L]
+  )
+  Xp <- mgcv::PredictMat(basis, data = as.data.frame(newdata))
+  as.numeric(Xp %*% coefs)
+}
+
+
+#' A simulated data set split by time into training and test sets
+#'
+#' The test set takes the last time points, as a forecast would.
+#'
+#' @param data_long Data frame holding a `time` column
+#' @param n_timepoints Integer number of time points
+#' @param proportional_train Numeric share of time points to train on
+#' @return List holding the `train` and `test` data frames. `test` is
+#'   `NULL` when every time point trains.
+#' @noRd
+split_train_test <- function(data_long, n_timepoints,
+                              proportional_train) {
+  checkmate::assert_data_frame(data_long)
+  checkmate::assert_int(n_timepoints, lower = 1L)
+  checkmate::assert_number(proportional_train, lower = 0, upper = 1)
+  n_train <- max(2L, floor(proportional_train * n_timepoints))
+  if (n_train >= n_timepoints) {
+    return(list(train = data_long, test = NULL))
+  }
+  is_train <- data_long$time <=
+    sort(unique(data_long$time))[n_train]
+  train <- data_long[is_train, , drop = FALSE]
+  test <- data_long[!is_train, , drop = FALSE]
+  rownames(train) <- NULL
+  rownames(test) <- NULL
+  list(train = train, test = test)
 }

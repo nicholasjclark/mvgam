@@ -2,93 +2,140 @@
 % Please edit documentation in R/summary.mvgam.R
 \name{summary.mvgam}
 \alias{summary.mvgam}
-\alias{summary.mvgam_prefit}
-\alias{coef.mvgam}
-\title{Summary for a fitted \pkg{mvgam} models}
+\alias{print.mvgam_summary}
+\title{Summary of mvgam model fits}
 \usage{
-\method{summary}{mvgam}(object, include_betas = TRUE, smooth_test = TRUE, digits = 2, ...)
+\method{summary}{mvgam}(object, probs = c(0.025, 0.975), robust = FALSE, matrices = FALSE, ...)
 
-\method{summary}{mvgam_prefit}(object, ...)
-
-\method{coef}{mvgam}(object, summarise = TRUE, ...)
+\method{print}{mvgam_summary}(x, digits = 2, ...)
 }
 \arguments{
-\item{object}{\code{list} object returned from \code{mvgam}}
+\item{object}{An object of class \code{mvgam}.}
 
-\item{include_betas}{Logical. Print a summary that includes posterior
-summaries of all linear predictor beta coefficients (including spline
-coefficients)? Defaults to \code{TRUE} but use \code{FALSE} for a more
-concise summary}
+\item{probs}{Two probabilities for the lower and upper bounds of the
+credible interval. Default \code{c(0.025, 0.975)}, a 95\% interval.}
 
-\item{smooth_test}{Logical. Compute estimated degrees of freedom and
-approximate p-values for smooth terms? Defaults to \code{TRUE}, but users
-may wish to set to \code{FALSE} for complex models with many smooth or
-random effect terms}
+\item{robust}{Logical. If \code{FALSE} (the default), uses mean and standard
+deviation for summaries. If \code{TRUE}, uses median and median absolute
+deviation (MAD).}
 
-\item{digits}{The number of significant digits for printing out the summary;
-defaults to \code{2}.}
+\item{matrices}{Logical; if \code{TRUE}, also print every cell of
+the matrices a correlated, VAR or hierarchical trend derives
+from its sampled parameters (\code{Phi_trend}, \code{Sigma_trend},
+\code{Omega_trend}, \code{Phi_group_trend},
+\code{Sigma_group_trend}). The default \code{FALSE} prints the
+sampled parameters alone, among them \code{sigma_trend},
+\code{Amu_trend}, \code{Aomega_trend} and
+\code{alpha_cor_trend}. \code{\link[=posterior_transition_matrix]{posterior_transition_matrix()}} and
+\code{\link[=residual_cor]{residual_cor()}} summarise the matrices a cell at a time.}
 
-\item{...}{Ignored}
+\item{...}{Unused. Anything passed here is refused.}
 
-\item{summarise}{\code{logical}. Summaries of coefficients will be returned
-if \code{TRUE}. Otherwise the full posterior distribution will be returned}
+\item{x}{An \code{mvgam_summary} object.}
+
+\item{digits}{Integer number of decimal places. Defaults to 2.}
 }
 \value{
-For \code{summary.mvgam}, an object of class \code{mvgam_summary} containing:
-\itemize{
-\item \code{model_spec}: Model specification details (formulas, family, dimensions)
-\item \code{parameters}: Parameter estimates and significance tests
-\item \code{diagnostics}: MCMC convergence diagnostics
-\item \code{sampling_info}: Sampling algorithm details
+An object of class \code{mvgam_summary}. Each block is a
+data frame of the columns below, one row per parameter, named as
+\code{print()} shows it. A block is absent when the model has no such
+parameter. The observation model's blocks are:
+\describe{
+\item{\code{smooth}}{Smoothing standard deviations, one row per
+penalty of each smooth. The basis coefficients are available by
+name from \code{as_draws(object, variable = "^s_", regex =
+    TRUE)}.}
+\item{\code{gp}}{Gaussian-process marginal standard deviations
+and length-scales.}
+\item{\code{random}}{Group-level standard deviations and
+correlations, as a list of tables named by grouping factor.
+\code{ngrps} gives each factor's number of levels. \code{ranef()}
+gives the per-level effects.}
+\item{\code{fixed}}{Regression coefficients, those of every
+distributional parameter given a formula among them.}
+\item{\code{mo}}{The simplex of each monotonic effect.}
+\item{\code{spec}}{Family parameters without a formula of their
+own, such as \code{sigma} or \code{shape}.}
 }
-
-For \code{summary.mvgam_prefit}, a \code{list} is printed on-screen showing
-the model specifications
-
-For \code{coef.mvgam}, either a \code{matrix} of posterior coefficient
-distributions (if \code{summarise == FALSE} or \code{data.frame} of
-coefficient summaries)
+The trend model's blocks take the same names with the prefix
+\code{trend_}, joined by \code{trend_spec} for the trend's
+dynamics, \code{loadings} for the factor loadings and
+\code{loadings_prior} for the hyperparameters of their prior. The
+formula, family, draw counts and data dimensions are stored with
+them.
+\code{print()} sets the blocks out under their headings, followed by the
+sampler diagnostics and suggested next steps.
 }
 \description{
-These functions take a fitted \code{mvgam} or \code{jsdgam} object and
-return various useful summaries
+Provides posterior summary statistics for mvgam model parameters,
+organised by category (fixed effects, smooth terms, family
+parameters, trend parameters and factor loadings).
 }
 \details{
-\code{summary.mvgam} and \code{summary.mvgam_prefit} return brief summaries of
-the model's call, along with posterior intervals for some of the key
-parameters in the model. Note that some smooths have extra penalties on the
-null space, so summaries for the \code{rho} parameters may include more
-penalty terms than the number of smooths in the original model formula.
-Approximate p-values for smooth terms are also returned, with methods used
-for their calculation following those used for \code{mgcv} equivalents (see
-\code{\link[mgcv]{summary.gam}} for details). The Estimated Degrees of
-Freedom (edf) for smooth terms is computed using either \code{edf.type = 1} for
-models with no trend component, or \code{edf.type = 0} for models with trend
-components. These are described in the documentation for
-\code{\link[mgcv]{jagam}}. Experiments suggest these p-values tend to be
-more conservative than those that might be returned from an equivalent model
-fit with \code{\link[mgcv]{summary.gam}} using \code{method = 'REML'}
+Each block has the columns:
+\describe{
+\item{\code{Estimate}}{Posterior mean, or median with
+\code{robust = TRUE}.}
+\item{\code{Est.Error}}{Posterior standard deviation, or MAD with
+\code{robust = TRUE}.}
+\item{\code{l-95\% CI}, \code{u-95\% CI}}{Credible interval
+bounds at \code{probs}, labelled by its coverage.}
+\item{\code{Rhat}}{Potential scale reduction factor on split
+chains, 1 at convergence.}
+\item{\code{Bulk_ESS}, \code{Tail_ESS}}{Bulk and tail effective
+sample sizes.}
+}
 
-\code{coef.mvgam} returns either summaries or full posterior estimates for \code{GAM}
-component coefficients
+Vehtari et al. (2021) recommend an Rhat below 1.01 and bulk and
+tail effective sample sizes above 400 before a summary is used. A
+fit should also have no divergent transitions. The section
+'Checking a fit' of \link{mvgam_diagnostics} says what to do when one of
+these checks fails.
 }
 \examples{
 \dontrun{
-simdat <- sim_mvgam(seasonality = "hierarchical")
+set.seed(13)
+simdat <- sim_mvgam(family = poisson(), n_series = 1L,
+                     n_timepoints = 120L, trend_model = AR())
+mod <- mvgam(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1),
+              data = simdat$data_train,
+              family = poisson(),
+              chains = 2, silent = 2)
 
-mod <- mvgam(
-  y ~ series +
-    s(season, bs = "cc", k = 6) +
-    s(season, series, bs = "fs", k = 4),
-  data = simdat$data_train,
-  chains = 2,
-  silent = 2
-)
+summary(mod)
 
-mod_summary <- summary(mod)
-mod_summary
+# Each block is a data frame, such as the trend's dynamics
+round(summary(mod)$trend_spec, 2)
+
+# Next: pp_check(mod) compares draws from the model with the data
 }
+
 }
-\author{
-Nicholas J Clark
+\references{
+Vehtari, A., Gelman, A., Simpson, D., Carpenter, B. and Burkner,
+P.-C. (2021). Rank-normalization, folding, and localization: an
+improved Rhat for assessing convergence of MCMC. \emph{Bayesian
+Analysis}, 16(2):667-718. \doi{10.1214/20-BA1221}
 }
+\seealso{
+\link{mvgam_diagnostics} checks convergence. \code{\link[=pp_check.mvgam]{pp_check.mvgam()}}
+checks the fit against the data.
+\code{\link[=how_to_cite]{how_to_cite()}} drafts a methods paragraph for the model.
+\code{\link[=methods_md]{methods_md()}} writes its equations, glossary and priors.
+\code{\link[=mcmc_plot.mvgam]{mcmc_plot.mvgam()}} plots the draws of these parameters.
+
+Other posterior summaries: 
+\code{\link{VarCorr.mvgam}()},
+\code{\link{bibtex}()},
+\code{\link{how_to_cite.mvgam}()},
+\code{\link{hypothesis.mvgam}()},
+\code{\link{index-mvgam}},
+\code{\link{mcmc_plot.mvgam}()},
+\code{\link{methods_md}()},
+\code{\link{mvgam_draws}},
+\code{\link{pairs.mvgam}()},
+\code{\link{posterior_interval.mvgam}()},
+\code{\link{ranef.mvgam}()},
+\code{\link{smooths.mvgam}()}
+}
+\concept{posterior summaries}

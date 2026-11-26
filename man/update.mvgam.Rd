@@ -2,292 +2,139 @@
 % Please edit documentation in R/update.mvgam.R
 \name{update.mvgam}
 \alias{update.mvgam}
-\alias{update.jsdgam}
-\title{Update an existing \pkg{mvgam} model object}
+\title{Update a fitted \pkg{mvgam} model}
 \usage{
-\method{update}{mvgam}(
-  object,
-  formula,
-  trend_formula,
-  knots,
-  trend_knots,
-  trend_model,
-  family,
-  share_obs_params,
-  data,
-  newdata,
-  trend_map,
-  use_lv,
-  n_lv,
-  priors,
-  chains,
-  burnin,
-  samples,
-  threads,
-  algorithm,
-  lfo = FALSE,
-  ...
-)
-
-\method{update}{jsdgam}(
-  object,
-  formula,
-  factor_formula,
-  knots,
-  factor_knots,
-  data,
-  newdata,
-  n_lv,
-  family,
-  share_obs_params,
-  priors,
-  chains,
-  burnin,
-  samples,
-  threads,
-  algorithm,
-  lfo = FALSE,
-  ...
-)
+\method{update}{mvgam}(object, formula. = NULL, newdata = NULL, recompile = NULL, ...)
 }
 \arguments{
-\item{object}{\code{list} object returned from \code{mvgam}. See \code{\link[=mvgam]{mvgam()}}}
+\item{object}{A fitted \code{mvgam} object.}
 
-\item{formula}{Optional new \code{formula} object. Note, \code{mvgam} currently does
-not support dynamic formula updates such as removal of specific terms with
-\code{- term}. When updating, the entire formula needs to be supplied.}
+\item{formula.}{A new observation formula, or an update to the
+fitted one such as \code{~ . + new_term}. \code{NULL} (the default) keeps
+\code{object$formula}. \code{\link[stats:update.formula]{stats::update.formula()}} applies the update.
+\code{~ . + z}, \code{~ . - z}, \code{y2 ~ x} and \code{. ~ .} all work.}
 
-\item{trend_formula}{An optional \code{formula} object specifying the GAM process
-model formula. If supplied, a linear predictor will be modelled for the
-latent trends to capture process model evolution separately from the
-observation model.
+\item{newdata}{An optional new training data frame. \code{NULL} (the
+default) keeps \code{object$data}. A \code{data} argument in \code{...} is an
+error.}
 
-\strong{Important notes:}
-\itemize{
-\item Should not have a response variable specified on the left-hand side
-(e.g., \code{~ season + s(year)})
-\item Use \code{trend} instead of \code{series} for effects that vary across time series
-\item Only available for \code{RW()}, \code{AR()} and \code{VAR()} trend models
-\item In \code{nmix()} family models, sets up linear predictor for latent abundance
-\item Consider dropping one intercept using \code{- 1} convention to avoid
-estimation challenges
-}}
+\item{recompile}{Optional logical. \code{NULL} (the default) and \code{TRUE}
+refit through \code{mvgam()}. Both backends cache compiled models by
+their Stan code. A refit with unchanged code skips compilation.
+\code{FALSE} builds the new Stan code first and compares it with
+\code{object$stancode}. A difference is an error. A refit that passes
+the check compiles nothing.}
 
-\item{knots}{An optional \code{list} containing user specified knot values for
-basis construction. For most bases the user simply supplies the knots to be
-used, which must match up with the \code{k} value supplied. Different terms can
-use different numbers of knots, unless they share a covariate.}
-
-\item{trend_knots}{As for \code{knots} above, this is an optional \code{list} of knot
-values for smooth functions within the \code{trend_formula}.}
-
-\item{trend_model}{\code{character} or \code{function} specifying the time series dynamics
-for the latent trend.
-
-\strong{Available options:}
-\itemize{
-\item \code{None}: No latent trend component (GAM component only, like \code{\link[mgcv]{gam}})
-\item \code{ZMVN} or \code{ZMVN()}: Zero-Mean Multivariate Normal (Stan only)
-\item \code{'RW'} or \code{RW()}: Random Walk
-\item \code{'AR1'}, \code{'AR2'}, \code{'AR3'} or \code{AR(p = 1, 2, 3)}: Autoregressive models
-\item \code{'CAR1'} or \code{CAR(p = 1)}: Continuous-time AR (Ornstein–Uhlenbeck process)
-\item \code{'VAR1'} or \code{VAR()}: Vector Autoregressive (Stan only)
-\item \code{'PWlogistic'}, \code{'PWlinear'} or \code{PW()}: Piecewise trends (Stan only)
-\item \code{'GP'} or \code{GP()}: Gaussian Process with squared exponential kernel (Stan only)
-}
-
-\strong{Additional features:}
-\itemize{
-\item Moving average and/or correlated process error terms available for most types
-(e.g., \code{RW(cor = TRUE)} for multivariate Random Walk)
-\item Hierarchical correlations possible for structured data
-\item See \link{mvgam_trends} for details and \code{\link[=ZMVN]{ZMVN()}} for examples
-}}
-
-\item{family}{\code{family} specifying the exponential observation family for the series.
-
-\strong{Supported families:}
-\itemize{
-\item \code{gaussian()}: Real-valued data
-\item \code{betar()}: Proportional data on \verb{(0,1)}
-\item \code{lognormal()}: Non-negative real-valued data
-\item \code{student_t()}: Real-valued data
-\item \code{Gamma()}: Non-negative real-valued data
-\item \code{bernoulli()}: Binary data
-\item \code{poisson()}: Count data (default)
-\item \code{nb()}: Overdispersed count data
-\item \code{binomial()}: Count data with imperfect detection when number of trials is known
-(use \code{cbind()} to bind observations and trials)
-\item \code{beta_binomial()}: As \code{binomial()} but allows for overdispersion
-\item \code{nmix()}: Count data with imperfect detection when number of trials is unknown
-(State-Space N-Mixture model with Poisson latent states and Binomial observations)
-}
-
-See \code{\link{mvgam_families}} for more details.}
-
-\item{share_obs_params}{\code{logical}. If \code{TRUE} and the \code{family} has additional
-family-specific observation parameters (e.g., variance components, dispersion
-parameters), these will be shared across all outcome variables. Useful when
-multiple outcomes share properties. Default is \code{FALSE}.}
-
-\item{data}{A \code{dataframe} or \code{list} containing the model response variable
-and covariates required by the GAM \code{formula} and optional \code{trend_formula}.
-
-\strong{Required columns for most models:}
-\itemize{
-\item \code{series}: A \code{factor} index of the series IDs (number of levels should equal
-number of unique series labels)
-\item \code{time}: \code{numeric} or \code{integer} index of time points. For most dynamic trend
-types, time should be measured in discrete, regularly spaced intervals
-(i.e., \code{c(1, 2, 3, ...)}). Irregular spacing is allowed for \code{trend_model = CAR(1)},
-but zero intervals are adjusted to \code{1e-12} to prevent sampling errors.
-}
-
-\strong{Special cases:}
-\itemize{
-\item Models with hierarchical temporal correlation (e.g., \code{AR(gr = region, subgr = species)})
-should NOT include a \code{series} identifier
-\item Models without temporal dynamics (\code{trend_model = 'None'} or \code{trend_model = ZMVN()})
-don't require a \code{time} variable
-}}
-
-\item{newdata}{Optional \code{dataframe} or \code{list} of test data containing the same
-variables as in \code{data}. If included, observations in variable \code{y} will be
-set to \code{NA} when fitting the model so that posterior simulations can be obtained.}
-
-\item{trend_map}{Optional \code{data.frame} specifying which series should depend on
-which latent trends. Enables multiple series to depend on the same latent
-trend process with different observation processes.
-
-\strong{Required structure:}
-\itemize{
-\item Column \code{series}: Single unique entry for each series (matching factor levels in data)
-\item Column \code{trend}: Integer values indicating which trend each series depends on
-}
-
-\strong{Notes:}
-\itemize{
-\item Sets up latent factor model by enabling \code{use_lv = TRUE}
-\item Process model intercept is NOT automatically suppressed
-\item Not yet supported for continuous time models (\code{CAR()})
-}}
-
-\item{use_lv}{\code{logical}. If \code{TRUE}, use dynamic factors to estimate series'
-latent trends in a reduced dimension format. Only available for \code{RW()},
-\code{AR()} and \code{GP()} trend models. Default is \code{FALSE}.
-See \code{\link{lv_correlations}} for examples.}
-
-\item{n_lv}{\code{integer} specifying the number of latent dynamic factors to use
-if \code{use_lv == TRUE}. Cannot exceed \code{n_series}. Default is
-\code{min(2, floor(n_series / 2))}.}
-
-\item{priors}{An optional \code{data.frame} with prior definitions or, preferably,
-a vector of \code{brmsprior} objects (see \code{\link[brms]{prior}()}).
-See \code{\link[=get_mvgam_priors]{get_mvgam_priors()}} and Details for more information.}
-
-\item{chains}{\code{integer} specifying the number of parallel chains for the model.
-Ignored for variational inference algorithms.}
-
-\item{burnin}{\code{integer} specifying the number of warmup iterations to tune
-sampling algorithms. Ignored for variational inference algorithms.}
-
-\item{samples}{\code{integer} specifying the number of post-warmup iterations for
-sampling the posterior distribution.}
-
-\item{threads}{\code{integer}. Experimental option for within-chain parallelisation
-in Stan using \code{reduce_sum}. Recommended only for experienced Stan users with
-slow models. Currently works for all families except \code{nmix()} and when using
-Cmdstan backend.}
-
-\item{algorithm}{Character string naming the estimation approach:
-\itemize{
-\item \code{"sampling"}: MCMC (default)
-\item \code{"meanfield"}: Variational inference with factorized normal distributions
-\item \code{"fullrank"}: Variational inference with multivariate normal distribution
-\item \code{"laplace"}: Laplace approximation (cmdstanr only)
-\item \code{"pathfinder"}: Pathfinder algorithm (cmdstanr only)
-}
-
-Can be set globally via \code{"brms.algorithm"} option. Limited testing suggests
-\code{"meanfield"} performs best among non-MCMC approximations for dynamic GAMs.}
-
-\item{lfo}{\code{logical}. Indicates whether this is part of \link{lfo_cv.mvgam} call.
-Returns lighter model version for speed. Users should leave as \code{FALSE}.}
-
-\item{...}{Other arguments to be passed to \code{\link{mvgam}} or
-\code{\link{jsdgam}}}
-
-\item{factor_formula}{Optional new \code{formula} object for the factor linear
-predictors}
-
-\item{factor_knots}{An optional \code{list} containing user specified knot
-values to be used for basis construction of any smooth terms in
-\code{factor_formula}. For most bases the user simply supplies the knots to be
-used, which must match up with the \code{k} value supplied (note that the
-number of knots is not always just \code{k}). Different terms can use different
-numbers of knots, unless they share a covariate}
+\item{...}{Any other argument \code{\link[=mvgam]{mvgam()}} accepts, or \code{\link[=jsdgam]{jsdgam()}} for a
+\code{jsdgam} fit (e.g. \code{trend_formula}, \code{family}, \code{prior}, \code{chains},
+\code{iter}, \code{warmup}, \code{cores}, \code{threads}, \code{algorithm}, \code{backend},
+\code{silent}, \code{seed}, \code{init}, \code{control}). Each value overrides the one
+inherited from \code{object}. A \code{prior} joins the priors the original
+fit set, as Details describes.}
 }
 \value{
-A \code{list} object of class \code{mvgam} containing model output,
-the text representation of the model file, the mgcv model output (for
-easily generating simulations at unsampled covariate values), Dunn-Smyth
-residuals for each outcome variable and key information needed for other
-functions in the package. See \code{\link{mvgam-class}} for details. Use
-\code{methods(class = "mvgam")} for an overview on available methods.
-
-A \code{list} object of class \code{mvgam} containing model output,
-the text representation of the model file, the mgcv model output (for
-easily generating simulations at unsampled covariate values), Dunn-Smyth
-residuals for each series and key information needed for other functions in
-the package. See \code{\link{mvgam-class}} for details. Use
-\code{methods(class = "mvgam")} for an overview on available methods.
+A refit \code{mvgam} object.
 }
 \description{
-This function allows a previously fitted \pkg{mvgam} model to be updated.
+Refit a fitted \code{mvgam} object with new data, an updated formula, new
+priors, different sampler settings or any other argument \code{\link[=mvgam]{mvgam()}}
+accepts. The signature follows \code{\link[brms:update.brmsfit]{brms::update.brmsfit()}}.
+}
+\details{
+Every \code{mvgam()} argument comes from \code{object} unless \code{...} overrides
+it. \code{update(fit, iter = 4000)} keeps the original formula, data,
+family, trend, prior and backend. Only the iteration count changes.
+
+Sampler settings follow \code{\link[brms:update.brmsfit]{brms::update.brmsfit()}}. \code{chains}, \code{iter},
+\code{warmup}, \code{thin} and \code{control} carry over when the refit keeps the
+original \code{algorithm}. \code{control} also needs the original \code{backend}. A
+new \code{iter} without a \code{warmup} takes the default warmup of
+\code{iter / 2}. \code{control} merges entry by entry:
+\code{update(fit, adapt_delta = 0.99)} keeps the original \code{max_treedepth}.
+
+New training data passed as \code{newdata} keeps the fit's held-out data
+when that lies after the new training times. Held-out data
+overlapping them is dropped with a message.
+
+A refit reuses the fitted prior table. The adaptive priors of brms,
+such as the Intercept prior centred on the response, keep the
+constants of the original fit. Because the constants stay fixed, a
+refit on a different \code{newdata} window has the same Stan code and
+reuses the compiled model. \code{\link[=lfo_cv]{lfo_cv()}} and other workflows that refit
+many times then repeat only the sampling. An inherited row for a
+parameter the refit lacks, such as the smooth of a dropped term, is
+left out of the refit. A \code{prior} passed to
+\code{update()} joins the priors the user set on the original fit, as in
+\code{\link[brms:update.brmsfit]{brms::update.brmsfit()}}. A new row replaces an old one for the same
+parameter:
+
+\if{html}{\out{<div class="sourceCode r">}}\preformatted{new_priors <- c(
+  prior(std_normal(), class = "b"),
+  prior(exponential(1), class = "sigma")
+)
+refit <- update(mod, prior = new_priors)
+}\if{html}{\out{</div>}}
+
+A prior change that alters the Stan code recompiles the model. With
+\code{recompile = FALSE} it is an error. \code{stancode(refit)} shows the
+model the refit compiled.
+
+Multivariate fits take a complete new formula as \code{formula.}. A
+formula update written with \code{.} is refused, as brms refuses it.
+
+A \code{jsdgam()} fit refits through \code{\link[=jsdgam]{jsdgam()}} with the arguments the
+original call evaluated, including \code{factor_formula}, \code{n_lv},
+\code{traits}, \code{trait_slopes} and \code{phylo}. \code{...} overrides any of them.
+
+\code{update()} refuses multiple-imputation fits from
+\code{mvgam_multiple(combine = TRUE)}. Refit each imputation with
+\code{\link[=mvgam]{mvgam()}} and pool them again.
 }
 \examples{
 \dontrun{
-# Simulate some data and fit a Poisson AR1 model
-simdat <- sim_mvgam(n_series = 1, trend_model = AR())
+# A Poisson GAM without a latent trend. PSIS approximates each
+# held-out count of such a model well (see Details of ?loo.mvgam)
+set.seed(13)
+simdat <- sim_mvgam(family = poisson(), n_series = 1L,
+                    n_timepoints = 120L, trend_model = "None")
+mod <- mvgam(y ~ s(x), data = simdat$data_train,
+             family = poisson(), chains = 2, silent = 2)
+}
+\dontrun{
+# Swap the family for a negative binomial. The formula, priors, data
+# and sampler settings carry over
+upd <- update(mod, family = negbinomial())
 
-mod <- mvgam(
-  y ~ s(season, bs = 'cc'),
-  trend_model = AR(),
-  noncentred = TRUE,
-  data = simdat$data_train,
-  chains = 2
-)
+# Compare the two fits by approximate leave-one-out cross-validation.
+# The better model comes first, with elpd_diff = 0. An elpd_diff
+# smaller than 4 in size means the two predict about equally well.
+# p_worse is the probability that a model predicts worse than the best
+loo_compare(mod, upd)
 
-summary(mod)
-conditional_effects(mod, type = 'link')
-
-# Update to an AR2 model
-updated_mod <- update(
-  mod,
-  trend_model = AR(p = 2),
-  noncentred = TRUE
-)
-
-summary(updated_mod)
-conditional_effects(updated_mod, type = 'link')
-
-# Now update to a Binomial AR1 by adding information on trials
-# requires that we supply newdata that contains the 'trials' variable
-simdat$data_train$trials <- max(simdat$data_train$y) + 15
-
-updated_mod <- update(
-  mod,
-  formula = cbind(y, trials) ~ s(season, bs = 'cc'),
-  noncentred = TRUE,
-  data = simdat$data_train,
-  family = binomial()
-)
-
-summary(updated_mod)
-conditional_effects(updated_mod, type = 'link')
+# A change of sampler settings alone reuses the compiled model
+longer <- update(mod, iter = 3000, recompile = FALSE)
 }
 
+}
+\seealso{
+\code{\link[=loo.mvgam]{loo.mvgam()}} and \code{\link[=loo_compare.mvgam]{loo_compare.mvgam()}} compare a refit with the
+original. \code{\link[=stancode.mvgam]{stancode.mvgam()}} shows the compiled model. The
+\href{https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html}{forecast evaluation article}
+compares competing models by their forecasts.
+
+Other model fitting: 
+\code{\link{check_newdata}()},
+\code{\link{jsdgam}()},
+\code{\link{mvgam}()},
+\code{\link{mvgam_data}()},
+\code{\link{mvgam_multiple}()},
+\code{\link{pivot_detection_array}()},
+\code{\link{pivot_species_matrix}()},
+\code{\link{print.mvgam_formula}()},
+\code{\link{series_to_mvgam}()},
+\code{\link{stancode.mvgam_formula}()}
 }
 \author{
 Nicholas J Clark
 }
+\concept{model fitting}

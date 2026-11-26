@@ -2,47 +2,140 @@
 % Please edit documentation in R/series_to_mvgam.R
 \name{series_to_mvgam}
 \alias{series_to_mvgam}
-\title{Convert timeseries object to format necessary for \pkg{mvgam} models}
+\title{Convert time series objects to mvgam long format}
 \usage{
-series_to_mvgam(series, freq, train_prop = 0.85)
+series_to_mvgam(
+  series,
+  freq = NULL,
+  response = NULL,
+  index = NULL,
+  h = NULL,
+  train_prop = NULL
+)
 }
 \arguments{
-\item{series}{\code{\link[xts]{xts}} or \code{\link[stats]{ts}} object to be
-converted to \code{\link{mvgam}} format}
+\item{series}{The data to convert. One of:
+\itemize{
+\item A \code{tsibble} (\code{tsibble::tsibble()}). Its key variables
+define the series and its index defines the time grid. Gaps in
+a regular \code{tsibble} become rows with a missing response, as
+\code{tsibble::fill_gaps(.full = TRUE)} builds them. Measured
+variables other than the response are carried over as
+covariates, with missing values on those rows. An irregular
+\code{tsibble} keeps its own times, for use with \code{CAR()} or
+\code{ZMVN()}.
+\item A \code{ts}, \code{mts} or \code{msts} object (\code{forecast::msts()}). Each
+column of an \code{mts} is a series.
+\item A wide \code{data.frame} holding one date column and one
+numeric column per series. Column names become the series
+levels, in column order.
+}}
 
-\item{freq}{\code{integer}. The seasonal frequency of the series}
+\item{freq}{Optional numeric vector of seasonal periods, in time
+steps. Each period above 1 adds a column giving the position of
+each row within that period. Defaults to the periods the object
+carries: \code{frequency()} of a \code{ts}, the \code{seasonal.periods} of an
+\code{msts}, or \code{tsibble::guess_frequency()} of the index.}
 
-\item{train_prop}{\code{numeric} stating the proportion of data to use for
-training. Should be between \code{0.25} and \code{0.95}}
+\item{response}{Name of the measured variable to use as the response
+of a \code{tsibble}. Optional when the \code{tsibble} has one measured
+variable. Ignored for other inputs, whose response column is \code{y}.}
+
+\item{index}{Name of the date column of a wide \code{data.frame}. Optional
+when exactly one column has class \code{Date}, \code{POSIXt}, \code{yearmonth},
+\code{yearquarter} or \code{yearweek}.}
+
+\item{h}{Optional number of final time steps to hold out as test
+data.}
+
+\item{train_prop}{Optional proportion of time steps to keep as
+training data, between 0 and 1. Only one of \code{h} and \code{train_prop}
+may be given.}
 }
 \value{
-A \code{list} object containing outputs needed for
-\code{\link{mvgam}}, including 'data_train' and 'data_test'
+A long \code{data.frame}. Its columns are \code{series} (a factor),
+\code{time} (an integer for regular data), the response and the original
+index (\code{index} for a \code{ts}). Any \code{tsibble} key and covariate columns
+follow, then one season column per period above 1. Rows are ordered
+by time, then series. With \code{h} or \code{train_prop}, a list holding
+\code{data_train} and \code{data_test} instead.
 }
 \description{
-This function converts univariate or multivariate time series (\code{xts} or
-\code{ts} objects) to the format necessary for \code{\link{mvgam}}.
+Convert a \code{tsibble}, a \code{ts}, \code{mts} or \code{msts} object, or a wide
+\code{data.frame} with a date column into the long \code{data.frame} that
+\code{\link[=mvgam]{mvgam()}} expects: one row per series and time, a \code{series} factor
+and a \code{time} column counting steps from the first index value.
+}
+\details{
+\code{time} counts steps from 1 at the first index value. The
+position within a seasonal period counts steps from the calendar
+origin of the index. A monthly index with \code{freq = 12} gives the
+month number whatever month the data start in. A \code{ts} gives
+\code{cycle()}. A single period produces a column named \code{season}. Several
+periods produce \verb{season_<period>} columns, such as \code{season_7} and
+\code{season_365.25}.
+
+Rows for future times with a missing response, built for example
+with \code{tsibble::new_data()} and bound to the observed data, receive
+\code{time} values that continue the grid. Converting observed and
+future rows together keeps the two aligned.
+
+Seasonal periods take the same numbers across packages. Monthly
+data carry \code{frequency = 12} in a \code{ts}. A fable
+\code{season(period = "year")} on a monthly \code{tsibble} resolves to 12
+steps. Both take \code{freq = 12}. Daily data with
+\code{seasonal.periods = c(7, 365.25)} in an \code{msts} take
+\code{freq = c(7, 365.25)}.
+
+A \code{season} column feeds a fixed seasonal shape, such as
+\code{s(season, bs = "cc")}. The same periods give \code{\link[=LLT]{LLT()}} a season
+whose shape drifts over the years, as
+\code{trend_formula = ~ LLT(season = 12)}.
 }
 \examples{
-# A ts object example
-data("sunspots")
-series <- cbind(sunspots, sunspots)
-colnames(series) <- c('blood', 'bone')
-head(series)
-series_to_mvgam(series, frequency(series), 0.85)
+# Monthly airline passengers, holding out the final year
+air <- series_to_mvgam(AirPassengers, h = 12)
+head(air$data_train)
 
-# An xts object example
-library(xts)
-dates <- seq(as.Date("2001-05-01"), length = 30, by = "quarter")
+# Two series in one mts
+deaths <- series_to_mvgam(cbind(male = mdeaths, female = fdeaths))
+levels(deaths$series)
 
-data <- cbind(
-  c(gas = rpois(30, cumprod(1 + rnorm(30, mean = 0.01, sd = 0.001)))),
-  c(oil = rpois(30, cumprod(1 + rnorm(30, mean = 0.01, sd = 0.001))))
-)
+# A wide data.frame with a date column. Converting dates needs the
+# tsibble package.
+if (requireNamespace("tsibble", quietly = TRUE)) {
+  wide <- data.frame(
+    date = seq(as.Date("2024-01-01"), by = "day", length.out = 28),
+    site_a = rpois(28, 5),
+    site_b = rpois(28, 8)
+  )
+  head(series_to_mvgam(wide))
+}
 
-series <- xts(x = data, order.by = dates)
-colnames(series) <- c('gas', 'oil')
-head(series)
-series_to_mvgam(series, freq = 4, train_prop = 0.85)
+# Next: fit the training data, for example with
+# mvgam(y ~ s(season, bs = "cc"), trend_formula = ~ AR(),
+#       data = air$data_train)
 
 }
+\seealso{
+The
+\href{https://nicholasjclark.github.io/mvgam/articles/data.html}{data article} covers the long format
+and its conversion in more depth. \code{\link[=LLT]{LLT()}} takes the same periods
+for a season that drifts.
+
+Other model fitting: 
+\code{\link{check_newdata}()},
+\code{\link{jsdgam}()},
+\code{\link{mvgam}()},
+\code{\link{mvgam_data}()},
+\code{\link{mvgam_multiple}()},
+\code{\link{pivot_detection_array}()},
+\code{\link{pivot_species_matrix}()},
+\code{\link{print.mvgam_formula}()},
+\code{\link{stancode.mvgam_formula}()},
+\code{\link{update.mvgam}()}
+}
+\author{
+Nicholas J Clark
+}
+\concept{model fitting}

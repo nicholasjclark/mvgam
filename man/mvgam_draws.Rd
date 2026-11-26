@@ -17,140 +17,134 @@
   x,
   row.names = NULL,
   optional = TRUE,
-  variable = "betas",
-  use_alias = TRUE,
-  regex = FALSE,
-  ...
-)
-
-\method{as.matrix}{mvgam}(x, variable = "betas", regex = FALSE, use_alias = TRUE, ...)
-
-\method{as.array}{mvgam}(x, variable = "betas", regex = FALSE, use_alias = TRUE, ...)
-
-\method{as_draws}{mvgam}(
-  x,
   variable = NULL,
+  draw = NULL,
   regex = FALSE,
-  inc_warmup = FALSE,
-  use_alias = TRUE,
   ...
 )
 
-\method{as_draws_matrix}{mvgam}(
-  x,
-  variable = NULL,
-  regex = FALSE,
-  inc_warmup = FALSE,
-  use_alias = TRUE,
-  ...
-)
+\method{as.matrix}{mvgam}(x, variable = NULL, draw = NULL, regex = FALSE, ...)
 
-\method{as_draws_df}{mvgam}(
-  x,
-  variable = NULL,
-  regex = FALSE,
-  inc_warmup = FALSE,
-  use_alias = TRUE,
-  ...
-)
+\method{as.array}{mvgam}(x, variable = NULL, draw = NULL, regex = FALSE, ...)
 
-\method{as_draws_array}{mvgam}(
-  x,
-  variable = NULL,
-  regex = FALSE,
-  inc_warmup = FALSE,
-  use_alias = TRUE,
-  ...
-)
+\method{as_draws}{mvgam}(x, variable = NULL, regex = FALSE, inc_warmup = FALSE, ...)
 
-\method{as_draws_list}{mvgam}(
-  x,
-  variable = NULL,
-  regex = FALSE,
-  inc_warmup = FALSE,
-  use_alias = TRUE,
-  ...
-)
+\method{as_draws_matrix}{mvgam}(x, variable = NULL, regex = FALSE, inc_warmup = FALSE, ...)
+
+\method{as_draws_df}{mvgam}(x, variable = NULL, regex = FALSE, inc_warmup = FALSE, ...)
+
+\method{as_draws_array}{mvgam}(x, variable = NULL, regex = FALSE, inc_warmup = FALSE, ...)
+
+\method{as_draws_list}{mvgam}(x, variable = NULL, regex = FALSE, inc_warmup = FALSE, ...)
 
 \method{as_draws_rvars}{mvgam}(x, variable = NULL, regex = FALSE, inc_warmup = FALSE, ...)
 }
 \arguments{
-\item{x}{\code{list} object of class \code{mvgam}}
+\item{x}{A fitted \code{mvgam} object.}
 
-\item{row.names}{Ignored}
+\item{row.names, optional}{Ignored.}
 
-\item{optional}{Ignored}
-
-\item{variable}{A character specifying which parameters to extract. Can
-either be one of the following options:
+\item{variable}{Either a keyword shortcut, a character vector of
+parameter names, or (when \code{regex = TRUE}) a vector of regular
+expressions. Recognised keywords:
 \itemize{
-\item \code{obs_params} (other parameters specific to the observation model,
-such as overdispersions for negative binomial models or observation error
-SD for gaussian / student-t models)
-\item \code{betas} (beta coefficients from the GAM observation model linear
-predictor; default)
-\item \code{smooth_params} (smoothing parameters from the GAM observation model)
-\item \code{linpreds} (estimated linear predictors on whatever link scale was
-used in the model)
-\item \code{trend_params} (parameters governing the trend dynamics, such as AR
-parameters, trend SD parameters or Gaussian Process parameters)
-\item \code{trend_betas} (beta coefficients from the GAM latent process model
-linear predictor; only available if a \code{trend_formula} was supplied in the
-original model)
-\item \code{trend_smooth_params} (process model GAM smoothing parameters; only
-available if a \code{trend_formula} was supplied in the original model)
-\item \code{trend_linpreds} (process model linear predictors on the identity
-scale; only available if a \code{trend_formula} was supplied in the original
-model)
+\item \code{"betas"}: population-level coefficients, the set
+\code{\link[brms:fixef.brmsfit]{brms::fixef()}} reports (\verb{b_*}, \verb{bs_*}, \verb{bsp_*} and \verb{bcs_*}).
+\item \code{"obs_params"}: observation-family distributional
+parameters (\code{sigma}, \code{phi}, \code{shape}, ...).
+\item \code{"smooth_params"}: smooth-term standard deviations
+(\verb{sds_*}).
+\item \code{"trend_betas"}: the trend formula's population-level
+coefficients (\verb{b_*_trend}, \verb{bs_*_trend} and \verb{bsp_*_trend}).
+\item \code{"trend_params"}: trend-dynamics parameters
+(autoregressive coefficients, innovation SDs, ...).
+\item \code{"trend_smooth_params"}: trend-side smooth SDs.
 }
-OR can be a character vector providing the variables to extract.}
+\code{NULL} (the default) returns every parameter. A bare vector name,
+such as \code{"sigma_trend"}, selects every element. Group-level
+effects, factor loadings and latent states have no keyword. Select
+them by name. \code{\link[=variables.mvgam]{variables.mvgam()}} lists the names a fit holds.}
 
-\item{use_alias}{Logical. If more informative names for parameters are
-available (i.e. for beta coefficients \code{b} or for smoothing parameters \code{rho}),
-replace the uninformative names with the more informative alias. Defaults to
-\code{TRUE}.}
+\item{draw}{Optional positive integer indices of the draws to keep,
+counted across chains. \code{NULL} (the default) keeps every draw.}
 
-\item{regex}{Logical. If not using one of the prespecified options for
-extractions, should \code{variable} be treated as a (vector of) regular
-expressions? Any variable in \code{x} matching at least one of the regular
-expressions will be selected. Defaults to \code{FALSE}.}
+\item{regex}{Logical. When \code{TRUE}, each entry of \code{variable} is
+treated as a regular expression and any parameter matching at
+least one pattern is selected. Keyword shortcuts are still
+honoured. Defaults to \code{FALSE}.}
 
-\item{...}{Ignored}
+\item{...}{Unused. Anything passed here is refused.}
 
-\item{inc_warmup}{Should warmup draws be included? Defaults to \code{FALSE}.}
+\item{inc_warmup}{Logical. Include warmup draws? Defaults to
+\code{FALSE}. A fit holds them only when sampled with
+\code{save_warmup = TRUE}.}
 }
 \value{
-A \code{data.frame}, \code{matrix}, or \code{array} containing the posterior draws.
+A \code{data.frame}, \code{matrix}, \code{array}, or one of the
+\verb{posterior::draws_*} classes (\code{draws_matrix}, \code{draws_array},
+\code{draws_df}, \code{draws_list}, \code{draws_rvars}) depending on the method
+dispatched.
 }
 \description{
-Extract posterior draws in conventional formats as data.frames, matrices,
-or arrays.
+Extract posterior draws as a data frame, matrix or array, or as one
+of the \verb{posterior::draws_*} classes. Parameters take their brms
+names, such as \code{b_x} and \code{sd_grp__Intercept}. A trend parameter
+indexed by series takes the series name, as in
+\code{sigma_trend[series_1]}. The
+\href{https://nicholasjclark.github.io/mvgam/articles/idm.html}{integrated data model article} contrasts
+intercepts drawn with \code{as_draws_df()}.
 }
 \examples{
 \dontrun{
-sim <- sim_mvgam(family = Gamma())
+set.seed(13)
+simdat <- sim_mvgam(family = poisson(), n_series = 1L,
+                     n_timepoints = 120L, trend_model = AR())
+mod <- mvgam(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1),
+              data    = simdat$data_train,
+              family  = poisson(),
+              chains  = 2, silent = 2)
 
-mod1 <- mvgam(
-  y ~ s(season, bs = 'cc'),
-  trend_model = AR(),
-  data = sim$data_train,
-  family = Gamma(),
-  chains = 2,
-  silent = 2
-)
+# Trend-dynamics parameters as a data frame of draws
+head(as.data.frame(mod, variable = "trend_params"))
 
-beta_draws_df <- as.data.frame(mod1, variable = 'betas')
-head(beta_draws_df)
-str(beta_draws_df)
+# Regular expressions select by pattern, here the smooth's basis
+# coefficients and its smoothing SD
+colnames(as.matrix(mod, variable = c("^s_", "^sds_"), regex = TRUE))
 
-beta_draws_mat <- as.matrix(mod1, variable = 'betas')
-head(beta_draws_mat)
-str(beta_draws_mat)
+# One random variable per parameter, printed as mean and SD
+as_draws_rvars(mod, variable = "trend_params")
 
-shape_pars <- as.matrix(mod1, variable = 'shape', regex = TRUE)
-head(shape_pars)
+# Next, mcmc_plot(mod) plots the same draws
 }
+
+}
+\seealso{
+\link{mvgam_diagnostics} for higher-level summaries derived from
+these draws (\code{rhat}, \code{neff_ratio}, \code{fixef}, \code{bayes_R2},
+\code{posterior_summary}, ...),
+\code{\link[=variables.mvgam]{variables.mvgam()}} to list every parameter name in the fit,
+\code{\link[=mcmc_plot.mvgam]{mcmc_plot.mvgam()}} for diagnostic visualisations,
+\code{\link[=summary.mvgam]{summary.mvgam()}} for a printed model summary,
+\code{\link[=tidy.mvgam]{tidy.mvgam()}} for a tibble of parameter summaries,
+\code{\link[=posterior_epred.mvgam]{posterior_epred.mvgam()}}, \code{\link[=posterior_linpred.mvgam]{posterior_linpred.mvgam()}},
+\code{\link[=posterior_predict.mvgam]{posterior_predict.mvgam()}} for prediction-scale outputs,
+\link[posterior:draws]{posterior::draws} for the underlying draws classes.
+
+Other posterior summaries: 
+\code{\link{VarCorr.mvgam}()},
+\code{\link{bibtex}()},
+\code{\link{how_to_cite.mvgam}()},
+\code{\link{hypothesis.mvgam}()},
+\code{\link{index-mvgam}},
+\code{\link{mcmc_plot.mvgam}()},
+\code{\link{methods_md}()},
+\code{\link{pairs.mvgam}()},
+\code{\link{posterior_interval.mvgam}()},
+\code{\link{ranef.mvgam}()},
+\code{\link{smooths.mvgam}()},
+\code{\link{summary.mvgam}()}
 }
 \author{
 Nicholas J Clark
 }
+\concept{posterior summaries}

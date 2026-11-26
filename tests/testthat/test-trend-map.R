@@ -1,0 +1,352 @@
+# Unit tests for `normalise_trend_map()`: the single entry
+# point that converts every accepted `trend_map` input shape
+# (matrix, data.frame, character code) to a canonical numeric
+# `Z` matrix.
+
+.make_data <- function(n_series = 3L) {
+  data.frame(
+    y = rnorm(n_series * 10L),
+    time = rep(seq_len(10L), n_series),
+    series = factor(
+      rep(paste0("s", seq_len(n_series)), each = 10L),
+      levels = paste0("s", seq_len(n_series))
+    )
+  )
+}
+
+
+# ---- NULL passthrough ------------------------------------
+
+test_that("NULL input returns NULL fast", {
+  expect_null(mvgam:::normalise_trend_map(NULL, .make_data()))
+})
+
+
+# ---- Character codes -------------------------------------
+
+test_that("character 'identity' yields the identity matrix", {
+  out <- mvgam:::normalise_trend_map("identity", .make_data(3L))
+  expect_equal(out$n_lv, 3L)
+  expect_equal(unname(out$Z), diag(1, 3L))
+  expect_equal(rownames(out$Z), c("s1", "s2", "s3"))
+})
+
+test_that("character 'shared' yields a single-column ones matrix", {
+  out <- mvgam:::normalise_trend_map("shared", .make_data(4L))
+  expect_equal(out$n_lv, 1L)
+  expect_equal(unname(out$Z), matrix(1, nrow = 4L, ncol = 1L))
+})
+
+test_that("unknown character code errors", {
+  expect_error(
+    mvgam:::normalise_trend_map("foo", .make_data()),
+    "Unknown 'trend_map' code"
+  )
+})
+
+test_that("character vector input errors", {
+  expect_error(
+    mvgam:::normalise_trend_map(c("identity", "shared"), .make_data()),
+    "single string"
+  )
+})
+
+
+# ---- Numeric matrix --------------------------------------
+
+test_that("numeric matrix passes through with row / column names", {
+  Z_in <- matrix(c(1, 0, 0.25, 0.75, 1, 0),
+                 nrow = 3L, ncol = 2L, byrow = TRUE)
+  out <- mvgam:::normalise_trend_map(Z_in, .make_data(3L))
+  expect_equal(out$n_lv, 2L)
+  expect_equal(unname(out$Z), Z_in)
+  expect_equal(rownames(out$Z), c("s1", "s2", "s3"))
+  expect_equal(colnames(out$Z), c("trend_1", "trend_2"))
+})
+
+test_that("matrix with wrong row count errors", {
+  expect_error(
+    mvgam:::normalise_trend_map(matrix(1, nrow = 5L, ncol = 1L),
+                                .make_data(3L)),
+    "wrong number of rows"
+  )
+})
+
+test_that("matrix with Inf entries errors", {
+  Z_in <- matrix(c(1, 0, Inf, 0.5, 1, 0),
+                 nrow = 3L, ncol = 2L, byrow = TRUE)
+  expect_error(
+    mvgam:::normalise_trend_map(Z_in, .make_data(3L)),
+    "Inf or NaN"
+  )
+})
+
+test_that("matrix with NA entries is accepted (partial Z)", {
+  # NA marks a free entry in the partial-Z surface. Each row
+  # still has at least one fixed non-zero (or any NA), so the
+  # zero-row guard is satisfied.
+  Z_in <- matrix(c(1, 0, NA, 0.5, 1, 0),
+                 nrow = 3L, ncol = 2L, byrow = TRUE)
+  out <- mvgam:::normalise_trend_map(Z_in, .make_data(3L))
+  expect_equal(out$n_lv, 2L)
+  expect_true(anyNA(out$Z))
+  # byrow = TRUE layout: row 2 = (NA, 0.5) so NA at Z[2, 1].
+  expect_true(is.na(out$Z[2L, 1L]))
+  expect_equal(out$Z[2L, 2L], 0.5)
+})
+
+test_that("matrix with all-zero rows errors", {
+  Z_in <- matrix(c(1, 0, 0, 0, 1, 0),
+                 nrow = 3L, ncol = 2L, byrow = TRUE)
+  expect_error(
+    mvgam:::normalise_trend_map(Z_in, .make_data(3L)),
+    "must load on at least one factor"
+  )
+})
+
+test_that("matrix with all-NA row passes (every entry free)", {
+  Z_in <- matrix(c(NA, NA, 1, 0, 0, 1),
+                 nrow = 3L, ncol = 2L, byrow = TRUE)
+  out <- mvgam:::normalise_trend_map(Z_in, .make_data(3L))
+  expect_true(all(is.na(out$Z[1L, ])))
+})
+
+test_that("a trend_map with every entry free passes validation", {
+  # Free columns are identified after sampling. Validation raises no
+  # warning about them. `matrix(NA, ...)` is logical and takes the same
+  # path as its numeric form.
+  for (Z_in in list(matrix(NA_real_, 3L, 2L), matrix(NA, 3L, 2L))) {
+    expect_no_warning(
+      out <- mvgam:::normalise_trend_map(Z_in, .make_data(3L))
+    )
+    expect_equal(sum(is.na(out$Z)), 6L)
+    expect_type(out$Z, "double")
+  }
+})
+
+
+# ---- data.frame mapping ----------------------------------
+
+test_that("data.frame mapping builds binary Z aligned to series_levels", {
+  tm <- data.frame(
+    series = c("s2", "s1", "s3"),
+    trend = c(2, 1, 2)
+  )
+  out <- mvgam:::normalise_trend_map(tm, .make_data(3L))
+  expect_equal(out$n_lv, 2L)
+  expected <- matrix(c(1, 0,
+                       0, 1,
+                       0, 1),
+                     nrow = 3L, ncol = 2L, byrow = TRUE,
+                     dimnames = list(c("s1", "s2", "s3"),
+                                     c("trend_1", "trend_2")))
+  expect_equal(out$Z, expected)
+})
+
+test_that("data.frame missing the trend column errors", {
+  tm <- data.frame(series = c("s1", "s2", "s3"))
+  expect_error(
+    mvgam:::normalise_trend_map(tm, .make_data(3L)),
+    "Absent: 'trend'"
+  )
+})
+
+test_that("data.frame with factor-class series column works", {
+  tm <- data.frame(
+    series = factor(c("s2", "s1", "s3"),
+                    levels = c("s1", "s2", "s3")),
+    trend = c(2L, 1L, 2L)
+  )
+  out <- mvgam:::normalise_trend_map(tm, .make_data(3L))
+  expect_equal(out$n_lv, 2L)
+  expected <- matrix(c(1, 0,
+                       0, 1,
+                       0, 1),
+                     nrow = 3L, ncol = 2L, byrow = TRUE)
+  expect_equal(unname(out$Z), expected)
+})
+
+test_that("data.frame with character trend column errors clearly", {
+  tm <- data.frame(
+    series = c("s1", "s2", "s3"),
+    trend = c("a", "b", "a")
+  )
+  expect_error(
+    mvgam:::normalise_trend_map(tm, .make_data(3L)),
+    "numeric or integer column"
+  )
+})
+
+test_that("data.frame missing a series errors", {
+  tm <- data.frame(series = c("s1", "s2"), trend = c(1, 2))
+  expect_error(
+    mvgam:::normalise_trend_map(tm, .make_data(3L)),
+    "every training series"
+  )
+})
+
+test_that("data.frame with duplicate series errors", {
+  tm <- data.frame(
+    series = c("s1", "s1", "s2", "s3"),
+    trend = c(1, 2, 1, 2)
+  )
+  expect_error(
+    mvgam:::normalise_trend_map(tm, .make_data(3L)),
+    "Duplicated: 's1'"
+  )
+})
+
+test_that("data.frame with unknown series errors", {
+  tm <- data.frame(
+    series = c("s1", "s2", "s_unknown"),
+    trend = c(1, 1, 2)
+  )
+  expect_error(
+    mvgam:::normalise_trend_map(tm, .make_data(3L)),
+    "every training series"
+  )
+})
+
+test_that("data.frame with non-contiguous trend integers errors", {
+  tm <- data.frame(
+    series = c("s1", "s2", "s3"),
+    trend = c(1, 3, 1)
+  )
+  expect_error(
+    mvgam:::normalise_trend_map(tm, .make_data(3L)),
+    "contiguous"
+  )
+})
+
+test_that("data.frame with negative trend integers errors", {
+  tm <- data.frame(
+    series = c("s1", "s2", "s3"),
+    trend = c(1, -1, 2)
+  )
+  expect_error(
+    mvgam:::normalise_trend_map(tm, .make_data(3L)),
+    "positive integers"
+  )
+})
+
+test_that("data.frame with max(trend) > n_series errors", {
+  tm <- data.frame(
+    series = c("s1", "s2", "s3"),
+    trend = c(1, 2, 4)
+  )
+  expect_error(
+    mvgam:::normalise_trend_map(tm, .make_data(3L)),
+    "contiguous"
+  )
+})
+
+
+# ---- Non-supported input shapes --------------------------
+
+test_that("integer-vector input is rejected (no implicit ordering)", {
+  expect_error(
+    mvgam:::normalise_trend_map(c(1L, 1L, 2L), .make_data(3L)),
+    "matrix, data.frame or character"
+  )
+})
+
+test_that("list input is rejected", {
+  expect_error(
+    mvgam:::normalise_trend_map(list(trend1 = "s1", trend2 = "s2"),
+                                .make_data(3L)),
+    "matrix, data.frame or character"
+  )
+})
+
+
+# ---- Data without a series column ------------------------
+
+test_that("missing series column on data errors", {
+  d <- data.frame(y = 1:3, time = 1:3)
+  expect_error(
+    mvgam:::normalise_trend_map("identity", d),
+    "Column 'series' is absent"
+  )
+})
+
+
+# ---- Constructor surface ---------------------------------
+
+test_that("AR / VAR / RW / ZMVN keep trend_map on the spec", {
+  tm <- data.frame(series = c("s1", "s2"), trend = c(1, 1))
+  Zmat <- matrix(c(1, 0.5, 0.5, 1), nrow = 2L, ncol = 2L)
+  expect_identical(AR(trend_map = tm)$trend_map, tm)
+  expect_identical(VAR(trend_map = "shared")$trend_map, "shared")
+  expect_identical(RW(trend_map = Zmat)$trend_map, Zmat)
+  expect_identical(ZMVN(trend_map = "identity")$trend_map, "identity")
+})
+
+test_that("PW refuses a factor request by either argument", {
+  # Both arguments raise one request, so both meet one refusal,
+  # composed from the reason the registry records against PW.
+  by_map <- expect_error(
+    PW(trend_map = "identity"),
+    "Factor models are not supported for PW trends"
+  )
+  by_n_lv <- expect_error(
+    PW(n_lv = 2),
+    "Factor models are not supported for PW trends"
+  )
+  expect_identical(conditionMessage(by_map), conditionMessage(by_n_lv))
+  expect_match(conditionMessage(by_n_lv), "changepoints separately",
+               fixed = TRUE)
+})
+
+test_that("CAR refuses a factor request by either argument", {
+  by_map <- expect_error(
+    CAR(trend_map = "identity"),
+    "Factor models are not supported for CAR trends"
+  )
+  by_n_lv <- expect_error(
+    CAR(n_lv = 2),
+    "Factor models are not supported for CAR trends"
+  )
+  expect_identical(conditionMessage(by_map), conditionMessage(by_n_lv))
+  expect_match(conditionMessage(by_n_lv), "irregular time gaps",
+               fixed = TRUE)
+})
+
+test_that("constructors fail-fast on malformed trend_map shapes", {
+  expect_error(AR(trend_map = 123), "trend_map")
+  expect_error(RW(trend_map = list(1)), "trend_map")
+  expect_error(VAR(trend_map = TRUE), "trend_map")
+  expect_error(ZMVN(trend_map = 1:3), "trend_map")
+})
+
+
+# ---- The map on the constructor ------------------------
+
+test_that("a constructor's trend_map reaches the Stan data", {
+  set.seed(1L)
+  d <- data.frame(
+    series = factor(rep(c("a", "b", "c"), each = 10L)),
+    time = rep(1:10, 3L),
+    y = rpois(30L, 5)
+  )
+  tm <- data.frame(series = factor(c("a", "b", "c")),
+                   trend = c(1L, 1L, 2L))
+  prefit <- mvgam(
+    y ~ 1, trend_formula = ~ AR(p = 1, trend_map = tm), data = d,
+    family = poisson(), run_model = FALSE, validate = FALSE
+  )
+  expect_equal(unname(prefit$standata$Z),
+               matrix(c(1, 1, 0, 0, 0, 1), nrow = 3L))
+})
+
+test_that("a top-level trend_map points to the trend constructor", {
+  # The map belongs on the constructor, which also takes `n_lv`
+  dat <- .make_data(3L)
+  for (call in list(
+    quote(mvgam(y ~ 1, trend_formula = ~ AR(), data = dat,
+                trend_map = "shared", run_model = FALSE)),
+    quote(get_prior(mvgam_formula(y ~ 1, ~ AR()), data = dat,
+                    trend_map = "shared"))
+  )) {
+    expect_error(eval(call), "AR(p = 1, trend_map = Z)", fixed = TRUE)
+  }
+})

@@ -1,262 +1,219 @@
 #' `mvgam_residcor` object description
 #'
 #' A \code{mvgam_residcor} object returned by function [residual_cor()].
-#' Run `methods(class = "mvgam_residcor")` to see an overview of available methods.
-#' @return Objects of this class are structured as a `list` with the following components:
+#' Run `methods(class = "mvgam_residcor")` to see the available
+#' methods.
 #'
-#'  \item{cor, cor_lower, cor_upper}{A set of \eqn{p \times p} correlation matrices,
-#'  containing either the posterior median or mean estimate, plus lower and upper limits
-#'  of the corresponding credible intervals supplied to `probs`}
-#'  \item{sig_cor}{A \eqn{p \times p} correlation matrix containing only those correlations whose credible
-#'  interval does not contain zero. All other correlations are set to zero}
-#'  \item{prec, prec_lower, prec_upper}{A set of \eqn{p \times p} precision matrices,
-#'  containing either the posterior median or mean estimate, plus lower and upper limits
-#'  of the corresponding credible intervals supplied to `probs`}
-#'  \item{sig_prec}{A \eqn{p \times p} precision matrix containing only those precisions whose credible
-#'  interval does not contain zero. All other precisions are set to zero}
-#'   \item{cov}{A \eqn{p \times p} posterior median or mean covariance matrix}
-#'   \item{trace}{The median/mean point estimator of the trace (sum of the diagonal elements)
-#'   of the residual covariance matrix `cov`}
+#' @return Objects of this class are structured as a `list` with the
+#'   following components:
+#'
+#'  \item{cor, cor_se, cor_lower, cor_upper}{Posterior summaries of
+#'  the \eqn{p \times p} correlation matrix: the posterior mean (the
+#'  median under `robust = TRUE`), the posterior SD (the MAD under
+#'  `robust = TRUE`) and the limits of the credible interval at the
+#'  `probs` levels.}
+#'  \item{cor_ess}{\eqn{p \times p} matrix of per-entry effective
+#'  sample sizes of the correlation draws, computed on the Fisher-z
+#'  scale with [posterior::ess_basic()]. The diagonal is `NA`, being
+#'  fixed at 1. A low value marks a correlation the chains sampled
+#'  poorly, however narrow its interval.}
+#'  \item{prob_positive, prob_negative, prob_nonzero}{\eqn{p \times p}
+#'  matrices of `Pr(r > 0)`, `Pr(r < 0)` and the larger of the two for
+#'  every off-diagonal entry. Each measures how well the data
+#'  determine the sign of a correlation.}
+#'  \item{sig_cor}{The correlation matrix with every entry set to zero
+#'  where `prob_nonzero` is at most `prob_threshold`.
+#'  [plot.mvgam_residcor()] draws `cor`. A hard cut would draw a
+#'  correlation the data leave uncertain the same as one estimated at
+#'  zero.}
+#'  \item{cov, cov_se, cov_lower, cov_upper, cov_ess}{Posterior
+#'  summaries of the residual covariance matrix, with per-entry ESS.}
+#'  \item{mean_abs_offdiag}{A `list` of `point`, `lower` and `upper`
+#'  summarising the mean absolute off-diagonal correlation. The mean is
+#'  taken within each draw and then summarised across draws. The
+#'  interval then describes the overall strength of correlation.}
+#'  \item{n_series, series_names}{Dimensions of the matrix and the
+#'  series labels.}
+#'  \item{pattern, hierarchical, group_label}{The residual structure
+#'  that was summarised.}
+#'  \item{covariance}{`"stationary"` for the covariance of the latent
+#'  states, or `"innovation"` for that of one step's shocks, as
+#'  `residual_cor()` was asked.}
+#'  \item{probs, prob_threshold}{The credible interval levels and the
+#'  `prob_nonzero` threshold of `sig_cor`.}
+#'
+#' Passing `partial = TRUE` to `residual_cor()` adds the partial
+#' correlations, with one field for each correlation field: `prec`,
+#' `prec_se`, `prec_lower`, `prec_upper`, `prec_ess`,
+#' `prec_prob_positive`, `prec_prob_negative`, `prec_prob_nonzero`
+#' and the thresholded `sig_prec`. Partial correlations are bounded
+#' like correlations. They are summarised on the same Fisher-z scale.
+#' [plot.mvgam_residcor()] with `type = "precision"` requires them.
 #'
 #' @details
-#' Hui (2016) provides an excellent description of the quantities that this function calculates, so this passage
-#' is heavily paraphrased from his associated \pkg{boral} package.
+#' In a latent factor model the residual covariance between series is
+#' \eqn{\Sigma = Z \Omega Z'}, where \eqn{Z} holds the factor
+#' loadings and \eqn{\Omega} is the covariance of the latent states.
+#' A strong residual correlation between two species can reflect a
+#' species interaction (facilitation or competition), a missing
+#' covariate, or any other association the predictors in `formula`
+#' leave unexplained (Hui 2016).
 #'
-#' In latent factor models, the residual covariance matrix is calculated
-#' based on the matrix of latent factor loading matrix \eqn{\Theta}, where the residual covariance
-#' matrix \eqn{\Sigma = \Theta\Theta'}. A strong residual covariance/correlation matrix
-#' between two species can be interpreted as evidence of species interactions (e.g.,
-#' facilitation or competition),
-#' missing covariates, as well as any additional species correlation not accounted for by shared
-#' environmental captured in `formula`.
+#' The partial correlation between two series conditions on every
+#' other series (Ovaskainen et al. 2016). It is computed from the
+#' inverse of the correlation matrix, with the diagonal set to 1. Two
+#' species with a partial correlation near zero can still be
+#' correlated. They are then conditionally independent given the other
+#' species. Their association runs *through* those species. A larger
+#' partial correlation suggests a more direct association.
 #'
-#' The residual precision matrix (also known as partial correlation matrix, Ovaskainen et al., 2016)
-#' is defined as the inverse of the residual correlation matrix. The precision matrix is often used to
-#' identify direct or causal relationships between two species e.g., two species can have a zero
-#' precision but still be correlated, which can be interpreted as saying that two species are not
-#' directly associated, but they are still correlated *through* other species. In other words, they
-#' are conditionally independent given the other species. It is important that the precision matrix
-#' does not exhibit the exact same properties of the correlation e.g., the diagonal elements are
-#' not equal to 1. Nevertheless, relatively larger values of precision may imply stronger
-#' direct relationships between two species.
-#'
-#' In addition to the residual correlation and precision matrices, the median or mean point estimator
-#' of trace of the residual covariance matrix is returned,
-#' \eqn{\sum\limits_{j=1}^p [\Theta\Theta']_{jj}}. Often used in other areas of multivariate
-#' statistics, the trace may be interpreted as the amount of covariation explained by the latent factors.
-#' One situation where the trace may be useful is when comparing a pure latent factor model
-#' (where no terms are suppled to `formula`) versus a model with latent
-#' factors and some additional predictors in `formula` -- the proportional difference in trace
-#' between these two models may be interpreted as the proportion of covariation between species explained
-#' by the predictors in `formula`. Of course, the trace itself is random due to the MCMC sampling, and so it
-#' is not always guaranteed to produce sensible answers.
-#' @author Nicholas J Clark
 #' @references
-#' Francis KC Hui (2016). BORAL - Bayesian ordination and regression analysis of
-#' multivariate abundance data in R. Methods in Ecology and Evolution. 7, 744-750.
+#' Gruvaeus G and Wainer H (1972). Two additions to hierarchical
+#' cluster analysis. British Journal of Mathematical and Statistical
+#' Psychology, 25, 200-206.
 #' \cr
 #' \cr
-#' Otso Ovaskainen et al. (2016). Using latent variable models to identify large networks of
-#' species-to-species associations at different spatial scales. Methods in Ecology and Evolution,
-#' 7, 549-555.
-#' @seealso [jsdgam()], [residual_cor()]
+#' Francis KC Hui (2016). BORAL - Bayesian ordination and regression
+#' analysis of multivariate abundance data in R. Methods in Ecology and
+#' Evolution. 7, 744-750.
+#' \cr
+#' \cr
+#' Otso Ovaskainen et al. (2016). Using latent variable models to
+#' identify large networks of species-to-species associations at
+#' different spatial scales. Methods in Ecology and Evolution, 7,
+#' 549-555.
+#' @section Methods:
+#' `print()` gives the source and kind of covariance, the mean absolute
+#' correlation and the number of pairs whose `prob_nonzero` exceeds
+#' `prob_threshold`. `summary()` returns a tibble with one row per pair
+#' of series, sorted by `prob_nonzero`: `series_1`, `series_2`,
+#' `Estimate`, `Est.Error`, `Q_lower`, `Q_upper`, `ESS`, the three sign
+#' probabilities and `sig`. A low `ESS` marks a pair the chains sampled
+#' poorly, however tight its interval.
+#'
+#' `plot()` draws the lower triangle of the correlation matrix as a
+#' heatmap of the point estimates. A black outline marks each pair
+#' whose `prob_nonzero` exceeds `prob_threshold`, the pairs `sig_cor`
+#' keeps. The `mvgam_residcor_list` of `residual_cor(by_group = TRUE)`
+#' plots one facet per group, on shared colour limits.
+#'
+#' @seealso `jsdgam()`, [residual_cor()]
 #' @author Nicholas J Clark
 #' @name mvgam_residcor-class
 NULL
 
-#' Plot residual correlations based on latent factors
-#'
-#' Plot residual correlation estimates from Joint Species Distribution
-#' (\code{jsdgam}) or dynamic factor (\code{mvgam}) models
-#' @param x \code{list} object of class \code{mvgam_residcor} resulting from a
-#' call to `residual_cor(..., summary = TRUE)`
-#' @param cluster Logical. Should the variables be re-arranged within the plot
-#' to group the correlation matrix into clusters of positive and negative correlations?
-#' Defaults to `FALSE`
-#' @param ... ignored
+#' @param x A summarised `mvgam_residcor` object, or for `plot()` an
+#'   `mvgam_residcor_list`.
+#' @param type Character. Which matrix to plot. `"correlation"` (the
+#'   default) draws `x$cor`. `"precision"` draws `x$prec`, the partial
+#'   correlations, which `residual_cor()` computes under
+#'   `partial = TRUE`.
+#' @param cluster Logical. `TRUE` reorders the matrix by an approximate
+#'   Robinson ordering (Gruvaeus and Wainer 1972; average linkage on
+#'   the `1 - cormat` distance). Clusters of positive and negative
+#'   correlations then lie adjacent. Defaults to `FALSE`.
+#' @param rescale Logical. By default colour spans `[-1, 1]`, the full
+#'   range of a correlation, which keeps panels from different fits
+#'   comparable. `TRUE` scales colour to the entries present, for a fit
+#'   whose correlations are all small. Defaults to `FALSE`.
+#' @param supported_only Logical. `TRUE` leaves blank every pair whose
+#'   `prob_nonzero` is at most `prob_threshold`. Defaults to `FALSE`.
+#' @param ... Unused. Anything passed here is refused.
+#' @rdname mvgam_residcor-class
 #' @method plot mvgam_residcor
-#' @details This function plots the significant residual correlations from a
-#' \code{mvgam_residcor} object, whereby the posterior mean (if `robust = FALSE`)
-#' or posterior median (if `robust = TRUE`) correlations are shown
-#' only those correlations whose credible interval does not contain zero. All other
-#' correlations are set to zero in the returned plot
-#' @return A `ggplot` object
-#' @seealso [jsdgam()], [lv_correlations()], [residual_cor()]
-#'
-#' @author Nicholas J Clark
-#'
 #' @export
-plot.mvgam_residcor = function(x, cluster = FALSE, ...) {
-  # Extract significant correlations
-  corrmat <- x$sig_cor
+plot.mvgam_residcor <- function(
+  x,
+  type = c("correlation", "precision"),
+  cluster = FALSE,
+  rescale = FALSE,
+  supported_only = FALSE,
+  ...
+) {
+  type <- match.arg(type)
+  checkmate::assert_flag(cluster)
+  checkmate::assert_flag(rescale)
+  checkmate::assert_flag(supported_only)
+  rlang::check_dots_empty()
+  set_color_scheme_local()
 
-  # Re-order into clusters, if specified
-  if (cluster) {
-    idx <- cluster_cormat(corrmat)
+  scale_name <- if (type == "correlation") {
+    "Posterior\ncorrelation"
   } else {
-    idx <- 1:NROW(corrmat)
+    "Posterior\npartial\ncorrelation"
   }
-
-  # Plot the correlation matrix
-  ggplot2::ggplot(
-    data = gather_matrix(corrmat[idx, idx]),
-    mapping = ggplot2::aes(
-      x = Var1,
-      y = Var2,
-      fill = correlation
-    )
-  ) +
-    ggplot2::geom_tile(colour = 'grey50') +
-    ggplot2::scale_fill_gradient2(
-      breaks = seq(-1, 1, by = 0.5),
-      limits = c(-1, 1)
-    ) +
-    ggplot2::labs(x = '', y = '') +
-    ggplot2::scale_x_discrete(guide = ggplot2::guide_axis(angle = 45)) +
-    ggplot2::theme_minimal()
+  residcor_heatmap(residcor_panel(x, type, cluster, supported_only),
+                   scale_name, rescale)
 }
 
-#' Melt a symmetric matrix into a long data.frame
+
+#' The lower triangle of a summarised residual correlation, with the
+#' supported pairs marked
+#'
+#' A pair is supported when its `prob_nonzero` exceeds the object's
+#' `prob_threshold`, the rule of `sig_cor`.
+#'
+#' @param x A summarised `mvgam_residcor`
+#' @param type `"correlation"` or `"precision"`
+#' @param cluster Reorder by `cluster_cormat()`
+#' @param supported_only Blank every pair that is not supported
+#' @return Frame from `support_panel()`
 #' @noRd
-gather_matrix <- function(mat) {
-  mat[upper.tri(mat)] <- NA
-  if (is.null(dimnames(mat))) {
-    grid <- expand.grid(seq.int(NROW(mat)), seq.int(NCOL(mat)))
-  } else {
-    grid <- expand.grid(dimnames(mat))
-  }
-  out <- as.data.frame(cbind(grid, value = as.vector(mat)))
-  colnames(out) <- c('Var1', 'Var2', 'correlation')
-  return(out)
+residcor_panel <- function(x, type = "correlation", cluster = FALSE,
+                           supported_only = FALSE) {
+  assert_residcor_summarised(x)
+  field <- if (type == "correlation") "cor" else "prec"
+  estimate <- x[[field]] %||% stop(insight::format_error(c(
+    "The 'mvgam_residcor' object holds no partial correlations.",
+    i = "Pass 'partial = TRUE' to 'residual_cor()' to compute them."
+  )), call. = FALSE)
+  prob <- x[[if (field == "cor") "prob_nonzero" else "prec_prob_nonzero"]]
+  # The cluster order comes from every estimate, blanked or not
+  idx <- if (cluster) cluster_cormat(estimate) else seq_len(nrow(estimate))
+  support_panel(estimate, prob, x[["prob_threshold"]], supported_only,
+                rows = idx, cols = idx, lower_only = TRUE)
 }
 
-#' Order a symmetric correlation matrix using approximate Robinson
-#' ordering, for better visualisation of "clusters"
-#' Credit for these functions goes to the maintainers of the gclus R package
-#' @importFrom stats hclust as.dist
+
+#' Heatmap of one or more residual correlation panels
+#'
+#' @param panel Frame from `residcor_panel()`, optionally with `group`
+#' @param scale_name Legend title
+#' @param rescale Scale colour to the entries present
+#' @param ncol Facet columns when `panel` has a `group` column
+#' @return A `ggplot` object
 #' @noRd
-cluster_cormat <- function(cormat, ...) {
-  dis <- -cormat
-  dis_d <- as.dist(dis)
-  n <- NROW(dis)
-  if (n <= 2) {
-    idx <- 1:n
-  } else {
-    clusters <- stats::hclust(dis_d, ...)
-    clusters <- reorder_clusters(clusters, dis)
-    idx <- clusters$order
-  }
-  return(idx)
+residcor_heatmap <- function(panel, scale_name, rescale, ncol = NULL) {
+  lim <- if (rescale) symmetric_limit(panel$value) else 1
+  matrix_heatmap(
+    panel,
+    mvgam_diverging_scale(name = scale_name, limits = c(-lim, lim)),
+    layout = "triangle", ncol = ncol
+  )
 }
 
-#' @noRd
-reorder_clusters <- function(x, dis, ...) {
-  if (!is.matrix(dis)) {
-    dis <- as.matrix(dis)
-  }
-  merges <- x$merge
-  n <- NROW(merges)
-  endpoints <- matrix(0, n, 2)
-  dir <- matrix(1L, n, 2)
-  for (i in 1L:n) {
-    j <- merges[i, 1]
-    k <- merges[i, 2]
-    if ((j < 0) && (k < 0)) {
-      endpoints[i, 1] <- -j
-      endpoints[i, 2] <- -k
-    } else if (j < 0) {
-      j <- -j
-      endpoints[i, 1] <- j
-      e1 <- endpoints[k, 1]
-      e2 <- endpoints[k, 2]
-      if (dis[j, e1] < dis[j, e2]) {
-        endpoints[i, 2] <- e2
-      } else {
-        endpoints[i, 2] <- e1
-        dir[i, 2] <- -1
-      }
-    } else if (k < 0) {
-      k <- -k
-      endpoints[i, 2] <- k
-      e1 <- endpoints[j, 1]
-      e2 <- endpoints[j, 2]
-      if (dis[k, e1] < dis[k, e2]) {
-        endpoints[i, 1] <- e2
-        dir[i, 1] <- -1
-      } else {
-        endpoints[i, 1] <- e1
-      }
-    } else {
-      ek1 <- endpoints[k, 1]
-      ek2 <- endpoints[k, 2]
-      ej1 <- endpoints[j, 1]
-      ej2 <- endpoints[j, 2]
 
-      d11 <- dis[ej1, ek1]
-      d12 <- dis[ej1, ek2]
-      d21 <- dis[ej2, ek1]
-      d22 <- dis[ej2, ek2]
-      dmin <- min(d11, d12, d21, d22)
-      if (dmin == d21) {
-        endpoints[i, 1] <- ej1
-        endpoints[i, 2] <- ek2
-      } else if (dmin == d11) {
-        endpoints[i, 1] <- ej2
-        endpoints[i, 2] <- ek2
-        dir[i, 1] <- -1
-      } else if (dmin == d12) {
-        endpoints[i, 1] <- ej2
-        endpoints[i, 2] <- ek1
-        dir[i, 1] <- -1
-        dir[i, 2] <- -1
-      } else {
-        endpoints[i, 1] <- ej1
-        endpoints[i, 2] <- ek1
-        dir[i, 2] <- -1
-      }
-    }
-  }
-  for (i in n:2L) {
-    if (dir[i, 1] == -1) {
-      m <- merges[i, 1]
-      if (m > 0) {
-        m1 <- merges[m, 1]
-        merges[m, 1] <- merges[m, 2]
-        merges[m, 2] <- m1
-        if (dir[m, 1] == dir[m, 2]) {
-          dir[m, ] <- -dir[m, ]
-        }
-      }
-    }
-    if (dir[i, 2] == -1) {
-      m <- merges[i, 2]
-      if (m > 0) {
-        m1 <- merges[m, 1]
-        merges[m, 1] <- merges[m, 2]
-        merges[m, 2] <- m1
-        if (dir[m, 1] == dir[m, 2]) {
-          dir[m, ] <- -dir[m, ]
-        }
-      }
-    }
-  }
-  clusters <- as.list(1:n)
-  for (i in 1:n) {
-    j <- merges[[i, 1]]
-    k <- merges[[i, 2]]
-    if ((j < 0) && (k < 0)) {
-      clusters[[i]] <- c(-j, -k)
-    } else if (j < 0) {
-      clusters[[i]] <- c(-j, clusters[[k]])
-    } else if (k < 0) {
-      clusters[[i]] <- c(clusters[[j]], -k)
-    } else {
-      clusters[[i]] <- c(clusters[[j]], clusters[[k]])
-    }
-  }
-
-  x1 <- x
-  x1$merge <- merges
-  x1$order <- clusters[[n]]
-  return(x1)
+#' @param include_global Logical, for an `mvgam_residcor_list`. `TRUE`
+#'   (the default) adds the `_global` correlation as one panel.
+#' @param ncol Optional number of facet columns. Defaults to
+#'   `ceiling(sqrt(n_panels))`.
+#' @rdname mvgam_residcor-class
+#' @method plot mvgam_residcor_list
+#' @export
+plot.mvgam_residcor_list <- function(x, include_global = TRUE,
+                                      ncol = NULL, rescale = FALSE,
+                                      supported_only = FALSE, ...) {
+  checkmate::assert_flag(include_global)
+  checkmate::assert_flag(rescale)
+  checkmate::assert_flag(supported_only)
+  rlang::check_dots_empty()
+  set_color_scheme_local()
+  keep <- if (isTRUE(include_global)) names(x) else
+    setdiff(names(x), "_global")
+  panel <- do.call(rbind, lapply(keep, function(g) {
+    df <- residcor_panel(x[[g]], supported_only = supported_only)
+    df$group <- g
+    df
+  }))
+  residcor_heatmap(panel, "Posterior\ncorrelation", rescale, ncol)
 }

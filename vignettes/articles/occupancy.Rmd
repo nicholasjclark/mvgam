@@ -1,0 +1,457 @@
+---
+title: "Occupancy models with mvgam"
+author: "Nicholas J Clark"
+date: "`r Sys.Date()`"
+output:
+  rmarkdown::html_document:
+    toc: yes
+    toc_float: yes
+---
+
+```{r, echo = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  message = FALSE,
+  warning = FALSE
+)
+```
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE, dpi = 100, fig.asp = 0.62, fig.width = 7,
+  out.width = "85%", fig.align = "center"
+)
+library(mvgam)
+library(ggplot2)
+theme_set(mvgam_theme(base_size = 12))
+```
+
+The purpose of this article is to show how `mvgam` can be used to fit
+and interrogate multi-season occupancy models for species that are
+detected imperfectly.
+
+## Occupancy models
+
+An occupancy model is a standard part of the ecological modeller's
+toolkit for making inferences about where a species occurs when our
+surveys can miss it (MacKenzie et al.
+[2002](https://doi.org/10.1890/0012-9658(2002)083[2248:ESORWD]2.0.CO;2)).
+Briefly, assume $y_{s,t,j}$ records whether the species was detected
+(1) or not (0) at site $s$ on replicate visit $j$ in season $t$. If
+the visits within a season are close enough together to satisfy the
+assumption that each site's status remained closed (i.e. the species
+did not colonise or abandon the site between visits), we can account
+for the fact that a non-detection does not always mean the species is
+absent. This is done by assuming the detections are Bernoulli random
+variables that depend on the true "latent" occupancy status $z$ and a
+detection probability $p$:
+
+\begin{align*}
+y_{s,t,j} & \sim \text{Bernoulli}(z_{s,t} \, p_{s,t,j}) \\
+z_{s,t} & \sim \text{Bernoulli}(\psi_{s,t})
+\end{align*}
+
+Using a set of linear predictors, we can estimate effects of
+covariates on the probability of occupancy $\psi$ (with a logit link)
+and, jointly, effects of possibly different covariates on detection
+probability $p$ (also with a logit link). In the example below,
+occupancy depends on a smooth function of forest cover and on a
+latent AR(1) process $\eta_t$ that all sites share. Detection depends
+on how much rain fell during each visit:
+
+\begin{align*}
+\text{logit}(\psi_{s,t}) & = \alpha + f(\text{forest}_s) + \eta_t \\
+\eta_t & \sim \text{Normal}(\phi \, \eta_{t-1}, \sigma) \\
+\text{logit}(p_{s,t,j}) & = \gamma + \delta \, \text{rain}_{s,t,j}
+\end{align*}
+
+`mvgam` can handle this type of model because it is designed to
+propagate unobserved temporal processes that evolve independently of
+the observation process. An occupancy model fits this State-Space
+format well, as it can be thought of as a State-Space model whose
+latent state is the binary "true" occupancy status of each site. This
+is very convenient. We can incorporate any of the package's diverse
+effect types (i.e. multidimensional splines, time-varying effects,
+random effects etc...) into either linear predictor, while the latent
+process links the seasons together and lets us forecast occupancy into
+seasons that have not yet been surveyed. All that is required is a
+marginalization trick that sums the likelihood over both possible
+values of $z$, leaving `Stan`'s samplers to deal only with continuous
+parameters (see more about this in the `Stan` User's Guide chapter on
+[latent discrete parameters](https://mc-stan.org/docs/stan-users-guide/latent-discrete.html)).
+
+## Simulating multi-season detection data
+
+First we will simulate detection / non-detection data for a single
+species surveyed at 40 sites over ten seasons, with four replicate
+visits per season. Occupancy probability increases with forest cover
+but levels off at the most forested sites. A regional AR(1) process
+causes occupancy at all sites to rise and fall together from one
+season to the next, as we might expect if the species responds to
+good and bad years across the region. Detection probability declines
+with the amount of rain recorded on each visit:
+
+```{r simulate}
+set.seed(42)
+n_site <- 40
+n_season <- 10
+n_visit <- 4
+
+# Forest cover of each site, with mean 0 and SD 1
+forest <- round(as.numeric(scale(runif(n_site))), 2)
+
+# Regional AR(1) deviations in logit occupancy, shared by every site
+z <- numeric(n_season)
+z[1] <- rnorm(1, 0, 0.6)
+for (t in 2:n_season) z[t] <- 0.7 * z[t - 1] + rnorm(1, 0, 0.45)
+
+# Occupancy rises with forest cover and levels off
+f_forest <- function(x) 1.6 * tanh(1.2 * x)
+psi <- plogis(outer(f_forest(forest), z, "+") - 0.2)
+occupied <- matrix(rbinom(length(psi), 1, psi), n_site, n_season)
+
+# One row per visit, with rain recorded on each
+dat <- expand.grid(visit = seq_len(n_visit), time = seq_len(n_season),
+                   site = seq_len(n_site))
+dat$series <- factor("species1")
+dat$site <- factor(dat$site)
+dat$forest <- forest[as.integer(dat$site)]
+dat$rain <- round(runif(nrow(dat)), 2)
+dat$occupied <- occupied[cbind(as.integer(dat$site), dat$time)]
+
+# An occupied site is detected with probability p, which falls with
+# rain. An empty site is never detected.
+p <- plogis(0.5 - 2 * dat$rain)
+dat$y <- rbinom(nrow(dat), 1, dat$occupied * p)
+```
+
+Preview the dataset to get an idea of how it is structured:
+
+```{r preview}
+head(dat)
+```
+
+Each row is one visit. `series` identifies the species, `site` the
+site and `time` the season. The `occupied` column holds the true
+simulated occupancy status, which we will use to check our estimates
+(the model never sees it). This long format differs from the
+multidimensional detection arrays that are commonly used to fit
+occupancy models in other software, but `pivot_detection_array()` can
+convert those arrays for you. Next we split the data into training
+and testing sets, holding out the last two seasons to evaluate
+forecasts:
+
+```{r split}
+train <- subset(dat, time <= 8)
+test <- subset(dat, time > 8)
+```
+
+It is always worth plotting the detection histories before fitting
+anything. Here we sum the detections at each site in each training
+season and order the sites by their forest cover:
+
+```{r histories, fig.asp = 0.75, fig.cap = "Number of detections from four visits at each site in each training season. Sites are ordered by forest cover, with the most forested sites at the top."}
+histories <- aggregate(y ~ site + time + forest, data = train, FUN = sum)
+histories$site <- reorder(histories$site, histories$forest)
+ggplot(histories, aes(x = time, y = site, fill = factor(y))) +
+  geom_tile(colour = "white") +
+  scale_fill_manual(
+    values = c("grey92", "#DCBCBC", "#C79999", "#A25050", "#7C0000"),
+    name = "Detections"
+  ) +
+  scale_x_continuous(breaks = 1:8, expand = c(0, 0)) +
+  labs(x = "Season", y = "Site (ordered by forest cover)") +
+  theme(axis.text.y = element_blank(), axis.ticks.y = element_blank())
+```
+
+Detections are concentrated at the more forested sites. Some seasons
+(such as season 5) also produced detections at many more sites than
+others. Notice how rarely an occupied site produces detections on all
+four visits. Some of the grey cells will be sites where the species
+was present but missed on every visit. We can see the forest cover
+relationship more directly by plotting the proportion of seasons in
+which each site produced at least one detection:
+
+```{r naive-forest, fig.cap = "Proportion of training seasons with at least one detection at each site, against standardised forest cover."}
+seen <- aggregate(y ~ site + forest + time, data = train, FUN = max)
+by_site <- aggregate(y ~ site + forest, data = seen, FUN = mean)
+ggplot(by_site, aes(x = forest, y = y)) +
+  geom_point(size = 2, alpha = 0.7) +
+  labs(x = "Forest cover (standardised)",
+       y = "Proportion of seasons with a detection")
+```
+
+This relationship looks nonlinear, with few detections at the least
+forested sites and a plateau at the most forested ones. But these raw
+proportions mix occupancy with detection. Imperfect detection pulls
+them below the true occupancy probabilities. Separating these two
+processes is exactly what the occupancy model is for.
+
+## Modelling with the `occ()` family
+
+Now we are ready to fit a model using `mvgam()`. Occupancy and
+detection each get their own formula inside `bf()`. The first formula
+sets up the linear predictor for occupancy on the logit scale, while
+the second (`p ~`) sets up the linear predictor for detection
+probability. `trend_formula = ~ AR()` adds the regional AR(1) process
+to logit occupancy. Setting `multi_season = TRUE` in `occ()` tells
+`mvgam` that each combination of site and season is its own closure
+unit (i.e. occupancy can change between seasons but not between visits
+within a season):
+
+```{r fit}
+mod <- mvgam(
+  bf(y ~ s(forest, k = 5), p ~ rain),
+  trend_formula = ~ AR(),
+  data = train,
+  newdata = test,
+  family = occ(multi_season = TRUE),
+  chains = 4, seed = 42, silent = 2
+)
+```
+
+```{r rain-numbers, include = FALSE}
+rain <- as.numeric(as_draws_matrix(mod, variable = "b_p_rain"))
+fe_rain <- sprintf("%.2f [%.2f, %.2f]", mean(rain),
+                   quantile(rain, 0.025), quantile(rain, 0.975))
+```
+
+The posterior summary separates parameters that belong to the
+observation model from those that belong to the latent AR(1) process:
+
+```{r summary}
+summary(mod)
+```
+
+The estimated effect of rain on detection (`p_rain`) is `r fe_rain` on
+the logit scale, which is close to the true simulated value of $-2$.
+
+## Estimating the proportion of sites occupied
+
+A common goal in occupancy modelling is to estimate how many sites the
+species occupies, which will usually be more than the number of
+sites where it happened to be detected (often called naive
+occupancy). `hindcast(type = "latent_state")` returns posterior
+probabilities that each site was occupied in each season, conditional
+on the detections observed there. Its `plot()` method averages these
+probabilities over sites to give the expected proportion of sites
+occupied in each season. Here we add the true proportions (black
+points) and naive occupancy (open circles) for comparison:
+
+```{r occupancy-plot, fig.cap = "Expected proportion of sites occupied in each training season, with 50% and 95% credible intervals. Black points show the true proportion. Open circles show naive occupancy, the proportion of sites with at least one detection."}
+hc <- hindcast(mod, type = "latent_state")
+units <- unique(train[, c("site", "time", "forest", "occupied")])
+occ_true <- aggregate(occupied ~ time, data = units, FUN = mean)
+detected <- aggregate(y ~ site + time, data = train, FUN = max)
+occ_naive <- aggregate(y ~ time, data = detected, FUN = mean)
+plot(hc) +
+  geom_point(data = occ_naive, aes(x = time, y = y), shape = 21,
+             fill = "white", colour = "grey30", size = 1.6) +
+  geom_point(data = occ_true, aes(x = time, y = occupied), size = 1.6) +
+  labs(y = "Proportion of sites occupied")
+```
+
+```{r occupancy-numbers, include = FALSE}
+n_below <- sum(occ_naive$y < occ_true$occupied)
+state <- merge(as.data.frame(hc), detected, by = c("site", "time"))
+state <- merge(state, units, by = c("site", "time"))
+missed <- subset(state, y == 0)
+n_missed <- sum(missed$occupied)
+by_status <- function(x) {
+  sprintf("%.2f", tapply(x, factor(missed$occupied, 1:0), mean))
+}
+psi_missed <- by_status(missed$median)
+forest_missed <- by_status(missed$forest)
+train$p <- predict(mod, type = "detection")[, "Estimate"]
+miss <- aggregate(cbind(q = 1 - p) ~ site + time, data = train, FUN = prod)
+p_miss <- sprintf("%.2f", mean(miss$q))
+prop <- sapply(1:8, function(t) {
+  rowMeans(hc$draws[, hc$unit$time == t])
+})
+band <- apply(prop, 2, quantile, c(0.025, 0.975))
+n_outside <- sum(occ_true$occupied < band[1, ] |
+                   occ_true$occupied > band[2, ])
+```
+
+Naive occupancy underestimates the true proportion of occupied sites
+in `r n_below` of the 8 training seasons. This happens because the
+species is fairly easy to miss: given the rain recorded on its
+visits, an occupied site has an average probability of `r p_miss` of
+going undetected on all four visits. The model accounts for these
+missed detections. Its estimates track the true proportions from
+season to season. The intervals show uncertainty in the expected
+proportion of sites occupied. Because the true proportion in any one
+season also depends on which of the undetected sites happen to be
+occupied, `r n_outside` of the 8 true values fall outside the 95%
+intervals.
+
+Since a single detection confirms that a site is occupied, all of the
+uncertainty in these estimates comes from sites where the species was
+never detected. In the training data there are `r nrow(missed)`
+combinations of site and season with no detections. The species was
+present in `r n_missed` of them. `as.data.frame(hc)` returns one row
+per site and season, which makes it easy to inspect these directly.
+The model's estimated occupancy probability averages `r psi_missed[1]`
+at the sites that were occupied but missed, compared to
+`r psi_missed[2]` at the sites that were empty. The forest cover
+effect explains this difference, as the occupied but missed sites are
+more heavily forested (average standardised forest cover of
+`r forest_missed[1]` vs `r forest_missed[2]`).
+
+## Habitat and detection effects
+
+`conditional_effects()` supports the occupancy prediction types. Using
+`type = "latent_state"` will plot the estimated effect of forest cover
+on the probability of occupancy. Because the result is a `ggplot`
+object, we can easily add the true simulated function as a dashed
+line:
+
+```{r forest-effect, fig.cap = "Occupancy probability against standardised forest cover, with its 95% credible interval. The dashed line is the true simulated function."}
+forest_grid <- data.frame(forest = seq(min(forest), max(forest),
+                                       length.out = 100))
+forest_grid$psi <- plogis(f_forest(forest_grid$forest) - 0.2)
+plot(conditional_effects(mod, effects = "forest", type = "latent_state"),
+     plot = FALSE)[[1]] +
+  geom_line(data = forest_grid, aes(x = forest, y = psi), linetype = 2)
+```
+
+The smooth has done a nice job of capturing the saturating effect of
+forest cover, which increases occupancy steeply across the middle of
+the forest gradient before levelling off at the most forested sites.
+Using `type = "detection"` instead will plot the estimated effect of
+rain on detection probability:
+
+```{r rain-effect, out.width = "70%", fig.cap = "Detection probability against the rain index, with its 95% credible interval."}
+plot(conditional_effects(mod, effects = "rain", type = "detection"),
+     ask = FALSE)
+```
+
+## Forecasting occupancy
+
+Because the latent AR(1) process links the seasons together, we can
+forecast occupancy into the two seasons we held out.
+`forecast(type = "latent_state")` propagates the AR(1) process forward,
+combines it with each site's forest cover and averages over sites to
+give the expected proportion of sites occupied in each future season:
+
+```{r forecast, fig.cap = "Expected proportion of sites occupied over the training seasons and the two held-out seasons. Points show the true proportion."}
+fc <- forecast(mod, type = "latent_state")
+occ_true_all <- aggregate(
+  occupied ~ time, data = unique(dat[, c("site", "time", "occupied")]),
+  FUN = mean
+)
+plot(fc) +
+  geom_point(data = occ_true_all, aes(x = time, y = occupied),
+             size = 1.6) +
+  labs(y = "Proportion of sites occupied")
+```
+
+```{r forecast-numbers, include = FALSE}
+fc_q <- apply(fc$forecasts[[1]], 2, quantile, c(0.025, 0.5, 0.975))
+fc_text <- sprintf("%.2f [%.2f, %.2f]", fc_q[2, ], fc_q[1, ], fc_q[3, ])
+```
+
+The forecast proportions of sites occupied are `r fc_text[1]` and
+`r fc_text[2]` for the two held-out seasons, compared to true
+proportions of `r sprintf("%.2f", occ_true_all$occupied[9])` and
+`r sprintf("%.2f", occ_true_all$occupied[10])`. The forecast intervals
+are much wider than the hindcast intervals because no detections from
+these seasons enter the model. If we instead want forecasts of the
+detections themselves, the default `forecast(mod)` will produce these
+for each visit in the held-out seasons. `score()` can then evaluate
+them against the observed detections.
+
+## Checking the fit
+
+`pp_check(type = "fit_stat")` computes the chi-squared statistic of
+MacKenzie and Bailey
+([2004](https://doi.org/10.1198/108571104X3361)), which compares the
+total detections at each site in each season against their
+expectations. The same statistic is then computed on detections
+simulated from the posterior. A Bayesian p-value near 0 would mean the
+simulated detections rarely reach the discrepancy of the observed
+ones:
+
+```{r fit-stat}
+fit_stat <- pp_check(mod, type = "fit_stat")
+fit_stat
+```
+
+```{r fit-stat-numbers, include = FALSE}
+fe_fit <- if (fit_stat$bayes_p > 0.05) {
+  "gives no sign of lack of fit"
+} else {
+  "suggests the model misses some variation among sites"
+}
+```
+
+The value here, `r sprintf("%.2f", fit_stat$bayes_p)`, `r fe_fit`. We
+can also inspect randomised quantile residuals, which `mvgam` computes
+for each site in each season from its total detections:
+
+```{r residuals, out.width = "70%", fig.cap = "Normal Q-Q plot of the randomised quantile residuals, one for each site in each season."}
+plot(mod, type = "residuals")
+```
+
+The residuals fall close to the line, giving us confidence that the
+model is capturing the main sources of variation in these detection
+histories.
+
+## Writing up the model
+
+`methods_md()` writes out the fitted model as Markdown with LaTeX
+equations, including the data dimensions, every linear predictor, the
+priors and the call that produced it. This makes it easy to drop a
+complete model description into a manuscript or supplement:
+
+```{r methods, results = "asis"}
+methods_md(mod, heading_level = 3)
+```
+
+`how_to_cite()` complements this with a methods paragraph and the
+references for each component of the model.
+
+## Extending the model
+
+Because both formulas are passed to `brms`, the occupancy and detection
+linear predictors can include any of the effects that `brms` and
+`mgcv` support. For example, we might give each observer their own
+detection intercept, add a Gaussian process over site coordinates to
+capture spatial variation in occupancy and place a regularizing prior
+on the detection coefficients. Priors for the detection predictor are
+identified with `dpar = p`:
+
+```{r extend, eval = FALSE}
+mod_ext <- mvgam(
+  bf(y ~ s(forest, k = 5) + gp(x, y_coord, k = 10, c = 5 / 4),
+     p ~ rain + (1 | observer)),
+  trend_formula = ~ AR(),
+  data = train,
+  family = occ(multi_season = TRUE),
+  prior = prior(normal(0, 1), class = b, dpar = p)
+)
+```
+
+Here `x` and `y_coord` would hold the coordinates of each site and
+`observer` would identify who carried out each visit. `get_prior()`
+lists every parameter whose prior can be changed in this way.
+
+## Further reading
+
+Each function used here has a help page with more details, such as
+`?occ` or `?hindcast.mvgam`. The [N-mixture models article](nmix.html) shows how to
+estimate abundance from repeated counts using the same data layout,
+while the [Joint species distribution models article](jsdgam.html)
+shows how to share latent factors among many species. The following
+papers offer useful material about occupancy models:
+
+MacKenzie DI and Bailey LL (2004). Assessing the fit of site-occupancy
+models. *Journal of Agricultural, Biological, and Environmental
+Statistics* 9(3), 300-318.
+[doi:10.1198/108571104X3361](https://doi.org/10.1198/108571104X3361)
+
+MacKenzie DI, Nichols JD, Lachman GB, Droege S, Royle JA and
+Langtimm CA (2002). Estimating site occupancy rates when detection
+probabilities are less than one. *Ecology* 83(8), 2248-2255.
+[doi:10.1890/0012-9658(2002)083[2248:ESORWD]2.0.CO;2](https://doi.org/10.1890/0012-9658(2002)083%5B2248:ESORWD%5D2.0.CO;2)

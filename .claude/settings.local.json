@@ -1,11 +1,82 @@
 {
   "permissions": {
     "allow": [
+      "Bash(Rscript:*)",
+      "Bash(git add:*)",
+      "Bash(git push:*)",
+      "Bash(grep:*)",
+      "Bash(find:*)",
+      "Bash(ls:*)",
+      "Bash(timeout:*)",
       "WebFetch(domain:github.com)",
-      "Bash(R CMD Rd2pdf:*)",
-      "Bash(git pull:*)",
-      "Bash(git stash:*)"
+      "Bash(git commit:*)",
+      "Read(*)",
+      "Search(*)",
+      "Bash(for i in 1 2 3 4 5 6)",
+      "Bash(do echo \"File $i:\")",
+      "Bash(done)",
+      "Bash(for i in 2 3 4)",
+      "Bash(do:*)",
+      "Bash(sed:*)",
+      "Bash(for i in 2 4)",
+      "Bash(for i in 1 2 4 5)",
+      "Bash(for i in 3 6)",
+      "Bash(/dev/null)",
+      "Bash(for i in {1..6})",
+      "Bash(cd:*)",
+      "Read(/C:\\c\\Users\\uqnclar2\\OneDrive - The University of Queensland\\Desktop\\mvgam/**)",
+      "WebSearch",
+      "Bash(rg:*)",
+      "Bash(git log:*)",
+      "Bash(for func in repair_stanfit repair_variable_names is_equal ulapply prepare_mvgam_stancode prepare_stan_data parse_model_rstan parse_model_cmdstanr is_multivariate_brmsfit rename_univariate_parameters rename_multivariate_parameters generate_stan_array_declaration extract_variables_from_block remove_variables_from_block)",
+      "Bash(for func in prepare_stanvars_for_brms extract_computed_variable_name format_matrix_for_stan_array extract_variable_from_line replace_stan_block_content handle_nse_param validate_pos_real check_semicolon_syntax validate_stan_data_structure is_valid_stanvar validate_trend_specs validate_trend_parameter_class validate_trend_parameter_bounds)",
+      "Bash(for func in validate_stan_code_fragment validate_combined_stancode apply_validation_rules validate_time_variable validate_series_variable)",
+      "WebFetch(domain:mc-stan.org)",
+      "Bash(where stanc)",
+      "Read(/C:\\Users\\uqnclar2\\Documents\\.cmdstan\\cmdstan-2.34.1/**)",
+      "WebFetch(domain:about.uq.edu.au)",
+      "WebFetch(domain:ecogambler.netlify.app)",
+      "WebFetch(domain:mathmarecol.github.io)",
+      "WebFetch(domain:www.physalia-courses.org)",
+      "WebFetch(domain:seonixbio.com)",
+      "Bash(cat:*)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(R CMD INSTALL:*)",
+      "Bash(claude mcp add:*)",
+      "mcp__github__get_file_contents",
+      "mcp__context7__get-library-docs",
+      "mcp__github__search_code",
+      "Bash(.claude/hooks/package-dependency-mapper.sh:*)",
+      "Bash(bash:*)",
+      "Bash(echo:*)",
+      "Bash(chmod:*)",
+      "Bash(./.claude/hooks/package-dependency-mapper.sh test:*)",
+      "Bash(tee /tmp/validate11.log)",
+      "Bash(tee /tmp/local-tests.log)",
+      "WebFetch(domain:jsocolar.github.io)",
+      "WebFetch(domain:besjournals.onlinelibrary.wiley.com)",
+      "Bash(curl -s \"https://api.github.com/repos/hmsc-r/HMSC/contents\")",
+      "WebFetch(domain:www.mv.helsinki.fi)",
+      "Bash(curl -s \"https://cran.r-project.org/web/packages/Hmsc/index.html\")",
+      "Bash(python3 ~/.claude/hooks/prose_lint.py --files /home/nicholas-clark/Desktop/mvgam/vignettes/mvgam_overview.Rmd)",
+      "WebFetch(domain:api.crossref.org)"
     ],
-    "deny": []
-  }
+    "deny": [],
+    "ask": [],
+    "defaultMode": "plan"
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash(git push*)",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/package-dependency-mapper.sh pre_push"
+          }
+        ]
+      }
+    ]
+  },
+  "outputStyle": "Concise"
 }

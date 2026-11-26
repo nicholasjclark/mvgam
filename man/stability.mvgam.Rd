@@ -3,22 +3,102 @@
 \name{stability.mvgam}
 \alias{stability.mvgam}
 \alias{stability}
+\alias{summary.mvgam_stability}
+\alias{plot.mvgam_stability_summary}
+\alias{plot.mvgam_stability}
 \title{Calculate measures of latent VAR community stability}
 \usage{
 stability(object, ...)
 
-\method{stability}{mvgam}(object, ...)
+\method{stability}{mvgam}(
+  object,
+  groups = NULL,
+  ndraws = NULL,
+  draw_ids = NULL,
+  summary = TRUE,
+  probs = c(0.025, 0.975),
+  future = FALSE,
+  ...
+)
+
+\method{summary}{mvgam_stability}(object, probs = c(0.025, 0.975), robust = TRUE, bins = 30L, ...)
+
+\method{plot}{mvgam_stability_summary}(
+  x,
+  variables = c("reactivity", "mean_return_rate", "var_return_rate"),
+  intervals = FALSE,
+  ...
+)
+
+\method{plot}{mvgam_stability}(
+  x,
+  variables = c("reactivity", "mean_return_rate", "var_return_rate"),
+  bins = 30L,
+  ...
+)
 }
 \arguments{
-\item{object}{\code{list} object of class \code{mvgam} resulting from a call
-to \code{\link[=mvgam]{mvgam()}} that used a Vector Autoregressive latent process model (either
-as \code{VAR(cor = FALSE)} or \code{VAR(cor = TRUE)})}
+\item{object}{An object of class \code{mvgam} fitted with a
+\code{VAR(p = 1)} latent process model.
+For \code{summary()}, an \code{mvgam_stability} object from
+\code{stability(summary = FALSE)}.}
 
-\item{...}{Ignored}
+\item{...}{Unused. Anything passed here is refused.}
+
+\item{groups}{Hierarchical VAR fits only. The panels to summarise,
+by name or by index into the levels of \code{gr}. The default \code{NULL}
+summarises every panel. A non-hierarchical fit accepts \code{NULL}
+alone.}
+
+\item{ndraws}{Positive integer specifying number of posterior draws to
+use. NULL (default) uses all available draws.}
+
+\item{draw_ids}{Optional integer vector selecting a subset of posterior
+draw indices to use. NULL (default) uses all draws (subject to
+\code{ndraws}).}
+
+\item{summary}{Logical. \code{TRUE} (the default) returns the posterior
+median and interval of each metric. \code{FALSE} returns the metrics of
+each draw. \code{plot()} draws histograms of either form.}
+
+\item{probs}{The lower and upper percentiles of the interval reported
+with the median when \code{summary = TRUE}.}
+
+\item{future}{\code{Logical}. When \code{TRUE}, the per-draw computation
+runs under the \code{\link[future:plan]{future::plan()}} the caller
+has set. The default \code{sequential} plan runs as base \code{lapply()}
+does. \code{plan(multisession, workers = N)} splits the draws across
+\code{N} R processes. Without the \pkg{future} package the draws
+run in turn, with a message.}
+
+\item{robust}{Logical, for \code{summary()}. \code{TRUE} (the default) reports
+the median and median absolute deviation. \code{FALSE} reports the mean
+and standard deviation.}
+
+\item{bins}{Number of histogram bins, which \code{summary()} records for
+\code{plot()}.}
+
+\item{x}{An \code{mvgam_stability} object or its summary.}
+
+\item{variables}{Character vector of the metrics to draw. Defaults
+to reactivity and the mean and variance return rates. Any column
+of \code{x} can be named.}
+
+\item{intervals}{Logical, for a summary. \code{TRUE} draws each metric as
+a median and interval. \code{FALSE} (the default) draws its binned
+posterior.}
 }
 \value{
-A \code{data.frame} containing posterior draws for each stability
-metric.
+A \code{data.frame} with the posterior median and interval of
+each stability metric, or under \code{summary = FALSE} an object of class
+\code{mvgam_stability} holding one row of metrics per posterior draw.
+\code{summary()} turns the draws into the summary, one row per metric,
+or per panel and metric on a hierarchical VAR. \code{plot()} draws a
+histogram of each metric, with a dashed line at zero on the
+reactivity panel, above which the system amplifies a shock before
+it decays. A hierarchical VAR draws a median and interval for each
+panel. A summary plots the histograms from the bins it recorded, or
+under \code{intervals = TRUE} a median and interval.
 }
 \description{
 Compute reactivity, return rates and contributions of interactions to
@@ -26,173 +106,131 @@ stationary forecast variance from \pkg{mvgam} models with Vector
 Autoregressive dynamics.
 }
 \details{
-These measures of stability can be used to assess how important
-inter-series dependencies are to the variability of a multivariate system
-and to ask how systems are expected to respond to environmental
-perturbations. Using the formula for a latent VAR(1) as:
+These measures describe how much the lagged interactions
+among the series contribute to the variability of the system. They
+also describe how the system responds to a perturbation (Ives et
+al. 2003). For a latent VAR(1)
 
 \deqn{
-  \mu_t \sim \text{MVNormal}(A(\mu_{t - 1}), \Sigma)
+  x_t \sim \text{MVNormal}(A x_{t - 1}, \Sigma)
   }
 
-this function will calculate the long-term stationary forecast distribution
-of the system, which has mean \eqn{\mu_{\infty}} and variance
-\eqn{\Sigma_{\infty}}, to then calculate the following quantities:
+the stationary covariance \eqn{\Sigma_{\infty}} solves
+\eqn{\Sigma_{\infty} = A \Sigma_{\infty} A^\top + \Sigma}. Each
+posterior draw of \eqn{A} and \eqn{\Sigma} gives one draw of every
+metric:
 
 \itemize{
-\item \code{prop_int}: Proportion of the volume of the stationary forecast
-distribution that is attributable to lagged interactions:
-\deqn{ det(A)^2 }
+\item \code{prop_int}: the proportion of the volume of the stationary
+distribution that the lagged interactions generate,
+\eqn{\det(A)^2}.
 
-\if{html}{\out{<div class="sourceCode">}}\preformatted{\\item `prop_int_adj`: Same as `prop_int` but scaled by the number of
-series \eqn{p}:
-\deqn{ det(A)^{2/p} }
+\if{html}{\out{<div class="sourceCode">}}\preformatted{\\item `prop_int_adj`: `prop_int` scaled by the number of series
+\eqn{p}, \eqn{|\det(A)|^{2/p}}. It compares across systems of
+different size.
 
-\\item `prop_int_offdiag`: Sensitivity of `prop_int` to inter-series
-interactions (off-diagonals of \eqn{A}):
-\deqn{ [2~det(A) (A^{-1})^T] }
+\\item `prop_int_offdiag`, `prop_int_diag`: the sensitivity of
+`prop_int` to each cell of \eqn{A} is
+\eqn{2 \det(A) (A^{-1})^\top}. `prop_int_offdiag` is the mean
+absolute sensitivity of the off-diagonal cells (interactions
+between series) as a share of that mean plus the mean absolute
+sensitivity of the diagonal cells (self-regulation).
+`prop_int_diag` is the remaining share.
 
-\\item `prop_int_diag`: Sensitivity of `prop_int` to intra-series
-interactions (diagonals of \eqn{A}):
-\deqn{ [2~det(A) (A^{-1})^T] }
+\\item `prop_cov_offdiag`, `prop_cov_diag`: the same split for the
+sensitivity of \eqn{\det(\Sigma_{\infty})} to each cell of
+\eqn{\Sigma_{\infty}}, \eqn{\det(\Sigma_{\infty})
+    (\Sigma_{\infty}^{-1})^\top}. Off-diagonal cells are counted
+where \eqn{\Sigma} is estimated.
 
-\\item `prop_cov_offdiag`: Sensitivity of \eqn{\Sigma_{\infty}} to
-inter-series error correlations:
-\deqn{ [2~det(\Sigma_{\infty}) (\Sigma_{\infty}^{-1})^T] }
+\\item `reactivity`: the log of the largest singular value of
+\eqn{A}, \eqn{\log \sigma_{max}(A)} (Neubert et al. 2009). A
+positive value means some perturbation grows in the step after
+it occurs, before the system returns to equilibrium.
 
-\\item `prop_cov_diag`: Sensitivity of \eqn{\Sigma_{\infty}} to error
-variances:
-\deqn{ [2~det(\Sigma_{\infty}) (\Sigma_{\infty}^{-1})^T] }
+\\item `mean_return_rate`: the largest modulus of the eigenvalues
+of \eqn{A}. The distance of the mean from its stationary value
+shrinks by this factor each step, asymptotically. A value nearer
+1 means a slower return.
 
-\\item `reactivity`: Degree to which the system moves away from a stable
-equilibrium following a perturbation. If \eqn{\sigma_{max}(A)} is the
-largest singular value of \eqn{A}:
-\deqn{ \log\sigma_{max}(A) }
-
-\\item `mean_return_rate`: Asymptotic return rate of the mean of the
-transition distribution to the stationary mean:
-\deqn{ \max(\lambda_{A}) }
-
-\\item `var_return_rate`: Asymptotic return rate of the variance of the
-transition distribution to the stationary variance:
-\deqn{ \max(\lambda_{A \otimes A}) }
+\\item `var_return_rate`: the same factor for the variance, the
+largest modulus of the eigenvalues of \eqn{A \otimes A}, which
+is `mean_return_rate` squared.
 }\if{html}{\out{</div>}}
 
 }
 
-Major advantages of using \pkg{mvgam} to compute these metrics are that
-well-calibrated uncertainties are available and that VAR processes are
-forced to be stationary. These properties make it simple and insightful to
-calculate and inspect aspects of both long-term and short-term stability.
+The prior on \eqn{A} keeps every draw stationary (Heaps 2023).
+\eqn{\Sigma_{\infty}} and every metric then exist in every draw.
 
-You can also inspect interactions among the time series in a latent VAR
-process using \code{\link{irf}} for impulse response functions or
-\code{\link{fevd}} for forecast error variance decompositions.
+\code{\link[=irf]{irf()}} and \code{\link[=fevd]{fevd()}} describe the same dynamics as responses to
+shocks.
 }
 \examples{
 \dontrun{
-# Simulate some time series that follow a latent VAR(1) process
-simdat <- sim_mvgam(
-  family = gaussian(),
-  n_series = 4,
-  trend_model = VAR(cor = TRUE),
-  prop_trend = 1
+# Ten years of monthly counts of a prey species and its predator.
+# Predators suppress the prey a month later. Prey raise the
+# predators a month later.
+set.seed(2025)
+n_months <- 120
+A <- rbind(prey     = c(0.6, -0.5),
+           predator = c(0.4,  0.5))
+z <- matrix(0, n_months, 2)
+for (t in 2:n_months) {
+  z[t, ] <- A \%*\% z[t - 1, ] + rnorm(2, sd = 0.35)
+}
+predator_prey <- data.frame(
+  time = rep(seq_len(n_months), 2),
+  series = factor(rep(c("prey", "predator"), each = n_months),
+                  levels = c("prey", "predator")),
+  y = rpois(2 * n_months, exp(c(2.5 + z[, 1], 1.5 + z[, 2])))
 )
+var_mod <- mvgam(y ~ series, trend_formula = ~ VAR(),
+                 data = predator_prey, family = poisson(),
+                 chains = 2, silent = 2)
+}
+\dontrun{
+# Posterior medians and intervals of the stability metrics
+stab <- stability(var_mod)
+stab[stab$metric \%in\% c("reactivity", "mean_return_rate"), ]
 
-plot_mvgam_series(data = simdat$data_train, series = 'all')
+# The full posterior of each metric
+plot(stability(var_mod, summary = FALSE))
 
-# Fit a model that uses a latent VAR(1)
-mod <- mvgam(
-  y ~ -1,
-  trend_formula = ~ 1,
-  trend_model = VAR(cor = TRUE),
-  family = gaussian(),
-  data = simdat$data_train,
-  chains = 2,
-  silent = 2
-)
-
-# Calculate stability metrics for this system
-metrics <- stability(mod)
-
-# Proportion of stationary forecast distribution attributable to interactions
-hist(
-  metrics$prop_int,
-  xlim = c(0, 1),
-  xlab = 'Prop_int',
-  main = '',
-  col = '#B97C7C',
-  border = 'white'
-)
-
-# Inter- vs intra-series interaction contributions
-layout(matrix(1:2, nrow = 2))
-hist(
-  metrics$prop_int_offdiag,
-  xlim = c(0, 1),
-  xlab = '',
-  main = 'Inter-series interactions',
-  col = '#B97C7C',
-  border = 'white'
-)
-
-hist(
-  metrics$prop_int_diag,
-  xlim = c(0, 1),
-  xlab = 'Contribution to interaction effect',
-  main = 'Intra-series interactions (density dependence)',
-  col = 'darkblue',
-  border = 'white'
-)
-layout(1)
-
-# Inter- vs intra-series contributions to forecast variance
-layout(matrix(1:2, nrow = 2))
-hist(
-  metrics$prop_cov_offdiag,
-  xlim = c(0, 1),
-  xlab = '',
-  main = 'Inter-series covariances',
-  col = '#B97C7C',
-  border = 'white'
-)
-
-hist(
-  metrics$prop_cov_diag,
-  xlim = c(0, 1),
-  xlab = 'Contribution to forecast variance',
-  main = 'Intra-series variances',
-  col = 'darkblue',
-  border = 'white'
-)
-layout(1)
-
-# Reactivity: system response to perturbation
-hist(
-  metrics$reactivity,
-  main = '',
-  xlab = 'Reactivity',
-  col = '#B97C7C',
-  border = 'white',
-  xlim = c(
-    -1 * max(abs(metrics$reactivity)),
-    max(abs(metrics$reactivity))
-  )
-)
-abline(v = 0, lwd = 2.5)
+# Next: irf() traces a shock through the system over time
 }
 
 }
 \references{
 AR Ives, B Dennis, KL Cottingham & SR Carpenter (2003). Estimating
 community stability and ecological interactions from time-series data.
-\emph{Ecological Monographs}, 73, 301–330.
+\emph{Ecological Monographs}, 73, 301-330.
+
+MG Neubert, H Caswell & AR Solow (2009). Detecting reactivity.
+\emph{Ecology}, 90, 2683-2688.
+
+SE Heaps (2023). Enforcing stationarity through the prior in vector
+autoregressions. \emph{Journal of Computational and Graphical
+Statistics}, 32, 74-83.
 }
 \seealso{
-\code{\link{VAR}},
-\code{\link{irf}},
-\code{\link{fevd}}
+\code{\link[=irf]{irf()}} and \code{\link[=fevd]{fevd()}} summarise the same VAR dynamics.
+The \href{https://nicholasjclark.github.io/mvgam/articles/var.html}{VAR article} runs \code{stability()} on
+a plankton community. The
+\href{https://nicholasjclark.github.io/mvgam/articles/hierarchical_var.html}{hierarchical VAR article}
+reports the metrics for each group of a hierarchical VAR.
+
+Other latent dynamics: 
+\code{\link{active_factors}()},
+\code{\link{compare_loadings}()},
+\code{\link{fevd.mvgam}()},
+\code{\link{irf.mvgam}()},
+\code{\link{ordinate}()},
+\code{\link{posterior_transition_matrix}()},
+\code{\link{residual_cor}()},
+\code{\link{shared_variation}()}
 }
 \author{
 Nicholas J Clark
 }
+\concept{latent dynamics}

@@ -3,152 +3,195 @@
 \name{lfo_cv.mvgam}
 \alias{lfo_cv.mvgam}
 \alias{lfo_cv}
-\title{Approximate leave-future-out cross-validation of fitted \pkg{mvgam} objects}
+\alias{plot.mvgam_lfo}
+\alias{summary.mvgam_lfo}
+\alias{print.mvgam_lfo}
+\title{Approximate leave-future-out cross-validation of fitted mvgam
+objects}
 \usage{
 lfo_cv(object, ...)
 
 \method{lfo_cv}{mvgam}(
   object,
-  data,
-  min_t,
-  fc_horizon = 1,
-  pareto_k_threshold = 0.7,
-  silent = 1,
-  ...
+  newdata = NULL,
+  min_t = NULL,
+  fc_horizon = 1L,
+  pareto_k_threshold = NULL,
+  score = "elpd",
+  save_log_lik = FALSE,
+  silent = 1L,
+  ...,
+  data = NULL
 )
+
+\method{plot}{mvgam_lfo}(x, ...)
+
+\method{summary}{mvgam_lfo}(object, ...)
+
+\method{print}{mvgam_lfo}(x, ...)
 }
 \arguments{
-\item{object}{\code{list} object of class \code{mvgam}. See \code{\link[=mvgam]{mvgam()}}}
+\item{object}{A fitted \link[=mvgam]{mvgam} object, or for
+\code{summary()} an \code{mvgam_lfo} object.}
 
-\item{...}{Ignored}
+\item{...}{Unused. Anything passed here is refused.}
 
-\item{data}{A \code{dataframe} or \code{list} containing the model response variable and covariates
-required by the GAM \code{formula}. Should include columns:
-'series' (character or factor index of the series IDs)
-'time' (numeric index of the time point for each observation).
-Any other variables to be included in the linear predictor of \code{formula} must also be present}
+\item{newdata}{Optional \code{data.frame} holding the response, the time
+and series columns and the covariates. \code{NULL} (the default) takes
+the training data. Every series must share its observed times,
+except under \code{CAR()}, whose series may be observed at their own
+times.}
 
-\item{min_t}{Integer specifying the minimum training time required before making predictions
-from the data. Default is either the \code{30}th timepoint in the observational data,
-or whatever training time allows for at least
-\code{10} lfo-cv calculations, if possible.
-This value is essentially arbitrary so it is highly recommended to change it
-to something that is more suitable to the
-data and models being evaluated.}
+\item{min_t}{The time at which the first training window ends. It
+must be a time present in the data, which need not be whole for an
+irregular \code{CAR()} grid. \code{NULL} (the default) takes the 30th
+observed time, earlier for a shorter series, leaving at least 10
+evaluation origins where the data allow.}
 
-\item{fc_horizon}{Integer specifying the number of time steps ahead for evaluating forecasts}
+\item{fc_horizon}{Integer number of observed times after each origin
+that are scored, whatever the gaps between them. Defaults to 1.}
 
-\item{pareto_k_threshold}{Proportion specifying the threshold over which the Pareto shape parameter
-is considered unstable, triggering a model refit. Default is \code{0.7}}
+\item{pareto_k_threshold}{Numeric. An origin whose Pareto k exceeds
+it triggers a refit. \code{NULL} (the default) takes the adaptive
+threshold \code{min(1 - 1 / log10(S), 0.7)} for \code{S} posterior draws
+(Vehtari et al. 2024). It is stricter for a fit with few draws,
+where PSIS is less reliable.}
 
-\item{silent}{Verbosity level between \code{0} and \code{2}. If \code{1} (the default), most of the informational
-messages of compiler and sampler are suppressed. If \code{2}, even more messages are suppressed. The
-actual sampling progress is still printed. Set \code{refresh = 0} to turn this off as well. If using
-\code{backend = "rstan"} you can also set open_progress = FALSE to prevent opening additional
-progress bars.}
+\item{score}{Character vector of scores to compute at each origin,
+from \code{"elpd"} (the default), \code{"crps"}, \code{"drps"}, \code{"sis"},
+\code{"brier"}, \code{"energy"} and \code{"variogram"}. The ELPD takes the PSIS
+log-likelihood. The others score forecast draws resampled by the
+PSIS weights, with \code{\link[=score.mvgam_forecast]{score.mvgam_forecast()}}.}
+
+\item{save_log_lik}{Logical. \code{TRUE} keeps the held-out log densities
+under the reweighted posterior, an \verb{[ndraws, n_eval_obs]} matrix.
+\code{\link[=loo_model_weights.mvgam_lfo]{loo_model_weights.mvgam_lfo()}} stacks models by it. Defaults to
+\code{FALSE}, the matrix being large.}
+
+\item{silent}{Integer in \verb{\\\{0, 1, 2\\\}}. \code{0} prints each refit
+and its sampler start and finish lines. \code{1} (default) and \code{2}
+print nothing from the refits.}
+
+\item{data}{Deprecated alias for \code{newdata}.}
+
+\item{x}{An \code{mvgam_lfo} object.}
 }
 \value{
-A \code{list} of class \code{mvgam_lfo} containing the approximate ELPD scores,
-the Pareto-k shape values and 'the specified \code{pareto_k_threshold}
+A list of class \code{mvgam_lfo}, with one element per origin in
+each vector.
+\itemize{
+\item \code{elpds}: the approximate ELPD of each origin, \code{NULL} unless
+\code{"elpd"} is in \code{score}. \code{sum_ELPD} is their sum.
+\item \code{scores}: a named list with one vector for each other score.
+\item \code{pareto_ks}: the Pareto k of each origin's importance weights,
+\code{NA} where the model was refitted.
+\item \code{eval_timepoints}: the first scored time of each origin.
+\item \code{n_obs}: the number of responses each origin scores.
+\item \code{refits_at}: the last training time of each refit.
+\item \code{refit_triggered}: \code{TRUE} at each origin scored on a refit.
+\item \code{pareto_k_threshold}: the threshold used. \code{TRUE} in
+\code{pareto_k_threshold_adaptive} marks the adaptive rule.
+\item \code{fc_horizon}: the horizon.
+\item \code{log_lik}: the held-out log densities when \code{save_log_lik = TRUE},
+otherwise \code{NULL}.
+}
+
+\code{print()} shows the horizon, the Pareto k threshold and the counts
+of evaluations and refits, with each score's sum and mean over the
+origins. \code{summary()} returns a tibble with one row per origin:
+\code{eval_time}, \code{refit_here}, \code{pareto_k} (\code{NA} at a refit), \code{n_obs}
+and one column per score. \code{plot()} draws the Pareto k of each
+origin and each score. The dashed line marks the threshold above
+which points are highlighted: the Pareto k threshold, the 15\%
+quantile of the ELPD (lower values highlighted) or the 85\% quantile
+of any other score.
 }
 \description{
-Approximate leave-future-out cross-validation of fitted \pkg{mvgam} objects
-}
-\details{
-Approximate leave-future-out cross-validation uses an expanding training window scheme
-to evaluate a model on its forecasting ability. The steps used in this function mirror those laid out
-in the \href{https://mc-stan.org/loo/articles/loo2-lfo.html}{lfo vignette from the \code{loo} package},
-written by Paul Bürkner, Jonah Gabry, Aki Vehtari. First, we refit the model using the first \code{min_t}
-observations to perform a single exact \code{fc_horizon}-ahead forecast step. This forecast is evaluated against
-the \code{min_t + fc_horizon} out of sample observations using the Expected Log Predictive Density (ELPD).
-Next, we approximate each successive round of
-expanding window forecasts by moving forward one step at a time \verb{for i in 1:N_evaluations} and re-weighting
-draws from the model's posterior predictive distribution using Pareto Smoothed
-Importance Sampling (PSIS). In each iteration \code{i}, PSIS weights are obtained for the next observation
-that would have been included in the model if we had re-fit (i.e. the last observation that would have
-been in the training data, or \code{min_t + i}). If these importance ratios are stable, we consider the
-approximation adequate and use the re-weighted posterior's forecast for evaluating the next holdout
-set of testing observations (\code{(min_t + i + 1):(min_t + i + fc_horizon)}). At some point the
-importance ratio variability will become too large and importance sampling will fail. This is
-indicated by the estimated shape parameter \code{k} of the generalized Pareto distribution
-crossing a certain threshold \code{pareto_k_threshold}. Only then do we refit the model using
-all of the observations up to the time of the failure. We then restart the process and iterate forward
-until the next refit is triggered (Bürkner et al. 2020).
+Scores a model on its forecasts. The model is fitted to the times up
+to \code{min_t} and scored on the next \code{fc_horizon} observed times. The
+origin then steps forward one time at a time. Pareto smoothed
+importance sampling (PSIS) reweights the posterior to each new
+origin. The model is refitted only where the Pareto k exceeds
+\code{pareto_k_threshold}. The algorithm is that of Burkner, Gabry and
+Vehtari (2020), as in the
+\href{https://mc-stan.org/loo/articles/loo2-lfo.html}{loo PSIS-LFO vignette}.
+
+The ELPD of each fold is higher for the better model. CRPS and the
+other scores of \code{\link[=score.mvgam_forecast]{score.mvgam_forecast()}} are lower for the better
+model. \code{\link[=loo.mvgam]{loo.mvgam()}} explains the ELPD and the Pareto k diagnostic.
 }
 \examples{
 \dontrun{
-# Simulate from a Poisson-AR2 model with a seasonal smooth
-set.seed(100)
-dat <- sim_mvgam(T = 75,
-                n_series = 1,
-                prop_trend = 0.75,
-                trend_model = 'AR2',
-                family = poisson())
+set.seed(11)
+simdat <- sim_mvgam(family = poisson(), n_series = 1L,
+                     n_timepoints = 120L, trend_model = AR())
 
-# Plot the time series
-plot_mvgam_series(data = dat$data_train,
-                 newdata = dat$data_test,
-                 series = 1)
+mod <- mvgam(
+  y ~ s(x, k = 5),
+  trend_formula = ~ AR(p = 1),
+  data    = simdat$data_train,
+  family  = poisson(),
+  chains  = 2, seed = 1, silent = 2
+)
 
-# Fit an appropriate model
-mod_ar2 <- mvgam(y ~ s(season, bs = 'cc', k = 6),
-               trend_model = AR(p = 2),
-               family = poisson(),
-               data = dat$data_train,
-               newdata = dat$data_test,
-               chains = 2,
-               silent = 2)
+# Forecasts one time step after each origin from t = 60, scored by
+# ELPD and CRPS. The model is refitted only where the Pareto k is high.
+lfo <- lfo_cv(mod, min_t = 60L, score = c("elpd", "crps"))
+lfo
 
-# Fit a less appropriate model
-mod_rw <- mvgam(y ~ s(season, bs = 'cc', k = 6),
-              trend_model = RW(),
-              family = poisson(),
-              data = dat$data_train,
-              newdata = dat$data_test,
-              chains = 2,
-              silent = 2)
+# Pareto k, ELPD and CRPS at each origin. Points past the dashed
+# line are highlighted
+plot(lfo)
 
-# Compare Discrete Ranked Probability Scores for the testing period
-fc_ar2 <- forecast(mod_ar2)
-fc_rw <- forecast(mod_rw)
-score_ar2 <- score(fc_ar2, score = 'drps')
-score_rw <- score(fc_rw, score = 'drps')
-sum(score_ar2$series_1$score)
-sum(score_rw$series_1$score)
+# One row per origin, with the refits in 'refit_here'
+summary(lfo)
 
-# Now use approximate leave-future-out CV to compare
-# rolling forecasts; start at time point 40 to reduce
-# computational time and to ensure enough data is available
-# for estimating model parameters
-lfo_ar2 <- lfo_cv(mod_ar2,
-                 min_t = 40,
-                 fc_horizon = 3,
-                 silent = 2)
-lfo_rw <- lfo_cv(mod_rw,
-                min_t = 40,
-                fc_horizon = 3,
-                silent = 2)
-
-# Plot Pareto-K values and ELPD estimates
-plot(lfo_ar2)
-plot(lfo_rw)
-
-# Proportion of timepoints in which AR2 model gives better forecasts
-length(which((lfo_ar2$elpds - lfo_rw$elpds) > 0)) /
-      length(lfo_ar2$elpds)
-
-# A higher total ELPD is preferred
-lfo_ar2$sum_ELPD
-lfo_rw$sum_ELPD
+# Next, rank models by their forecasts with loo_compare()
 }
+
 }
 \references{
-Paul-Christian Bürkner, Jonah Gabry & Aki Vehtari (2020). Approximate leave-future-out cross-validation for Bayesian time series models
-Journal of Statistical Computation and Simulation. 90:14, 2499-2523.
+Burkner, P.-C., Gabry, J. and Vehtari, A. (2020). Approximate
+leave-future-out cross-validation for Bayesian time series models.
+\emph{Journal of Statistical Computation and Simulation},
+90(14):2499-2523.
+\doi{10.1080/00949655.2020.1783262}
+
+Vehtari, A., Simpson, D., Gelman, A., Yao, Y. and Gabry, J.
+(2024). Pareto smoothed importance sampling. \emph{Journal of Machine
+Learning Research}, 25(72):1-58.
+\url{https://jmlr.org/papers/v25/19-556.html}
 }
 \seealso{
-\code{\link{forecast}}, \code{\link{score}}, \code{\link{compare_mvgams}}
+\code{\link[=loo_compare.mvgam_lfo]{loo_compare.mvgam_lfo()}} ranks models by their
+leave-future-out ELPD. \code{\link[=loo_model_weights.mvgam_lfo]{loo_model_weights.mvgam_lfo()}} weights
+them. \code{\link[=loo.mvgam]{loo.mvgam()}} approximates leave-one-out cross-validation.
+\code{\link[=kfold.mvgam]{kfold.mvgam()}} runs grouped k-fold cross-validation. The
+\href{https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html}{forecast evaluation article}
+runs \code{lfo_cv()} on rodent counts, with its Pareto k refits and
+stacking weights.
+
+Other forecasting: 
+\code{\link{compare_scores}()},
+\code{\link{ensemble.mvgam_forecast}()},
+\code{\link{forecast.mvgam}()},
+\code{\link{forecast_uncertainty}()},
+\code{\link{hindcast}()},
+\code{\link{score}()}
+
+Other model comparison: 
+\code{\link{bridge_sampler.mvgam}()},
+\code{\link{compare_elpds}()},
+\code{\link{kfold.mvgam}()},
+\code{\link{log_lik.mvgam}()},
+\code{\link{loo.mvgam}()},
+\code{\link{loo_compare.mvgam_lfo}()},
+\code{\link{mvgam_loo_extras}},
+\code{\link{posterior_average.mvgam}()},
+\code{\link{waic.mvgam}()}
 }
 \author{
 Nicholas J Clark
 }
+\concept{forecasting}
+\concept{model comparison}

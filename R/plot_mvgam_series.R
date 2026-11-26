@@ -1,347 +1,397 @@
-#' Plot observed time series used for \pkg{mvgam} modelling
+# Exploratory plots of the observed time series held on a fitted
+# `mvgam` object, drawn by `plot.mvgam(x, type = "series")`. Plots of
+# data before a fit go through `mvgam_data(plot = TRUE)`.
+
+#' Observed time series exploratory plot
 #'
-#' This function takes either a fitted \code{mvgam} object or a
-#' \code{data.frame} object and produces plots of observed time series, ACF,
-#' CDF and histograms for exploratory data analysis
+#' Single-series: a 4-panel patchwork of the time series, its ACF,
+#' its empirical CDF and its histogram. Multi-series: one faceted
+#' time series plot. When `newdata` is supplied (or carried on the
+#' fit as `object$test_data`), the test observations are overlaid in
+#' black with a dashed line at the boundary.
 #'
-#' @importFrom stats lag
+#' @param object A fitted `mvgam` object.
+#' @param newdata Optional data frame / list of future
+#'   observations with the same `time` and `series` columns as
+#'   the training data. When omitted the function uses
+#'   `object$test_data`.
+#' @param series `NULL` (default), `"all"`, or a positive
+#'   integer indexing the series levels. `NULL` resolves to
+#'   `"all"` for multi-series fits and `1` for single-series.
+#' @param resp Optional response of a multivariate fit. Where the
+#'   responses are the series it narrows the plot to that response's
+#'   series. Otherwise it names the response every series is drawn for,
+#'   and `NULL` stacks one plot per response.
+#' @param lines Logical. Plot lines (default) or points.
+#' @param n_bins Optional histogram bin count. Defaults to the
+#'   number returned by `hist(..., plot = FALSE)$breaks` (at
+#'   least 20).
+#' @param log_scale Logical. Plot the response as
+#'   `log(y + 1)` (multi-series view, where different scales
+#'   are common).
 #'
-#' @param object Optional \code{list} object returned from \code{mvgam}. Either
-#'   \code{object} or \code{data} must be supplied
+#' @return A `ggplot` (multi-series) or `patchwork`
+#'   (single-series 4-panel) object. A long-frame multivariate fit
+#'   without `resp` gives one `patchwork` stacking each response's plot.
 #'
-#' @param data Optional \code{data.frame} or \code{list} of training data
-#'   containing at least 'series' and 'time'. Use this argument if training
-#'   data have been gathered in the correct format for \code{mvgam} modelling
-#'   but no model has yet been fitted.
-#'
-#' @param newdata Optional \code{data.frame} or \code{list} of test data
-#'   containing at least 'series' and 'time' for the forecast horizon, in
-#'   addition to any other variables included in the linear predictor of
-#'   \code{formula}. If included, the observed values in the test data are
-#'   compared to the model's forecast distribution for exploring biases in
-#'   model predictions
-#'
-#' @param y Character. What is the name of the outcome variable in the supplied
-#'   data? Defaults to \code{'y'}
-#'
-#' @param lines Logical. If \code{TRUE}, line plots are used for visualizing
-#'   time series. If \code{FALSE}, points are used.
-#'
-#' @param series Either an \code{integer} specifying which series in the set is
-#'   to be plotted or the string 'all', which plots all series available in the
-#'   supplied data
-#'
-#' @param n_bins \code{integer} specifying the number of bins to use for
-#'   binning observed values when plotting a histogram. Default is to use the
-#'   number of bins returned by a call to `hist` in base `R`
-#'
-#' @param log_scale \code{logical}. If \code{series == 'all'}, this flag is
-#'   used to control whether the time series plot is shown on the log scale
-#'   (using `log(Y + 1)`). This can be useful when visualizing many series that
-#'   may have different observed ranges. Default is \code{FALSE}
-#'
-#' @author Nicholas J Clark and Matthijs Hollanders
-#'
-#' @return A set of ggplot objects. If \code{series} is an integer, the plots
-#'   will show observed time series, autocorrelation and cumulative
-#'   distribution functions, and a histogram for the series. If
-#'   \code{series == 'all'}, a set of observed time series plots is returned in
-#'   which all series are shown on each plot but only a single focal series is
-#'   highlighted, with all remaining series shown as faint gray lines.
-#'
-#' @examples
-#' # Simulate and plot series with observations bounded at 0 and 1 (Beta responses)
-#' sim_data <- sim_mvgam(
-#'   family = betar(),
-#'   trend_model = RW(),
-#'   prop_trend = 0.6
-#' )
-#'
-#' plot_mvgam_series(
-#'   data = sim_data$data_train,
-#'   series = 'all'
-#' )
-#'
-#' plot_mvgam_series(
-#'   data = sim_data$data_train,
-#'   newdata = sim_data$data_test,
-#'   series = 1
-#' )
-#'
-#' # Now simulate series with overdispersed discrete observations
-#' sim_data <- sim_mvgam(
-#'   family = nb(),
-#'   trend_model = RW(),
-#'   prop_trend = 0.6,
-#'   phi = 10
-#' )
-#'
-#' plot_mvgam_series(
-#'   data = sim_data$data_train,
-#'   series = 'all'
-#' )
-#'
-#' @export
+#' @noRd
 plot_mvgam_series <- function(
   object,
-  data,
-  newdata,
-  y = 'y',
+  newdata = NULL,
+  series = NULL,
+  resp = NULL,
   lines = TRUE,
-  series = 1,
   n_bins = NULL,
   log_scale = FALSE
 ) {
-  # Validate series
-  if (is.character(series)) {
-    if (series != 'all') {
-      stop(
-        'argument "series" must be either a positive integer or "all"',
-        call. = FALSE
-      )
-    }
-  } else {
-    if (sign(series) != 1) {
-      stop(
-        'argument "series" must be either a positive integer or "all"',
-        call. = FALSE
-      )
-    } else {
-      if (series %% 1 != 0) {
-        stop(
-          'argument "series" must be either a positive integer or "all"',
-          call. = FALSE
-        )
-      }
-    }
+  checkmate::assert_class(object, "mvgam")
+  # Where the responses are the series, one plot draws them all. On a
+  # long frame each response gets its own plot, stacked in one figure.
+  keyed <- is_response_keyed(object)
+  if (!keyed) {
+    fan <- mv_resp_fan_out(object, resp, combine = stack_response_plots)
+    if (!is.null(fan)) return(fan)
   }
-
-  # Extract training data
-  if (!missing(object)) {
-    if (!(inherits(object, "mvgam"))) {
-      stop('argument "object" must be of class "mvgam"')
-    }
-
-    if (!missing("data")) {
-      warning('both "object" and "data" were supplied; only using "object"')
-    }
-
-    data_train <- object$obs_data
-
-    # What is the response variable?
-    resp_terms <- as.character(terms(formula(object$call))[[2]])
-    if (length(resp_terms) == 1) {
-      y <- as.character(terms(object$call)[[2]])
-    } else {
-      if (any(grepl('cbind', resp_terms))) {
-        resp_terms <- resp_terms[-grepl('cbind', resp_terms)]
-        y <- resp_terms[1]
-      }
-    }
-  } else {
-    data_train <- data
-  }
-
-  # Validate data
-  data_train <- validate_plot_data(data_train, y)
-  if (!missing(newdata)) {
-    data_test <- validate_plot_data(newdata, y)
-  }
-
-  # Determine what to plot
-  if (is.character(series) && series == 'all') {
-    # Only return a plot of the time series
-    dat <- dplyr::as_tibble(data_train) %>%
-      dplyr::distinct(time, y, series)
-
-    # Create time series plot
-    plot_ts <- plot_time_series(dat, lines, log_scale, y, series)
-
-    # Return
-    return(plot_ts)
-  } else {
-    # Return multiple plots for one time series
-    s_name <- levels(data_train$series)[series]
-
-    # Bind test data if supplied
-    dat <- dplyr::as_tibble(data_train) %>%
-      dplyr::filter(series == s_name) %>%
-      dplyr::distinct(time, y) %>%
-      dplyr::mutate(data = "train")
-
-    if (!missing(newdata)) {
-      dat <- dplyr::bind_rows(
-        dat,
-        dplyr::as_tibble(data_test) %>%
-          dplyr::filter(series == s_name) %>%
-          dplyr::distinct(time, y) %>%
-          dplyr::mutate(data = "validate")
-      )
-    }
-
-    # Create each plot component
-    plot_ts <- plot_time_series(dat, lines, log_scale, y, series)
-    plot_hist <- plot_histogram(dat, y, n_bins)
-    plot_acf_obj <- plot_acf(dat)
-    plot_ecdf_obj <- plot_ecdf(dat, y)
-
-    # Wrap plots using patchwork
-    return(
-      patchwork::wrap_plots(
-        plot_ts,
-        plot_hist,
-        plot_acf_obj,
-        plot_ecdf_obj,
-        ncol = 2,
-        nrow = 2,
-        byrow = TRUE
-      )
+  resolve_resp(object, resp)
+  time_var <- axis_vars(object)$time_var
+  series_levels <- fitted_series_levels(object)
+  test <- jsdgam_prediction_columns(object, newdata %||% object$test_data)
+  if (!is.null(test) && !is.null(object$trend_metadata)) {
+    validate_prediction_factor_levels(
+      test, object$trend_metadata,
+      series_label = series_column_label(object)
     )
   }
+
+  # Where the responses are the series, a row is one occasion carrying
+  # every response. Each series is then its own response's column. The
+  # frame is stacked one response at a time. Everywhere else a row
+  # names its series the way the fit identified it. Every series is
+  # drawn for the one response in scope. A derived series axis has no
+  # raw column to take the labels from.
+  if (keyed && !is.null(resp)) {
+    series_levels <- resp
+  }
+  labels <- if (keyed) {
+    vapply(stats::setNames(series_levels, series_levels),
+           function(key) response_column(object, key), character(1L))
+  } else {
+    response_column(object, resp)
+  }
+  long_of <- function(df, label) {
+    if (is.null(df)) {
+      return(NULL)
+    }
+    if (keyed) {
+      return(do.call(rbind, lapply(series_levels, function(key) {
+        series_long_df(df, labels[[key]], key, time_var, label)
+      })))
+    }
+    series_long_df(df, labels, axis_row_series(object, df, required = TRUE),
+                   time_var, label)
+  }
+
+  series_obs_plot(
+    dat           = rbind(long_of(object$data, "train"),
+                          long_of(test, "validate")),
+    labels        = labels,
+    series_levels = series_levels,
+    series        = series,
+    lines         = lines,
+    n_bins        = n_bins,
+    log_scale     = log_scale
+  )
 }
 
-#' Helper function to validate and format input plotting data
+
+#' A plot of observed series from their long data frame
+#'
+#' Draws a faceted plot of every series when `series` resolves to
+#' `"all"`. One series gets a four-panel grid of the time series,
+#' histogram, ACF and empirical CDF. `plot_mvgam_series()` and
+#' `mvgam_data()` both pass the frame `series_long_df()` builds.
+#'
+#' @param dat Data frame from `series_long_df()` holding `time`, `y`,
+#'   `series` and `data`
+#' @param labels Character response names for the y axis. A single name
+#'   covers every series. A named vector gives one per series when each
+#'   series is a different response. A facet over several responses
+#'   takes a generic label.
+#' @param series_levels Character vector of series levels
+#' @param series Series to plot, as `NULL`, `"all"`, a name or an index
+#' @param lines Logical flag. `TRUE` draws lines and `FALSE` draws
+#'   points.
+#' @param n_bins Integer histogram bin count, or `NULL`
+#' @param log_scale Logical flag to plot `log(y + 1)`
+#' @return A `ggplot` for several series, or a `patchwork` grid for one
 #' @noRd
-validate_plot_data <- function(data, y) {
-  # Check if data is not a list
-  if (!inherits(data, 'list')) {
-    # If 'series' column is missing, create a default factor
-    if (!'series' %in% colnames(data)) {
-      data$series <- factor('series1')
-    }
-    # If 'time' column is missing, stop with error
-    if (!'time' %in% colnames(data)) {
-      stop('data does not contain a "time" column', call. = FALSE)
-    }
+series_obs_plot <- function(dat, labels, series_levels, series = NULL,
+                             lines = TRUE, n_bins = NULL,
+                             log_scale = FALSE) {
+  checkmate::assert_data_frame(dat)
+  checkmate::assert_character(labels, min.len = 1L)
+  checkmate::assert_character(series_levels, min.len = 1L)
+  checkmate::assert_flag(lines)
+  checkmate::assert_flag(log_scale)
+  checkmate::assert_integerish(n_bins, lower = 1L, len = 1L,
+                                null.ok = TRUE)
+  set_color_scheme_local()
+
+  series_idx <- resolve_series_index(series, series_levels)
+  dat$series <- factor(dat$series, levels = series_levels)
+  s_name <- if (identical(series_idx, "all")) NULL else {
+    series_levels[series_idx]
+  }
+  response <- if (!is.null(s_name) && length(labels) > 1L) {
+    labels[[s_name]]
+  } else if (length(unique(labels)) == 1L) {
+    labels[[1L]]
   } else {
-    # If data is a list, check for 'series' and 'time' in names
-    if (!'series' %in% names(data)) {
-      data$series <- factor('series1')
-    }
-    if (!'time' %in% names(data)) {
-      stop('data does not contain a "time" column')
-    }
+    "Observed value"
   }
 
-  # Check if the outcome variable 'y' exists in data
-  if (!y %in% names(data)) {
-    stop(paste0('variable "', y, '" not found in data'), call. = FALSE)
-  } else {
-    # Assign the outcome variable to a standard column 'y'
-    data$y <- data[[y]]
+  # An ordinal response arrives as an ordered factor, which none of the
+  # four panels can take. The rest of the package predicts on its level
+  # index. The panels draw that index. The axis label lists the levels
+  # in order.
+  ordinal_levels <- NULL
+  if (is.factor(dat$y)) {
+    if (!is.ordered(dat$y)) {
+      stop(insight::format_error(c(
+        paste0("Response '", response, "' is an unordered factor."),
+        i = "The series plots need an ordered response."
+      )), call. = FALSE)
+    }
+    ordinal_levels <- levels(dat$y)
+    dat$y <- as.integer(dat$y)
   }
 
-  # Drop unused factor levels in 'series'
-  data$series <- droplevels(data$series)
+  ylab <- if (log_scale) paste0("log(", response, " + 1)") else response
+  if (!is.null(ordinal_levels)) {
+    ylab <- paste0(ylab, " (", paste(ordinal_levels, collapse = " < "), ")")
+  }
+  if (log_scale) dat$y <- log(dat$y + 1)
 
-  # Return the validated and formatted data
-  return(data)
+  if (is.null(s_name)) {
+    return(series_time_plot(dat, ylab, lines))
+  }
+  dat_s <- dat[as.character(dat$series) == s_name, , drop = FALSE]
+  if (nrow(dat_s) == 0L) {
+    stop(insight::format_error(c(
+      "No observations found for the requested series.",
+      x = paste0("Series: '", s_name, "'.")
+    )), call. = FALSE)
+  }
+  # The ACF panel takes its values in row order. A frame may hold a
+  # series out of time order.
+  dat_s <- dat_s[order(dat_s$time), , drop = FALSE]
+  patchwork::wrap_plots(
+    series_time_plot(dat_s, ylab, lines, facet = FALSE),
+    series_hist_panel(dat_s$y, ylab, n_bins),
+    series_acf_panel(dat_s$y),
+    series_ecdf_panel(dat_s$y, ylab),
+    ncol = 2L, nrow = 2L, byrow = TRUE
+  )
 }
 
-#' Function to generate time series plots
+
+#' The series a series plot draws
+#'
+#' `NULL` selects every series of a multi-series fit and the single series
+#' of a one-series fit. Names and indices go through `resolve_series()`,
+#' the parser every series-aware function uses.
+#'
+#' @param series Series to plot, as `NULL`, `"all"`, a name or an index
+#' @param series_levels Character vector of series levels
+#' @return `"all"`, or the integer index of one series
 #' @noRd
-plot_time_series <- function(
-  dat,
-  lines = TRUE,
-  log_scale = FALSE,
-  ylab = 'y',
-  series = 'all'
-) {
-  # Determine scale and y label
-  if (log_scale) {
-    dat$y <- log(dat$y + 1)
-    ylab <- paste0('log(', ylab, ' + 1)')
+resolve_series_index <- function(series, series_levels) {
+  checkmate::assert_character(series_levels, min.len = 1L)
+  n_series <- length(series_levels)
+  if (is.null(series)) {
+    return(if (n_series > 1L) "all" else 1L)
   }
-
-  # Create time series plot
-  if (series == 'all') {
-    p <- ggplot2::ggplot(dat, ggplot2::aes(time, y)) +
-      ggplot2::facet_wrap(~series) +
-      ggplot2::labs(x = "Time", y = ylab) +
-      ggplot2::theme_bw()
-
-    if (lines) {
-      p <- p + ggplot2::geom_line(colour = "#8F2727", linewidth = 0.75)
-    } else {
-      p <- p + ggplot2::geom_point(colour = "#8F2727")
-    }
-  } else {
-    p <- ggplot2::ggplot(dat, ggplot2::aes(time, y, colour = data)) +
-      ggplot2::labs(title = "Time series", x = "Time", y = ylab) +
-      ggplot2::geom_vline(
-        xintercept = dat %>%
-          dplyr::filter(data == "validate") %>%
-          dplyr::pull(time) %>%
-          min(c(., Inf)),
-        linetype = "dashed",
-        colour = "black"
-      ) +
-      ggplot2::scale_colour_manual(values = c("#8F2727", "black")) +
-      ggplot2::theme_bw()
-
-    if (lines) {
-      p <- p + ggplot2::geom_line(show.legend = F, linewidth = 0.75)
-    } else {
-      p <- p + ggplot2::geom_point(show.legend = F)
-    }
+  idx <- resolve_series(series, series_levels)
+  if (length(idx) == n_series && n_series > 1L) {
+    return("all")
   }
-  return(p)
+  if (length(idx) != 1L) {
+    stop(insight::format_error(c(
+      "'series' selects one series on this plot.",
+      x = paste0("Got ", length(idx), " of ", n_series, " series."),
+      i = "Use 'all' to draw every series."
+    )), call. = FALSE)
+  }
+  idx
 }
 
-#' Function to create histogram of observed values
+
+#' A training or test frame in the long form the series plots take
+#'
+#' The caller names the response column and the series of each row.
+#' Both depend on the model, which the frame alone cannot supply.
+#'
+#' @param df Data frame of training or test data, or `NULL`
+#' @param response Character name of the response column
+#' @param series Vector of series labels, one per row or a single label
+#' @param time_var Character name of the time column
+#' @param label Character tag for the `data` column, `"train"` or
+#'   `"validate"`
+#' @return Data frame holding `time`, `y`, `series` and `data`, or
+#'   `NULL` when `df` is `NULL`. `rbind()` drops a `NULL` block.
 #' @noRd
-plot_histogram <- function(dat, ylab = 'y', n_bins = NULL) {
-  # Determine bins
+series_long_df <- function(df, response, series, time_var, label) {
+  checkmate::assert(
+    checkmate::check_data_frame(df),
+    checkmate::check_list(df),
+    checkmate::check_null(df)
+  )
+  checkmate::assert_string(response)
+  checkmate::assert_string(time_var)
+  checkmate::assert_string(label)
+  if (is.null(df)) {
+    return(NULL)
+  }
+  if (!response %in% names(df)) {
+    stop(insight::format_error(c(
+      "Response variable not found in data.",
+      x = paste0("Expected: '", response, "'."),
+      i = paste0("Got columns: ",
+                 paste0("'", names(df), "'", collapse = ", "), ".")
+    )), call. = FALSE)
+  }
+  data.frame(
+    time = df[[time_var]],
+    y = df[[response]],
+    series = as.character(series),
+    data = label,
+    stringsAsFactors = FALSE
+  )
+}
+
+
+#' Observed series plotted over time
+#'
+#' Training observations take the active palette. Test observations
+#' are drawn in black after a dashed line at the boundary. A missing `y`
+#' breaks the line at an unobserved occasion. Missing values are dropped
+#' without the ggplot2 removal notice, which would repeat on every
+#' render for a gap at the end of a series.
+#'
+#' @param dat Data frame from `series_long_df()`
+#' @param ylab Character y-axis label
+#' @param lines Logical flag. `TRUE` draws lines and `FALSE` draws
+#'   points.
+#' @param facet Logical flag to draw one panel per series. The
+#'   single-series grid sets it to `FALSE`.
+#' @return A `ggplot` object
+#' @noRd
+series_time_plot <- function(dat, ylab, lines, facet = TRUE) {
+  checkmate::assert_data_frame(dat)
+  checkmate::assert_string(ylab)
+  checkmate::assert_flag(lines)
+  checkmate::assert_flag(facet)
+  cut_t <- if (any(dat$data == "validate")) {
+    min(dat$time[dat$data == "validate"], na.rm = TRUE)
+  } else {
+    NA_real_
+  }
+  geom_obs <- if (lines) {
+    ggplot2::geom_line(linewidth = 0.75, na.rm = TRUE)
+  } else {
+    ggplot2::geom_point(na.rm = TRUE)
+  }
+  p <- ggplot2::ggplot(
+    dat, ggplot2::aes(x = time, y = y, colour = data)
+  ) +
+    geom_obs +
+    ggplot2::scale_colour_manual(
+      values = c(train = mvgam_colour("dark"), validate = "black"),
+      guide = "none"
+    ) +
+    mvgam_cut_layer(cut_t) +
+    ggplot2::labs(title = if (!facet) "Time series",
+                  x = "Time", y = ylab) +
+    mvgam_theme()
+  if (facet) p + mvgam_facet_series() else p
+}
+
+
+#' Histogram panel of one observed series
+#'
+#' A missing `y` is dropped without the ggplot2 removal notice, as in
+#' `series_time_plot()`.
+#'
+#' @param y Numeric response values
+#' @param ylab Character x-axis label
+#' @param n_bins Integer bin count, or `NULL` for at least 20 bins
+#' @return A `ggplot` object
+#' @noRd
+series_hist_panel <- function(y, ylab, n_bins = NULL) {
+  checkmate::assert_numeric(y)
+  checkmate::assert_string(ylab)
   if (is.null(n_bins)) {
-    n_bins <- max(c(length(hist(c(dat$y), plot = F)$breaks), 20))
+    n_bins <- max(
+      length(graphics::hist(y, plot = FALSE)$breaks), 20L
+    )
   }
-
-  # Plot the histogram
-  ggplot2::ggplot(dat, ggplot2::aes(y)) +
-    ggplot2::geom_histogram(bins = n_bins, fill = "#8F2727", col = 'white') +
+  ggplot2::ggplot(data.frame(y = y), ggplot2::aes(x = y)) +
+    ggplot2::geom_histogram(
+      bins = n_bins, fill = mvgam_colour("dark"), colour = "white",
+      na.rm = TRUE
+    ) +
+    # Counts take whole-number ticks
+    ggplot2::scale_y_continuous(breaks = function(limits) {
+      breaks <- pretty(limits)
+      breaks[breaks == round(breaks)]
+    }) +
     ggplot2::labs(title = "Histogram", x = ylab, y = "Count") +
-    ggplot2::theme_bw()
+    mvgam_theme()
 }
 
-#' Function to compute and plot autocorrelation
-#' @noRd
-plot_acf <- function(dat) {
-  # Compute empirical ACF
-  acf_y <- acf(dat$y, plot = F, na.action = na.pass)
 
-  # Plot
-  data.frame(acf = acf_y$acf[,, 1], lag = acf_y$lag[, 1, 1]) %>%
-    ggplot2::ggplot(ggplot2::aes(x = lag, y = 0, yend = acf)) +
-    ggplot2::geom_hline(
-      yintercept = c(-1, 1) * qnorm((1 + 0.95) / 2) / sqrt(acf_y$n.used),
-      linetype = "dashed"
+#' Autocorrelation panel of one observed series
+#'
+#' @param y Numeric response values in time order. A missing value is
+#'   passed to `stats::acf()`, which skips the pairs it enters.
+#' @return A `ggplot` object with 95% bounds for white noise
+#' @noRd
+series_acf_panel <- function(y) {
+  checkmate::assert_numeric(y)
+  acf_y <- stats::acf(y, plot = FALSE, na.action = stats::na.pass)
+  df <- data.frame(
+    lag = as.numeric(acf_y$lag[, 1, 1]),
+    acf = as.numeric(acf_y$acf[, , 1])
+  )
+  ci <- stats::qnorm(0.975) / sqrt(acf_y$n.used)
+  ggplot2::ggplot(df, ggplot2::aes(x = lag, y = 0, yend = acf)) +
+    acf_reference_layers(ci) +
+    ggplot2::geom_segment(
+      colour = mvgam_colour("dark"), linewidth = 1
     ) +
-    ggplot2::geom_hline(
-      yintercept = 0,
-      colour = "#8F2727",
-      linewidth = 0.25
-    ) +
-    ggplot2::geom_segment(colour = "#8F2727", linewidth = 1) +
     ggplot2::labs(title = "ACF", x = "Lag", y = "Autocorrelation") +
-    ggplot2::theme_bw()
+    mvgam_theme()
 }
 
-#' Function to generate empirical cumulative distribution
-#' @noRd
-plot_ecdf <- function(dat, ylab = 'y') {
-  # Compute empriical ECDF
-  range_y <- range(dat$y, na.rm = T)
-  data.frame(x = seq(range_y[1], range_y[2], length.out = 100)) %>%
-    dplyr::mutate(y = ecdf(dat$y)(x)) %>%
 
-    # Plot
-    ggplot2::ggplot(ggplot2::aes(x, y)) +
-    ggplot2::geom_line(colour = "#8F2727", linewidth = 0.75) +
-    ggplot2::scale_y_continuous(limits = c(0, 1)) +
-    ggplot2::labs(
-      title = "CDF",
-      x = ylab,
-      y = "Empirical CDF"
+#' Empirical CDF panel of one observed series
+#'
+#' @param y Numeric response values. Missing values are dropped.
+#' @param ylab Character x-axis label
+#' @return A `ggplot` object
+#' @noRd
+series_ecdf_panel <- function(y, ylab) {
+  checkmate::assert_numeric(y)
+  checkmate::assert_string(ylab)
+  y_clean <- y[!is.na(y)]
+  rng <- range(y_clean)
+  df <- data.frame(x = seq(rng[1L], rng[2L], length.out = 100L))
+  df$y <- stats::ecdf(y_clean)(df$x)
+  ggplot2::ggplot(df, ggplot2::aes(x = x, y = y)) +
+    ggplot2::geom_line(
+      colour = mvgam_colour("dark"), linewidth = 0.75
     ) +
-    ggplot2::theme_bw()
+    ggplot2::scale_y_continuous(limits = c(0, 1)) +
+    ggplot2::labs(title = "CDF", x = ylab, y = "Empirical CDF") +
+    mvgam_theme()
 }

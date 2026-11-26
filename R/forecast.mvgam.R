@@ -1,1299 +1,1946 @@
-#' @importFrom generics forecast
-#' @export
-generics::forecast
+# forecast.mvgam: posterior forecasts that propagate the fitted latent
+# state of every trend type, series-grain and factor alike.
+# `build_forecast_arms()` and `propagate_one_draw()` give the steps.
 
-#' @title Extract or compute hindcasts and forecasts for a fitted
-#'   \code{mvgam} object
+
+#' Posterior forecasts for an mvgam state-space model
 #'
-#' @name forecast.mvgam
+#' Posterior forecasts at future time points, with posterior hindcasts
+#' at the training time points. Each draw propagates the fitted latent
+#' state through the trend's dynamics. The observation family then
+#' maps the trend to the response scale.
 #'
-#' @method forecast mvgam
+#' @inheritParams posterior_epred.mvgam
+#' @param object A fitted [mvgam][mvgam::mvgam] object.
+#' @param newdata Optional `data.frame` with the columns of the
+#'   training data, one row per series and future time to forecast.
+#'   When `NULL`, `forecast()` uses the held-out data given to
+#'   `mvgam(newdata = )`. A fit without held-out data needs `newdata`.
 #'
-#' @importFrom stats predict
+#'   The trend decides which future times are allowed:
+#'   \itemize{
+#'     \item `AR()`, `RW()`, `VAR()`, `LLT()` and `PW()` step once per
+#'       time point. Their forecast times must continue each series at
+#'       its own spacing, with no gap. After training ends at `t = 30`,
+#'       rows for `t = 41:42` alone are refused. The trend would step
+#'       once and twice, though those times are 11 and 12 steps past the
+#'       end of training. Supply every time in between, with or without
+#'       a response.
+#'     \item `CAR()` allows for the gap between times. Each series may
+#'       have its own forecast times, all after the last fitted time.
+#'     \item `ZMVN()` has no time dynamics and takes any later times.
+#'   }
+#'   `ZMVN()` and `PW()` need the same forecast times for every
+#'   series.
+#' @param ... Unused. Anything passed here is refused.
+#' @param type The scale of the draws:
+#'   * `"response"` (the default) samples from the observation family.
+#'   * `"expected"` returns the family's mean. A binomial mean is
+#'     `trials * p` and a zero-inflated mean is `(1 - zi) * mu`.
+#'   * `"link"` returns the linear predictor on the link scale.
+#'   * `"trend"` returns the latent trend on the link scale.
+#'   * `"latent_state"` returns the latent state of an [occ()] or
+#'     [nmix()] fit: the occupancy probability, or the abundance `N`.
+#'     The hindcast conditions each closure unit on its own visits, as
+#'     `hindcast(type = "latent_state")` does. The forecast takes the
+#'     state from the covariates and the propagated trend. A
+#'     multi-season fit holds one unit per site in each season and
+#'     returns the mean over those sites, which for [occ()] is the
+#'     expected share of sites occupied.
+#' @param component `NULL` (the default) for the summed trend, or the
+#'   names of state components of the trend, with `type = "trend"`.
+#'   Several names give the sum of their components. [LLT()] has
+#'   `"level"`, the stochastic level, and `"slope"`, its growth per time
+#'   step. A seasonal [LLT()] adds `"season"`. `"predictor"` holds the
+#'   effects of the trend formula's covariates. `c("level",
+#'   "predictor")` gives the level with those effects. A factor model
+#'   projects each component through its loadings, as it projects the
+#'   trend.
+#' @param coef_uncertainty Logical, `TRUE` by default. `FALSE` holds
+#'   the coefficients of the observation and trend formulas at one
+#'   posterior draw, the first that `ndraws` or `draw_ids` selects. That
+#'   includes smooth, random-effect and `gp()` coefficients. An exact
+#'   `gp()` term's draw at new values is held too. The forecast then
+#'   leaves out their uncertainty.
+#'   Turning off one source of uncertainty at a time shows how much each
+#'   contributes to a forecast.
+#' @param trend_uncertainty Logical, `TRUE` by default. `FALSE` holds
+#'   the parameters of the trend dynamics (`sigma`, AR, MA and VAR
+#'   coefficients), the last fitted state and the trend formula's
+#'   predictor at that same draw. Each draw still takes new
+#'   innovations. The spread then shows innovation noise alone.
+#' @param re_formula,allow_new_levels,sample_new_levels As in
+#'   [posterior_epred.mvgam()]. A formula applies to the observation and
+#'   the trend formulas alike.
+#' @param obs_uncertainty Logical, `TRUE` by default. `FALSE` returns
+#'   the family's mean under `type = "response"`, in place of a sampled
+#'   observation.
 #'
-#' @importFrom rlang missing_arg
+#' @return An object of class [mvgam_forecast-class][mvgam].
+#'   Hindcasts and forecasts are returned as named lists of
+#'   `[ndraws, n_times]` matrices, one per series. A forecast of state
+#'   components names them in its `component` slot.
 #'
-#' @inheritParams predict.mvgam
-#'
-#' @param newdata Optional \code{dataframe} or \code{list} of test data
-#'   containing the same variables that were included in the original `data`
-#'   used to fit the model. If included, the covariate information in
-#'   \code{newdata} will be used to generate forecasts from the fitted model
-#'   equations. If this same \code{newdata} was originally included in the call
-#'   to \code{mvgam}, then forecasts have already been produced by the
-#'   generative model and these will simply be extracted and plotted. However
-#'   if no \code{newdata} was supplied to the original model call, an
-#'   assumption is made that the \code{newdata} supplied here comes
-#'   sequentially after the data supplied in the original model (i.e. we
-#'   assume there is no time gap between the last observation of series 1 in
-#'   the original data and the first observation for series 1 in
-#'   \code{newdata})
-#'
-#' @param data_test Deprecated. Still works in place of \code{newdata} but
-#'   users are recommended to use \code{newdata} instead for more seamless
-#'   integration into `R` workflows
-#'
-#' @param n_cores Deprecated. Parallel processing is no longer supported
-#'
-#' @param ... Ignored
-#'
-#' @details Posterior predictions are drawn from the fitted \code{mvgam} and
-#'   used to simulate a forecast distribution
-#'
-#' @return An object of class \code{mvgam_forecast} containing hindcast and
-#'   forecast distributions. See \code{\link{mvgam_forecast-class}} for
-#'   details.
-#'
-#' @seealso [hindcast.mvgam()], [plot.mvgam_forecast()],
-#'   [summary.mvgam_forecast()], [score.mvgam_forecast()]
-#'   [ensemble.mvgam_forecast()]
-#'
+#' @seealso [hindcast.mvgam()] returns the fitted latent states.
+#'   [posterior_predict.mvgam()] and [posterior_epred.mvgam()] predict
+#'   from the covariate part of the model. `forecast()`
+#'   extrapolates the fitted latent state. [score.mvgam_forecast()]
+#'   scores a forecast against held-out data.
+#'   [forecast_uncertainty()] splits its variance by source. The
+#'   `r mvgam_article("forecast_evaluation", "forecast evaluation article")`
+#'   scores, compares and combines the forecasts of three models of
+#'   rodent counts.
 #' @examples
 #' \dontrun{
-#'   # Simulate data with 3 series and AR trend model
-#'   simdat <- sim_mvgam(n_series = 3, trend_model = AR())
+#' set.seed(11)
+#' simdat <- sim_mvgam(family = poisson(), n_series = 1L,
+#'                      n_timepoints = 120L, trend_model = AR(),
+#'                      proportional_train = 0.75)
 #'
-#'   # Fit mvgam model
-#'   mod <- mvgam(
-#'     y ~ s(season, bs = 'cc', k = 6),
-#'     trend_model = AR(),
-#'     noncentred = TRUE,
-#'     data = simdat$data_train,
-#'     chains = 2,
-#'     silent = 2
-#'   )
+#' mod <- mvgam(
+#'   y ~ s(x, k = 5),
+#'   trend_formula = ~ AR(p = 1),
+#'   data    = simdat$data_train,
+#'   newdata = simdat$data_test,
+#'   family  = poisson(),
+#'   chains  = 2, silent = 2
+#' )
 #'
-#'   # Hindcasts on response scale
-#'   hc <- hindcast(mod)
-#'   str(hc)
+#' # The held-out data given to mvgam() set the forecast horizon
+#' fc <- forecast(mod)
+#' plot(fc)
 #'
-#'   # Use summary() to extract hindcasts / forecasts for custom plotting
-#'   head(summary(hc), 12)
+#' # The latent AR(1) trend alone, on the log scale
+#' plot(forecast(mod, type = "trend"))
 #'
-#'   # Or just use the plot() function for quick plots
-#'   plot(hc, series = 1)
-#'   plot(hc, series = 2)
-#'   plot(hc, series = 3)
+#' # The expected counts, without the Poisson sampling noise
+#' plot(forecast(mod, type = "expected"))
 #'
-#'   # Forecasts on response scale
-#'   fc <- forecast(
-#'     mod,
-#'     newdata = simdat$data_test
-#'   )
-#'   str(fc)
-#'   head(summary(fc), 12)
-#'   plot(fc, series = 1)
-#'   plot(fc, series = 2)
-#'   plot(fc, series = 3)
+#' # Next, score the forecast against the held-out counts
+#' head(score(fc, score = "crps")[[1]])
 #'
-#'   # Forecasts as expectations
-#'   fc <- forecast(
-#'     mod,
-#'     newdata = simdat$data_test,
-#'     type = 'expected'
-#'   )
-#'   head(summary(fc), 12)
-#'   plot(fc, series = 1)
-#'   plot(fc, series = 2)
-#'   plot(fc, series = 3)
+#' # The sources of the forecast's variance at each horizon
+#' plot(forecast_uncertainty(mod, ndraws = 200))
 #'
-#'   # Dynamic trend extrapolations
-#'   fc <- forecast(
-#'     mod,
-#'     newdata = simdat$data_test,
-#'     type = 'trend'
-#'   )
-#'   head(summary(fc), 12)
-#'   plot(fc, series = 1)
-#'   plot(fc, series = 2)
-#'   plot(fc, series = 3)
+#' # How a future with higher `x` would change the forecast
+#' higher <- simdat$data_test
+#' higher$x <- higher$x + 1
+#' plot(forecast_uncertainty(
+#'   mod, newdata = list(observed = simdat$data_test, higher = higher),
+#'   ndraws = 200
+#' ))
 #' }
 #'
+#' @importFrom generics forecast
+#' @family forecasting
+#' @method forecast mvgam
 #' @export
-forecast.mvgam = function(
-  object,
-  newdata,
-  data_test,
-  n_cores = 1,
-  type = 'response',
-  ...
-) {
-  # Check arguments
-  validate_pos_integer(n_cores)
-  if (n_cores > 1L) {
-    message('argument "n_cores" is deprecated')
+forecast.mvgam <- function(object,
+                           newdata = NULL,
+                           ...,
+                           type = c("response", "link",
+                                    "expected", "trend",
+                                    "latent_state"),
+                           component = NULL,
+                           ndraws = NULL,
+                           draw_ids = NULL,
+                           coef_uncertainty = TRUE,
+                           trend_uncertainty = TRUE,
+                           obs_uncertainty = TRUE,
+                           resp = NULL,
+                           re_formula = NULL,
+                           allow_new_levels = FALSE,
+                           sample_new_levels = "uncertainty") {
+  checkmate::assert_class(object, "mvgam")
+  require_fitted_model(object, "forecast")
+  require_series_axis(object, "forecast")
+  # Every argument after `...` is named. A misspelt one would land in
+  # `...` and leave its default in force.
+  rlang::check_dots_empty()
+  type <- match.arg(type)
+  is_state <- type == "latent_state"
+  if (is_state) {
+    require_closure_unit_predict_type(object$family, type)
   }
-
-  if (!missing("newdata")) {
-    data_test <- newdata
+  checkmate::assert_flag(coef_uncertainty)
+  checkmate::assert_flag(trend_uncertainty)
+  checkmate::assert_flag(obs_uncertainty)
+  checkmate::assert_string(resp, null.ok = TRUE)
+  fan <- mv_resp_fan_out(object, resp, class = "mvgam_forecast")
+  if (!is.null(fan)) {
+    return(fan)
   }
+  setup <- forecast_setup(object, newdata, type, resp, ndraws, draw_ids,
+                          re_formula, allow_new_levels, sample_new_levels)
+  component <- resolve_trend_component(object, component, type)
+  is_trendless <- is.null(setup$trend_model)
+  draw_idx <- setup$draw_idx
+  training <- setup$training
+  fc_grid <- setup$fc_grid
+  reported <- setup$reported
 
-  if (missing("newdata") & missing(data_test) & is.null(object$test_data)) {
-    stop('newdata must be supplied to compute forecasts', call. = FALSE)
-  }
-
-  type <- match.arg(
-    arg = type,
-    choices = c(
-      "link",
-      "response",
-      "trend",
-      "expected",
-      "detection",
-      "latent_N"
-    )
-  )
-
-  if (inherits(object, 'jsdgam')) {
-    orig_trend_model <- attr(object$model_data, 'prepped_trend_model')
+  # The hindcast slot holds the fitted states, as hindcast() does with
+  # `process_error = FALSE`. The two then agree on the training grid.
+  # A latent state's forecast maps the forecast predictor to the state
+  # of each occasion, unconditioned on visits that have not happened.
+  hindcasts <- if (is_state) {
+    latent_state_hindcast_arms(object, training, draw_idx, reported)
   } else {
-    orig_trend_model <- object$trend_model
-  }
-
-  data_train <- validate_series_time(
-    object$obs_data,
-    trend_model = orig_trend_model
-  )
-  n_series <- NCOL(object$ytimes)
-
-  # Check whether a forecast has already been computed
-  forecasts_exist <- FALSE
-  if (!is.null(object$test_data) && !missing(data_test)) {
-    object$test_data <- validate_series_time(
-      object$test_data,
-      trend_model = orig_trend_model
+    build_hindcast_arms(
+      object, training, type, draw_idx, obs_uncertainty,
+      process_error = FALSE, resp = resp, series_levels = reported,
+      component = component
     )
-    data_test <- validate_series_time(data_test, trend_model = orig_trend_model)
-    if (
-      max(data_test$index..time..index) <=
-        max(object$test_data$index..time..index)
-    ) {
-      forecasts_exist <- TRUE
-    } else {
-      data.frame(time = data_test$time) %>%
-        dplyr::mutate(rowid = dplyr::row_number()) %>%
-        dplyr::filter(time > max(object$test_data$index..time..index)) %>%
-        dplyr::pull(rowid) -> idx
-      if (inherits(data_test, 'list')) {
-        data_arranged <- data_test
-        data_arranged <- lapply(data_test, function(x) {
-          if (is.matrix(x)) {
-            matrix(x[idx, ], ncol = NCOL(x))
-          } else {
-            x[idx]
-          }
-        })
-        names(data_arranged) <- names(data_test)
-        data_test <- data_arranged
-      } else {
-        data_test <- data_test[idx, ]
-      }
+  }
+  state_of <- if (is_state) {
+    function(whole, trend, frame) {
+      occasion_state_rows(object, whole, frame, draw_idx)
     }
   }
 
-  if (!is.null(object$test_data) && missing(data_test)) {
-    forecasts_exist <- TRUE
-  }
-
-  if (is.null(object$test_data)) {
-    data_test <- validate_series_time(
-      data_test,
-      name = 'newdata',
-      trend_model = orig_trend_model
-    )
-    data.frame(series = object$obs_data$series, time = object$obs_data$time) %>%
-      dplyr::group_by(series) %>%
-      dplyr::summarise(maxt = max(time)) -> series_max_ts
-
-    data.frame(series = data_test$series, time = data_test$time) %>%
-      dplyr::mutate(orig_rows = dplyr::row_number()) %>%
-      dplyr::left_join(series_max_ts, by = 'series') %>%
-      dplyr::filter(time > maxt) %>%
-      dplyr::pull(orig_rows) -> idx
-
-    if (inherits(data_test, 'list')) {
-      data_arranged <- data_test
-      data_arranged <- lapply(data_test, function(x) {
-        if (is.matrix(x)) {
-          matrix(x[idx, ], ncol = NCOL(x))
-        } else {
-          x[idx]
-        }
-      })
-      names(data_arranged) <- names(data_test)
-      data_test <- data_arranged
-    } else {
-      data_test <- data_test[idx, ]
-    }
-    object$test_data <- data_test
-  }
-
-  # Only compute forecasts if they don't already exist!
-  if (!forecasts_exist) {
-    resp_terms <- as.character(terms(formula(object))[[2]])
-    if (length(resp_terms) == 1) {
-      out_name <- as.character(terms(formula(object))[[2]])
-    } else {
-      if (any(grepl('cbind', resp_terms))) {
-        resp_terms <- resp_terms[-grepl('cbind', resp_terms)]
-        out_name <- resp_terms[1]
-      }
-    }
-
-    if (out_name != 'y') {
-      data_test$y <- data_test[[out_name]]
-    }
-
-    if (!missing(data_test)) {
-      if (!'y' %in% names(data_test)) {
-        data_test$y <- rep(NA, NROW(data_test))
-      }
-      data_test <- validate_series_time(
-        data_test,
-        name = 'newdata',
-        trend_model = orig_trend_model
-      )
-    }
-
-    # Generate draw-specific forecasts
-    fc_preds <- forecast_draws(
+  forecasts <- if (is.null(fc_grid)) {
+    NULL
+  } else if (is_trendless) {
+    build_trendless_forecast_arms(
       object = object,
+      fc_grid = fc_grid,
       type = type,
-      series = 'all',
-      data_test = data_test,
-      n_cores = n_cores,
-      ...
+      draw_idx = draw_idx,
+      obs_uncertainty = obs_uncertainty,
+      series_levels = reported,
+      resp = resp,
+      group_level = setup$group_level,
+      effect_of = state_of
     )
-
-    # Extract forecasts into the correct format
-    series_fcs <- lapply(seq_len(n_series), function(series) {
-      indexed_forecasts <- do.call(
-        rbind,
-        lapply(seq_along(fc_preds), function(x) {
-          fc_preds[[x]][[series]]
-        })
-      )
-      indexed_forecasts
-    })
-    names(series_fcs) <- levels(data_test$series)
-
-    # Extract hindcasts
-    data_train <- validate_series_time(
-      object$obs_data,
-      trend_model = orig_trend_model
-    )
-    ends <- seq(
-      0,
-      dim(mcmc_chains(object$model_output, 'ypred'))[2],
-      length.out = NCOL(object$ytimes) + 1
-    )
-    starts <- ends + 1
-    starts <- c(1, starts[-c(1, (NCOL(object$ytimes) + 1))])
-    ends <- ends[-1]
-
-    series_hcs <- lapply(seq_len(n_series), function(series) {
-      to_extract <- switch(
-        type,
-        'link' = 'mus',
-        'expected' = 'mus',
-        'response' = 'ypred',
-        'trend' = 'trend',
-        'latent_N' = 'mus',
-        'detection' = 'mus'
-      )
-      if (
-        object$family == 'nmix' &
-          type == 'link'
-      ) {
-        to_extract <- 'trend'
-      }
-      if (object$fit_engine == 'stan') {
-        preds <- mcmc_chains(object$model_output, to_extract)[,
-          seq(
-            series,
-            dim(mcmc_chains(object$model_output, 'ypred'))[2],
-            by = NCOL(object$ytimes)
-          ),
-          drop = FALSE
-        ]
-      } else {
-        preds <- mcmc_chains(object$model_output, to_extract)[,
-          starts[series]:ends[series],
-          drop = FALSE
-        ]
-      }
-
-      if (
-        object$family == 'nmix' &
-          type == 'link'
-      ) {
-        preds <- exp(preds)
-      }
-
-      if (type %in% c('expected', 'latent_N', 'detection')) {
-        # Compute expectations as one long vector
-        Xpmat <- matrix(as.vector(preds))
-        attr(Xpmat, 'model.offset') <- 0
-
-        family_pars <- extract_family_pars(object = object)
-        par_extracts <- lapply(seq_along(family_pars), function(j) {
-          if (is.matrix(family_pars[[j]])) {
-            as.vector(matrix(
-              rep(as.vector(family_pars[[j]][, series]), NCOL(preds)),
-              nrow = NROW(preds),
-              byrow = FALSE
-            ))
-          } else {
-            as.vector(matrix(
-              rep(family_pars[[j]], NCOL(preds)),
-              nrow = NROW(preds),
-              byrow = FALSE
-            ))
-          }
-        })
-        names(par_extracts) <- names(family_pars)
-
-        # Add trial information if this is a Binomial model
-        if (object$family %in% c('binomial', 'beta_binomial')) {
-          trials <- as.vector(matrix(
-            rep(
-              as.vector(attr(object$mgcv_model, 'trials')[, series]),
-              NROW(preds)
-            ),
-            nrow = NROW(preds),
-            byrow = TRUE
-          ))
-          par_extracts$trials <- trials
-        }
-
-        if (object$family == 'nmix') {
-          preds <- mcmc_chains(object$model_output, 'detprob')[,
-            object$ytimes[, series],
-            drop = FALSE
-          ]
-          Xpmat <- matrix(qlogis(as.vector(preds)))
-          attr(Xpmat, 'model.offset') <- 0
-          latent_lambdas <- as.vector(mcmc_chains(
-            object$model_output,
-            'trend'
-          )[,
-            seq(
-              series,
-              dim(mcmc_chains(object$model_output, 'ypred'))[2],
-              by = NCOL(object$ytimes)
-            ),
-            drop = FALSE
-          ])
-          latent_lambdas <- exp(latent_lambdas)
-          n_draws <- dim(mcmc_chains(object$model_output, 'ypred'))[1]
-          cap <- as.vector(t(replicate(
-            n_draws,
-            object$obs_data$cap[which(
-              as.numeric(object$obs_data$series) == series
-            )]
-          )))
-        } else {
-          latent_lambdas <- NULL
-          cap <- NULL
-        }
-
-        if (type == 'latent_N') {
-          preds <- mcmc_chains(object$model_output, 'latent_ypred')[,
-            seq(
-              series,
-              dim(mcmc_chains(object$model_output, 'ypred'))[2],
-              by = NCOL(object$ytimes)
-            ),
-            drop = FALSE
-          ]
-        } else {
-          preds <- matrix(
-            as.vector(mvgam_predict(
-              family = object$family,
-              Xp = Xpmat,
-              latent_lambdas = latent_lambdas,
-              cap = cap,
-              type = type,
-              betas = 1,
-              family_pars = par_extracts
-            )),
-            nrow = NROW(preds)
-          )
-        }
-      }
-      preds
-    })
-    names(series_hcs) <- levels(data_test$series)
-
-    # Extract observations
-    series_obs <- lapply(seq_len(n_series), function(series) {
-      s_name <- levels(object$obs_data$series)[series]
-      data.frame(
-        series = object$obs_data$series,
-        time = object$obs_data$index..time..index,
-        y = object$obs_data$y
-      ) %>%
-        dplyr::filter(series == s_name) %>%
-        dplyr::arrange(time) %>%
-        dplyr::pull(y)
-    })
-    names(series_obs) <- levels(data_test$series)
-
-    series_test <- lapply(seq_len(n_series), function(series) {
-      s_name <- levels(object$obs_data$series)[series]
-      data.frame(
-        series = data_test$series,
-        time = data_test$index..time..index,
-        y = data_test$y
-      ) %>%
-        dplyr::filter(series == s_name) %>%
-        dplyr::arrange(time) %>%
-        dplyr::pull(y)
-    })
-    names(series_test) <- levels(data_test$series)
   } else {
-    # If forecasts already exist, simply extract them
-    data_test <- validate_series_time(
-      object$test_data,
-      trend_model = orig_trend_model
+    build_forecast_arms(
+      object = object,
+      trend_model = setup$trend_model,
+      meta = object$trend_metadata,
+      training = training,
+      fc_grid = fc_grid,
+      type = type,
+      draws_mat = forecast_draws(object, draw_idx),
+      draw_idx = draw_idx,
+      coef_uncertainty = coef_uncertainty,
+      trend_uncertainty = trend_uncertainty,
+      obs_uncertainty = obs_uncertainty,
+      series_levels = setup$series_levels,
+      resp = resp,
+      reported = reported,
+      component = component,
+      group_level = setup$group_level,
+      effect_of = state_of
     )
-    last_train <- max(object$obs_data$index..time..index) -
-      (min(object$obs_data$index..time..index) - 1)
-
-    data_train <- validate_series_time(
-      object$obs_data,
-      trend_model = orig_trend_model
-    )
-    ends <- seq(
-      0,
-      dim(mcmc_chains(object$model_output, 'ypred'))[2],
-      length.out = NCOL(object$ytimes) + 1
-    )
-    starts <- ends + 1
-    starts <- c(1, starts[-c(1, (NCOL(object$ytimes) + 1))])
-    ends <- ends[-1]
-
-    series_fcs <- lapply(seq_len(n_series), function(series) {
-      to_extract <- switch(
-        type,
-        'link' = 'mus',
-        'expected' = 'mus',
-        'response' = 'ypred',
-        'trend' = 'trend',
-        'latent_N' = 'mus',
-        'detection' = 'mus'
-      )
-      if (
-        object$family == 'nmix' &
-          type == 'link'
-      ) {
-        to_extract <- 'trend'
-      }
-
-      if (object$fit_engine == 'stan') {
-        preds <- mcmc_chains(object$model_output, to_extract)[,
-          seq(
-            series,
-            dim(mcmc_chains(object$model_output, 'ypred'))[2],
-            by = NCOL(object$ytimes)
-          ),
-          drop = FALSE
-        ]
-      } else {
-        preds <- mcmc_chains(object$model_output, to_extract)[,
-          starts[series]:ends[series],
-          drop = FALSE
-        ]
-      }
-
-      if (
-        object$family == 'nmix' &
-          type == 'link'
-      ) {
-        preds <- exp(preds)
-      }
-
-      if (type %in% c('expected', 'latent_N', 'detection')) {
-        # Compute expectations as one long vector
-        Xpmat <- matrix(as.vector(preds))
-        attr(Xpmat, 'model.offset') <- 0
-
-        family_pars <- extract_family_pars(object = object)
-        par_extracts <- lapply(seq_along(family_pars), function(j) {
-          if (is.matrix(family_pars[[j]])) {
-            family_pars[[j]][, series]
-          } else {
-            family_pars[[j]]
-          }
-        })
-        names(par_extracts) <- names(family_pars)
-
-        # Add trial information if this is a Binomial model
-        if (object$family %in% c('binomial', 'beta_binomial')) {
-          trials <- as.vector(matrix(
-            rep(
-              as.vector(attr(object$mgcv_model, 'trials')[, series]),
-              NROW(mus)
-            ),
-            nrow = NROW(mus),
-            byrow = TRUE
-          ))
-          par_extracts$trials <- trials
-        }
-
-        if (object$family == 'nmix') {
-          preds <- mcmc_chains(object$model_output, 'detprob')[,
-            object$ytimes[, series],
-            drop = FALSE
-          ]
-          Xpmat <- matrix(qlogis(as.vector(preds)))
-          attr(Xpmat, 'model.offset') <- 0
-          n_draws <- dim(mcmc_chains(object$model_output, 'ypred'))[1]
-          n_cols <- dim(mcmc_chains(object$model_output, 'ypred'))[2]
-          latent_lambdas <- as.vector(mcmc_chains(
-            object$model_output,
-            'trend'
-          )[, seq(series, n_cols, by = NCOL(object$ytimes)), drop = FALSE])
-          latent_lambdas <- exp(latent_lambdas)
-          cap <- as.vector(t(replicate(
-            n_draws,
-            c(
-              object$obs_data$cap[which(
-                as.numeric(object$obs_data$series) == series
-              )],
-              object$test_data$cap[which(
-                as.numeric(object$test_data$series) == series
-              )]
-            )
-          )))
-        } else {
-          latent_lambdas <- NULL
-          cap <- NULL
-        }
-
-        if (type == 'latent_N') {
-          preds <- mcmc_chains(object$model_output, 'latent_ypred')[,
-            seq(
-              series,
-              dim(mcmc_chains(object$model_output, 'ypred'))[2],
-              by = NCOL(object$ytimes)
-            ),
-            drop = FALSE
-          ]
-        } else {
-          preds <- matrix(
-            as.vector(mvgam_predict(
-              family = object$family,
-              Xp = Xpmat,
-              latent_lambdas = latent_lambdas,
-              cap = cap,
-              type = type,
-              betas = 1,
-              family_pars = par_extracts
-            )),
-            nrow = NROW(preds)
-          )
-        }
-      }
-      preds[, (last_train + 1):NCOL(preds)]
-    })
-    names(series_fcs) <- levels(data_train$series)
-
-    # Extract hindcasts for storing in the returned object
-    series_hcs <- lapply(seq_len(n_series), function(series) {
-      to_extract <- switch(
-        type,
-        'link' = 'mus',
-        'expected' = 'mus',
-        'response' = 'ypred',
-        'trend' = 'trend',
-        'latent_N' = 'mus',
-        'detection' = 'mus'
-      )
-      if (
-        object$family == 'nmix' &
-          type == 'link'
-      ) {
-        to_extract <- 'trend'
-      }
-      if (object$fit_engine == 'stan') {
-        preds <- mcmc_chains(object$model_output, to_extract)[,
-          seq(
-            series,
-            dim(mcmc_chains(object$model_output, 'ypred'))[2],
-            by = NCOL(object$ytimes)
-          ),
-          drop = FALSE
-        ][, 1:last_train]
-      } else {
-        preds <- mcmc_chains(object$model_output, to_extract)[,
-          starts[series]:ends[series],
-          drop = FALSE
-        ][, 1:last_train]
-      }
-
-      if (
-        object$family == 'nmix' &
-          type == 'link'
-      ) {
-        preds <- exp(preds)
-      }
-
-      if (type %in% c('expected', 'latent_N', 'detection')) {
-        # Compute expectations as one long vector
-        Xpmat <- matrix(as.vector(preds))
-        attr(Xpmat, 'model.offset') <- 0
-
-        family_pars <- extract_family_pars(object = object)
-        par_extracts <- lapply(seq_along(family_pars), function(j) {
-          if (is.matrix(family_pars[[j]])) {
-            family_pars[[j]][, series]
-          } else {
-            family_pars[[j]]
-          }
-        })
-        names(par_extracts) <- names(family_pars)
-
-        # Add trial information if this is a Binomial model
-        if (object$family %in% c('binomial', 'beta_binomial')) {
-          trials <- as.vector(matrix(
-            rep(
-              as.vector(attr(object$mgcv_model, 'trials')[
-                1:last_train,
-                series
-              ]),
-              NROW(mus)
-            ),
-            nrow = NROW(mus),
-            byrow = TRUE
-          ))
-          par_extracts$trials <- trials
-        }
-
-        if (object$family == 'nmix') {
-          preds <- mcmc_chains(object$model_output, 'detprob')[,
-            object$ytimes[1:last_train, series],
-            drop = FALSE
-          ]
-          Xpmat <- matrix(qlogis(as.vector(preds)))
-          attr(Xpmat, 'model.offset') <- 0
-          n_draws <- dim(mcmc_chains(object$model_output, 'ypred'))[1]
-          n_cols <- dim(mcmc_chains(object$model_output, 'ypred'))[2]
-          latent_lambdas <- as.vector(mcmc_chains(
-            object$model_output,
-            'trend'
-          )[, seq(series, n_cols, by = NCOL(object$ytimes)), drop = FALSE][,
-            1:last_train
-          ])
-          latent_lambdas <- exp(latent_lambdas)
-          cap <- as.vector(t(replicate(
-            n_draws,
-            object$obs_data$cap[which(
-              as.numeric(object$test_data$series) == series
-            )]
-          )))
-        } else {
-          latent_lambdas <- NULL
-          cap <- NULL
-        }
-
-        if (type == 'latent_N') {
-          preds <- mcmc_chains(object$model_output, 'latent_ypred')[,
-            seq(
-              series,
-              dim(mcmc_chains(object$model_output, 'ypred'))[2],
-              by = NCOL(object$ytimes)
-            ),
-            drop = FALSE
-          ][, 1:last_train]
-        } else {
-          preds <- matrix(
-            as.vector(mvgam_predict(
-              family = object$family,
-              Xp = Xpmat,
-              latent_lambdas = latent_lambdas,
-              cap = cap,
-              type = type,
-              betas = 1,
-              family_pars = par_extracts
-            )),
-            nrow = NROW(preds)
-          )
-        }
-      }
-      preds
-    })
-    names(series_hcs) <- levels(data_train$series)
-
-    series_obs <- lapply(seq_len(n_series), function(series) {
-      s_name <- levels(object$obs_data$series)[series]
-      data.frame(
-        series = object$obs_data$series,
-        time = object$obs_data$index..time..index,
-        y = object$obs_data$y
-      ) %>%
-        dplyr::filter(series == s_name) %>%
-        dplyr::arrange(time) %>%
-        dplyr::pull(y)
-    })
-    names(series_obs) <- levels(data_train$series)
-
-    series_test <- lapply(seq_len(n_series), function(series) {
-      s_name <- levels(object$obs_data$series)[series]
-      data.frame(
-        series = object$test_data$series,
-        time = object$test_data$index..time..index,
-        y = object$test_data$y
-      ) %>%
-        dplyr::filter(series == s_name) %>%
-        dplyr::arrange(time) %>%
-        dplyr::pull(y)
-    })
-    names(series_test) <- levels(data_train$series)
   }
 
-  series_train_times <- lapply(seq_len(n_series), function(series) {
-    s_name <- levels(object$obs_data$series)[series]
-    data.frame(
-      series = object$obs_data$series,
-      time = object$obs_data$time,
-      y = object$obs_data$y
-    ) %>%
-      dplyr::filter(series == s_name) %>%
-      dplyr::arrange(time) %>%
-      dplyr::pull(time)
-  })
-  names(series_train_times) <- levels(data_train$series)
+  family_pars <- if (type == "link") {
+    extract_family_pars_for_draws(object, draw_idx, resp = resp)
+  } else {
+    NULL
+  }
 
-  series_test_times <- lapply(seq_len(n_series), function(series) {
-    s_name <- levels(object$obs_data$series)[series]
-    data.frame(
-      series = data_test$series,
-      time = data_test$time
-    ) %>%
-      dplyr::filter(series == s_name) %>%
-      dplyr::arrange(time) %>%
-      dplyr::pull(time)
-  })
-  names(series_test_times) <- levels(data_train$series)
-
-  series_fcs <- structure(
-    list(
-      call = object$call,
-      trend_call = object$trend_call,
-      family = object$family,
-      family_pars = if (type == 'link') {
-        extract_family_pars(object = object)
-      } else {
-        NULL
-      },
-      trend_model = object$trend_model,
-      drift = object$drift,
-      use_lv = object$use_lv,
-      fit_engine = object$fit_engine,
-      type = type,
-      series_names = factor(
-        levels(data_train$series),
-        levels = levels(data_train$series)
-      ),
-      train_observations = series_obs,
-      train_times = series_train_times,
-      test_observations = series_test,
-      test_times = series_test_times,
-      hindcasts = series_hcs,
-      forecasts = series_fcs
-    ),
-    class = 'mvgam_forecast'
+  new_mvgam_forecast(
+    object, type, resp, reported, training,
+    hindcasts = hindcasts, forecasts = forecasts, fc_grid = fc_grid,
+    family_pars = family_pars, component = component
   )
-  return(series_fcs)
 }
 
-#'Compute forecasts using a posterior distribution
-#'@noRd
-forecast_draws = function(
-  object,
-  type = 'response',
-  series = 'all',
-  data_test,
-  n_cores = 1,
-  n_samples,
-  ending_time,
-  b_uncertainty = TRUE,
-  trend_uncertainty = TRUE,
-  obs_uncertainty = TRUE
-) {
-  # Check arguments
-  validate_pos_integer(n_cores)
-  if (inherits(object, 'jsdgam')) {
-    orig_trend_model <- attr(object$model_data, 'prepped_trend_model')
-  } else {
-    orig_trend_model <- object$trend_model
-  }
-  data_test <- validate_series_time(
-    data_test,
-    name = 'newdata',
-    trend_model = orig_trend_model
+
+#' What a forecast and its parts share before any draw is taken
+#'
+#' @param object A fitted `mvgam` object
+#' @param newdata The caller's frame, or `NULL` for the held-out data
+#' @param type The prediction type
+#' @param resp A response name, or NULL
+#' @param ndraws,draw_ids The draws to take
+#' @param re_formula,allow_new_levels,sample_new_levels As
+#'   `validate_group_level_args()` takes them
+#' @return List of `trend_model`, `NULL` for a trendless fit,
+#'   `series_levels`, `reported`, `draw_idx`, `training`, `fc_grid` and
+#'   `group_level`, the last three arguments as one list
+#' @noRd
+forecast_setup <- function(object, newdata, type, resp, ndraws, draw_ids,
+                           re_formula, allow_new_levels, sample_new_levels) {
+  validate_draw_selectors(ndraws, draw_ids)
+  validate_group_level_args(re_formula, allow_new_levels, sample_new_levels)
+  newdata <- ensure_obs_placeholder(
+    jsdgam_prediction_columns(object, newdata %||% object$test_data), object
   )
-  data_test <- sort_data(data_test)
-  n_series <- NCOL(object$ytimes)
-  use_lv <- object$use_lv
-
-  if (series != 'all') {
-    s_name <- levels(data_test$series)[series]
+  trend_specs <- object$mv_spec$trend_specs
+  # A trendless fit forecasts its observation predictor at the new
+  # occasions. With no latent state, `type = "trend"` names nothing.
+  if (is.null(trend_specs) && identical(type, "trend")) {
+    stop(insight::format_error(c(
+      "'type = \"trend\"' is not defined for trendless fits.",
+      i = paste0("Use 'type = \"link\"', 'type = \"expected\"' ",
+                 "or 'type = \"response\"' (the default).")
+    )), call. = FALSE)
   }
-
-  # Generate the observation model linear predictor matrix,
-  # ensuring the test data is sorted correctly (by time and then series)
-  if (inherits(data_test, 'list')) {
-    Xp <- obs_Xp_matrix(
-      newdata = sort_data(data_test),
-      mgcv_model = object$mgcv_model
-    )
-
-    if (series != 'all') {
-      obs_keep <- data.frame(
-        y = data_test$y,
-        series = data_test$series,
-        time = data_test$index..time..index,
-        rowid = 1:length(data_test$y)
-      ) %>%
-        dplyr::filter(series == s_name) %>%
-        dplyr::arrange(time) %>%
-        dplyr::pull(rowid)
-      series_test <- data.frame(
-        y = data_test$y,
-        series = data_test$series,
-        time = data_test$index..time..index,
-        rowid = 1:length(data_test$y)
-      ) %>%
-        dplyr::filter(series == s_name) %>%
-        dplyr::arrange(time)
-      Xp <- Xp[obs_keep, ]
-    } else {
-      series_test <- NULL
-    }
-  } else {
-    if (series != 'all') {
-      series_test <- data_test %>%
-        dplyr::filter(series == s_name) %>%
-        dplyr::arrange(index..time..index)
-      Xp <- obs_Xp_matrix(newdata = series_test, mgcv_model = object$mgcv_model)
-    } else {
-      Xp <- obs_Xp_matrix(
-        newdata = sort_data(data_test),
-        mgcv_model = object$mgcv_model
-      )
-      series_test <- NULL
-    }
+  # The horizon comes from the caller's frame or the held-out data
+  # stored at fit time. A fit cannot invent occasions. Every
+  # covariate the model uses must be in that frame.
+  if (is.null(newdata)) {
+    stop(insight::format_error(c(
+      "'newdata' is required to forecast.",
+      x = "The fit stores no held-out data from 'mvgam(newdata = )'.",
+      i = paste0("Pass a frame with times after the training grid and ",
+                 "every covariate the model uses."),
+      i = "For the training occasions, use 'hindcast()'."
+    )), call. = FALSE)
   }
-
-  # Generate linear predictor matrix from trend mgcv model, ensuring
-  # the test data is sorted correctly (by time and then series)
-  if (!is.null(object$trend_call)) {
-    Xp_trend <- trend_Xp_matrix(
-      newdata = sort_data(data_test),
-      trend_map = object$trend_map,
-      series = series,
-      mgcv_model = object$trend_mgcv_model,
-      forecast = TRUE
-    )
-
-    # For trend_formula models with autoregressive processes,
-    # the process model operates as: AR * (process[t - 1] - mu[t-1]])
-    # We therefore need the values of mu at the end of the training set
-    # to correctly propagate the process model forward
-    if (use_lv & attr(object$model_data, 'trend_model') != 'GP') {
-      # Get the observed trend predictor matrix
-      newdata <- trend_map_data_prep(
-        object$obs_data,
-        object$trend_map,
-        forecast = TRUE
-      )
-      Xp_trend_last <- predict(
-        object$trend_mgcv_model,
-        newdata = newdata,
-        type = 'lpmatrix'
-      )
-
-      # Ensure the last three values are used, in case the obs_data
-      # was not supplied in order
-      data.frame(
-        time = newdata$index..time..index,
-        series = newdata$series,
-        row_id = 1:length(newdata$index..time..index)
-      ) %>%
-        dplyr::arrange(time, series) %>%
-        dplyr::pull(row_id) -> sorted_inds
-      n_processes <- length(unique(object$trend_map$trend))
-      linpred_order <- tail(sorted_inds, 3 * n_processes)
-
-      # Deal with any offsets
-      if (!all(attr(Xp_trend_last, 'model.offset') == 0)) {
-        offset_vec <- attr(Xp_trend_last, 'model.offset')
-        offset_last <- offset_vec[linpred_order]
-        offset_last[is.na(offset_last)] <- 0
-        full_offset <- c(offset_last, attr(Xp_trend, 'model.offset'))
-      } else {
-        full_offset <- 0
-      }
-
-      # Bind the last 3 linpred rows with the forecast linpred rows
-      Xp_trend <- rbind(Xp_trend_last[linpred_order, , drop = FALSE], Xp_trend)
-      attr(Xp_trend, 'model.offset') <- full_offset
-    }
-  } else {
-    Xp_trend <- NULL
+  series_levels <- fitted_series_levels(object)
+  training <- build_training_arms(object, series_levels, resp = resp)
+  fc_grid <- resolve_forecast_grid(object, newdata, training,
+                                   series_levels, resp = resp)
+  # A discrete-time trend takes one step per forecast row. The
+  # propagator cannot tell a gap from a shorter horizon. The rows
+  # are checked here.
+  if (!is.null(fc_grid)) {
+    assert_forecast_times_steppable(fc_grid$times, object)
   }
+  list(
+    # A later guard refuses an unsupported trend
+    trend_model = if (!is.null(trend_specs)) trend_spec_head(trend_specs),
+    series_levels = series_levels,
+    reported = reported_series(object, resp, series_levels),
+    draw_idx = resolve_draw_indices(posterior::ndraws(object), ndraws,
+                                    draw_ids),
+    training = training,
+    fc_grid = fc_grid,
+    group_level = list(re_formula = re_formula,
+                       allow_new_levels = allow_new_levels,
+                       sample_new_levels = sample_new_levels)
+  )
+}
 
-  # No need to compute in parallel if there was no trend model
-  nmix_notrend <- FALSE
-  if (
-    !inherits(orig_trend_model, 'mvgam_trend') &
-      object$family == 'nmix'
-  ) {
-    nmix_notrend <- TRUE
+
+#' Each part of the forecast link predictor
+#'
+#' The forecast's own parts: the observation terms and the trend terms
+#' at the future rows, with the latent state from the propagated paths.
+#' Each part of `latent_part_specs()` takes one path per draw. Within
+#' each draw and series the parts sum to `forecast(type = "link")`.
+#' An ordinal response's threshold shifts stay outside the predictor.
+#'
+#' @inheritParams forecast.mvgam
+#' @return A list of `obs`, `trend` and `latent`, each a named list of
+#'   parts, each part a list of `[ndraws x h]` matrices named by series.
+#'   A fit without a trend leaves `trend` and `latent` empty. A
+#'   multivariate model with `resp = NULL` gives one such list per
+#'   response.
+#' @noRd
+get_forecast_parts <- function(object, newdata = NULL, ndraws = NULL,
+                               draw_ids = NULL, coef_uncertainty = TRUE,
+                               trend_uncertainty = TRUE, resp = NULL,
+                               re_formula = NULL, allow_new_levels = FALSE,
+                               sample_new_levels = "uncertainty") {
+  checkmate::assert_class(object, "mvgam")
+  require_fitted_model(object, "forecast")
+  require_series_axis(object, "forecast")
+  checkmate::assert_flag(coef_uncertainty)
+  checkmate::assert_flag(trend_uncertainty)
+  fan <- mv_resp_fan_out(object, resp)
+  if (!is.null(fan)) {
+    return(fan)
   }
-  if (
-    attr(object$model_data, 'trend_model') == 'None' |
-      nmix_notrend
-  ) {
-    if (type == 'trend' & !nmix_notrend & !use_lv) {
-      stop('No trend_model was used in this model', call. = FALSE)
-    }
+  parts <- forecast_parts_of(
+    object,
+    forecast_setup(object, newdata, "link", resp, ndraws, draw_ids,
+                   re_formula, allow_new_levels, sample_new_levels),
+    coef_uncertainty, trend_uncertainty, resp
+  )
+  parts$latent <- parts$latent[[1L]]
+  lapply(parts[c("obs", "trend", "latent")], function(group) {
+    lapply(group, parts$slice)
+  })
+}
 
-    all_preds <- predict(
-      object,
+
+#' The forecast's parts from a prepared forecast
+#'
+#' A caller repeating the propagation prepares once.
+#'
+#' @inheritParams forecast.mvgam
+#' @param setup What `forecast_setup()` gives
+#' @param replicates Number of times each draw is propagated
+#' @return List of `obs` and `trend`, named lists of `[ndraws x nrow]`
+#'   matrices in the rows of `frame`. `latent` holds one such list per
+#'   replicate. `slice` cuts such a matrix into one per series.
+#' @noRd
+forecast_parts_of <- function(object, setup, coef_uncertainty,
+                              trend_uncertainty, resp, replicates = 1L) {
+  if (is.null(setup$fc_grid)) {
+    stop(insight::format_error(c(
+      "Forecast parts need rows after the training grid.",
+      i = "Pass a frame holding future times in 'newdata'."
+    )), call. = FALSE)
+  }
+  # The parts are split at each occasion, which the forecast times list
+  if (is.null(setup$trend_model)) {
+    return(build_trendless_forecast_arms(
+      object, setup$fc_grid, "link", setup$draw_idx, TRUE, setup$reported,
+      resp, setup$group_level, parts = TRUE, per_row = FALSE
+    ))
+  }
+  build_forecast_arms(
+    object = object, trend_model = setup$trend_model,
+    meta = object$trend_metadata, training = setup$training,
+    fc_grid = setup$fc_grid, type = "link",
+    draws_mat = forecast_draws(object, setup$draw_idx),
+    draw_idx = setup$draw_idx, coef_uncertainty = coef_uncertainty,
+    trend_uncertainty = trend_uncertainty, obs_uncertainty = TRUE,
+    series_levels = setup$series_levels, resp = resp,
+    reported = setup$reported, group_level = setup$group_level, parts = TRUE,
+    replicates = replicates, per_row = FALSE
+  )
+}
+
+
+# ----- Series / training / forecast grids -------------------------
+
+#' The series a result scoped to `resp` reports
+#'
+#' A wide frame's series are its responses. A result for one response
+#' covers its own series.
+#'
+#' @param object A fitted `mvgam` object
+#' @param resp A response name, or NULL
+#' @param series_levels The fitted series
+#' @return Character vector of series
+#' @noRd
+reported_series <- function(object, resp, series_levels) {
+  checkmate::assert_string(resp, null.ok = TRUE)
+  if (!is.null(resp) && is_response_keyed(object)) resp else series_levels
+}
+
+
+#' The `mvgam_forecast` record a hindcast or forecast returns
+#'
+#' Cut to the series the result reports. The record names the family
+#' of the response it is for. A multivariate fit's top-level family is
+#' a placeholder every response shares.
+#'
+#' @param object A fitted `mvgam` object
+#' @param type The prediction type
+#' @param resp A response name, or NULL
+#' @param reported The series the result reports
+#' @param training The training data from `build_training_arms()`
+#' @param hindcasts,forecasts Lists of draws matrices, one per series
+#' @param fc_grid The forecast grid, or NULL
+#' @param family_pars Family parameter draws for `type = "link"`
+#' @param component The state components the draws hold, or `NULL` for
+#'   the summed trend
+#' @return An `mvgam_forecast`
+#' @noRd
+new_mvgam_forecast <- function(object, type, resp, reported, training,
+                               hindcasts, forecasts = NULL,
+                               fc_grid = NULL, family_pars = NULL,
+                               component = NULL) {
+  pick <- function(x) if (is.null(x)) NULL else x[reported]
+  structure(
+    list(
+      family = resolve_family_name(model_families(object, resp)),
+      family_pars = family_pars,
       type = type,
-      newdata = data_test,
-      summary = FALSE
-    )
-    fc_preds <- lapply(seq_len(NROW(all_preds)), function(draw) {
-      lapply(seq_len(n_series), function(series) {
-        all_preds[
-          draw,
-          which(data_test$series == levels(data_test$series)[series])
-        ]
-      })
-    })
+      series_names = factor(reported, levels = reported),
+      train_observations = pick(training$observations),
+      train_times = if (!is.null(training)) {
+        pick(column_times(object, type, resp, training))
+      },
+      test_observations = pick(fc_grid$observations),
+      test_times = if (!is.null(fc_grid)) {
+        pick(column_times(object, type, resp, fc_grid))
+      },
+      hindcasts = hindcasts,
+      forecasts = forecasts,
+      site_units = inherits(object, "jsdgam"),
+      component = component
+    ),
+    class = "mvgam_forecast"
+  )
+}
+
+
+#' A wide fit's per-response forecasts as one forecast
+#'
+#' On a wide frame the responses are the series. Each element of the
+#' per-response list holds one series. Plotting and scoring take them
+#' as one forecast over the whole axis. Each series keeps the family
+#' of its own response.
+#'
+#' @param x An `mvgam_forecast` holding one element per response
+#' @return An `mvgam_forecast` over every series
+#' @noRd
+response_axis_forecast <- function(x) {
+  checkmate::assert_class(x, "mvgam_forecast")
+  levs <- unlist(lapply(x, function(el) as.character(el$series_names)),
+                 use.names = FALSE)
+  # `c()` over a named list prefixes each element's names with the
+  # list's. Unnamed elements keep the series names.
+  arms <- function(field) {
+    out <- do.call(c, unname(lapply(unclass(x), `[[`, field)))
+    if (is.null(out)) NULL else out[levs]
+  }
+  structure(
+    list(
+      family = stats::setNames(
+        vapply(unclass(x), `[[`, character(1L), "family"), levs
+      ),
+      family_pars = NULL,
+      type = x[[1L]]$type,
+      series_names = factor(levs, levels = levs),
+      train_observations = arms("train_observations"),
+      train_times = arms("train_times"),
+      test_observations = arms("test_observations"),
+      test_times = arms("test_times"),
+      hindcasts = arms("hindcasts"),
+      forecasts = arms("forecasts"),
+      site_units = isTRUE(x[[1L]]$site_units),
+      component = x[[1L]]$component
+    ),
+    class = "mvgam_forecast"
+  )
+}
+
+
+#' The training data of each series
+#'
+#' Each series' rows, observations and times, in time order, with the
+#' frame and its time and series column names.
+#'
+#' On a long frame a series is the rows labelled with it. The label is
+#' the derived one: a fit whose series came from a `gr` and `subgr`
+#' pair takes its names from that pair. On a wide frame the responses
+#' are the series. A series there is the occasions where its own
+#' column was measured.
+#'
+#' @param object A fitted `mvgam` object
+#' @param series_levels The series to cut
+#' @param resp A response name, or NULL
+#' @param data The frame to cut. Defaults to the fit's own. `lfo_cv()`
+#'   passes a window of it.
+#' @return List of `data`, `time_var`, `series_var`, `response_keyed`,
+#'   `series_labels`, `series_rows`, `observations`, `times` (each
+#'   occasion once) and `row_times` (one per row)
+#' @noRd
+build_training_arms <- function(object, series_levels, resp = NULL,
+                                data = NULL) {
+  checkmate::assert_atomic(series_levels, min.len = 1L)
+  checkmate::assert_string(resp, null.ok = TRUE)
+  checkmate::assert_data_frame(data, null.ok = TRUE)
+  d <- data %||% object$data
+  meta_vars <- axis_vars(object)
+  time_var <- meta_vars$time_var
+  series_var <- meta_vars$series_var
+
+  response_keyed <- is_response_keyed(object)
+  series_labels <- if (response_keyed) {
+    NULL
   } else {
-    # Else compute forecasts including dynamic trend components
-
-    # Set forecast horizon
-    if (series != 'all') {
-      fc_horizon <- NROW(series_test)
-    } else {
-      fc_horizon <- length(unique(data_test$index..time..index))
-    }
-
-    # Beta coefficients for GAM observation component
-    betas <- mcmc_chains(object$model_output, 'b')
-
-    # Generate sample sequence for n_samples
-    if (missing(n_samples)) {
-      sample_seq <- 1:dim(betas)[1]
-    } else {
-      if (n_samples < dim(betas)[1]) {
-        sample_seq <- sample(
-          seq_len(dim(betas)[1]),
-          size = n_samples,
-          replace = FALSE
-        )
-      } else {
-        sample_seq <- sample(
-          seq_len(dim(betas)[1]),
-          size = n_samples,
-          replace = TRUE
-        )
-      }
-    }
-
-    # Beta coefficients for GAM trend component
-    if (!is.null(object$trend_call)) {
-      betas_trend <- mcmc_chains(object$model_output, 'b_trend')
-    } else {
-      betas_trend <- NULL
-    }
-
-    # Family of model
-    family <- object$family
-
-    # Family-specific parameters
-    family_pars <- extract_family_pars(object = object, newdata = data_test)
-
-    # Add trial information if this is a Binomial model
-    if (object$family %in% c('binomial', 'beta_binomial')) {
-      resp_terms <- as.character(terms(formula(object$call))[[2]])
-      resp_terms <- resp_terms[-grepl('cbind', resp_terms)]
-      trial_name <- resp_terms[2]
-
-      if (!exists(trial_name, data_test)) {
-        stop(
-          paste0('Variable ', trial_name, ' not found in newdata'),
-          call. = FALSE
-        )
-      }
-
-      trial_df <- data.frame(
-        series = data_test$series,
-        time = data_test$index..time..index,
-        trial = data_test[[trial_name]]
-      )
-      trials <- matrix(NA, nrow = fc_horizon, ncol = n_series)
-      for (i in 1:n_series) {
-        trials[, i] <- trial_df %>%
-          dplyr::filter(series == levels(data_test$series)[i]) %>%
-          dplyr::arrange(time) %>%
-          dplyr::pull(trial)
-      }
-    } else {
-      trials <- NULL
-    }
-
-    # Trend model
-    trend_model <- attr(object$model_data, 'trend_model')
-
-    # Calculate time_dis if this is a CAR1 model
-    if (trend_model == 'CAR1') {
-      data_test$index..time..index <- data_test$index..time..index +
-        max(object$obs_data$index..time..index)
-      time_dis <- add_corcar(
-        model_data = list(),
-        data_train = object$obs_data,
-        data_test = data_test
-      )[[1]]
-      time_dis <- time_dis[-c(1:max(object$obs_data$index..time..index)), ]
-    } else {
-      time_dis <- NULL
-    }
-
-    # Trend-specific parameters
-    if (missing(ending_time)) {
-      trend_pars <- extract_trend_pars(
-        object = object,
-        keep_all_estimates = FALSE
-      )
-    } else {
-      trend_pars <- extract_trend_pars(
-        object = object,
-        keep_all_estimates = FALSE,
-        ending_time = ending_time
-      )
-    }
-
-    # Any model in which an autoregressive process was included should be
-    # considered as VAR1 for forecasting purposes as this will make use of the
-    # faster c++ functions
-    if (trend_model == 'CAR1') {
-      if (!'last_lvs' %in% names(trend_pars)) {
-        trend_pars$last_lvs <- trend_pars$last_trends
-      }
-    } else {
-      if (
-        'Sigma' %in%
-          names(trend_pars) |
-          'sigma' %in% names(trend_pars) |
-          'tau' %in% names(trend_pars)
-      ) {
-        trend_model <- 'VAR1'
-        if (!'last_lvs' %in% names(trend_pars)) {
-          trend_pars$last_lvs <- trend_pars$last_trends
-        }
-      }
-    }
-
-    # Loop over draws and compute forecasts (in serial at the moment)
-    fc_preds <- lapply(seq_len(dim(betas)[1]), function(i) {
-      # Sample index
-      samp_index <- i
-
-      # Sample beta coefs
-      if (b_uncertainty) {
-        betas <- betas[samp_index, ]
-      } else {
-        betas <- betas[1, ]
-      }
-
-      if (!is.null(betas_trend)) {
-        if (b_uncertainty) {
-          betas_trend <- betas_trend[samp_index, ]
-        } else {
-          betas_trend <- betas_trend[1, ]
-        }
-      }
-
-      # Return predictions
-      # Sample general trend-specific parameters
-      if (trend_uncertainty) {
-        general_trend_pars <- extract_general_trend_pars(
-          trend_pars = trend_pars,
-          samp_index = samp_index
-        )
-      } else {
-        general_trend_pars <- extract_general_trend_pars(
-          trend_pars = trend_pars,
-          samp_index = 1
-        )
-      }
-
-      if (
-        use_lv || trend_model %in% c('VAR1', 'PWlinear', 'PWlogistic', 'CAR1')
-      ) {
-        if (trend_model == 'PWlogistic') {
-          if (!(exists('cap', where = data_test))) {
-            stop(
-              'Capacities must also be supplied in "newdata" for logistic growth predictions',
-              call. = FALSE
-            )
-          }
-          family_links <- eval(parse(text = family))
-          if (family_links()$family == 'Gamma') {
-            family_links <- Gamma(link = 'log')
-          }
-          cap <- data.frame(
-            series = data_test$series,
-            time = data_test$index..time..index,
-            cap = suppressWarnings(linkfun(
-              data_test$cap,
-              link = family_links()$link
-            ))
-          )
-
-          if (any(is.na(cap$cap)) | any(is.infinite(cap$cap))) {
-            stop(
-              paste0(
-                'Missing or infinite values found for some "cap" terms\n',
-                'after transforming to the ',
-                family$link,
-                ' link scale'
-              ),
-              call. = FALSE
-            )
-          }
-        } else {
-          cap <- NULL
-        }
-
-        # Propagate all trends / lvs forward jointly using sampled trend parameters
-        trends <- forecast_trend(
-          trend_model = trend_model,
-          use_lv = use_lv,
-          trend_pars = general_trend_pars,
-          h = fc_horizon,
-          betas_trend = betas_trend,
-          Xp_trend = Xp_trend,
-          time = unique(
-            data_test$index..time..index -
-              min(object$obs_data$index..time..index) +
-              1
-          ),
-          cap = cap,
-          time_dis = time_dis
-        )
-      }
-
-      # Loop across series and produce the next trend estimate
-      trend_states <- lapply(seq_len(n_series), function(series) {
-        # Sample series- and trend-specific parameters
-        trend_extracts <- extract_series_trend_pars(
-          series = series,
-          samp_index = samp_index,
-          trend_pars = trend_pars,
-          use_lv = use_lv
-        )
-
-        if (
-          use_lv || trend_model %in% c('VAR1', 'PWlinear', 'PWlogistic', 'CAR1')
-        ) {
-          if (use_lv) {
-            # Multiply lv states with loadings to generate the series' forecast trend state
-            out <- as.numeric(trends %*% trend_extracts$lv_coefs)
-          } else if (
-            trend_model %in% c('VAR1', 'PWlinear', 'PWlogistic', 'CAR1')
-          ) {
-            out <- trends[, series]
-          }
-        } else {
-          # Propagate the series-specific trends forward
-          out <- forecast_trend(
-            trend_model = trend_model,
-            use_lv = FALSE,
-            trend_pars = trend_extracts,
-            h = fc_horizon,
-            betas_trend = betas_trend,
-            Xp_trend = Xp_trend,
-            time = sort(unique(data_test$index..time..index)),
-            time_dis = NULL
-          )
-        }
-        out
-      })
-
-      if (type == 'trend') {
-        out <- trend_states
-      } else {
-        trend_states <- do.call(cbind, trend_states)
-        out <- lapply(seq_len(n_series), function(series) {
-          if (family == 'nmix') {
-            Xpmat <- Xp[which(as.numeric(data_test$series) == series), ]
-            latent_lambdas <- exp(trend_states[, series])
-            pred_betas <- betas
-            cap <- data_test$cap[which(as.numeric(data_test$series) == series)]
-          } else {
-            Xpmat <- cbind(
-              Xp[which(as.numeric(data_test$series) == series), ],
-              trend_states[, series]
-            )
-            latent_lambdas <- NULL
-            pred_betas <- c(betas, 1)
-            cap <- NULL
-          }
-
-          if (!is.null(attr(Xp, 'model.offset'))) {
-            attr(Xpmat, 'model.offset') <-
-              attr(Xp, 'model.offset')[which(
-                as.numeric(data_test$series) == series
-              )]
-
-            attr(Xpmat, 'model.offset')[is.na(attr(Xpmat, 'model.offset'))] <- 0
-          }
-
-          # Family-specific parameters
-          family_extracts <- lapply(seq_along(family_pars), function(x) {
-            if (is.matrix(family_pars[[x]])) {
-              if (obs_uncertainty) {
-                family_pars[[x]][samp_index, series]
-              } else {
-                family_pars[[x]][1, series]
-              }
-            } else {
-              if (obs_uncertainty) {
-                family_pars[[x]][samp_index]
-              } else {
-                family_pars[[x]][1]
-              }
-            }
-          })
-          names(family_extracts) <- names(family_pars)
-
-          # Add trial information if this is a Binomial model
-          if (family %in% c('binomial', 'beta_binomial')) {
-            family_extracts$trials <- trials[, series]
-          }
-
-          mvgam_predict(
-            family = family,
-            Xp = Xpmat,
-            latent_lambdas = latent_lambdas,
-            cap = cap,
-            type = type,
-            betas = pred_betas,
-            family_pars = family_extracts
-          )
-        })
-      }
-      out
-    })
+    as.character(training_series_labels(object, d))
+  }
+  # A wide frame's series takes its own response's column. Every other
+  # series takes the one response in scope. `response_column()` maps
+  # brms's key for a response to its column, which can differ by a `.`
+  # or an `_`.
+  column_of <- function(lv) {
+    response_column(object, if (response_keyed) lv else resp)
   }
 
-  return(fc_preds)
+  # The observations, the row times and the hindcast columns all take
+  # this time order
+  series_rows <- lapply(series_levels, function(lv) {
+    rows <- if (response_keyed) {
+      which(!is.na(d[[column_of(lv)]]))
+    } else {
+      which(series_labels == lv)
+    }
+    rows[order(d[[time_var]][rows])]
+  })
+  names(series_rows) <- series_levels
+
+  observations <- lapply(series_levels, function(lv) {
+    rows <- series_rows[[lv]]
+    if (!length(rows)) return(numeric(0L))
+    as.numeric(d[[column_of(lv)]][rows])
+  })
+  names(observations) <- series_levels
+  # The occasions as the user supplied them, continuous ones included.
+  # A closure-unit family has one row per visit. Its `expected` and
+  # `response` hindcasts take one column per row, which `row_times`
+  # labels. `times` holds each occasion once, for every other surface.
+  row_times <- lapply(series_rows, function(rows) d[[time_var]][rows])
+  times <- lapply(row_times, function(t) sort(unique(t)))
+
+  list(
+    data = d,
+    time_var = time_var,
+    series_var = series_var,
+    response_keyed = response_keyed,
+    series_labels = series_labels,
+    series_rows = series_rows,
+    observations = observations,
+    times = times,
+    row_times = row_times
+  )
+}
+
+
+#' The time of each column of a hindcast or forecast matrix
+#'
+#' A closure-unit family's `expected` and `response` predictions take
+#' one column per visit row, as does the `link` of a multi-season fit.
+#' Every other type takes one column per occasion. `plot()`,
+#' `summary()` and `score()` pair each column with its time by
+#' position.
+#'
+#' @param object A fitted `mvgam` object
+#' @param type The prediction type
+#' @param resp A response name, or NULL
+#' @param grid The training data from `build_training_arms()` or the
+#'   forecast grid from `resolve_forecast_grid()`
+#' @return List of times, one vector per series
+#' @noRd
+column_times <- function(object, type, resp, grid) {
+  checkmate::assert_list(grid)
+  if (hindcast_per_row(object, type, resp)) grid$row_times else grid$times
+}
+
+
+#' Does a hindcast take one column per row of the frame?
+#'
+#' A closure-unit family has one row per visit. Its detection-
+#' marginalised `expected` and `response` predictions vary by visit.
+#' `trend` belongs to the occasion. So does `link`, except in a
+#' multi-season fit, whose sites share an occasion and differ in their
+#' covariates. The response's own family decides: a multivariate fit's
+#' top-level family is a placeholder.
+#'
+#' @param object A fitted `mvgam` object
+#' @param type The prediction type
+#' @param resp A response name, or NULL
+#' @return Logical scalar
+#' @noRd
+hindcast_per_row <- function(object, type, resp) {
+  checkmate::assert_string(type)
+  family <- model_families(object, resp)
+  uses_closure_unit_layout(family) &&
+    (type %in% c("expected", "response") ||
+       (type == "link" && is_multi_season_family(family)))
+}
+
+
+#' The occasions of `candidate` a series has yet to reach
+#'
+#' A horizon lies after the last occasion a series was observed at.
+#' An unobserved occasion inside the training grid stays out of it.
+#'
+#' @param candidate Occasions the new frame supplies
+#' @param last_time The series' last observed occasion. `NA` for a
+#'   series the fit never observed, which has no origin to forecast
+#'   from.
+#' @return The occasions after `last_time`, sorted
+#' @noRd
+horizon_beyond <- function(candidate, last_time) {
+  checkmate::assert_atomic_vector(candidate)
+  checkmate::assert_atomic_vector(last_time, len = 1L)
+  if (is.na(last_time)) return(candidate[0L])
+  sort(unique(candidate[candidate > last_time]))
+}
+
+
+#' Refuse a frame whose occasions every series has passed
+#'
+#' The message names the occasions the frame supplied and the last one
+#' each series was observed at. Both are what a caller needs to fix
+#' the call.
+#'
+#' @param newdata The new frame
+#' @param candidate Occasions the frame supplies
+#' @param last_times Last observed occasion of each series, named
+#' @param time_var Name of the time column
+#' @return Raises an error
+#' @noRd
+refuse_empty_horizon <- function(newdata, candidate, last_times,
+                                 time_var) {
+  checkmate::assert_string(time_var)
+  origin <- last_times[!is.na(last_times)]
+  observed_line <- if (length(origin)) {
+    paste0(
+      "Last observed: ",
+      paste0(names(origin), " at ",
+             format(unname(origin), trim = TRUE), collapse = ", "),
+      "."
+    )
+  } else {
+    "No series records an occasion it was last observed at."
+  }
+  stop(insight::format_error(c(
+    "'newdata' ends at or before the last training time.",
+    x = paste0(
+      "Supplied '", time_var, "' values: ",
+      paste(format(candidate, trim = TRUE), collapse = ", "), "."
+    ),
+    x = observed_line,
+    i = "A forecast needs 'newdata' times after the training grid.",
+    i = paste0("For occasions the model was fitted on, use ",
+               "'hindcast()' or 'posterior_predict()'.")
+  )), call. = FALSE)
+}
+
+
+#' The forecast horizon a new frame describes
+#'
+#' The forecast times and observations of each series, with the rows
+#' of the frame inside the horizon for the linear predictor calls. A
+#' frame whose occasions every series has passed is refused.
+#'
+#' @param object A fitted `mvgam` object
+#' @param newdata The new frame, or NULL
+#' @param training The training data from `build_training_arms()`
+#' @param series_levels The fitted series
+#' @param resp A response name, or NULL
+#' @return NULL for no frame. Otherwise a list of `data`, `times`,
+#'   `observations` and `time_var`.
+#' @noRd
+resolve_forecast_grid <- function(object, newdata, training,
+                                  series_levels, resp = NULL) {
+  if (is.null(newdata)) return(NULL)
+  checkmate::assert_data_frame(newdata, min.rows = 1L)
+  checkmate::assert_list(training)
+  time_var <- training$time_var
+  # `axis_row_series()` places the rows on the series. A grouping
+  # names the series without a `series` column.
+  assert_axis_column(newdata, time_var, "time", frame = "newdata")
+  # `NA > last_time` is `NA`, which would drop the row from the grid
+  refuse_missing_times(newdata[[time_var]], time_var)
+  # The validator that owns unknown levels gives one message for every
+  # route a frame takes
+  validate_prediction_factor_levels(
+    newdata, object$trend_metadata,
+    series_label = series_column_label(object)
+  )
+
+  # A wide frame holds one row per time and one column per response.
+  # Each series takes every occasion the frame supplies.
+  last_times <- stats::setNames(
+    extract_last_observed_times(object, length(series_levels)),
+    series_levels
+  )
+
+  if (is_response_keyed(object)) {
+    nt <- sort(unique(newdata[[time_var]]))
+    fc_times <- stats::setNames(lapply(series_levels, function(lv) {
+      horizon_beyond(nt, last_times[[lv]])
+    }), series_levels)
+    if (all(lengths(fc_times) == 0L)) {
+      refuse_empty_horizon(newdata, nt, last_times, time_var)
+    }
+    # Each response's observed values come from its own column. A
+    # frame holding some response columns gives observations for
+    # those alone.
+    fc_observations <- stats::setNames(lapply(series_levels, function(lv) {
+      column <- response_column(object, lv)
+      if (!column %in% names(newdata)) return(NULL)
+      idx <- newdata[[time_var]] %in% fc_times[[lv]]
+      if (!any(idx)) return(NULL)
+      as.numeric(newdata[[column]][idx])[order(newdata[[time_var]][idx])]
+    }), series_levels)
+    keep <- newdata[[time_var]] %in%
+      unique(unlist(fc_times, use.names = FALSE))
+    fc_data <- newdata[keep, , drop = FALSE]
+    fc_data <- fc_data[
+      order(fc_data[[time_var]]), , drop = FALSE
+    ]
+    # One row per occasion, which every series shares
+    return(list(data = fc_data, times = fc_times, row_times = fc_times,
+                observations = fc_observations,
+                time_var = time_var))
+  }
+
+  # The rows take their series as the fit placed them. A grouping
+  # defines the series of a hierarchical frame.
+  row_ids <- as.character(axis_row_series(object, newdata, required = TRUE))
+  refuse_unseen_levels("Series", unique(row_ids), series_levels)
+  series_fac <- factor(row_ids, levels = series_levels)
+
+  fc_times <- lapply(series_levels, function(lv) {
+    idx <- series_fac == lv
+    if (!any(idx)) return(newdata[[time_var]][0L])
+    horizon_beyond(newdata[[time_var]][idx], last_times[[lv]])
+  })
+  names(fc_times) <- series_levels
+
+  if (all(lengths(fc_times) == 0L)) {
+    refuse_empty_horizon(newdata, sort(unique(newdata[[time_var]])),
+                         last_times, time_var)
+  }
+
+  # The truths and the rows of the linear predictor take the sorted
+  # order of `fc_times`. `score()` pairs each truth with its horizon by
+  # position.
+  column <- response_column(object, resp)
+  fc_observations <- lapply(series_levels, function(lv) {
+    idx <- series_fac == lv &
+      newdata[[time_var]] %in% fc_times[[lv]]
+    if (!any(idx) || !(column %in% names(newdata))) return(NULL)
+    times_lv <- newdata[[time_var]][idx]
+    as.numeric(newdata[[column]][idx])[order(times_lv)]
+  })
+  names(fc_observations) <- series_levels
+
+  keep <- vapply(seq_len(nrow(newdata)), function(i) {
+    lv <- as.character(series_fac[i])
+    if (is.na(lv)) return(FALSE)
+    newdata[[time_var]][i] %in% fc_times[[lv]]
+  }, logical(1L))
+  fc_data <- newdata[keep, , drop = FALSE]
+  fc_series <- series_fac[keep]
+  row_order <- order(match(as.character(fc_series), series_levels),
+                     fc_data[[time_var]])
+  fc_data <- fc_data[row_order, , drop = FALSE]
+  fc_series <- fc_series[row_order]
+  # A closure-unit frame holds several visit rows per occasion
+  row_times <- lapply(stats::setNames(nm = series_levels), function(lv) {
+    fc_data[[time_var]][fc_series == lv]
+  })
+
+  list(
+    data = fc_data,
+    times = fc_times,
+    row_times = row_times,
+    observations = fc_observations,
+    time_var = time_var
+  )
+}
+
+
+#' The last `max_lag` training rows of each series
+#'
+#' `extract_component_linpred()` takes these rows to give `mu_trend`
+#' over the window of the stored state. Each block is sorted by time.
+#' `propagate_one_draw()` centres the stored state row by row against
+#' this grid.
+#'
+#' A wide frame's rows hold every series. Its tail is the last
+#' occasions of the fit's recorded time axis. Each response's own rows
+#' hold its observed occasions alone, which can stop short of the axis.
+#'
+#' @param object A fitted `mvgam` object
+#' @param training The training data from `build_training_arms()`
+#' @param max_lag The largest AR or MA lag
+#' @return A data frame, or NULL without lags
+#' @noRd
+build_training_tail_data <- function(object, training, max_lag) {
+  checkmate::assert_list(training)
+  checkmate::assert_int(max_lag, lower = 0L)
+  if (max_lag == 0L) return(NULL)
+  series_levels <- names(training$observations)
+  time_var <- training$time_var
+  if (training$response_keyed) {
+    tail_ts <- tail(mvgam_axes(object)$time$values, max_lag)
+    sub <- training$data[
+      training$data[[time_var]] %in% tail_ts, , drop = FALSE
+    ]
+    return(sub[order(sub[[time_var]]), , drop = FALSE])
+  }
+
+  # The rows of each series as `build_training_arms()` placed them
+  rows <- lapply(series_levels, function(lv) {
+    tail_ts <- tail(training$times[[lv]], max_lag)
+    block <- training$data[training$series_rows[[lv]], , drop = FALSE]
+    sub <- block[block[[time_var]] %in% tail_ts, , drop = FALSE]
+    sub[order(sub[[time_var]]), , drop = FALSE]
+  })
+  do.call(rbind, rows)
+}
+
+
+# ----- Hindcasts --------------------------------------------------
+
+#' The hindcast draws of each series
+#'
+#' `posterior_predict()`, `posterior_epred()` and the component linear
+#' predictors give the draws, cut to `draw_idx`.
+#'
+#' With `process_error = FALSE` the hindcast takes the fitted
+#' `trend[t, s]`, the latent states plus `mu_trend`. Response draws of
+#' a closely fitted trend then follow the training values. With `TRUE`
+#' the marginal prediction draws fresh innovations from the trend's
+#' covariance.
+#'
+#' @param object A fitted `mvgam` object
+#' @param training The training data from `build_training_arms()`
+#' @param type The prediction type
+#' @param draw_idx Indices of the draws to keep
+#' @param obs_uncertainty Whether `type = "response"` samples the
+#'   family
+#' @param process_error Whether to draw fresh trend innovations
+#' @param resp A response name, or NULL
+#' @param series_levels The series to report
+#' @param component State components of the trend, or `NULL` for the
+#'   summed trend
+#' @return Named list of draws matrices, one per series
+#' @noRd
+build_hindcast_arms <- function(object, training, type, draw_idx,
+                                obs_uncertainty,
+                                process_error = FALSE,
+                                resp = NULL,
+                                series_levels =
+                                  names(training$observations),
+                                component = NULL) {
+  checkmate::assert_list(training)
+  checkmate::assert_integerish(draw_idx, lower = 1L, min.len = 1L)
+  checkmate::assert_flag(obs_uncertainty)
+  checkmate::assert_flag(process_error)
+  time_var <- training$time_var
+  no_columns <- matrix(NA_real_, nrow = length(draw_idx), ncol = 0L)
+  predict_rows <- function(frame, arm_resp) {
+    hindcast_draws(object, frame, type, draw_idx, obs_uncertainty,
+                   process_error, resp = arm_resp, component = component)
+  }
+
+  # A simplex family's expectation is a softmax across the rows of a
+  # closure unit, whose rows are the series. One series alone gives a
+  # softmax of width one, which is 1 whatever the predictor. The
+  # `expected` and `response` draws come from the whole frame, cut
+  # afterwards.
+  if (type %in% c("expected", "response") &&
+        is_simplex_response_family(model_families(object, resp))) {
+    full <- predict_rows(training$data, resp)
+    return(lapply(training$series_rows[series_levels], function(rows) {
+      full[, rows, drop = FALSE]
+    }))
+  }
+
+  # One row per occasion unless the prediction varies by visit
+  series_frame <- function(lv, arm_resp) {
+    sub <- training$data[training$series_rows[[lv]], , drop = FALSE]
+    if (hindcast_per_row(object, type, arm_resp)) {
+      return(sub)
+    }
+    sub[!duplicated(sub[[time_var]]), , drop = FALSE]
+  }
+
+  # A wide frame predicts each series as its own response
+  if (training$response_keyed) {
+    return(lapply(stats::setNames(nm = series_levels), function(lv) {
+      frame <- series_frame(lv, lv)
+      if (nrow(frame) == 0L) no_columns else predict_rows(frame, lv)
+    }))
+  }
+
+  # Each row is predicted independently given a draw. One call on the
+  # rows of every series serves them all, cut afterwards.
+  frames <- lapply(stats::setNames(nm = series_levels), series_frame,
+                   arm_resp = resp)
+  sizes <- vapply(frames, nrow, integer(1L))
+  if (sum(sizes) == 0L) {
+    return(lapply(frames, function(frame) no_columns))
+  }
+  full <- predict_rows(do.call(rbind, frames), resp)
+  Map(function(end, size) full[, end - size + seq_len(size), drop = FALSE],
+      cumsum(sizes), sizes)
+}
+
+
+#' The hindcast draws of the given training rows
+#'
+#' `trend_state_rows()` gives the fitted `trend[t, s]` of each draw, or
+#' the state component `component` names. The observation predictor
+#' added to the trend gives the `link` hindcast. A fit without a trend
+#' takes a zero trend. A closure-unit family's `expected` and `response`
+#' marginalise over the latent state of each unit. `posterior_epred()`
+#' and `posterior_predict()` give those per visit row, as
+#' `posterior_linpred()` gives a multi-season `link`. With
+#' `process_error = FALSE` they condition on the fitted trend, as the
+#' other types do. `process_error = TRUE` takes the marginal draws of
+#' those functions for every family.
+#'
+#' @inheritParams build_hindcast_arms
+#' @param sub_data Rows of the training frame
+#' @return Draws matrix, one column per row of `sub_data`
+#' @noRd
+hindcast_draws <- function(object, sub_data, type, draw_idx,
+                           obs_uncertainty,
+                           process_error = FALSE,
+                           resp = NULL,
+                           component = NULL) {
+  checkmate::assert_data_frame(sub_data)
+  checkmate::assert_integerish(draw_idx, lower = 1L, min.len = 1L)
+  sample_family <- type == "response" && obs_uncertainty
+  if (hindcast_per_row(object, type, resp)) {
+    full <- predictor_for_type(type, sample_family)(
+      object, newdata = sub_data, draw_ids = draw_idx,
+      process_error = process_error, incl_autocor = !process_error,
+      resp = resp
+    )
+  } else if (process_error) {
+    # The marginal draws, with fresh innovations in place of the fitted
+    # states. The trend alone is the linear predictor less the
+    # observation predictor.
+    lp_type <- if (type == "trend") "link" else type
+    full <- predictor_for_type(lp_type, sample_family)(
+      object, newdata = sub_data, draw_ids = draw_idx,
+      process_error = TRUE, resp = resp
+    )
+    if (type == "trend") {
+      full <- full - extract_component_linpred(
+        mvgam_fit = object, newdata = sub_data, component = "obs",
+        resp = resp, draw_ids = draw_idx
+      )
+    }
+  } else {
+    fitted_states <- trend_state_rows(
+      object, sub_data, draw_idx, resp = resp, component = component
+    ) %||% matrix(0, nrow = length(draw_idx), ncol = nrow(sub_data))
+    full <- if (type == "trend") {
+      fitted_states
+    } else {
+      obs_linpred <- extract_component_linpred(
+        mvgam_fit = object, newdata = sub_data,
+        component = "obs", resp = resp, draw_ids = draw_idx
+      )
+      assert_one_response_draws(obs_linpred, "The observation predictor")
+      linpred <- obs_linpred + fitted_states
+      if (type == "link") {
+        linpred
+      } else if (sample_family) {
+        draw_observations(object, linpred, sub_data, draw_ids = draw_idx,
+                          resp = resp)
+      } else {
+        response_epred(object, linpred, newdata = sub_data,
+                       draw_ids = draw_idx, resp = resp, ordinal = "mean")
+      }
+    }
+  }
+  assert_one_response_draws(full, "The hindcast")
+  full
+}
+
+
+#' The hindcast of each series' latent state
+#'
+#' The state of each closure unit given its visits and the fitted trend,
+#' as `hindcast(type = "latent_state")` gives it. The units of each
+#' occasion are averaged. Each series then takes one column per training
+#' occasion, in time order.
+#'
+#' @param object A fitted `mvgam` object with a closure-unit family
+#' @param training The training data from `build_training_arms()`
+#' @param draw_idx Indices of the draws to keep
+#' @param series_levels The series to report
+#' @return Named list of draws matrices, one per series
+#' @noRd
+latent_state_hindcast_arms <- function(object, training, draw_idx,
+                                       series_levels) {
+  checkmate::assert_list(training)
+  hc <- hindcast_latent_state(object, draw_ids = draw_idx)
+  pooled <- pool_units_by_occasion(hc$draws, hc$unit)
+  lapply(stats::setNames(nm = series_levels), function(lv) {
+    cols <- which(pooled$occasions$series == lv)
+    if (length(cols) != length(training$times[[lv]])) {
+      stop_shape_fault(paste0("The latent-state occasions of '", lv, "'"),
+                       length(cols), length(training$times[[lv]]))
+    }
+    pooled$draws[, cols, drop = FALSE]
+  })
+}
+
+
+#' The latent state of each occasion, at the grain of the frame's rows
+#'
+#' The state of each closure unit comes from the covariates and the
+#' supplied predictor, unconditioned on visits, as at a future
+#' occasion. The units of an occasion are averaged. Every row of the
+#' occasion holds that mean, which the per-occasion columns of
+#' `slice_per_series()` take.
+#'
+#' @param object A fitted `mvgam` object with a closure-unit family
+#' @param linpred `[S x N_row]` predictor at the rows of `frame`
+#' @param frame The frame of visit rows
+#' @param draw_idx Indices of the draws `linpred` holds
+#' @return `[S x N_row]` matrix
+#' @noRd
+occasion_state_rows <- function(object, linpred, frame, draw_idx) {
+  frame <- closure_unit_frame(object, frame)
+  state <- posterior_latent_N(object, newdata = frame, draw_ids = draw_idx,
+                              conditional = FALSE, linpred = linpred)
+  arrays <- closure_unit_arrays_for(object, frame)
+  pooled <- pool_units_by_occasion(state, closure_unit_meta(object, arrays))
+  pooled$draws[, pooled$unit_occasion[arrays$row_unit], drop = FALSE]
+}
+
+
+#' The prediction function that gives draws of a type
+#'
+#' @param type `"link"`, `"expected"` or `"response"`
+#' @param sample_family Whether `"response"` samples the family
+#' @return `posterior_linpred`, `posterior_predict` or `posterior_epred`
+#' @noRd
+predictor_for_type <- function(type, sample_family) {
+  checkmate::assert_choice(type, c("link", "expected", "response"))
+  checkmate::assert_flag(sample_family)
+  if (type == "link") {
+    posterior_linpred
+  } else if (sample_family) {
+    posterior_predict
+  } else {
+    posterior_epred
+  }
+}
+
+
+# ----- Forecasts --------------------------------------------------
+
+#' The forecast draws of each series of a trendless fit
+#'
+#' The observation predictor at the new occasions, with no state to
+#' propagate. The draws take the shape `build_forecast_arms()` gives.
+#'
+#' @param object A fitted `mvgam` object
+#' @param fc_grid The forecast grid
+#' @param type "link", "expected", "response" or "latent_state".
+#'   `forecast.mvgam()` refuses "trend" for a trendless fit.
+#' @param draw_idx Indices of the draws to keep
+#' @param obs_uncertainty Whether `type = "response"` samples the
+#'   family
+#' @param series_levels The series to report
+#' @param resp A response name, or NULL
+#' @param group_level List of `re_formula`, `allow_new_levels` and
+#'   `sample_new_levels`
+#' @param parts Whether to return what `forecast_parts_of()` gives, in
+#'   place of the draws of `type`
+#' @param effect_of As `build_forecast_arms()` takes it, applied to the
+#'   linear predictor with a `NULL` trend. `"latent_state"` needs one.
+#' @param per_row As `build_forecast_arms()` takes it
+#' @return Named list of draws matrices, one per series
+#' @noRd
+build_trendless_forecast_arms <- function(object, fc_grid, type,
+                                          draw_idx,
+                                          obs_uncertainty,
+                                          series_levels,
+                                          resp = NULL,
+                                          group_level = list(),
+                                          parts = FALSE,
+                                          effect_of = NULL,
+                                          per_row = hindcast_per_row(
+                                            object, type, resp
+                                          )) {
+  checkmate::assert_choice(type, c("link", "expected", "response",
+                                   "latent_state"))
+  checkmate::assert_list(fc_grid)
+  checkmate::assert_flag(parts)
+  checkmate::assert_function(effect_of, null.ok = type != "latent_state")
+  checkmate::assert_flag(per_row)
+  fc_data <- fc_grid$data
+  structure <- get_observation_structure(object, newdata = fc_data,
+                                         resp = resp)
+  arms_of <- function(mat) {
+    slice_per_series(mat, fc_grid, structure, length(draw_idx), series_levels,
+                     per_row = per_row)
+  }
+  if (parts) {
+    obs <- do.call(extract_component_parts, c(
+      list(mvgam_fit = object, newdata = fc_data, resp = resp,
+           draw_ids = draw_idx),
+      group_level
+    ))
+    return(list(obs = obs, trend = list(), latent = list(list()),
+                frame = fc_data, slice = arms_of))
+  }
+  # Scoped to one response, which gives one draws matrix. `effect_of`
+  # takes the linear predictor, as in `build_forecast_arms()`.
+  predict_type <- if (is.null(effect_of)) type else "link"
+  draws <- do.call(
+    predictor_for_type(predict_type,
+                       predict_type == "response" && obs_uncertainty),
+    c(list(object, newdata = fc_data, draw_ids = draw_idx, resp = resp),
+      group_level)
+  )
+  arms_of(if (is.null(effect_of)) draws else effect_of(draws, NULL, fc_data))
+}
+
+
+#' The forecast draws of each series
+#'
+#' Two passes. The first propagates the latent trend `h_max` steps for
+#' each draw, from row slices of linear predictors computed once. The
+#' second combines the trend draws with the observation predictor and
+#' applies the family to every draw at once.
+#'
+#' A correlated or VAR state moves all of its columns together at each
+#' step. The trend advances over every fitted series for that reason.
+#' The draws returned cover the `reported` series.
+#'
+#' @inheritParams build_hindcast_arms
+#' @param trend_model The trend specification
+#' @param meta The fit's trend metadata
+#' @param fc_grid The forecast grid
+#' @param draws_mat Matrix from `forecast_draws()`, one row per draw of
+#'   `draw_idx`
+#' @param coef_uncertainty,trend_uncertainty Whether coefficients and
+#'   trend quantities vary over draws
+#' @param series_levels Every fitted series
+#' @param reported The series to report
+#' @param component State components of the trend, or `NULL` for the
+#'   summed trend. A component needs `type = "trend"`.
+#' @param group_level List of `re_formula`, `allow_new_levels` and
+#'   `sample_new_levels`
+#' @param parts Whether to return what `forecast_parts_of()` gives, in
+#'   place of the draws of `type`
+#' @param replicates With `parts`, the number of times each draw is
+#'   propagated, each with fresh innovations. The predictor's terms are
+#'   computed once.
+#' @param effect_of Function of the whole predictor, the `component` and
+#'   the frame, all in the rows of the grid. It gives the draws to
+#'   return. `NULL` returns the draws of `type`.
+#' @param per_row Whether each row of the grid keeps its own column.
+#'   Otherwise each occasion takes its first row. The default follows
+#'   `type`. A caller whose `effect_of` gives one value per occasion
+#'   passes `FALSE`.
+#' @return Named list of draws matrices, one per reported series
+#' @noRd
+build_forecast_arms <- function(object, trend_model, meta,
+                                training, fc_grid, type,
+                                draws_mat, draw_idx,
+                                coef_uncertainty,
+                                trend_uncertainty,
+                                obs_uncertainty,
+                                series_levels,
+                                resp = NULL,
+                                reported = series_levels,
+                                component = NULL,
+                                group_level = list(),
+                                parts = FALSE,
+                                replicates = 1L,
+                                effect_of = NULL,
+                                per_row = hindcast_per_row(object, type,
+                                                           resp)) {
+  checkmate::assert_list(fc_grid)
+  checkmate::assert_integerish(draw_idx, lower = 1L, min.len = 1L)
+  checkmate::assert_flag(parts)
+  checkmate::assert_count(replicates, positive = TRUE)
+  checkmate::assert_function(effect_of, null.ok = TRUE)
+  checkmate::assert_flag(per_row)
+  checkmate::assert_flag(coef_uncertainty)
+  checkmate::assert_flag(trend_uncertainty)
+  checkmate::assert_flag(obs_uncertainty)
+  n_series <- length(series_levels)
+  ndraws_use <- length(draw_idx)
+
+  max_lag <- as.integer(meta$max_lag %||% 0L)
+  tail_data <- build_training_tail_data(object, training, max_lag)
+  obs_struct_fc <- get_observation_structure(object,
+                                             newdata = fc_grid$data,
+                                             resp = resp)
+  obs_struct_tail <- if (!is.null(tail_data)) {
+    get_observation_structure(object, newdata = tail_data, resp = resp)
+  }
+  nobs_fc <- length(obs_struct_fc$time)
+  # One step per occasion of the forecast grid. Series forecast at
+  # their own times make the union longer than any one series.
+  h_max <- length(obs_struct_fc$unique_times)
+  arms_of <- function(mat) {
+    slice_per_series(mat, fc_grid, obs_struct_fc, ndraws_use, reported,
+                     per_row = per_row)
+  }
+
+  # The linear predictors are computed once, at the draws of
+  # `draw_idx`. The loop below takes a row of each per draw. Without
+  # `coef_uncertainty` every row repeats the first draw.
+  pin_coefs <- function(lp) {
+    if (coef_uncertainty || is.null(lp)) {
+      return(lp)
+    }
+    if (is.list(lp)) {
+      return(lapply(lp, pin_coefs))
+    }
+    matrix(lp[1L, ], nrow = nrow(lp), ncol = ncol(lp), byrow = TRUE)
+  }
+  component_lp <- function(newdata, component, resp = NULL,
+                           impute_trend = NULL,
+                           extract = extract_component_linpred) {
+    pin_coefs(do.call(extract, c(
+      list(mvgam_fit = object, newdata = newdata, component = component,
+           resp = resp, draw_ids = draw_idx, impute_trend = impute_trend),
+      group_level
+    )))
+  }
+  # A random draw such as a new level's coefficients enters once. The
+  # predictor is then the sum of the parts.
+  trend_parts <- if (parts) {
+    component_lp(fc_grid$data, "trend",
+                 extract = extract_component_parts)
+  }
+  trend_lp_fc <- if (parts) {
+    Reduce(`+`, trend_parts, matrix(0, ndraws_use, nobs_fc))
+  } else {
+    component_lp(fc_grid$data, "trend")
+  }
+  trend_lp_tail <- if (!is.null(tail_data)) {
+    component_lp(tail_data, "trend")
+  }
+
+  # What the trend's kernel takes from the new times, the same in
+  # every draw: CAR's gaps, PW's times and capacities.
+  context <- trend_method(
+    meta$trend_type, trend_method_optional_templates[["forecast_context"]]
+  )(object, training, fc_grid, series_levels)
+
+  # Without `trend_uncertainty`, the dynamics, the last state and the
+  # trend's mean all come from the first draw. The innovations alone
+  # vary. Each draw's parameters are extracted once, before the loop.
+  if (!trend_uncertainty) {
+    draws_mat <- draws_mat[1L, , drop = FALSE]
+  }
+  states <- extract_last_states(object, draws_mat)
+
+  # A factor fit propagates its `n_lv` latent factors. Each draw's
+  # loadings `Z` project the `[h, n_lv]` path onto the series. A factor
+  # fit can have `n_lv = n_series`, under an MGP loadings prior or a
+  # `by = lv_axis()` term. `detect_factor_n_lv()` tells the two kinds
+  # of fit apart here and in `extract_last_states()`.
+  n_lv_trend <- as.integer(
+    object$standata$N_lv_trend %||% n_series
+  )
+  is_factor_fit <- !is.null(detect_factor_n_lv(object, n_series))
+  Z_arr <- if (is_factor_fit) {
+    resolve_factor_loadings(object, draws_mat, n_lv = n_lv_trend,
+                            n_series = n_series, basis = "model")
+  } else {
+    NULL
+  }
+
+  # `trend_flat[i, j]` is the trend of draw `draw_idx[i]` at row `j`
+  # of the forecast grid, in the order of `obs_struct_fc`.
+  trend_flat <- matrix(NA_real_, nrow = ndraws_use, ncol = nobs_fc)
+  # A missing `mi()` value joins the trend of its own response
+  imputed <- if (type != "trend") missing_imputed(object, fc_grid$data)
+  imputed_struct <- lapply(stats::setNames(nm = imputed), function(var) {
+    get_observation_structure(object, newdata = fc_grid$data, resp = var)
+  })
+  imputed_trend <- rep(list(lapply(imputed_struct, function(struct) {
+    trend_flat
+  })), replicates)
+  latent_specs <- if (parts || !is.null(effect_of)) {
+    latent_part_specs(object)
+  }
+  latent_flat <- rep(list(lapply(stats::setNames(nm = latent_specs$label),
+                                 function(label) trend_flat)), replicates)
+  components <- if (!is.null(component) || !is.null(latent_specs)) {
+    trend_components(object)
+  } else {
+    list()
+  }
+  for (i in seq_len(ndraws_use)) {
+    d <- if (trend_uncertainty) i else 1L
+    # A single factor drops `Z[d, , ]` to a vector. The reshape keeps
+    # it an `[n_series, n_lv]` matrix.
+    Z_slice <- if (!is.null(Z_arr)) {
+      matrix(Z_arr[d, , ], nrow = n_series, ncol = n_lv_trend)
+    }
+    for (r in seq_len(replicates)) {
+      fc_trend <- propagate_one_draw(
+        trend_model = trend_model,
+        meta = meta,
+        state = last_state_of_draw(states, d),
+        d = d,
+        h_max = h_max,
+        n_series = n_series,
+        trend_lp_tail = trend_lp_tail,
+        trend_lp_fc = trend_lp_fc,
+        obs_struct_tail = obs_struct_tail,
+        obs_struct_fc = obs_struct_fc,
+        context = context,
+        Z_slice = Z_slice,
+        component = component,
+        components = components,
+        latent_specs = latent_specs
+      )
+      for (label in latent_specs$label) {
+        latent_flat[[r]][[label]][i, ] <- flatten_grid_to_obs_order(
+          attr(fc_trend, "latent")[[label]], obs_struct_fc
+        )
+      }
+      # A value `mi()` imputes takes the trend of its own replicate
+      for (var in imputed) {
+        imputed_trend[[r]][[var]][i, ] <- flatten_grid_to_obs_order(
+          fc_trend, imputed_struct[[var]]
+        )
+      }
+      # The first replicate is the forecast
+      if (r == 1L) {
+        trend_flat[i, ] <- flatten_grid_to_obs_order(fc_trend, obs_struct_fc)
+      }
+    }
+  }
+
+  if (type == "trend") {
+    return(arms_of(trend_flat))
+  }
+  impute_trend <- function(r) {
+    if (length(imputed)) function(var) imputed_trend[[r]][[var]]
+  }
+  if (!is.null(effect_of)) {
+    whole <- component_lp(fc_grid$data, "obs", resp, impute_trend(1L)) +
+      Reduce(`+`, latent_flat[[1L]], trend_lp_fc)
+    return(arms_of(effect_of(whole, trend_flat, fc_grid$data)))
+  }
+  if (parts) {
+    obs_parts <- component_lp(fc_grid$data, "obs", resp, impute_trend(1L),
+                              extract_component_parts)
+    if (length(imputed) && replicates > 1L) {
+      # A replicate's imputed values move its predictor. One seed holds
+      # every other random quantity, such as a new level, across them.
+      seed <- sample.int(.Machine$integer.max, 1L)
+      obs_of <- function(r) {
+        local_seed(seed)
+        Reduce(`+`, component_lp(fc_grid$data, "obs", resp, impute_trend(r),
+                                 extract_component_parts))
+      }
+      first <- obs_of(1L)
+      latent_flat <- Map(function(latent, r) {
+        c(latent, list(imputed = obs_of(r) - first))
+      }, latent_flat, seq_len(replicates))
+    }
+    return(list(obs = obs_parts, trend = trend_parts, latent = latent_flat,
+                frame = fc_grid$data, slice = arms_of))
+  }
+  eta_full <- component_lp(fc_grid$data, "obs", resp, impute_trend(1L)) +
+    trend_flat
+  if (type == "link") {
+    return(arms_of(eta_full))
+  }
+  # `eta_full` holds the rows of `draw_idx`. The family's mean and
+  # draw take their parameters at those same draws. A second
+  # subsample would pair `mu` with a `zi` or `shape` from another
+  # draw.
+  if (type == "expected" || !obs_uncertainty) {
+    return(arms_of(do.call(response_epred, c(
+      list(object, eta_full, newdata = fc_grid$data, draw_ids = draw_idx,
+           resp = resp, ordinal = "mean"),
+      group_level
+    ))))
+  }
+  arms_of(do.call(draw_observations, c(
+    list(object, eta_full, fc_grid$data, draw_idx, resp = resp),
+    group_level
+  )))
+}
+
+
+#' The forecast trend of one draw
+#'
+#' Every generated program builds the trend as
+#' `trend[t, s] = Z[s, ] . lv_trend[t, ] + mu_trend[t, s]`. The state
+#' advances with mean zero. The trend formula's predictor `mu_trend`
+#' adds at the series grain after the loadings project the state. A
+#' `by = lv_axis()` fit puts its mean inside the projection.
+#' `extract_component_linpred()` returns that mean projected. The sum
+#' is linear, which makes the two orders equal.
+#'
+#' A state component comes from the summed trend and the paths the
+#' propagator records in its `components` attribute. The loadings
+#' project each path as they project the state.
+#'
+#' @param trend_model The trend specification
+#' @param meta The fit's trend metadata
+#' @param state The draw's trend parameters and last state, from
+#'   `last_state_of_draw()`
+#' @param d The draw's row in `trend_lp_tail` and `trend_lp_fc`
+#' @param h_max Number of steps
+#' @param n_series Number of fitted series
+#' @param trend_lp_tail,trend_lp_fc The trend's predictor over the
+#'   training tail and the forecast grid, one row per draw. The tail is
+#'   NULL without lags.
+#' @param obs_struct_tail,obs_struct_fc Their observation structures
+#' @param context What the kernel takes from the forecast times
+#' @param Z_slice The draw's `[n_series, n_lv]` loadings, or NULL
+#' @param component State components of the trend, or `NULL` for the
+#'   summed trend
+#' @param components Named list from `trend_components()`
+#' @param latent_specs What `latent_part_specs()` gives, to attach each
+#'   part's grid as the `latent` attribute, or `NULL`
+#' @return Numeric matrix `[h_max, n_series]`
+#' @noRd
+propagate_one_draw <- function(trend_model, meta, state, d,
+                               h_max, n_series,
+                               trend_lp_tail, trend_lp_fc,
+                               obs_struct_tail, obs_struct_fc,
+                               context = list(), Z_slice = NULL,
+                               component = NULL, components = list(),
+                               latent_specs = NULL) {
+  checkmate::assert_list(state)
+  checkmate::assert_int(d, lower = 1L)
+  checkmate::assert_int(h_max, lower = 1L)
+  checkmate::assert_matrix(Z_slice, nrows = n_series, null.ok = TRUE)
+  checkmate::assert_character(component, null.ok = TRUE)
+  max_lag <- as.integer(meta$max_lag %||% 0L)
+  lp_forecast <- trend_linpred_grid(
+    trend_lp_fc, obs_struct_fc, d, h_max, n_series
+  )
+
+  # A factor fit stores the zero-mean `lv_trend` and advances its
+  # `n_lv` columns. Every other fit stores `trend[t, s]`, which holds
+  # `mu_trend`. Subtracting it leaves both advancing a zero-mean
+  # state.
+  in_factor_mode <- !is.null(Z_slice) && !is.null(state$n_lv_active)
+  if (!in_factor_mode && max_lag > 0L) {
+    state$last_state$trends <- state$last_state$trends -
+      trend_linpred_grid(trend_lp_tail, obs_struct_tail, d, max_lag,
+                         n_series)
+  }
+
+  fc_state <- do.call(propagate_trend, c(
+    list(trend_model = trend_model, params = state$params, h = h_max,
+         n_series = if (in_factor_mode) state$n_lv_active else n_series,
+         last_state = state$last_state),
+    context
+  ))
+  # The paths are taken first. Each projected grid is a plain matrix.
+  paths <- attr(fc_state, "components")
+  project <- function(x) {
+    if (in_factor_mode) {
+      return(x %*% t(Z_slice))
+    }
+    attr(x, "components") <- NULL
+    x
+  }
+  parts <- lapply(
+    stats::setNames(nm = component_parts(components, component)),
+    function(nm) project(paths[[nm]])
+  )
+  out <- trend_component_values(project(fc_state) + lp_forecast, parts,
+                                component, components)
+  if (!is.null(latent_specs)) {
+    attr(out, "latent") <- latent_part_grids(
+      fc_state, paths, latent_specs, components,
+      if (in_factor_mode) Z_slice
+    )
+  }
+  out
+}
+
+
+#' One draw's forecast latent state by part
+#'
+#' A factor's share is its path projected through that factor's loadings
+#' alone. A fit without factors stores each path by series.
+#'
+#' @param state The draw's propagated state, before any projection
+#' @param paths The propagator's `components` attribute
+#' @param specs What `latent_part_specs()` gives
+#' @param components Named list from `trend_components()`
+#' @param Z The draw's `[n_series, n_lv]` loadings, or `NULL`
+#' @return Named list of `[h, n_series]` matrices
+#' @noRd
+latent_part_grids <- function(state, paths, specs, components, Z) {
+  attr(state, "components") <- NULL
+  grid <- function(part, k) {
+    path <- if (identical(part, "state")) {
+      state
+    } else {
+      trend_component_values(NULL, paths, part, components)
+    }
+    if (is.null(Z)) return(path)
+    Z[, -k] <- 0
+    path %*% t(Z)
+  }
+  stats::setNames(Map(grid, specs$part, specs$factor), specs$label)
+}
+
+
+#' The trend's predictor of one draw as a time-by-series grid
+#'
+#' `mu_trend` is indexed by series in every generated program. The grid
+#' is at the series grain for factor fits too.
+#'
+#' @param lp_mat The trend's predictor, one row per draw
+#' @param obs_struct Observation structure of the rows of `lp_mat`
+#' @param draw_row The draw to take
+#' @param n_rows Number of occasions to keep, the last ones of the grid
+#' @param n_series Number of fitted series
+#' @return Numeric matrix `[n_rows, n_series]`
+#' @noRd
+trend_linpred_grid <- function(lp_mat, obs_struct, draw_row, n_rows,
+                               n_series) {
+  checkmate::assert_matrix(lp_mat)
+  checkmate::assert_int(draw_row, lower = 1L)
+  checkmate::assert_int(n_rows, lower = 1L)
+  checkmate::assert_int(n_series, lower = 1L)
+  grid <- reshape_linpred_to_grid(lp_mat[draw_row, ], obs_struct)
+  if (ncol(grid) != n_series) {
+    stop(insight::format_error(c(
+      "The trend's linear predictor must span every fitted series.",
+      x = paste0("The predictor spans ", ncol(grid), " of ", n_series,
+                 " series."),
+      i = paste0("Give the series column of 'newdata' every series ",
+                 "level of the training data.")
+    )), call. = FALSE)
+  }
+  # A CAR history holds each series' last observed occasions. Series
+  # observed at their own times give more occasions than lags.
+  if (nrow(grid) < n_rows) {
+    stop_shape_fault("The trend's predictor grid", nrow(grid), n_rows)
+  }
+  grid[seq.int(nrow(grid) - n_rows + 1L, nrow(grid)), , drop = FALSE]
+}
+
+
+#' The forecast times every series shares
+#'
+#' Refuses series forecast at different times. Only `CAR()` steps each
+#' series to its own times. An empty entry is a series with nothing to
+#' forecast.
+#'
+#' @param fc_grid The forecast grid
+#' @param series_levels Every fitted series
+#' @param trend The trend's name, for the message
+#' @return The sorted shared times, or `numeric(0)` without any
+#' @noRd
+shared_forecast_times <- function(fc_grid, series_levels, trend) {
+  checkmate::assert_list(fc_grid)
+  checkmate::assert_string(trend)
+  per_series <- lapply(fc_grid$times[series_levels], function(t) {
+    sort(unique(as.numeric(t)))
+  })
+  filled <- Filter(length, per_series)
+  if (length(filled) == 0L) {
+    return(numeric(0L))
+  }
+  differs <- !vapply(filled, function(v) {
+    isTRUE(all.equal(v, filled[[1L]]))
+  }, logical(1L))
+  if (any(differs)) {
+    stop(insight::format_error(c(
+      paste0("'", trend, "()' forecasts require every series to share ",
+             "one set of forecast times."),
+      x = paste0("Series '", names(filled)[1L], "' and '",
+                 names(filled)[which(differs)[1L]],
+                 "' have different times in 'newdata'."),
+      i = "Only 'CAR()' forecasts series at their own times."
+    )), call. = FALSE)
+  }
+  filled[[1L]]
+}
+
+
+#' The forecast context of a ZMVN trend
+#'
+#' Correlated innovations pair the series at one time. The draws are
+#' independent over time and need no context.
+#'
+#' @inheritParams forecast_context_car
+#' @return An empty list
+#' @noRd
+forecast_context_zmvn <- function(object, training, fc_grid,
+                                  series_levels) {
+  shared_forecast_times(fc_grid, series_levels, "ZMVN")
+  list()
+}
+
+
+#' The time gaps of each step of a CAR forecast
+#'
+#' Every series steps from its state at the last occasion of the fitted
+#' grid, over the union of the forecast times. Each series reports its
+#' own times. The gaps are in the unit the fit measured its own gaps
+#' in. A series whose last responses are missing has a state at the
+#' last occasion too.
+#'
+#' @param object A fitted `mvgam` object
+#' @param training The training data, unused here
+#' @param fc_grid The forecast grid
+#' @param series_levels Every fitted series
+#' @return List holding `time`, one gap per step
+#' @noRd
+forecast_context_car <- function(object, training, fc_grid,
+                                 series_levels) {
+  checkmate::assert_list(fc_grid)
+  time_axis <- mvgam_axes(object)$time
+  origin <- max(time_axis$values)
+  for (lv in series_levels) {
+    fut_t <- fc_grid$times[[lv]]
+    if (length(fut_t) > 0L && min(fut_t) <= origin) {
+      stop(insight::format_error(c(
+        paste0("CAR forecasts begin after the last fitted time, ",
+               format(origin, trim = TRUE), "."),
+        x = paste0("Series '", lv, "' has 'newdata' times from ",
+                   format(min(fut_t), trim = TRUE), "."),
+        i = paste0("Use 'hindcast()' or 'posterior_predict()' for times ",
+                   "the model was fitted on.")
+      )), call. = FALSE)
+    }
+  }
+  horizon <- sort(unique(as.numeric(
+    unlist(fc_grid$times[series_levels], use.names = FALSE)
+  )))
+  list(time = car_scaled_gaps(diff(c(origin, horizon)),
+                              car_time_scale(time_axis)))
+}
+
+
+#' What the PW kernel evaluates its closed form at
+#'
+#' @param object A fitted `mvgam` object
+#' @param training The training data from `build_training_arms()`
+#' @param fc_grid The forecast grid
+#' @param series_levels Every fitted series
+#' @return List of `fc_times`, the shared forecast times on the time
+#'   index; `training_times`, the observed occasions on that index,
+#'   which set the rate of new changepoints; `cap`, the `[h, n_series]`
+#'   link-scale capacities of a logistic trend or NULL; and
+#'   `changepoint_range`, the share of the history holding changepoints
+#' @noRd
+forecast_context_pw <- function(object, training, fc_grid,
+                                series_levels) {
+  checkmate::assert_list(training)
+  checkmate::assert_list(fc_grid)
+  fc_times <- shared_forecast_times(fc_grid, series_levels, "PW")
+
+  # Stan fits the piecewise trend on the time index, 1 to N_time, and
+  # places its changepoints there. The forecast is evaluated on the
+  # same index. The user's own units put a fit on years 2001 to 2030
+  # at t = 2031 against changepoints near 1 to 30.
+  axis_time <- mvgam_axes(object)$time
+  to_index <- function(t) {
+    (as.numeric(t) - axis_time$values[1L]) / axis_time$step + 1
+  }
+  # The occasions carrying a response, which is the history
+  # `changepoint_range` is a proportion of at fit time
+  training_times <- to_index(sort(unique(unlist(training$times))))
+
+  # A logistic PW takes an `[h, n_series]` capacity matrix from
+  # newdata. A linear PW has none.
+  spec <- first_trend_spec(object)
+  cap <- if (pw_is_logistic(spec)) {
+    extract_pw_cap_matrix(
+      object, fc_grid, spec, fc_times, series_levels,
+      family = pw_cap_link_family(formula_families(object, object$family))
+    )
+  } else {
+    NULL
+  }
+
+  list(fc_times = to_index(fc_times),
+       training_times = training_times,
+       cap = cap,
+       changepoint_range = object$trend_metadata$pw_changepoint_range)
+}
+
+
+#' The capacity matrix of a logistic PW trend over a forecast
+#'
+#' The `cap` column of `newdata` at each forecast time and series, as an
+#' `[h, n_series]` matrix. The cap is on the response scale.
+#' `transform_pw_cap_to_link()` puts it on the link scale, where the
+#' kernel evaluates `cap * inv_logit(...)`. With the zero-intercept
+#' observation formula of a logistic PW fit, `E[Y]` then saturates at
+#' the stated cap.
+#'
+#' @param object A fitted `mvgam` object
+#' @param fc_grid The forecast grid, holding `data` and `time_var`
+#' @param spec The `PW()` trend specification
+#' @param fc_times Forecast times, one per row of the result
+#' @param series_levels Series of the trend, one per column
+#' @param family Family whose link the capacity takes
+#' @return Numeric matrix on the link scale
+#' @noRd
+extract_pw_cap_matrix <- function(object, fc_grid, spec, fc_times,
+                                  series_levels, family) {
+  checkmate::assert_list(fc_grid, names = "named")
+  checkmate::assert_vector(fc_times, min.len = 1L, any.missing = FALSE)
+  checkmate::assert_vector(series_levels, min.len = 1L)
+  cap_var <- pw_cap_var(spec)
+  d <- fc_grid$data
+  if (!(cap_var %in% names(d))) {
+    stop(insight::format_error(c(
+      paste0("A logistic 'PW()' forecast requires a '", cap_var,
+             "' column in 'newdata'."),
+      i = "The capacity at each forecast time sets the trend's ceiling."
+    )), call. = FALSE)
+  }
+  # The grid's own time column matches the forecast times exactly.
+  # The series come from the axes the fit placed each row on.
+  time_var <- fc_grid$time_var
+  series_ids <- axis_row_series(object, d)
+  row_series <- if (is.null(series_ids)) {
+    as.character(d[[axis_vars(object)$series_var]])
+  } else {
+    as.character(series_ids)
+  }
+  cap_mat <- matrix(NA_real_, nrow = length(fc_times),
+                    ncol = length(series_levels))
+  for (s in seq_along(series_levels)) {
+    for (k in seq_along(fc_times)) {
+      ix <- which(row_series == series_levels[s] &
+                    d[[time_var]] == fc_times[k])
+      if (length(ix) > 0L) {
+        cap_mat[k, s] <- as.numeric(d[[cap_var]][ix[1L]])
+      }
+    }
+  }
+  if (anyNA(cap_mat)) {
+    stop(insight::format_error(c(
+      paste0("A logistic 'PW()' forecast needs '", cap_var,
+             "' for every series at every forecast time."),
+      i = paste0("Add the missing '", cap_var, "' values to 'newdata'.")
+    )), call. = FALSE)
+  }
+  transform_pw_cap_to_link(cap_mat, family, cap_var)
+}
+
+#' A response-scale capacity on the link scale
+#'
+#' Applies the family's link to the capacity matrix, at fit time and at
+#' forecast time.
+#'
+#' @param cap_mat Numeric matrix of capacities on the response scale
+#' @param family Family whose link the capacity takes
+#' @param cap_var Name of the capacity column, for the message
+#' @return `cap_mat` on the link scale
+#' @noRd
+transform_pw_cap_to_link <- function(cap_mat, family, cap_var = "cap") {
+  checkmate::assert_matrix(cap_mat, mode = "numeric")
+  checkmate::assert_function(family$linkfun, .var.name = "family$linkfun")
+  checkmate::assert_string(cap_var, min.chars = 1L)
+  out <- family$linkfun(cap_mat)
+  if (any(!is.finite(out))) {
+    stop(insight::format_error(c(
+      paste0("The '", family$link, "' link maps some '", cap_var,
+             "' values to infinity."),
+      i = paste0("Give '", cap_var, "' values inside the range of the ",
+                 "response.")
+    )), call. = FALSE)
+  }
+  out
+}
+
+#' The family whose link puts a logistic PW capacity on the trend scale
+#'
+#' The one latent trend enters every response's linear predictor. The
+#' capacity, given on the response scale, reaches it through a link.
+#' Responses on different links would put the trend on different
+#' scales, which no single capacity describes.
+#'
+#' @param families List of the observation families
+#' @return The first family, once every link is shown to agree
+#' @noRd
+pw_cap_link_family <- function(families) {
+  checkmate::assert_list(families, min.len = 1L)
+  links <- unique(vapply(families, function(f) f$link, character(1L)))
+  if (length(links) > 1L) {
+    stop(insight::format_error(c(
+      "A logistic 'PW()' trend needs every response on one link.",
+      x = paste0("The responses use the links ",
+                 paste0("'", links, "'", collapse = ", "), "."),
+      i = paste0("The capacity is on the response scale and enters ",
+                 "the shared trend through the link."),
+      i = paste0("Give the responses families with one link or use a ",
+                 "linear 'PW()' trend.")
+    )), call. = FALSE)
+  }
+  families[[1L]]
+}
+
+
+#' Forecast draws cut into one matrix per series
+#'
+#' @param mat Draws matrix `[ndraws_use, nobs_fc]`, one column per row
+#'   of the forecast grid in the order of `obs_struct`
+#' @param fc_grid The forecast grid
+#' @param obs_struct Observation structure of the forecast grid
+#' @param ndraws_use Number of draws
+#' @param series_levels The series to report
+#' @param per_row Whether each visit row of a closure unit keeps its
+#'   own column. Otherwise each occasion takes the mean of its rows. An
+#'   occasion of one row, or of visits sharing one value, keeps that
+#'   value. The sites of a multi-season occasion are averaged.
+#' @return Named list of `[ndraws_use, h_s]` matrices, one column per
+#'   forecast time of each series, or per row with `per_row`
+#' @noRd
+slice_per_series <- function(mat, fc_grid, obs_struct,
+                             ndraws_use, series_levels,
+                             per_row = FALSE) {
+  checkmate::assert_matrix(mat, nrows = ndraws_use)
+  checkmate::assert_flag(per_row)
+  # The forecast times come from this column too. Both sides hold the
+  # same doubles. Labels printed from them lose digits.
+  raw_times <- as.numeric(fc_grid$data[[fc_grid$time_var]])
+  out <- lapply(series_levels, function(lv) {
+    ts <- fc_grid$times[[lv]]
+    # Found by name on the fit's axis. A forecast of one response of
+    # a wide frame reports fewer series than the axis holds.
+    rows <- which(
+      obs_struct$series_int == match(lv, obs_struct$series_levels)
+    )
+    if (per_row) return(mat[, rows, drop = FALSE])
+    occasion <- match(raw_times[rows], as.numeric(ts))
+    absent <- setdiff(seq_along(ts), occasion)
+    if (length(absent)) {
+      stop_mvgam_fault(
+        "Every forecast occasion needs a row in the forecast grid.",
+        paste0("Series '", lv, "' at ",
+               format(ts[absent[1L]], trim = TRUE),
+               " is absent from the grid.")
+      )
+    }
+    group_column_means(mat[, rows, drop = FALSE], occasion)
+  })
+  names(out) <- series_levels
+  out
+}
+
+
+#' The family's parameter draws of a `type = "link"` forecast
+#'
+#' The rows follow `draw_idx`, the rows of the hindcasts and forecasts.
+#'
+#' @param object A fitted `mvgam` object
+#' @param draw_idx Indices of the draws to keep
+#' @param resp A response name, or NULL
+#' @return Named list of draws matrices, one per sampled parameter
+#' @noRd
+extract_family_pars_for_draws <- function(object, draw_idx, resp = NULL) {
+  checkmate::assert_integerish(draw_idx, lower = 1L, min.len = 1L)
+  # Each response of a multivariate fit has its own family and
+  # distributional parameters
+  fam_name <- resolve_family_name(model_families(object, resp))
+  dpar_names <- get_family_dpars(fam_name)
+  if (length(dpar_names) == 0L) return(list())
+  # A response of a model with several carries its parameters under
+  # its own key, as in `sigma_y1`.
+  suffix <- response_suffix(object, resp)
+  draws_mat <- fit_draws(object$fit, paste0(dpar_names, suffix))
+  out <- list()
+  for (nm in dpar_names) {
+    cols <- param_draw_columns(colnames(draws_mat), paste0(nm, suffix))
+    if (length(cols) == 0L) next
+    out[[nm]] <- draws_mat[draw_idx, cols, drop = FALSE]
+  }
+  out
+}
+
+
+#' Fault on draws that span several responses
+#'
+#' A hindcast scoped to one response holds one draws matrix.
+#'
+#' @param draws The draws to check
+#' @param what What the draws are, for the message
+#' @return `TRUE`, invisibly
+#' @noRd
+assert_one_response_draws <- function(draws, what) {
+  checkmate::assert_string(what)
+  if (is_per_response(draws)) {
+    stop_mvgam_fault(
+      paste0(what, " must be one draws matrix."),
+      paste0("Got a list over responses: ",
+             paste0("'", names(draws), "'", collapse = ", "), ".")
+    )
+  }
+  invisible(TRUE)
 }

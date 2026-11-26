@@ -1,0 +1,360 @@
+# `compare_scores()`, `compare_elpds()`, `ensemble()` and
+# `print.mvgam_forecast()`, on small hand-built `mvgam_forecast` and
+# `mvgam_lfo` objects.
+
+
+# ---- Mock helpers ------------------------------------------------
+
+make_mock_forecast <- function(n_series = 2L, h = 5L,
+                                 ndraws = 30L, type = "response",
+                                 family = "gaussian",
+                                 obs_offset = 0,
+                                 seed = 1L) {
+  set.seed(seed)
+  series_names <- factor(
+    paste0("s", seq_len(n_series)),
+    levels = paste0("s", seq_len(n_series))
+  )
+  forecasts <- lapply(seq_len(n_series), function(s) {
+    matrix(stats::rnorm(ndraws * h, mean = s, sd = 1),
+            nrow = ndraws, ncol = h)
+  })
+  names(forecasts) <- levels(series_names)
+  test_observations <- lapply(
+    seq_len(n_series), function(s) rep(s + obs_offset, h)
+  )
+  names(test_observations) <- levels(series_names)
+  structure(
+    list(
+      type = type,
+      series_names = series_names,
+      forecasts = forecasts,
+      hindcasts = list(),
+      test_observations = test_observations,
+      test_times = NULL,
+      train_observations = list(),
+      train_times = list(),
+      family = family
+    ),
+    class = "mvgam_forecast"
+  )
+}
+
+
+make_mock_lfo <- function(elpds, eval_timepoints = NULL,
+                            fc_horizon = 1L, pareto_ks = NULL,
+                            refit_triggered = NULL) {
+  n <- length(elpds)
+  if (is.null(eval_timepoints)) eval_timepoints <- seq_len(n) + 30L
+  if (is.null(pareto_ks)) pareto_ks <- rep(0.3, n)
+  if (is.null(refit_triggered)) refit_triggered <- rep(FALSE, n)
+  structure(
+    list(
+      elpds = elpds,
+      eval_timepoints = eval_timepoints,
+      fc_horizon = fc_horizon,
+      pareto_ks = pareto_ks,
+      refit_triggered = refit_triggered,
+      refits_at = integer(0),
+      pareto_k_threshold = 0.7
+    ),
+    class = "mvgam_lfo"
+  )
+}
+
+
+# ---- compare_scores --------------------------------------------
+
+test_that("compare_scores returns a tidy long-format frame for crps", {
+  skip_if_not_installed("scoringRules")
+  fc1 <- make_mock_forecast(seed = 1L)
+  fc2 <- make_mock_forecast(seed = 2L)
+  out <- compare_scores(fc1, fc2, score = "crps")
+  expect_named(out, c("model", "series", "eval_horizon",
+                       "score", "in_interval"))
+  # Level order sets the legend and the colours. For `series` it also
+  # sets the panel order, with all_series last.
+  expect_identical(levels(out$model), c("fc1", "fc2"))
+  # 2 series + 1 all_series = 3; 5 horizons; 2 models = 30 rows.
+  expect_identical(nrow(out), 30L)
+  expect_identical(levels(out$series), c("s1", "s2", "all_series"))
+})
+
+
+test_that("compare_scores honours model_names", {
+  skip_if_not_installed("scoringRules")
+  fc1 <- make_mock_forecast(seed = 1L)
+  fc2 <- make_mock_forecast(seed = 2L)
+  out <- compare_scores(fc1, fc2, score = "crps",
+                         model_names = c("alpha", "beta"))
+  # The names arrive in the order they were supplied.
+  expect_identical(levels(out$model), c("alpha", "beta"))
+})
+
+
+test_that("compare_scores forwards score_args to score()", {
+  skip_if_not_installed("scoringRules")
+  # An observation one SD from the centre of its predictive
+  # distribution separates a 0.9 interval from a 0.5 one.
+  fc1 <- make_mock_forecast(seed = 1L, obs_offset = 1)
+  fc2 <- make_mock_forecast(seed = 2L, obs_offset = 1)
+  wide <- compare_scores(fc1, fc2, score = "crps")
+  narrow <- compare_scores(fc1, fc2, score = "crps",
+                            score_args = list(interval_width = 0.5))
+  # The default interval covers all 20 scored rows. The narrow one
+  # covers fewer than half.
+  expect_identical(sum(wide$in_interval, na.rm = TRUE), 20)
+  expect_lt(sum(narrow$in_interval, na.rm = TRUE), 10L)
+})
+
+
+test_that("compare_scores carries multivariate scores in all_series", {
+  skip_if_not_installed("scoringRules")
+  fc1 <- make_mock_forecast(seed = 1L)
+  fc2 <- make_mock_forecast(seed = 2L)
+  out <- compare_scores(fc1, fc2, score = "energy")
+  # all_series rows have the joint score; per-series rows are NA.
+  all_rows <- subset(out, series == "all_series")
+  per_rows <- subset(out, series != "all_series")
+  expect_true(all(!is.na(all_rows$score)))
+  expect_true(all(is.na(per_rows$score)))
+})
+
+
+test_that("compare_scores errors on a single forecast", {
+  fc1 <- make_mock_forecast()
+  expect_error(compare_scores(fc1, score = "crps"),
+               "at least 2")
+})
+
+
+test_that("compare_scores errors on a non-mvgam_forecast arg", {
+  fc1 <- make_mock_forecast()
+  bad <- list(forecasts = NULL)
+  expect_error(compare_scores(fc1, bad, score = "crps"),
+               "must be an 'mvgam_forecast' object")
+})
+
+
+# ---- compare_elpds ---------------------------------------------
+
+test_that("compare_elpds returns a long-format frame", {
+  m1 <- make_mock_lfo(c(-1, -2, -3))
+  m2 <- make_mock_lfo(c(-3, -4, -5))
+  out <- compare_elpds(m1, m2)
+  expect_named(out, c("model", "eval_time", "elpd",
+                       "pareto_k", "refit_here"))
+  expect_identical(nrow(out), 6L)
+  expect_identical(levels(out$model), c("m1", "m2"))
+})
+
+
+test_that("compare_elpds errors on grid mismatch", {
+  m1 <- make_mock_lfo(c(-1, -2, -3), eval_timepoints = c(10, 11, 12))
+  m2 <- make_mock_lfo(c(-1, -2, -3), eval_timepoints = c(20, 21, 22))
+  expect_error(compare_elpds(m1, m2), "eval_timepoints")
+})
+
+
+test_that("compare_elpds errors on a single LFO arg", {
+  m1 <- make_mock_lfo(c(-1, -2, -3))
+  expect_error(compare_elpds(m1), "at least 2")
+})
+
+
+test_that("compare_elpds honours model_names", {
+  m1 <- make_mock_lfo(c(-1, -2, -3))
+  m2 <- make_mock_lfo(c(-3, -4, -5))
+  out <- compare_elpds(m1, m2, model_names = c("fast", "slow"))
+  expect_identical(levels(out$model), c("fast", "slow"))
+})
+
+
+# ---- print.mvgam_forecast --------------------------------------
+
+test_that("print.mvgam_forecast emits a single-screen header", {
+  fc <- make_mock_forecast(n_series = 2L, h = 5L, ndraws = 30L)
+  # A print method writes to standard output.
+  blob <- paste(capture.output(print(fc)), collapse = "\n")
+  expect_lt(nchar(blob), 1000L)
+  expect_match(blob, "mvgam_forecast")
+  expect_match(blob, "series:.*2")
+  expect_match(blob, "draws:.*30")
+})
+
+
+test_that("print.mvgam_forecast adds an ensemble bullet when weighted", {
+  fc <- make_mock_forecast()
+  attr(fc, "weights") <- c(spline = 0.2, ar = 0.5, var = 0.3)
+  expect_output(print(fc), "ensemble:.*3 components")
+})
+
+
+test_that("ensemble takes one set of draws across series and slots", {
+  # Every cell in row r of each input equals r, in every series and
+  # slot. A draw chosen separately per series or per slot breaks the
+  # equality.
+  mk <- function(nd, fc = TRUE) {
+    draws <- list(s1 = matrix(seq_len(nd), nd, 4L),
+                  s2 = matrix(seq_len(nd), nd, 4L))
+    structure(list(series_names = factor(c("s1", "s2")),
+                   hindcasts = draws,
+                   forecasts = if (fc) lapply(draws, `[`, , 1:2)),
+              class = "mvgam_forecast")
+  }
+  fit_a <- mk(10L)
+  ens <- ensemble(fit_a, mk(20L), weights = c(1, 3), ndraws = 40L,
+                  seed = 1L)
+  expect_identical(attr(ens, "ndraws_per_model"),
+                   c(fit_a = 10L, `mk(20L)` = 30L))
+  expect_identical(ens$hindcasts$s1, ens$hindcasts$s2)
+  expect_identical(ens$hindcasts$s1[, 1:2], ens$forecasts$s2)
+  # The weights loo_model_weights() returns pass as they are
+  stacked <- ensemble(fit_a, mk(20L), ndraws = 40L, seed = 1L,
+                      weights = structure(c(1, 3),
+                                          class = "stacking_weights"))
+  expect_identical(attr(stacked, "weights"), attr(ens, "weights"))
+
+  # A `hindcast()` result has no forecasts to combine
+  hc <- ensemble(mk(10L, fc = FALSE), mk(20L, fc = FALSE), ndraws = 8L)
+  expect_identical(dim(hc$hindcasts$s2), c(8L, 4L))
+  expect_null(hc$forecasts)
+
+  # Hindcasts and forecasts from different draws are refused
+  bad <- mk(10L)
+  bad$forecasts$s1 <- bad$forecasts$s1[1:5, ]
+  expect_error(ensemble(bad, mk(10L)), "Input 1 holds 5, 10 draws")
+  # A forecast over other times is refused
+  short <- mk(10L)
+  short$forecasts <- lapply(short$forecasts, `[`, , 1L, drop = FALSE)
+  expect_error(ensemble(mk(10L), short),
+               "Input 2 differs in its forecast horizons")
+})
+
+
+test_that("summary.mvgam_compare_scores joint -> wide horizon x model", {
+  skip_if_not_installed("scoringRules")
+  fc1 <- make_mock_forecast(seed = 1L)
+  fc2 <- make_mock_forecast(seed = 2L)
+  out <- compare_scores(fc1, fc2, score = "energy")
+  s <- summary(out)
+  # A joint score has one row per horizon and one column per model, in
+  # the order the models are given
+  expect_identical(names(s), c("eval_horizon", "fc1", "fc2"))
+  expect_identical(nrow(s), 5L)
+})
+
+
+test_that(
+  "summary.mvgam_compare_scores univariate -> series + horizon x model", {
+  skip_if_not_installed("scoringRules")
+  fc1 <- make_mock_forecast(seed = 1L)
+  fc2 <- make_mock_forecast(seed = 2L)
+  out <- compare_scores(fc1, fc2, score = "crps")
+  s <- summary(out)
+  expect_identical(names(s),
+                   c("series", "eval_horizon", "fc1", "fc2"))
+  # 2 series x 5 horizons = 10 rows.
+  expect_identical(nrow(s), 10L)
+})
+
+
+test_that("plot.mvgam_compare_scores facets a univariate score by series", {
+  skip_if_not_installed("scoringRules")
+  fc1 <- make_mock_forecast(seed = 1L)
+  fc2 <- make_mock_forecast(seed = 2L)
+  out <- compare_scores(fc1, fc2, score = "crps")
+  p <- plot(out)
+  # The default facets by series. `plot$facet$params$facets` then
+  # names `series`.
+  expect_true("series" %in% names(p$facet$params$facets))
+})
+
+
+test_that("plot.mvgam_compare_scores joint score gets one panel", {
+  skip_if_not_installed("scoringRules")
+  fc1 <- make_mock_forecast(seed = 1L)
+  fc2 <- make_mock_forecast(seed = 2L)
+  out <- compare_scores(fc1, fc2, score = "energy")
+  p <- plot(out)
+  # Joint scores drop facet; FacetNull params have no `facets`.
+  expect_length(p$facet$params$facets, 0L)
+})
+
+
+test_that("plot.mvgam_compare_scores honours facet = FALSE", {
+  skip_if_not_installed("scoringRules")
+  fc1 <- make_mock_forecast(seed = 1L)
+  fc2 <- make_mock_forecast(seed = 2L)
+  out <- compare_scores(fc1, fc2, score = "crps")
+  p <- plot(out, facet = FALSE)
+  expect_length(p$facet$params$facets, 0L)
+})
+
+
+test_that("plot.mvgam_compare_scores relative pivot drops the baseline", {
+  skip_if_not_installed("scoringRules")
+  fc1 <- make_mock_forecast(seed = 1L)
+  fc2 <- make_mock_forecast(seed = 2L)
+  out <- compare_scores(fc1, fc2, score = "crps")
+  p <- plot(out, relative = "fc1")
+  # The baseline is dropped and each cell holds fc2 minus fc1
+  expect_identical(levels(p$data$model), "fc2")
+  cells <- out[out$series != "all_series", ]
+  diffs <- cells$score[cells$model == "fc2"] -
+    cells$score[cells$model == "fc1"]
+  plotted <- p$data[order(p$data$series, p$data$eval_horizon), ]
+  expect_equal(plotted$score, diffs)
+  expect_error(plot(out, relative = "ghost"), "must name a model")
+})
+
+
+test_that("plot.mvgam_compare_elpds draws cumulative ELPD", {
+  m1 <- make_mock_lfo(c(-1, -2, -3))
+  m2 <- make_mock_lfo(c(-3, -4, -5))
+  out <- compare_elpds(m1, m2)
+  p_cum <- plot(out, cumulative = TRUE)
+  expect_match(p_cum$labels$y, "Cumulative")
+  # m1 cumulative is c(-1, -3, -6); confirm last value matches.
+  m1_cum <- p_cum$data[p_cum$data$model == "m1", "elpd",
+                        drop = TRUE]
+  expect_equal(tail(m1_cum, 1L), -6, tolerance = 1e-10)
+})
+
+
+test_that("plot.mvgam_compare_elpds relative drops baseline", {
+  m1 <- make_mock_lfo(c(-1, -2, -3))
+  m2 <- make_mock_lfo(c(-3, -4, -5))
+  p <- plot(compare_elpds(m1, m2), relative = "m1")
+  expect_identical(levels(p$data$model), "m2")
+  expect_equal(p$data$elpd, c(-2, -2, -2))
+  expect_match(p$labels$y, "Δ")
+})
+
+
+test_that("print.mvgam_forecast handles hindcast-only fits", {
+  fc <- make_mock_forecast()
+  fc$forecasts <- NULL
+  # Give it a hindcast so the print isn't completely empty.
+  fc$hindcasts <- list(s1 = matrix(0, nrow = 10L, ncol = 8L),
+                        s2 = matrix(0, nrow = 10L, ncol = 8L))
+  fc$train_times <- list(s1 = 1:8, s2 = 1:8)
+  blob <- paste(capture.output(print(fc)), collapse = "\n")
+  expect_match(blob, "hindcast:  8 timepoints")
+  expect_match(blob, "forecast:  0 \\(hindcast only\\)")
+})
+
+test_that("print() of compare_scores ranks the models by mean score", {
+  skip_if_not_installed("scoringRules")
+  fcs <- list(make_mock_forecast(seed = 1L), make_mock_forecast(seed = 2L))
+  totals <- vapply(fcs, function(f) {
+    mean(score(f, score = "crps")$all_series$score)
+  }, numeric(1L))
+  # The worse model is passed first. Its row must move below the best.
+  worse <- fcs[[which.max(totals)]]
+  better <- fcs[[which.min(totals)]]
+  out <- compare_scores(Worse = worse, Better = better, score = "crps")
+  rows <- grep("^ *(Worse|Better) ", capture.output(print(out)),
+               value = TRUE)
+  expect_match(rows[1], "^ *Better ")
+})

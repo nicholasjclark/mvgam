@@ -1,950 +1,962 @@
-#'Fit Joint Species Distribution Models in \pkg{mvgam}
+# Joint species distribution GAMs.
+#
+# `jsdgam()` builds the `mvgam()` call of a joint species distribution
+# model. The latent factors form the trend. `trend_formula` is
+# `factor_formula` with `ZMVN(n_lv = )` added, which samples every
+# loading. The fit is an mvgam fit with `jsdgam` after `mvgam` in its class. The
+# mvgam methods serve it, using the extra slots set below.
+#
+# The loadings are identified after sampling by the QR rotation of
+# Heaps and Jermyn. A `factor_formula` with `by = lv_axis()` constrains
+# them instead and skips the rotation.
+
+#' Fit a joint species distribution model
 #'
-#'This function sets up a Joint Species Distribution Model whereby the residual
-#'associations among species can be modelled in a reduced-rank format using a
-#'set of latent factors. The factor specification is extremely flexible,
-#'allowing users to include spatial, temporal or any other type of predictor
-#'effects to more efficiently capture unmodelled residual associations, while
-#'the observation model can also be highly flexible (including all smooth, GP
-#'and other effects that \pkg{mvgam} can handle)
+#' Fits a joint species distribution model (JSDM) to the presences,
+#' detections or counts of many species across many sampling units.
+#' Species often co-occur more or less often than their responses to
+#' the measured covariates predict. A few latent factors capture that
+#' residual association. They need far fewer parameters than a full
+#' correlation matrix among species. The observation model takes the
+#' smooths, Gaussian processes and random effects of any mvgam model.
+#' The factors take their own predictors through `factor_formula`.
+#' Write [lv_axis()] in one of its terms to give each factor its own
+#' effect of a covariate, a constrained ordination.
 #'
-#'@inheritParams mvgam
-#'@inheritParams ZMVN
+#' @inheritParams mvgam
+#' @param factor_formula A one-sided formula for the latent factors'
+#'   linear predictor. Write [lv_axis()] in a term to give each factor
+#'   its own effect, as in `~ s(elev, by = lv_axis())` or
+#'   `~ elev:lv_axis()`. Each covariate must take one value per
+#'   sampling unit. The deprecated `by = trend` acts as
+#'   `by = lv_axis()`. Defaults to `~ -1`, factors without predictors.
+#' @param knots Optional named list of knot positions for smooth terms,
+#'   by covariate, as `knots` of [mvgam()].
+#' @param data A `data.frame` or `list` holding the response, the
+#'   covariates of both formulas, the `unit` column and the `species`
+#'   factor.
 #'
-#'@param formula A \code{formula} object specifying the GAM observation model
-#'  formula. These are exactly like the formula for a GLM except that smooth
-#'  terms, `s()`, `te()`, `ti()`, `t2()`, as well as time-varying `dynamic()`
-#'  terms, nonparametric `gp()` terms and offsets using `offset()`, can be
-#'  added to the right hand side to specify that the linear predictor depends
-#'  on smooth functions of predictors (or linear functionals of these).
-#'  Details of the formula syntax used by \pkg{mvgam} can be found in
-#'  \code{\link{mvgam_formulae}}
+#'   Data held as arrays, as \pkg{unmarked}, \pkg{ubms},
+#'   \pkg{flocker}, \pkg{Hmsc} and \pkg{spOccupancy} take them, convert
+#'   to this long format. [pivot_detection_array()] converts detection
+#'   histories of occupancy and N-mixture data: `[J, K]`, `[N, J, K]`,
+#'   multi-season `[N, J, T, K]` or a list of `[J, K]` matrices per
+#'   species. [pivot_species_matrix()] converts a wide `[J, N]` species
+#'   composition matrix.
+#' @param family The observation family every species shares, as a
+#'   family object. [mvgam_families] lists them. Defaults to
+#'   `binomial()` for presence-absence data. Counts take a count family
+#'   such as `poisson()` or `negbinomial()`.
 #'
-#'@param factor_formula A \code{formula} object specifying the linear predictor
-#'  effects for the latent factors. Use `by = trend` within calls to functional
-#'  terms (i.e. `s()`, `te()`, `ti()`, `t2()`, `dynamic()`, or `gp()`) to
-#'  ensure that each factor captures a different axis of variation. See the
-#'  example below as an illustration
+#'   The factors and a family's dispersion parameter, such as `shape`,
+#'   `phi` or `sigma`, explain the same residual variation. Where the
+#'   factors explain it, the dispersion posterior runs toward its limit
+#'   and the sampler can diverge there. An informative dispersion prior
+#'   or a family without dispersion, such as `poisson()`, settles it.
 #'
-#'@param factor_knots An optional \code{list} containing user specified knot
-#'  values to be used for basis construction of any smooth terms in
-#'  `factor_formula`. For most bases the user simply supplies the knots to be
-#'  used, which must match up with the `k` value supplied (note that the
-#'  number of knots is not always just `k`). Different terms can use different
-#'  numbers of knots, unless they share a covariate
+#'   For one family per species, write `formula` with one [brms::bf()]
+#'   per species, each naming its family, as in
+#'   `bf(count ~ env, family = poisson()) +
+#'   bf(seen ~ env, family = bernoulli())`. The responses then form the
+#'   species axis, in place of a `species` column. `family` applies to
+#'   any response that names none.
 #'
-#'@param data A \code{dataframe} or \code{list} containing the model response
-#'  variable and covariates required by the GAM \code{formula} and
-#'  \code{factor_formula} objects
+#'   The simplex families [diri()], [multi()] and [categ()] need a
+#'   per-species term, as in `y ~ env * species` or
+#'   `y ~ 0 + species + env:species`. A coefficient shared by every
+#'   species cancels from their likelihood. In `y ~ env`, `b_Intercept`
+#'   and `b_env` take their priors alone. mvgam warns of this once per
+#'   session. [diri()] sets out the identification.
+#' @param unit The unquoted name of the numeric column indexing the
+#'   sampling units, often `time` or `site`. Defaults to `time`.
+#' @param species The unquoted name of the factor column indexing the
+#'   species. Defaults to `series`, as in other mvgam models.
+#' @param n_lv Integer number of latent factors, from 1 to the number
+#'   of species. Defaults to 2. The residual covariance
+#'   `Z Z' + diag(Psi^2)` has rank at most the number of species.
+#'   Further columns of `Z` add nothing.
 #'
-#'@param family \code{family} specifying the observation family for the
-#'  outcomes. Currently supported families are:
-#'\itemize{
-#'   \item`gaussian()` for real-valued data
-#'   \item`betar()` for proportional data on `(0,1)`
-#'   \item`lognormal()` for non-negative real-valued data
-#'   \item`student_t()` for real-valued data
-#'   \item`Gamma()` for non-negative real-valued data
-#'   \item`bernoulli()` for binary data
-#'   \item`poisson()` for count data
-#'   \item`nb()` for overdispersed count data
-#'   \item`binomial()` for count data with imperfect detection when the number
-#'     of trials is known; note that the `cbind()` function must be used to
-#'     bind the discrete observations and the discrete number of trials
-#'   \item`beta_binomial()` as for `binomial()` but allows for overdispersion}
-#'Default is `poisson()`. See \code{\link{mvgam_families}} for more details
+#'   Under the default normal prior on `Z`, or a structured prior
+#'   built from `traits`, `phylo` or `loadings_prior$distances`, `n_lv`
+#'   is the number of factors in the likelihood. Under the
+#'   multiplicative gamma process prior (`loadings_prior = "mgp"` or
+#'   `list(column_shrinkage = "mgp", ...)`) it is a ceiling. The prior
+#'   shrinks later columns towards zero. A larger
+#'   `loadings_prior$mgp_a2` shrinks them harder. [active_factors()]
+#'   counts the factors the data support.
+#' @param priors Optional `brmsprior` of priors to set, from
+#'   [brms::prior()]. `prior`, the brms spelling, is accepted in `...`.
+#'   `get_prior()` of a model built with `run_model = FALSE` lists every
+#'   class and coefficient with its default, the `trait_slopes` terms
+#'   among them. See *Trait-mediated responses* for their scales. Each
+#'   loading in `Z` takes `normal(0, s)` by default. `s` is 1, widened
+#'   as 'brms' widens its default scale priors for responses that
+#'   spread far on their link scale. A binary response says little
+#'   about the size of a
+#'   loading. The light tails keep chains from stalling at extreme
+#'   values. `prior(student_t(3, 0, 1), class = "Z")` gives heavier
+#'   tails.
+#' @param traits Optional species traits for a structured loadings
+#'   prior: a `data.frame` or matrix with one row per species, or the
+#'   name of an element of `data2`. Rows are matched to
+#'   `levels(data[[species]])` by a `series` column, by row name or by
+#'   order. Factor columns are one-hot encoded and numeric columns are
+#'   standardised. They become `loadings_prior$features`. Supplying an
+#'   explicit `loadings_prior` as well is refused.
+#' @param trait_slopes Optional one-sided formula of traits, such as
+#'   `~ trait1 + trait2`, for species responses that depend on their
+#'   traits (the fourth-corner model of \pkg{Hmsc}). The traits must be
+#'   columns of `data`, constant within species, as \pkg{brms} takes
+#'   every variable of a formula. A prediction frame that omits a trait
+#'   takes each species' value from the fit. The grids of
+#'   [conditional_effects()] and \pkg{marginaleffects} omit the traits,
+#'   which draws each species at its own. Each term of `formula`
+#'   takes a shared effect, an effect of each trait and a species
+#'   deviation. See *Trait-mediated responses*.
+#' @param phylo Optional phylogeny: an `ape::phylo` tree, whose
+#'   cophenetic distances are taken, or a numeric distance matrix
+#'   with row and column names matching `levels(data[[species]])`.
+#'   The distances are rescaled to a maximum of 1 and become
+#'   `loadings_prior$distances$phylo`. A tree that is not ultrametric
+#'   draws a warning once. A tree requires the \pkg{ape} package.
+#'   Supplying an explicit `loadings_prior` as well is refused.
+#' @param loadings_prior Optional structured prior on the loadings, as
+#'   `loadings_prior` of [mvgam()] takes it. Supplying `traits` or
+#'   `phylo` as well is refused.
+#' @param ... Further arguments of [mvgam()], such as `data2` (where
+#'   `traits` and `phylo` find a named element), `algorithm`, `chains`
+#'   and `silent`.
 #'
-#' @param species The unquoted name of the `factor` variable that indexes the
-#'   different response units in `data` (usually `'species'` in a JSDM).
-#'   Defaults to `series` to be consistent with other `mvgam` models
+#' @return A fitted model of class `c("mvgam", "jsdgam", "brmsfit")`.
+#'   Every mvgam method applies, such as `summary()`, `predict()`,
+#'   `forecast()` and `loo()`. [ordinate()] and [residual_cor()]
+#'   describe the factors. `update(fit, n_lv = 3)` refits it through
+#'   `jsdgam()` with the arguments given changed.
 #'
-#'@param n_lv \code{integer} the number of latent factors to use for modelling
-#'  residual associations. Cannot be `> n_species`. Defaults arbitrarily to `2`
+#' @section Trait-mediated responses:
+#' `trait_slopes = ~ size` adds terms to `formula`. Each term takes a
+#' shared effect, an effect of each trait and a species deviation:
+#' \describe{
+#'   \item{Intercept}{`size`, with the species deviation `1` in
+#'     `(1 + ... | sp | series)`}
+#'   \item{A term with design columns}{a numeric or factor covariate, an
+#'     interaction, `I()`, `poly()`, `mo()`, `me()` or `mi()`: the term
+#'     `env:size` and the deviation `env` in `(1 + env | sp | series)`.
+#'     The `|sp|` tag correlates the deviations under one LKJ prior.}
+#'   \item{A smooth, `s()` or `t2()`}{`s(x, by = size)` scales the
+#'     smooth by the trait. `s(x, by = series, m = 1)` gives each species
+#'     a smooth penalised towards a flat line.}
+#'   \item{A Gaussian process, `gp()`}{`gp(x, by = size)` and
+#'     `gp(x, by = series)`, one approximate process per species}
+#'   \item{A group-level term}{entered as written, as is a smooth with
+#'     `bs = "re"` or `bs = "fs"`}
+#' }
+#' A smooth trait, `~ s(size)`, gives the intercept `s(size)`. Each
+#' design column of a covariate scales the trait's smooth: `env` takes
+#' `s(size, by = env)` and a factor `hab` takes `s(size, by = habb)`. A
+#' smooth of `x` takes the surface `t2(x, size)`. A smooth with its own
+#' `by`, such as `s(x, by = hab)`, crosses the trait level by level.
+#' Its species deviations keep the `by`. `mo()`, `me()` and `mi()`
+#' terms cross linear traits alone.
 #'
-#'@param threads \code{integer} Experimental option to use multithreading for
-#'  within-chain parallelisation in \code{Stan}. We recommend its use only if
-#'  you are experienced with \code{Stan}'s `reduce_sum` function and have a
-#'  slow running model that cannot be sped up by any other means. Currently
-#'  works for all families when using \pkg{cmdstanr} as the backend
+#' A smooth or `gp()` takes one column of `data` as its `by`. A factor
+#' level, a `poly()` column or a `by` scaled per species enters through
+#' a derived column. Its name follows [fixef.mvgam()], such as `habb`,
+#' `polyx21` or `env_size`. Each prediction frame recomputes these
+#' columns from the variables they come from. A frame that changes
+#' `env` then changes `env_size`.
 #'
-#'@param priors An optional \code{data.frame} with prior definitions (in Stan
-#'  syntax) or, preferentially, a vector containing objects of class
-#'  `brmsprior` (see. \code{\link[brms]{prior}} for details). See
-#'  [get_mvgam_priors] and for more information on changing default prior
-#'  distributions
+#' A crossing of a centred smooth passes through zero at the mean of its
+#' covariates (mgcv's `pc`). The shared term then carries the effect at
+#' the means. mgcv leaves a smooth with a numeric `by` uncentred. Its
+#' crossing keeps the constant, the trait's effect on that column's
+#' slope. A `t2()` surface takes first-order margins. Their penalties
+#' separate it from the main smooths. A margin of one covariate is a thin
+#' plate spline, or keeps a cyclic basis. An `s()` of several covariates
+#' gives one isotropic Duchon spline margin.
 #'
-#'@param ... Other arguments to pass to [mvgam]
+#' The coefficients take their brms names, such as `b_env:size`. Each
+#' population-level coefficient takes `normal(0, r / s)` by default. `s`
+#' is the SD of its design column. `r` is 1, or the SD of the response
+#' under an identity link, which keeps the coefficients in its units.
+#' Every covariate then has one prior scale on the link, whatever its
+#' units or the basis `poly()` gives it, as rstanarm's autoscaled priors
+#' do. `student_t(3, 0, 2.5 r)` is the default on the SDs of the
+#' correlated species deviations. The smooth and `gp()` deviations take
+#' the brms defaults. `priors` overrides any of them. A prior on class
+#' `b` without a `coef` replaces every coefficient's default. A term of
+#' `formula` naming the species is refused: each species already takes
+#' its own response. For some of these terms alone, write them in
+#' `formula` directly, as in
+#' `y ~ env + size + env:size + (1 + env | series)`.
 #'
-#'@author Nicholas J Clark
+#' @seealso [sim_jsdgam()] simulates data this function fits.
+#'   [sim_closure_unit_data()] simulates the `occ()` and `nmix()`
+#'   case. [residual_cor()], [ordinate()], [shared_variation()],
+#'   [active_factors()] and [compare_loadings()] interpret the fitted
+#'   factors. [species_effects()] gives each species' response to the
+#'   covariates. [community()] gives richness, diversity and
+#'   co-occurrence. [lv_axis()] gives each factor its own covariate
+#'   effect. [how_to_cite()] drafts a methods paragraph for the fit and
+#'   [methods_md()] writes its equations.
+#'   The `r mvgam_article("jsdgam", "JSDM article")` fits a negative
+#'   binomial model with a trait-informed loadings prior, ordination
+#'   biplots and multiplicative gamma process shrinkage. The
+#'   `r mvgam_cheatsheet("jsdgam", "JSDM cheatsheet")` summarises the
+#'   functions on one page.
 #'
-#'@details Joint Species Distribution Models allow for responses of multiple
-#'species to be learned hierarchically, whereby responses to environmental
-#'variables in `formula` can be partially pooled and any latent, unmodelled
-#'residual associations can also be learned. In \pkg{mvgam}, both of these
-#'effects can be modelled with the full power of latent factor Hierarchical
-#'GAMs, providing unmatched flexibility to model full communities of species.
-#'When calling [jsdgam], an initial State-Space model using `trend = 'None'` is
-#'set up and then modified to include the latent factors and their linear
-#'predictors. Consequently, you can inspect priors for these models using
-#'[get_mvgam_priors] by supplying the relevant `formula`, `factor_formula`,
-#'`data` and `family` arguments and keeping the default `trend = 'None'`.
+#' @references
+#' Warton, D. I., Blanchet, F. G., O'Hara, R. B., Ovaskainen, O.,
+#' Taskinen, S., Walker, S. C. and Hui, F. K. C. (2015). So many
+#' variables: joint modeling in community ecology. *Trends in
+#' Ecology and Evolution*, 30(12):766-779. \doi{10.1016/j.tree.2015.09.007}
 #'
-#' In a JSDGAM, the expectation of response \eqn{Y_{ij}} is modelled with
+#' Ovaskainen, O., Tikhonov, G., Norberg, A., Blanchet, F. G., Duan,
+#' L., Dunson, D., Roslin, T. and Abrego, N. (2017). How to make
+#' more out of community data? *Ecology Letters*, 20(5):561-576.
+#' \doi{10.1111/ele.12757}
 #'
-#' \deqn{g(\mu_{ij}) = X_i\beta + u_i\theta_j,}
+#' Tikhonov, G., Opedal, O. H., Abrego, N., Lehikoinen, A., de Jonge,
+#' M. M. J., Oksanen, J. and Ovaskainen, O. (2020). Joint species
+#' distribution modelling with the R-package Hmsc. *Methods in
+#' Ecology and Evolution*, 11(3):442-447.
+#' \doi{10.1111/2041-210X.13345}
 #'
-#' where \eqn{g(.)} is a known link function,
-#' \eqn{X} is a design matrix of linear predictors (with associated \eqn{\beta}
-#' coefficients), \eqn{u} are \eqn{n_{lv}}-variate latent factors
-#' (\eqn{n_{lv}}<<\eqn{n_{species}}) and \eqn{\theta_j} are species-specific
-#' loadings on the latent factors, respectively. The design matrix \eqn{X} and
-#' \eqn{\beta} coefficients are constructed and modelled using `formula` and
-#' can contain any of `mvgam`'s predictor effects, including random intercepts
-#' and slopes, multidimensional penalized smooths, GP effects etc... The factor
-#' loadings \eqn{\theta_j} are constrained for identifiability but can be used
-#' to reconstruct an estimate of the species' residual variance-covariance
-#' matrix using \eqn{\Theta \Theta'} (see the example below and
-#' [residual_cor()] for details). The latent factors are further modelled using:
-#'\deqn{
-#'u_i \sim \text{Normal}(Q_i\beta_{factor}, 1)
-#'}
-#'where the second design matrix \eqn{Q} and associated \eqn{\beta_{factor}}
-#'coefficients are constructed and modelled using `factor_formula`. Again, the
-#'effects that make up this linear predictor can contain any of `mvgam`'s
-#'allowed predictor effects, providing enormous flexibility for modelling
-#'species' communities.
+#' Hui, F. K. C. (2016). boral - Bayesian Ordination and Regression
+#' Analysis of Multivariate Abundance Data in R. *Methods in Ecology
+#' and Evolution*, 7(6):744-750. \doi{10.1111/2041-210X.12514}
 #'
-#'@seealso [mvgam()], [residual_cor()]
+#' Heaps, S. E. and Jermyn, I. H. (2024). Structured prior
+#' distributions for the covariance matrix in latent factor
+#' models. *Statistics and Computing*, 34:143.
+#' \doi{10.1007/s11222-024-10454-0}
 #'
-#'@references Nicholas J Clark & Konstans Wells (2023). Dynamic generalised
-#'additive models (DGAMs) for forecasting discrete ecological time series.
-#'Methods in Ecology and Evolution. 14:3, 771-784.
-#' \cr
-#' \cr
-#'David I Warton, F Guillaume Blanchet, Robert B O'Hara, Otso Ovaskainen, Sara
-#'Taskinen, Steven C Walker & Francis KC Hui (2015). So many variables: joint
-#'modeling in community ecology. Trends in Ecology & Evolution 30:12, 766-779.
+#' @examples
+#' \dontrun{
+#' # Detections of 6 species at 80 sites, 4 visits each. Occupancy
+#' # responds to the site covariate `env` and detection to the time of
+#' # day `tod_c`. Two latent factors drive the species associations.
+#' simdat <- sim_closure_unit_data(
+#'   family    = occ(),
+#'   n_species = 6L,
+#'   n_sites   = 80L,
+#'   n_visits  = 4L,
+#'   n_lv      = 2L,
+#'   seed      = 1L
+#' )
 #'
-#'@return A \code{list} object of class \code{mvgam} containing model output,
-#'the text representation of the model file, the mgcv model output (for easily
-#'generating simulations at unsampled covariate values), Dunn-Smyth residuals
-#'for each species and key information needed for other functions in the
-#'package. See \code{\link{mvgam-class}} for details. Use
-#'`methods(class = "mvgam")` for an overview on available methods
-#'
-#'@examples
-#'\dontrun{
-#' # ========================================================================
-#' # Example 1: Basic JSDGAM with Portal Data
-#' # ========================================================================
-#'
-#' # Fit a JSDGAM to the portal_data captures
+#' # A joint occupancy model. Each species has its own occupancy
+#' # intercept and `env` slope, plus its own detection intercept. Two
+#' # latent factors take up the residual association.
 #' mod <- jsdgam(
-#'   formula = captures ~
-#'     # Fixed effects of NDVI and mintemp, row effect as a GP of time
-#'     ndvi_ma12:series + mintemp:series + gp(time, k = 15),
+#'   formula        = bf(y ~ series * env, p ~ series + tod_c),
 #'   factor_formula = ~ -1,
-#'   data = portal_data,
-#'   unit = time,
-#'   species = series,
-#'   family = poisson(),
-#'   n_lv = 2,
-#'   silent = 2,
-#'   chains = 2
+#'   data           = simdat$data_train,
+#'   family         = occ(),
+#'   n_lv           = 2L,
+#'   chains         = 2,
+#'   silent         = 2
 #' )
 #'
-#' # Plot covariate effects
-#' library(ggplot2); theme_set(theme_bw())
-#' plot_predictions(
-#'   mod,
-#'   condition = c('ndvi_ma12', 'series', 'series')
-#' )
+#' summary(mod)
 #'
-#' plot_predictions(
-#'   mod,
-#'   condition = c('mintemp', 'series', 'series')
-#' )
+#' # The effect of `env` on the chance of a detection, occupancy times
+#' # detection
+#' conditional_effects(mod)
 #'
-#' # A residual correlation plot
+#' # Each species' response to env, outlined where its sign is clear
+#' plot(species_effects(mod, variables = "env"))
+#'
+#' # The residual correlations among species the factors imply
 #' plot(residual_cor(mod))
 #'
-#' # An ordination biplot can also be constructed
-#' # from the factor scores and their loadings
-#' if(requireNamespace('ggrepel', quietly = TRUE)){
-#'   ordinate(mod, alpha = 0.7)
+#' # Site scores and species loadings on the two factors
+#' ordinate(mod, rotation = "varimax")
+#'
+#' # Expected richness along `env`. The second plot marks the pairs of
+#' # species found together more often than `env` predicts.
+#' gradient <- datagrid(model = mod, env = seq(-2, 2, length.out = 20))
+#' cm <- community(mod, newdata = gradient)
+#' plot(cm)
+#' plot(cm, type = "cooccurrence")
+#'
+#' # The draws, for any contrast: richness at the end of the gradient
+#' # less that at its start
+#' rv <- as_draws_rvars(cm)
+#' rv$richness[20] - rv$richness[1]
+#'
+#' # Next, compare n_lv = 1 with update(mod, n_lv = 1L) and loo()
 #' }
 #'
-#' # ========================================================================
-#' # Example 2: Advanced JSDGAM with Spatial Predictors
-#' # ========================================================================
-#'
-#' # Simulate latent count data for 500 spatial locations and 10 species
-#' set.seed(0)
-#' N_points <- 500
-#' N_species <- 10
-#'
-#' # Species-level intercepts (on the log scale)
-#' alphas <- runif(N_species, 2, 2.25)
-#'
-#' # Simulate a covariate and species-level responses to it
-#' temperature <- rnorm(N_points)
-#' betas <- runif(N_species, -0.5, 0.5)
-#'
-#' # Simulate points uniformly over a space
-#' lon <- runif(N_points, min = 150, max = 155)
-#' lat <- runif(N_points, min = -20, max = -19)
-#'
-#' # Set up spatial basis functions as a tensor product of lat and lon
-#' sm <- mgcv::smoothCon(
-#'   mgcv::te(lon, lat, k = 5),
-#'   data = data.frame(lon, lat),
-#'   knots = NULL
-#' )[[1]]
-#'
-#' # The design matrix for this smooth is in the 'X' slot
-#' des_mat <- sm$X
-#' dim(des_mat)
-#'
-#' # Function to generate a random covariance matrix where all variables
-#' # have unit variance (i.e. diagonals are all 1)
-#' random_Sigma = function(N){
-#'   L_Omega <- matrix(0, N, N);
-#'   L_Omega[1, 1] <- 1;
-#'   for (i in 2 : N) {
-#'     bound <- 1;
-#'     for (j in 1 : (i - 1)) {
-#'       L_Omega[i, j] <- runif(1, -sqrt(bound), sqrt(bound));
-#'       bound <- bound - L_Omega[i, j] ^ 2;
-#'     }
-#'     L_Omega[i, i] <- sqrt(bound);
-#'   }
-#'   Sigma <- L_Omega %*% t(L_Omega);
-#'   return(Sigma)
-#' }
-#'
-#' # Simulate a variance-covariance matrix for the correlations among
-#' # basis coefficients
-#' Sigma <- random_Sigma(N = NCOL(des_mat))
-#'
-#' # Now simulate the species-level basis coefficients hierarchically, where
-#' # spatial basis function correlations are a convex sum of a base correlation
-#' # matrix and a species-level correlation matrix
-#' basis_coefs <- matrix(NA, nrow = N_species, ncol = NCOL(Sigma))
-#' base_field <- mgcv::rmvn(1, mu = rep(0, NCOL(Sigma)), V = Sigma)
-#' for(t in 1:N_species){
-#'   corOmega <- (cov2cor(Sigma) * 0.7) +
-#'     (0.3 * cov2cor(random_Sigma(N = NCOL(des_mat))))
-#'   basis_coefs[t, ] <- mgcv::rmvn(1, mu = rep(0, NCOL(Sigma)), V = corOmega)
-#' }
-#'
-#' # Simulate the latent spatial processes
-#' st_process <- do.call(rbind, lapply(seq_len(N_species), function(t){
-#'   data.frame(
-#'     lat = lat,
-#'     lon = lon,
-#'     species = paste0('species_', t),
-#'     temperature = temperature,
-#'     process = alphas[t] +
-#'       betas[t] * temperature +
-#'       des_mat %*% basis_coefs[t,]
-#'   )
-#' }))
-#'
-#' # Now take noisy observations at some of the points (60)
-#' obs_points <- sample(1:N_points, size = 60, replace = FALSE)
-#' obs_points <- data.frame(
-#'   lat = lat[obs_points],
-#'   lon = lon[obs_points],
-#'   site = 1:60
-#' )
-#'
-#' # Keep only the process data at these points
-#' st_process %>%
-#'   dplyr::inner_join(obs_points, by = c('lat', 'lon')) %>%
-#'   # now take noisy Poisson observations of the process
-#'   dplyr::mutate(count = rpois(NROW(.), lambda = exp(process))) %>%
-#'   dplyr::mutate(species = factor(
-#'     species,
-#'     levels = paste0('species_', 1:N_species)
-#'   )) %>%
-#'   dplyr::group_by(lat, lon) -> dat
-#'
-#' # View the count distributions for each species
-#' ggplot(dat, aes(x = count)) +
-#'   geom_histogram() +
-#'   facet_wrap(~ species, scales = 'free')
-#'
-#' ggplot(dat, aes(x = lon, y = lat, col = log(count + 1))) +
-#'   geom_point(size = 2.25) +
-#'   facet_wrap(~ species, scales = 'free') +
-#'   scale_color_viridis_c()
-#'
-#' # ------------------------------------------------------------------------
-#' # Model Fitting with Custom Priors
-#' # ------------------------------------------------------------------------
-#'
-#' # Inspect default priors for a joint species model with three spatial factors
-#' priors <- get_mvgam_priors(
-#'   formula = count ~
-#'     # Environmental model includes random slopes for
-#'     # a linear effect of temperature
-#'     s(species, bs = 're', by = temperature),
-#'
-#'   # Each factor estimates a different nonlinear spatial process, using
-#'   # 'by = trend' as in other mvgam State-Space models
-#'   factor_formula = ~ gp(lon, lat, k = 6, by = trend) - 1,
-#'   n_lv = 3,
-#'
-#'   # The data and grouping variables
-#'   data = dat,
-#'   unit = site,
-#'   species = species,
-#'
-#'   # Poisson observations
-#'   family = poisson()
-#' )
-#' head(priors)
-#'
-#' # Fit a JSDM that estimates hierarchical temperature responses
-#' # and that uses three latent spatial factors
-#' mod <- jsdgam(
-#'   formula = count ~
-#'     # Environmental model includes random slopes for a
-#'     # linear effect of temperature
-#'     s(species, bs = 're', by = temperature),
-#'
-#'   # Each factor estimates a different nonlinear spatial process, using
-#'   # 'by = trend' as in other mvgam State-Space models
-#'   factor_formula = ~ gp(lon, lat, k = 6, by = trend) - 1,
-#'   n_lv = 3,
-#'
-#'   # Change default priors for fixed random effect variances and
-#'   # factor GP marginal deviations to standard normal
-#'   priors = c(
-#'     prior(std_normal(), class = sigma_raw),
-#'     prior(std_normal(), class = `alpha_gp_trend(lon, lat):trendtrend1`),
-#'     prior(std_normal(), class = `alpha_gp_trend(lon, lat):trendtrend2`),
-#'     prior(std_normal(), class = `alpha_gp_trend(lon, lat):trendtrend3`)
-#'   ),
-#'
-#'   # The data and the grouping variables
-#'   data = dat,
-#'   unit = site,
-#'   species = species,
-#'
-#'   # Poisson observations
-#'   family = poisson(),
-#'   chains = 2,
-#'   silent = 2
-#' )
-#'
-#' # ------------------------------------------------------------------------
-#' # Model Visualization and Diagnostics
-#' # ------------------------------------------------------------------------
-#'
-#' # Plot the implicit species-level intercept estimates
-#' plot_predictions(mod, condition = 'species', type = 'link')
-#'
-#' # Plot species' hierarchical responses to temperature
-#' plot_predictions(
-#'   mod,
-#'   condition = c('temperature', 'species', 'species'),
-#'   type = 'link'
-#' )
-#'
-#' # Plot posterior median estimates of the latent spatial factors
-#' plot(mod, type = 'smooths', trend_effects = TRUE)
-#'
-#' # Or using gratia, if you have it installed
-#' if(requireNamespace('gratia', quietly = TRUE)){
-#'   gratia::draw(mod, trend_effects = TRUE, dist = 0)
-#' }
-#'
-#' # Plot species' randomized quantile residual distributions
-#' # as a function of latitude
-#' pp_check(
-#'   mod,
-#'   type = 'resid_ribbon_grouped',
-#'   group = 'species',
-#'   x = 'lat',
-#'   ndraws = 200
-#' )
-#'
-#' # ------------------------------------------------------------------------
-#' # Residual Correlation Analysis
-#' # ------------------------------------------------------------------------
-#'
-#' # Calculate residual spatial correlations
-#' post_cors <- residual_cor(mod)
-#' names(post_cors)
-#'
-#' # Look at lower and upper credible interval estimates for
-#' # some of the estimated correlations
-#' post_cors$cor[1:5, 1:5]
-#' post_cors$cor_upper[1:5, 1:5]
-#' post_cors$cor_lower[1:5, 1:5]
-#'
-#' # Plot of the posterior median correlations for those estimated
-#' # to be non-zero
-#' plot(post_cors, cluster = TRUE)
-#'
-#' # An ordination biplot can also be constructed
-#' # from the factor scores and their loadings
-#' if(requireNamespace('ggrepel', quietly = TRUE)){
-#'   ordinate(mod)
-#' }
-#'
-#' # ------------------------------------------------------------------------
-#' # Model Validation and Prediction
-#' # ------------------------------------------------------------------------
-#'
-#' # Posterior predictive checks and ELPD-LOO can ascertain model fit
-#' pp_check(
-#'   mod,
-#'   type = "pit_ecdf_grouped",
-#'   group = "species",
-#'   ndraws = 200
-#' )
-#' loo(mod)
-#'
-#' # Forecast log(counts) for entire region (site value doesn't matter as long
-#' # as each spatial location has a different and unique site identifier);
-#' # note this calculation takes a few minutes because of the need to calculate
-#' # draws from the stochastic latent factors
-#' newdata <- st_process %>%
-#'   dplyr::mutate(species = factor(
-#'     species,
-#'     levels = paste0('species_', 1:N_species)
-#'   )) %>%
-#'   dplyr::group_by(lat, lon) %>%
-#'   dplyr::mutate(site = dplyr::cur_group_id()) %>%
-#'   dplyr::ungroup()
-#' preds <- predict(mod, newdata = newdata)
-#'
-#' # Plot the median log(count) predictions on a grid
-#' newdata$log_count <- preds[,1]
-#' ggplot(newdata, aes(x = lon, y = lat, col = log_count)) +
-#'   geom_point(size = 1.5) +
-#'   facet_wrap(~ species, scales = 'free') +
-#'   scale_color_viridis_c() +
-#'   theme_classic()
-#'
-#' # Not needed for general use; cleans up connections for automated testing
-#' closeAllConnections()
-#' }
-#'@export
-jsdgam = function(
-  formula,
-  factor_formula = ~ -1,
-  knots,
-  factor_knots,
-  data,
-  newdata,
-  family = poisson(),
-  unit = time,
-  species = series,
-  share_obs_params = FALSE,
-  priors,
-  n_lv = 2,
-  backend = getOption("brms.backend", "cmdstanr"),
-  algorithm = getOption("brms.algorithm", "sampling"),
-  control = list(max_treedepth = 10, adapt_delta = 0.8),
-  chains = 4,
-  burnin = 500,
-  samples = 500,
-  thin = 1,
-  parallel = TRUE,
-  threads = 1,
-  silent = 1,
-  run_model = TRUE,
-  return_model_data = FALSE,
-  residuals = TRUE,
-  ...
-) {
-  #### Validate arguments and initialise the model skeleton ####
-  validate_pos_integer(n_lv)
+#' @family model fitting
+#' @export
+jsdgam <- function(formula,
+                   factor_formula = ~ -1,
+                   knots,
+                   data,
+                   newdata,
+                   family = binomial(),
+                   unit = time,
+                   species = series,
+                   priors,
+                   n_lv = 2L,
+                   traits = NULL,
+                   trait_slopes = NULL,
+                   phylo = NULL,
+                   loadings_prior = NULL,
+                   backend = default_backend(),
+                   threads = NULL,
+                   run_model = TRUE,
+                   ...) {
+  call <- match.call(expand.dots = FALSE)
 
-  # Prep the trend so that the data can be structured in the usual
-  # mvgam fashion (with 'time' and 'series' variables)
-  unit <- deparse0(substitute(unit))
-  subgr <- deparse0(substitute(species))
-  prepped_trend <- prep_jsdgam_trend(unit = unit, subgr = subgr, data = data)
-  data_train <- validate_series_time(data = data, trend_model = prepped_trend)
+  local_mvgam_silent(list(...)$silent %||% 1L)
 
-  # Set up a simple trend_map to get the model dimensions correct;
-  # this requires that we only have n_lv trends and that each series
-  # only maps to one distinct trend, resulting in a loading matrix of
-  # the correct size (n_series x n_lv)
-  trend_map <- prep_jsdgam_trendmap(data_train, n_lv)
+  # `unit` and `species` are unquoted column names, `time` and
+  # `series` by default
+  unit_chr <- column_name_arg(substitute(unit), "unit")
+  species_chr <- column_name_arg(substitute(species), "species")
 
-  # Set up the model structure but leave autoformat off so that the
-  # model file can be easily modified
-  mod <- suppressWarnings(mvgam(
-    formula = formula,
-    trend_formula = factor_formula,
-    knots = knots,
-    trend_knots = factor_knots,
-    family = family,
-    share_obs_params = share_obs_params,
-    priors = priors,
-    trend_model = 'None',
-    trend_map = trend_map,
-    data = data_train,
-    noncentred = TRUE,
-    run_model = FALSE,
-    autoformat = FALSE,
-    backend = backend,
-    ...
-  ))
-  model_file <- mod$model_file
-
-  #### Modify model data and model file ####
-  # Remove Z from supplied data
-  model_file <- model_file[
-    -grep(
-      "matrix[n_series, n_lv] Z; // matrix mapping series to latent states",
-      model_file,
-      fixed = TRUE
-    )
-  ]
-
-  # Add M to data block
-  model_file[grep(
-    'int<lower=0> n_lv; // number of dynamic factors',
-    model_file,
-    fixed = TRUE
-  )] <- paste0(
-    'int<lower=0> n_lv; // number of dynamic factors\n',
-    'int<lower=0> M; // number of nonzero lower-triangular factor loadings'
+  checkmate::assert_data_frame(data, min.rows = 1L)
+  # Every formula `mvgam()` takes: a plain `formula`, a `bf()` with
+  # sub-formulas (`p ~ visit_cov` for occ() and nmix(), `phi ~ env` for
+  # diri()), or a multivariate formula naming a family per response.
+  checkmate::assert_multi_class(
+    formula, c("formula", "brmsformula", "mvbrmsformula")
   )
-  model_file <- readLines(textConnection(model_file), n = -1)
-
-  # Update parameters
-  model_file <- model_file[
-    -grep("// latent state SD terms", model_file, fixed = TRUE)
-  ]
-  model_file <- model_file[
-    -grep("vector<lower=0>[n_lv] sigma;", model_file, fixed = TRUE)
-  ]
-  model_file[grep(
-    "matrix[n, n_lv] LV_raw;",
-    model_file,
-    fixed = TRUE
-  )] <- paste0(
-    "matrix[n, n_lv] LV_raw;\n\n",
-    "// factor lower triangle loadings\n",
-    "vector[M] L_lower;\n",
-    "// factor diagonal loadings\n",
-    "vector<lower=0>[n_lv] L_diag;"
+  checkmate::assert_class(factor_formula, "formula")
+  # A multivariate formula gives each species its own response and
+  # family. Its species axis is the set of responses, with a data
+  # column per species in place of a species column. The code below
+  # takes the species from `species_levels` in both layouts.
+  is_mv_formula <- inherits(formula, "mvbrmsformula")
+  checkmate::assert_names(
+    names(data),
+    must.include = if (is_mv_formula) unit_chr else c(unit_chr, species_chr)
   )
-  model_file <- readLines(textConnection(model_file), n = -1)
+  checkmate::assert_int(n_lv, lower = 1)
 
-  # Update transformed parameters
-  model_file <- model_file[-grep("// latent states", model_file, fixed = TRUE)]
-  model_file <- model_file[-grep("lv_coefs = Z;", model_file, fixed = TRUE)]
-  model_file <- model_file[
-    -grep("matrix[n, n_lv] LV;", model_file, fixed = TRUE)
-  ]
-  model_file <- model_file[
-    -grep("trend_mus = X_trend * b_trend;", model_file, fixed = TRUE)
-  ]
-  model_file[grep(
-    "matrix[n_series, n_lv] lv_coefs;",
-    model_file,
-    fixed = TRUE
-  )] <- paste0(
-    "matrix[n_series, n_lv] lv_coefs = rep_matrix(0, n_series, n_lv);\n",
-    'matrix[n, n_lv] LV;\n'
-  )
-
-  starts <- grep(
-    "LV = LV_raw .* rep_matrix(sigma', rows(LV_raw));",
-    model_file,
-    fixed = TRUE
-  )
-  ends <- starts + 5
-  model_file <- model_file[-(starts:ends)]
-
-  # Simplified latent variable creation if no terms in factor_formula
-  if (
-    is.null(rownames(attr(terms.formula(factor_formula), 'factors'))) &
-      is.null(colnames(attr(terms.formula(factor_formula), 'factors')))
-  ) {
-    model_file[grep(
-      "// latent process linear predictors",
-      model_file,
-      fixed = TRUE
-    )] <- paste0(
-      "// latent process linear predictors\n",
-      "trend_mus = X_trend * b_trend;\n\n",
-      "// constraints allow identifiability of loadings\n",
-      "{\n",
-      "int idx;\n",
-      "idx = 0;\n",
-      "for(j in 1 : n_lv) lv_coefs[j, j] = L_diag[j];\n",
-      "for(j in 1 : n_lv) {\n",
-      "for(k in (j + 1) : n_series) {\n",
-      "idx = idx + 1;\n",
-      "lv_coefs[k, j] = L_lower[idx];\n",
-      "}\n",
-      "}\n",
-      "}\n\n",
-      "// raw latent factors\n",
-      "LV = LV_raw;\n"
-    )
+  if (is_mv_formula) {
+    species_levels <- names(formula$forms)
   } else {
-    model_file[grep(
-      "// latent process linear predictors",
-      model_file,
-      fixed = TRUE
-    )] <- paste0(
-      "// latent process linear predictors\n",
-      "trend_mus = X_trend * b_trend;\n\n",
-      "// constraints allow identifiability of loadings\n",
-      "{\n",
-      "int idx;\n",
-      "idx = 0;\n",
-      "for(j in 1 : n_lv) lv_coefs[j, j] = L_diag[j];\n",
-      "for(j in 1 : n_lv) {\n",
-      "for(k in (j + 1) : n_series) {\n",
-      "idx = idx + 1;\n",
-      "lv_coefs[k, j] = L_lower[idx];\n",
-      "}\n",
-      "}\n",
-      "}\n\n",
-      "// raw latent factors (with linear predictors)\n",
-      "for (j in 1 : n_lv) {\n",
-      "for (i in 1 : n) {\n",
-      "LV[i, j] = trend_mus[ytimes_trend[i, j]] + LV_raw[i, j];\n",
-      "}\n}\n"
-    )
+    assert_axis_column(data, species_chr, "series")
+    species_levels <- levels(data[[species_chr]])
   }
-
-  model_file <- model_file[
-    -grep("// derived latent states", model_file, fixed = TRUE)
-  ]
-  model_file <- readLines(textConnection(model_file), n = -1)
-
-  # Update model block
-  sigma_prior <- grep(
-    "// priors for latent state SD parameters",
-    model_file,
-    fixed = TRUE
-  ) +
-    1
-  model_file <- model_file[-sigma_prior]
-
-  # Use standard normal for loadings in most models, apart from
-  # those using identify link
-  if (family_links(mod$family) != 'identity') {
-    model_file[grep(
-      "// priors for latent state SD parameters",
-      model_file,
-      fixed = TRUE
-    )] <- paste0(
-      "// priors for factors and loading coefficients\n",
-      "L_lower ~ std_normal();\n",
-      "L_diag ~ std_normal();"
-    )
-    model_file <- readLines(textConnection(model_file), n = -1)
-  } else {
-    model_file[grep(
-      "// priors for latent state SD parameters",
-      model_file,
-      fixed = TRUE
-    )] <- paste0(
-      "// priors for factors and loading coefficients\n",
-      "L_lower ~ student_t(3, 0, 1);\n",
-      "L_diag ~ student_t(3, 0, 1);"
-    )
-    model_file <- readLines(textConnection(model_file), n = -1)
+  n_species <- length(species_levels)
+  if (n_species < 2L) {
+    stop(insight::format_error(c(
+      "'jsdgam' requires at least 2 species levels.",
+      i = paste0(
+        "The '", species_chr, "' column has ", n_species, " level(s)."
+      )
+    )), call. = FALSE)
   }
-
-  # Update generated quantities
-  model_file[grep(
-    'matrix[n, n_series] mus;',
-    model_file,
-    fixed = TRUE
-  )] <- paste0(
-    'matrix[n, n_series] mus;\n',
-    'vector[n_lv] sigma;'
+  # Checked here as well as in `mvgam()`, where the error would name
+  # series. This one names species.
+  validate_n_lv_ceiling(
+    n_lv         = n_lv,
+    n_species    = n_species,
+    fit_function = "jsdgam"
   )
-  model_file[grep(
-    "penalty = 1.0 / (sigma .* sigma);",
-    model_file,
-    fixed = TRUE
-  )] <- paste0(
-    "penalty = rep_vector(1.0, n_lv);\n",
-    "sigma = rep_vector(1.0, n_lv);"
-  )
-  model_file <- readLines(textConnection(model_file), n = -1)
-  model_file <- sanitise_modelfile(model_file)
 
-  # Remove Z from model_data as it is no longer needed
-  model_data <- mod$model_data
-  model_data$Z <- NULL
+  # The unit becomes the time axis.
+  assert_axis_column(data, unit_chr, "time")
 
-  # Add M to model_data
-  n_series <- NCOL(model_data$ytimes)
-  model_data$M <- n_lv * (n_series - n_lv) + n_lv * (n_lv - 1) / 2
+  # The unit and species columns are copied to the `time` and
+  # `series` columns mvgam fits on. The originals stay. A prediction
+  # grid can then name them, as `insight::find_predictors()` reports.
+  # On a multivariate formula `mvgam()` builds the series from the
+  # responses.
+  data_train <- jsdgam_fit_frame(data, unit_chr, species_chr,
+                                 species_levels, is_mv_formula)
 
-  #### Autoformat the Stan code ####
-  if (requireNamespace('cmdstanr', quietly = TRUE) & backend == 'cmdstanr') {
-    if (
-      requireNamespace('cmdstanr') &
-        cmdstanr::cmdstan_version() >= "2.29.0"
-    ) {
-      model_file <- .autoformat(
-        model_file,
-        overwrite_file = FALSE,
-        backend = 'cmdstanr',
-        silent = silent >= 1L
-      )
-    }
-    model_file <- readLines(textConnection(model_file), n = -1)
-  } else {
-    model_file <- .autoformat(
-      model_file,
-      overwrite_file = FALSE,
-      backend = 'rstan',
-      silent = silent >= 1L
-    )
-    model_file <- readLines(textConnection(model_file), n = -1)
-  }
-
-  # Remove lp__ from monitor params if VB is to be used
-  param <- unique(c(mod$monitor_pars, 'Sigma', 'LV'))
-  if (algorithm %in% c('meanfield', 'fullrank', 'pathfinder', 'laplace')) {
-    param <- param[!param %in% 'lp__']
-  }
-
-  #### Determine what to return ####
-  if (!run_model) {
-    mod$model_file <- model_file
-    mod$monitor_pars <- param
-    attr(model_data, 'trend_model') <- 'None'
-    attr(model_data, 'prepped_trend_model') <- prepped_trend
-    attr(model_data, 'noncentred') <- NULL
-    attr(model_data, 'threads') <- threads
-    mod$model_data <- model_data
-    out <- mod
-  } else {
-    # Check if cmdstan is accessible; if not, use rstan
-    if (backend == 'cmdstanr') {
-      if (!requireNamespace('cmdstanr', quietly = TRUE)) {
-        if (silent < 2) {
-          message('cmdstanr library not found; defaulting to rstan')
-        }
-        use_cmdstan <- FALSE
-      } else {
-        use_cmdstan <- TRUE
-        if (is.null(cmdstanr::cmdstan_version(error_on_NA = FALSE))) {
-          warning(
-            'cmdstanr library found but Cmdstan not found. Defaulting to rstan'
-          )
-          use_cmdstan <- FALSE
-        }
-      }
-    }
-
-    #### Run the model ####
-    if (use_cmdstan) {
-      # Prepare threading and generate the model
-      cmd_mod <- .model_cmdstanr(model_file, threads = threads, silent = silent)
-
-      # Condition the model using Cmdstan
-      out_gam_mod <- .sample_model_cmdstanr(
-        model = cmd_mod,
-        algorithm = algorithm,
-        prior_simulation = FALSE,
-        data = model_data,
-        chains = chains,
-        parallel = parallel,
-        silent = silent,
-        max_treedepth = control$max_treedepth,
-        adapt_delta = control$adapt_delta,
-        threads = threads,
-        burnin = burnin,
-        samples = samples,
-        param = param,
-        save_all_pars = FALSE,
-        ...
-      )
-    } else {
-      # Condition the model using rstan
-      requireNamespace('rstan', quietly = TRUE)
-      out_gam_mod <- .sample_model_rstan(
-        model = model_file,
-        algorithm = algorithm,
-        prior_simulation = FALSE,
-        data = model_data,
-        chains = chains,
-        parallel = parallel,
-        silent = silent,
-        max_treedepth = control$max_treedepth,
-        adapt_delta = control$adapt_delta,
-        threads = threads,
-        burnin = burnin,
-        samples = samples,
-        thin = thin,
-        ...
-      )
-    }
-
-    # After modeling (add a new class to make predictions and other post-processing
-    # simpler)
-    out1 <- mod
-    out1$model_output <- out_gam_mod
-    class(out1) <- c('mvgam')
-    if (residuals) {
-      mod_residuals <- dsresids_vec(out1)
-    } else {
-      mod_residuals <- NULL
-    }
-    rm(out1)
-
-    # Add the posterior median coefficients to the mgcv objects
-    ss_gam <- mod$mgcv_model
-    V <- cov(mcmc_chains(out_gam_mod, 'b'))
-    ss_gam$Vp <- ss_gam$Vc <- V
-    p <- mcmc_summary(
-      out_gam_mod,
-      'b',
-      variational = algorithm %in%
-        c('meanfield', 'fullrank', 'pathfinder', 'laplace')
-    )[, c(4)]
-    names(p) <- names(ss_gam$coefficients)
-    ss_gam$coefficients <- p
-
-    trend_mgcv_model <- mod$trend_mgcv_model
-    V <- cov(mcmc_chains(out_gam_mod, 'b_trend'))
-    trend_mgcv_model$Vp <- trend_mgcv_model$Vc <- V
-    p <- mcmc_summary(
-      out_gam_mod,
-      'b_trend',
-      variational = algorithm %in%
-        c('meanfield', 'fullrank', 'pathfinder', 'laplace')
-    )[, c(4)]
-    names(p) <- names(trend_mgcv_model$coefficients)
-    trend_mgcv_model$coefficients <- p
-
-    #### Return the output as class mvgam ####
-    trim_data <- list()
-    attr(trim_data, 'threads') <- threads
-    attr(trim_data, 'noncentred') <- NULL
-    attr(trim_data, 'trend_model') <- 'None'
-    attr(trim_data, 'prepped_trend_model') <- prepped_trend
-
-    # Extract sampler arguments
-    dots <- list(...)
-    if ('adapt_delta' %in% names(dots)) {
-      message(
-        'argument "adapt_delta" should be supplied as an element in "control"'
-      )
-      adapt_delta <- dots$adapt_delta
-      dots$adapt_delta <- NULL
-    } else {
-      adapt_delta <- control$adapt_delta
-      if (is.null(adapt_delta)) adapt_delta <- 0.8
-    }
-
-    if ('max_treedepth' %in% names(dots)) {
-      message(
-        'argument "max_treedepth" should be supplied as an element in "control"'
-      )
-      max_treedepth <- dots$max_treedepth
-      dots$max_treedepth <- NULL
-    } else {
-      max_treedepth <- control$max_treedepth
-      if (is.null(max_treedepth)) max_treedepth <- 10
-    }
-
-    out <- structure(
-      list(
-        call = mod$call,
-        trend_call = factor_formula,
-        family = mod$family,
-        share_obs_params = mod$share_obs_params,
-        trend_model = 'None',
-        trend_map = trend_map,
-        drift = FALSE,
-        priors = mod$priors,
-        model_output = out_gam_mod,
-        model_file = model_file,
-        model_data = if (return_model_data) {
-          model_data
-        } else {
-          trim_data
-        },
-        inits = NULL,
-        monitor_pars = param,
-        sp_names = mod$sp_names,
-        trend_sp_names = mod$trend_sp_names,
-        mgcv_model = ss_gam,
-        trend_mgcv_model = trend_mgcv_model,
-        ytimes = mod$ytimes,
-        resids = mod_residuals,
-        use_lv = TRUE,
-        n_lv = n_lv,
-        upper_bounds = mod$upper_bounds,
-        obs_data = mod$obs_data,
-        test_data = mod$test_data,
-        fit_engine = 'stan',
-        backend = backend,
-        algorithm = algorithm,
-        max_treedepth = max_treedepth,
-        adapt_delta = adapt_delta
-      ),
-      class = c('mvgam', 'jsdgam')
-    )
-  }
-
-  return(out)
-}
-
-#' Prep trend for jsdgam
-#' @noRd
-prep_jsdgam_trend = function(data, unit, subgr) {
-  unit <- as_one_character(unit)
-  subgr <- as_one_character(subgr)
-  validate_var_exists(
-    data = data,
-    variable = unit,
-    type = 'num/int',
-    name = 'data',
-    trend_char = 'ZMVN'
-  )
-  validate_var_exists(
-    data = data,
-    variable = subgr,
-    type = 'factor',
-    name = 'data',
-    trend_char = 'ZMVN'
-  )
-  out <- structure(
+  # The deprecated `samples` and `burnin` become `iter` and `warmup`
+  # here. `update()` merges new arguments into the stored ones. Under
+  # the translated names, a new `iter` replaces the stored `iter`.
+  dots <- translate_samples_burnin(list(...))
+  attr(dots, "translated") <- NULL
+  # The priors arrive as `priors` or as the brms spelling `prior` in
+  # `...`. Both resolve to one table, which the refit arguments store.
+  if (!missing(priors)) dots$priors <- priors
+  dots <- normalise_prior_arg_alias(dots)
+  user_prior <- dots$prior
+  dots$prior <- NULL
+  # The arguments as evaluated, which `update()` hands back to this
+  # function. The call records symbols. A refit in another scope or
+  # session could not resolve them.
+  refit_args <- Filter(Negate(is.null), c(
     list(
-      trend_model = 'ZMVN',
-      ma = FALSE,
-      cor = TRUE,
-      unit = unit,
-      gr = "NA",
-      subgr = subgr,
-      label = NULL
+      formula = formula, factor_formula = factor_formula,
+      family = if (!missing(family)) family,
+      unit = unit_chr, species = species_chr, n_lv = n_lv,
+      traits = traits, trait_slopes = trait_slopes, phylo = phylo,
+      loadings_prior = loadings_prior, backend = backend,
+      threads = threads,
+      prior = user_prior,
+      knots = if (!missing(knots)) knots
     ),
-    class = 'mvgam_trend'
+    dots
+  ))
+  # `traits` and `phylo` become fields of `loadings_prior`
+  loadings_prior_resolved <- build_jsdgam_loadings_prior(
+    traits = traits,
+    phylo = phylo,
+    loadings_prior = loadings_prior,
+    species_levels = species_levels
+  )
+
+  # A simplex family whose `formula` has no species term draws a
+  # warning. The family a univariate `bf()` names is the model's, as
+  # in `mvgam()`.
+  if (is_simplex_response_family(
+    resolve_observation_family(formula, family)$family
+  )) {
+    warn_simplex_obs_formula_lacks_species(formula, species_chr)
+  }
+
+  # `trait_slopes` adds to `formula` each term's response to the traits
+  # and a species deviation of each term. The coefficients and the
+  # species SDs take default priors. A user prior on the same class and
+  # coefficient replaces one.
+  trait_slopes_priors <- NULL
+  trait_columns <- NULL
+  if (is_mv_formula && !is.null(trait_slopes)) {
+    stop(insight::format_error(c(
+      "'trait_slopes' is not supported with a multivariate 'formula'.",
+      x = paste0(
+        "The species-level random effect of 'trait_slopes' groups rows ",
+        "by a 'series' column."
+      ),
+      x = paste0(
+        "A formula with one response per species carries no 'series' ",
+        "column."
+      ),
+      i = "Pass a single-response 'formula' with a 'species' column."
+    )), call. = FALSE)
+  }
+  if (!is.null(trait_slopes)) {
+    validate_trait_slopes(
+      trait_slopes = trait_slopes,
+      obs_formula  = formula,
+      data         = data_train,
+      species_chr  = "series"
+    )
+    expansion <- build_trait_slopes_formula(
+      obs_formula   = formula,
+      trait_slopes  = trait_slopes,
+      data          = data_train,
+      species_var   = "series",
+      species_names = c("series", species_chr)
+    )
+    formula <- expansion$formula
+    trait_columns <- expansion$columns
+    data_train <- derive_trait_columns(trait_columns, data_train)
+    trait_slopes_priors <- default_trait_slopes_priors(
+      "series", trait_slopes_column_sds(formula, data_train), user_prior,
+      trait_slopes_response_scale(
+        formula, resolve_observation_family(formula, family)$family,
+        data_train
+      )
+    )
+  }
+
+  # The trend is `factor_formula` with `ZMVN(n_lv = )` added. The call
+  # joins the formula as written, its other terms untouched.
+  if (!length(trend_constructor_calls(rlang::f_rhs(factor_formula)))) {
+    trend_formula_out <- rlang::new_formula(
+      NULL,
+      call("+", rlang::f_rhs(factor_formula),
+           call("ZMVN", n_lv = as.integer(n_lv))),
+      env = environment(factor_formula)
+    )
+  } else {
+    # A caller's constructor that sets `n_lv` keeps it, checked against
+    # the ceiling. One that does not takes `jsdgam()`'s `n_lv`.
+    trend_formula_out <- factor_formula
+    user_spec <- parse_trend_formula(factor_formula)$trend_model
+    if (is.null(user_spec$n_lv)) {
+      trend_formula_out <- set_trend_constructor_args(
+        factor_formula, list(n_lv = as.integer(n_lv))
+      )
+    } else {
+      validate_n_lv_ceiling(
+        n_lv         = user_spec$n_lv,
+        n_species    = n_species,
+        fit_function = "jsdgam"
+      )
+    }
+  }
+
+  forward_args <- list(
+    formula = formula,
+    trend_formula = trend_formula_out,
+    data = data_train,
+    backend = backend,
+    threads = threads,
+    run_model = run_model
+  )
+  # A family named in a multivariate formula belongs to its response.
+  # The default `binomial()` is forwarded only for a single response.
+  # A `family` the caller gives reaches the responses naming none.
+  if (!missing(family) || !is_mv_formula) {
+    forward_args$family <- family
+  }
+  # `newdata` and `knots` are forwarded when given. `mvgam()` applies
+  # its own defaults otherwise.
+  # `newdata` takes the columns `data` was given above. A trait it
+  # omits comes from the species' training rows.
+  if (!missing(newdata) && !is.null(newdata)) {
+    newdata <- jsdgam_fit_frame(newdata, unit_chr, species_chr,
+                                species_levels, is_mv_formula)
+    if (!is.null(trait_slopes)) {
+      newdata <- derive_trait_columns(trait_columns, fill_traits(
+        newdata, all.vars(trait_slopes),
+        data_train[!duplicated(data_train$series), , drop = FALSE],
+        "series"
+      ))
+    }
+    forward_args$newdata <- newdata
+  }
+  if (!missing(knots)) forward_args$knots <- knots
+  # A user row replaces the trait_slopes default it matches
+  combined_prior <- if (!is.null(trait_slopes_priors)) {
+    merge_user_priors(trait_slopes_priors, user_prior)
+  } else {
+    user_prior
+  }
+  if (!is.null(combined_prior)) {
+    forward_args$prior <- combined_prior
+  }
+  if (!is.null(loadings_prior_resolved)) {
+    forward_args$loadings_prior <- loadings_prior_resolved
+  }
+  # `build_jsdgam_loadings_prior()` has resolved the loadings prior
+  dots$loadings_prior <- NULL
+  forward_args <- c(forward_args, dots)
+
+  fit <- do.call(mvgam, forward_args)
+  # `mvgam()` takes every row of `prior` as the user's
+  if (!is.null(trait_slopes_priors)) {
+    fit$prior <- label_trait_slopes_defaults(fit$prior, combined_prior)
+  }
+
+  # The arguments record the unit and species columns the user
+  # named. Messages and prediction frames name those columns in
+  # place of the `time` and `series` copies mvgam fits on.
+  fit$jsdgam_args <- refit_args
+  # The columns `trait_slopes` derived, rebuilt in every prediction frame
+  fit$trait_columns <- trait_columns
+  # `mvgam()` recorded the `do.call()` of its resolved arguments. The
+  # fit reports the `jsdgam()` call, with the symbols the user wrote.
+  fit$call <- call
+  fit$data.name <- call_data_name(call)
+
+  # A fit keeps the classes `mvgam()` gave it, `brmsfit` for a fit
+  # and `mvgam_prefit` for a stub, with `jsdgam` after `mvgam`.
+  class(fit) <- append(class(fit), "jsdgam", after = 1L)
+  fit
+}
+
+
+#' The column an unquoted argument names
+#'
+#' @param expr The `substitute()`d argument
+#' @param arg The argument's name, for the error
+#' @return Character scalar
+#' @noRd
+column_name_arg <- function(expr, arg) {
+  checkmate::assert_string(arg)
+  out <- as.character(expr)
+  if (length(out) != 1L || !nzchar(out)) {
+    stop(insight::format_error(
+      paste0("'", arg, "' must name a single column.")
+    ), call. = FALSE)
+  }
+  out
+}
+
+
+#' Give a frame the `time` and `series` columns `jsdgam()` fits on
+#'
+#' @param data Data frame
+#' @param unit_chr,species_chr The user's unit and species columns
+#' @param species_levels The species, in their fitted order
+#' @param is_mv_formula Whether `formula` takes one response per
+#'   species, which leaves the series to `mvgam()`
+#' @return `data` with the two copies
+#' @noRd
+jsdgam_fit_frame <- function(data, unit_chr, species_chr, species_levels,
+                             is_mv_formula) {
+  out <- copy_axis_column(data, unit_chr, "time", "unit")
+  if (is_mv_formula) {
+    return(out)
+  }
+  out <- copy_axis_column(out, species_chr, "series", "species")
+  out$series <- factor(out$series, levels = species_levels)
+  out
+}
+
+
+#' A frame of a `jsdgam()` fit, as the user gave it
+#'
+#' `jsdgam()` adds the `time` and `series` copies of the unit and
+#' species columns and the columns `trait_slopes` derived. A refit
+#' passes the frame without them. `jsdgam()` then adds them again
+#' under the same names.
+#'
+#' @param object A fitted `mvgam` object `jsdgam()` built
+#' @param frame The fit's data or test data, or `NULL`
+#' @return `frame` without the added columns, or `NULL`
+#' @noRd
+jsdgam_user_frame <- function(object, frame) {
+  if (is.null(frame)) {
+    return(NULL)
+  }
+  args <- object$jsdgam_args
+  columns <- c(time = args$unit, series = args$species)
+  added <- c(names(columns)[columns != names(columns)],
+             names(object$trait_columns$derived))
+  frame[setdiff(names(frame), added)]
+}
+
+
+#' Copy a user's axis column to the column mvgam fits on
+#'
+#' @param data Data frame
+#' @param from The user's column
+#' @param to `"time"` or `"series"`
+#' @param arg The argument naming `from`, for the error
+#' @return `data` with `to` holding `from`
+#' @noRd
+copy_axis_column <- function(data, from, to, arg) {
+  checkmate::assert_choice(to, c("time", "series"))
+  if (identical(from, to)) {
+    return(data)
+  }
+  if (to %in% names(data)) {
+    stop(insight::format_error(c(
+      paste0("'data' already contains a '", to, "' column."),
+      x = paste0("'", arg, " = ", from, "' names a different column."),
+      i = paste0("Rename the '", to, "' column or pass '", arg, " = ",
+                 to, "'.")
+    )), call. = FALSE)
+  }
+  data[[to]] <- data[[from]]
+  data
+}
+
+
+#' Warn once when a simplex formula has no species term
+#'
+#' Without a term naming the species, every category shares each
+#' coefficient. A shared coefficient such as `b_Intercept` or `b_env`
+#' cancels from the softmax likelihood and takes its prior alone. The
+#' latent factors carry every difference among categories.
+#'
+#' @param formula The observation formula
+#' @param species_chr The user's species column
+#' @return `NULL`, invisibly
+#' @noRd
+warn_simplex_obs_formula_lacks_species <- function(formula, species_chr) {
+  if (!inherits(formula, "formula") && !inherits(formula, "brmsformula")) {
+    return(invisible(NULL))
+  }
+  rhs_formula <- obs_arm_main_formula(formula)
+  rhs_vars <- all.vars(rhs_formula[[length(rhs_formula)]])
+  if (species_chr %in% rhs_vars || "series" %in% rhs_vars) {
+    return(invisible(NULL))
+  }
+  warn_once(
+    paste0(
+      "All fixed effects in 'formula' are shared across categories. ",
+      "The factor model 'Z' will carry the per-category differentiation. ",
+      "For interpretable per-category fixed effects, consider ",
+      "'y ~ env * ", species_chr, "' or ",
+      "'y ~ 0 + ", species_chr, " + env:", species_chr, "'."
+    ),
+    "jsdgam_simplex_no_species_interaction"
+  )
+  invisible(NULL)
+}
+
+
+#' The unit and species columns a `jsdgam()` fit was given
+#'
+#' @param object A fitted `mvgam` object
+#' @return A list naming `unit` and `species`, or `NULL` for a fit
+#'   `jsdgam()` did not build
+#' @noRd
+jsdgam_axis_names <- function(object) {
+  args <- object$jsdgam_args
+  if (is.null(args)) NULL else args[c("unit", "species")]
+}
+
+
+#' Name axis columns as the user of a `jsdgam()` fit named them
+#'
+#' A message about a frame names the unit and species columns the user
+#' supplied. The `time` and `series` copies are mvgam's own.
+#'
+#' @param object A fitted `mvgam` object
+#' @param columns Column names, some of them `time` or `series`
+#' @return `columns`, with each copy replaced by the user's column and
+#'   repeats dropped
+#' @noRd
+user_axis_names <- function(object, columns) {
+  named <- jsdgam_axis_names(object)
+  if (is.null(named)) {
+    return(columns)
+  }
+  vars <- axis_vars(object)
+  columns[columns == vars$time_var] <- named$unit
+  columns[columns == vars$series_var] <- named$species
+  unique(columns)
+}
+
+
+#' Name the series of a fit as a message about a frame calls them
+#'
+#' @param object A fitted `mvgam` object
+#' @return `"Series"`, or the user's species column for a `jsdgam()`
+#'   fit
+#' @noRd
+series_column_label <- function(object) {
+  species <- jsdgam_axis_names(object)$species
+  if (is.null(species)) "Series" else paste0("Column '", species, "'")
+}
+
+
+#' Give a frame the columns a `jsdgam()` fit predicts from
+#'
+#' The `time` and `series` copies of the unit and species columns come
+#' from `copy_jsdgam_axis_columns()`. The traits of a `trait_slopes` fit
+#' come from `fill_species_traits()`. `derive_trait_columns()` computes
+#' the columns its expansion derived.
+#'
+#' @param object A fitted `mvgam` object
+#' @param data Frame to predict for
+#' @return `data`. A fit `jsdgam()` did not build returns it unchanged.
+#' @noRd
+jsdgam_prediction_columns <- function(object, data) {
+  derive_trait_columns(
+    object$trait_columns,
+    fill_species_traits(object, copy_jsdgam_axis_columns(object, data))
   )
 }
 
+
+#' Give a frame the `time` and `series` columns a `jsdgam()` fit uses
+#'
+#' `jsdgam()` fits on `time` and `series` columns that repeat the
+#' user's unit and species columns. A frame naming only the user's
+#' columns takes the two copies here.
+#'
+#' The observation formula may use either name of the species. A
+#' prediction grid varies the column the caller conditions on and
+#' holds the other at its most frequent level, which pairs each
+#' species with the trend of another. Where the two columns differ
+#' in a row, the one away from the held level is the varied column.
+#' Both columns take its value.
+#'
+#' @param object A fitted `mvgam` object
+#' @param data Frame to predict for
+#' @return `data`. A fit `jsdgam()` did not build returns it unchanged.
 #' @noRd
-prep_jsdgam_trendmap = function(data, n_lv) {
-  if (n_lv > nlevels(data$series)) {
-    stop(
-      'Number of factors must be <= number of levels in species',
-      call. = FALSE
+copy_jsdgam_axis_columns <- function(object, data) {
+  named <- jsdgam_axis_names(object)
+  if (is.null(named) || !is.data.frame(data)) {
+    return(data)
+  }
+  vars <- axis_vars(object)
+  # A value the training data never held keeps its own label. The
+  # check of unseen levels then names it in its error.
+  as_fitted <- function(values, column) {
+    fitted <- object$data[[column]]
+    if (is.factor(fitted) && all(values %in% levels(fitted))) {
+      factor(as.character(values), levels = levels(fitted))
+    } else {
+      values
+    }
+  }
+  unit <- named$unit
+  if (!identical(unit, vars$time_var) && unit %in% names(data) &&
+        !vars$time_var %in% names(data)) {
+    data[[vars$time_var]] <- data[[unit]]
+  }
+  species <- named$species
+  series_var <- vars$series_var
+  if (identical(species, series_var) || !species %in% names(data)) {
+    return(data)
+  }
+  if (!series_var %in% names(data)) {
+    data[[series_var]] <- as_fitted(data[[species]], series_var)
+    return(data)
+  }
+  by_species <- as.character(data[[species]])
+  by_series <- as.character(data[[series_var]])
+  if (identical(by_species, by_series)) {
+    return(data)
+  }
+  held <- names(which.max(table(object$data[[species]])))
+  varied <- ifelse(by_species == held, by_series, by_species)
+  data[[species]] <- as_fitted(varied, species)
+  data[[series_var]] <- as_fitted(varied, series_var)
+  data
+}
+
+
+#' Give a frame the traits of a `trait_slopes` fit
+#'
+#' A species' traits are constant. The training rows hold them. A frame
+#' naming the species takes each trait it omits from those rows.
+#' A trait the frame gives is kept, which predicts for a species under
+#' other traits.
+#'
+#' @param object A fitted `mvgam` object
+#' @param data Frame to predict for
+#' @return `data` with every trait of `trait_slopes`
+#' @noRd
+fill_species_traits <- function(object, data) {
+  traits <- all.vars(object$jsdgam_args$trait_slopes)
+  series_var <- axis_vars(object)$series_var
+  if (!length(setdiff(traits, names(data))) || !is.data.frame(data)) {
+    return(data)
+  }
+  fill_traits(data, traits,
+              species_rows(object, fitted_data(object), series_var),
+              series_var)
+}
+
+
+#' Give a frame each trait it omits, from one row per species
+#'
+#' @param data Frame to fill
+#' @param traits The trait columns
+#' @param table Frame with one row per species, holding `traits`
+#' @param series_var The species column of both frames
+#' @return `data` with every trait. A frame without `series_var` is
+#'   returned unchanged.
+#' @noRd
+fill_traits <- function(data, traits, table, series_var) {
+  missing <- setdiff(traits, names(data))
+  if (!length(missing) || !series_var %in% names(data)) {
+    return(data)
+  }
+  at <- match(as.character(data[[series_var]]),
+              as.character(table[[series_var]]))
+  data[missing] <- table[at, missing, drop = FALSE]
+  data
+}
+
+
+#' The `loadings_prior` that `traits` and `phylo` describe
+#'
+#' `traits` becomes `features` and `phylo` becomes `distances$phylo`.
+#' An explicit `loadings_prior` given with either is refused.
+#'
+#' @param traits,phylo,loadings_prior The arguments of `jsdgam()`
+#' @param species_levels The species, in their fitted order
+#' @return A `loadings_prior` list, or `NULL` for the default prior
+#' @noRd
+build_jsdgam_loadings_prior <- function(traits,
+                                        phylo,
+                                        loadings_prior,
+                                        species_levels) {
+  has_alias <- !is.null(traits) || !is.null(phylo)
+  if (!is.null(loadings_prior) && has_alias) {
+    stop(insight::format_error(c(
+      paste0(
+        "'loadings_prior' and the 'traits' / 'phylo' aliases were both ",
+        "supplied."
+      ),
+      x = "The aliases build their own 'loadings_prior'."
+    )), call. = FALSE)
+  }
+  if (!is.null(loadings_prior)) return(loadings_prior)
+  if (!has_alias) return(NULL)
+  spec <- list()
+  if (!is.null(traits)) {
+    spec$features <- traits
+  }
+  if (!is.null(phylo)) {
+    spec$distances <- list(
+      phylo = jsdgam_phylo_to_dist(phylo, species_levels)
     )
   }
-  data.frame(
-    trend = rep(1:n_lv, nlevels(data$series))[1:nlevels(data$series)],
-    series = factor(levels(data$series), levels = levels(data$series))
-  )
+  spec
+}
+
+
+#' A phylogeny as a distance matrix over the species
+#'
+#' An `ape::phylo` tree gives its cophenetic distances, with a warning
+#' once when it is not ultrametric. A numeric matrix passes after a
+#' check of its names. `validate_pairwise_distance()` checks symmetry,
+#' the zero diagonal and the signs. It rescales to a maximum of 1.
+#'
+#' @param phylo An `ape::phylo` tree or a numeric distance matrix
+#' @param species_levels The species, in their fitted order
+#' @return A numeric matrix with species names on both dimensions
+#' @noRd
+jsdgam_phylo_to_dist <- function(phylo, species_levels) {
+  checkmate::assert_character(species_levels, min.len = 2L,
+                              any.missing = FALSE)
+  if (inherits(phylo, "phylo")) {
+    insight::check_if_installed("ape")
+    if (!ape::is.ultrametric(phylo)) {
+      warn_once(
+        c(
+          paste0(
+            "Phylogeny passed to 'phylo' has unequal root-to-tip ",
+            "path lengths."
+          ),
+          i = "The cophenetic distances are rescaled to a maximum of 1."
+        ),
+        "jsdgam_non_ultrametric_phylo"
+      )
+    }
+    d <- ape::cophenetic.phylo(phylo)
+  } else if (is.matrix(phylo) || is.data.frame(phylo)) {
+    d <- as.matrix(phylo)
+    if (!is.numeric(d)) {
+      stop(insight::format_error(
+        "'phylo' matrix must be numeric."
+      ), call. = FALSE)
+    }
+  } else {
+    stop(insight::format_error(c(
+      paste0(
+        "'phylo' must be an 'ape::phylo' object or a ",
+        "numeric distance matrix."
+      ),
+      x = paste0("Got: '", class(phylo)[1L], "'.")
+    )), call. = FALSE)
+  }
+  if (is.null(rownames(d)) || is.null(colnames(d))) {
+    stop(insight::format_error(c(
+      paste0(
+        "Phylogenetic distance matrix needs row and column names ",
+        "matching the species levels."
+      ),
+      i = paste0(
+        "Set rownames(d) and colnames(d) before passing, or supply ",
+        "an 'ape::phylo' object whose tip labels match the ",
+        "species levels."
+      )
+    )), call. = FALSE)
+  }
+  missing_sp <- setdiff(species_levels, rownames(d))
+  if (length(missing_sp) > 0L) {
+    stop(insight::format_error(c(
+      "Phylogeny is missing one or more species levels.",
+      x = paste0(
+        "Missing: ",
+        paste0("'", missing_sp, "'", collapse = ", "), "."
+      ),
+      i = paste0(
+        "Every species level must appear as a tip label / row name."
+      )
+    )), call. = FALSE)
+  }
+  d[species_levels, species_levels, drop = FALSE]
 }

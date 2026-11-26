@@ -1,120 +1,137 @@
-#' MCMC plots of \pkg{mvgam} parameters, as implemented in \pkg{bayesplot}
+#' MCMC plots of mvgam parameters with bayesplot
 #'
-#' Convenient way to call MCMC plotting functions
-#' implemented in the \pkg{bayesplot} package for \pkg{mvgam} models
+#' Draws any \pkg{bayesplot} MCMC plot of the posterior, as
+#' [brms::mcmc_plot()] does. Without `variable`, the plot shows the
+#' parameters [pairs.mvgam()] shows: the population coefficients, the
+#' trend parameters and the family parameters.
+#'
 #' @importFrom bayesplot color_scheme_set color_scheme_get
-#' @inheritParams brms::mcmc_plot
 #' @inheritParams as.data.frame.mvgam
-#' @param type The type of the plot.
-#'   Supported types are (as names) \code{hist}, \code{dens},
-#'   \code{hist_by_chain}, \code{dens_overlay},
-#'   \code{violin}, \code{intervals}, \code{areas},
-#'   \code{areas_ridges}, \code{combo}, \code{acf},
-#'   \code{acf_bar}, \code{trace}, \code{trace_highlight},
-#'   \code{scatter}, \code{hex}, \code{pairs}, \code{violin},
-#'   \code{rhat}, \code{rhat_hist}, \code{neff}, \code{neff_hist}
-#'   and \code{nuts_energy}.
-#'   For an overview on the various plot types see
-#'   \code{\link[bayesplot:MCMC-overview]{MCMC-overview}}.
-#' @return A \code{\link[ggplot2:ggplot]{ggplot}} object
-#' that can be further customized using the \pkg{ggplot2} package.
-#' @seealso \code{\link{mvgam_draws}} for an overview of some of the shortcut strings
-#' that can be used for argument `variable`
+#' @inheritParams brms::mcmc_plot
+#' @param object A fitted `mvgam` object.
+#' @param type The plot type, the name of a bayesplot `mcmc_*()` function
+#'   without its prefix. `bayesplot::available_mcmc()` lists them. The
+#'   default `"intervals"` shows posterior intervals. `"trace"` and
+#'   `"rank_overlay"` check mixing. `"nuts_energy"` and the other
+#'   `"nuts_*"` types diagnose the sampler.
+#' @param ... Further arguments to the bayesplot function, such as
+#'   `prob` for `"intervals"` or `true` for the `"recover_*"` types.
+#'
+#' @return A `ggplot` object, or a `bayesplot_grid` for `"pairs"` and
+#'   `"combo"`.
+#'
+#' @seealso [mvgam_draws] lists the shortcuts `variable` accepts, such as
+#'   `"trend_params"`. [pairs.mvgam()] plots the joint posterior. See
+#'   the [bayesplot MCMC overview](https://mc-stan.org/bayesplot/reference/MCMC-overview.html).
+#'
 #' @examples
 #' \dontrun{
-#' simdat <- sim_mvgam(n_series = 1, trend_model = AR())
-#' mod <- mvgam(y ~ s(season, bs = 'cc', k = 6),
-#'              trend_model = AR(),
-#'              noncentred = TRUE,
-#'              data = simdat$data_train,
-#'              chains = 2,
-#'              silent = 2)
-#' mcmc_plot(mod)
-#' mcmc_plot(mod, type = 'neff_hist')
-#' mcmc_plot(mod, variable = 'betas', type = 'areas')
-#' mcmc_plot(mod, variable = 'trend_params', type = 'combo')
+#' set.seed(13)
+#' simdat <- sim_mvgam(family = poisson(), n_series = 1L,
+#'                      n_timepoints = 120L, trend_model = AR())
+#' mod <- mvgam(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1),
+#'               data    = simdat$data_train,
+#'               family  = poisson(),
+#'               chains  = 2, silent = 2)
+#'
+#' # Posterior intervals of the trend parameters
+#' mcmc_plot(mod, variable = "trend_params", type = "intervals")
+#'
+#' # Rank histograms of the same parameters check that the chains mix
+#' mcmc_plot(mod, variable = "trend_params", type = "rank_overlay")
+#'
+#' # Next, pairs() shows how the parameters covary
 #' }
+#'
+#' @family posterior summaries
 #' @export
-mcmc_plot.mvgam = function(
+mcmc_plot.mvgam <- function(
   object,
   type = 'intervals',
   variable = NULL,
   regex = FALSE,
-  use_alias = TRUE,
   ...
 ) {
-  # Set red colour scheme
-  col_scheme <- attr(color_scheme_get(), 'scheme_name')
-  color_scheme_set('red')
+  checkmate::assert_class(object, "mvgam")
+  require_fitted_model(object, "mcmc_plot")
+  checkmate::assert_string(type)
+  checkmate::assert_character(variable, null.ok = TRUE)
+  checkmate::assert_flag(regex)
 
-  # Check type validity
   valid_types <- as.character(bayesplot::available_mcmc(""))
   valid_types <- sub("^mcmc_", "", valid_types)
   if (!type %in% valid_types) {
-    stop(
-      "Invalid plot type. Valid plot types are: \n",
-      paste0("'", valid_types, "'", collapse = ", "),
-      call. = FALSE
-    )
+    stop(insight::format_error(c(
+      "'type' must be a bayesplot MCMC plot type.",
+      x = paste0("Got: '", type, "'."),
+      i = paste0(
+        "Available: ",
+        paste0("'", valid_types, "'", collapse = ", "), "."
+      )
+    )), call. = FALSE)
   }
 
-  # Set default params to plot
-  # By default, don't plot the Betas as there can be hundreds
-  # of them in spline models
+  # The interpretable parameters, as `pairs()` chooses them
   if (is.null(variable)) {
-    all_pars <- variables(object)
-    variable <- c(
-      all_pars$observation_pars[, 1],
-      all_pars$observation_smoothpars[, 1],
-      all_pars$observation_re_params[, 1],
-      all_pars$trend_pars[, 1],
-      all_pars$trend_smoothpars[, 1],
-      all_pars$trend_re_params[, 1]
-    )
+    variable <- default_plot_variables(object)
     regex <- FALSE
   }
 
-  # Formal arguments
   mcmc_fun <- get(paste0("mcmc_", type), asNamespace("bayesplot"))
   mcmc_arg_names <- names(formals(mcmc_fun))
   mcmc_args <- list(...)
+  # bayesplot would ignore a name outside the function's formals
+  refuse_unread_dots(mcmc_args, mcmc_arg_names, "mcmc_plot")
+  # The sampler parameters are the `x` of a `nuts_*` type and the `np`
+  # of a type that marks divergences
+  need_np <- ("x" %in% mcmc_arg_names && grepl("^nuts_", type)) ||
+    "np" %in% mcmc_arg_names
+  np <- if (need_np) nuts_params(object) else NULL
   if ("x" %in% mcmc_arg_names) {
     if (grepl("^nuts_", type)) {
-      # x refers to a molten data.frame of NUTS parameters
-      mcmc_args$x <- brms::nuts_params(object$model_output)
+      mcmc_args$x <- np
     } else {
-      # x refers to a data.frame of draws
-      draws <- as.array(
-        object,
-        variable = variable,
-        regex = regex,
-        use_alias = use_alias
-      )
+      draws <- as.array(object, variable = variable, regex = regex)
       sel_variables <- dimnames(draws)$variable
       if (type %in% c("scatter", "hex") && length(sel_variables) != 2L) {
-        stop(
-          "Exactly 2 parameters must be selected for this type.",
-          "\nParameters selected: ",
-          paste0("'", sel_variables, "'", collapse = ", "),
-          call. = FALSE
-        )
+        stop(insight::format_error(c(
+          paste0(
+            "'type = ", type,
+            "' requires exactly two parameters."
+          ),
+          x = paste0(
+            "Selected: ",
+            paste0("'", sel_variables, "'", collapse = ", "), "."
+          ),
+          i = "Name two parameters in 'variable'."
+        )), call. = FALSE)
       }
-
       if (type == 'pairs' && length(sel_variables) == 1L) {
-        stop(
-          "2 or more parameters must be selected for this type.",
-          "\nParameters selected: ",
-          paste0("'", sel_variables, "'", collapse = ", "),
-          call. = FALSE
-        )
+        stop(insight::format_error(c(
+          "'type = pairs' requires two or more parameters.",
+          x = paste0(
+            "Selected: ",
+            paste0("'", sel_variables, "'", collapse = ", "), "."
+          ),
+          i = "Name more parameters in 'variable'."
+        )), call. = FALSE)
       }
-
       mcmc_args$x <- draws
     }
   }
-
   if ("np" %in% mcmc_arg_names) {
-    mcmc_args$np <- brms::nuts_params(object$model_output)
+    mcmc_args$np <- np
+  }
+  # bayesplot marks a divergent transition with a red cross. Over the
+  # dark red points of the mvgam scheme the cross cannot be seen. A
+  # blue cross keeps it visible. A caller's own `np_style` is kept.
+  if ("np_style" %in% mcmc_arg_names && is.null(mcmc_args$np_style)) {
+    mcmc_args$np_style <- bayesplot::pairs_style_np(
+      div_color = "#1E88E5", div_size = 2
+    )
+  }
+  if ("lp" %in% mcmc_arg_names) {
+    mcmc_args$lp <- log_posterior(object)
   }
   interval_type <- type %in% c("intervals", "areas")
   if ("rhat" %in% mcmc_arg_names && !interval_type) {
@@ -124,12 +141,7 @@ mcmc_plot.mvgam = function(
     mcmc_args$ratio <- neff_ratio(object)
   }
 
-  # Generate plot and reset colour scheme
-  out_plot <- do.call(mcmc_fun, args = mcmc_args)
-  color_scheme_set(col_scheme)
-
-  # Return the plot
-  return(out_plot)
+  with_color_scheme(do.call(mcmc_fun, args = mcmc_args))
 }
 
 #' @export

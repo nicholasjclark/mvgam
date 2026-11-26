@@ -1,213 +1,157 @@
 #' `mvgam_irf` object description
 #'
-#' A \code{mvgam_irf} object returned by function \code{\link{irf}}.
-#' Run `methods(class = "mvgam_irf")` to see an overview of available methods.
+#' The objects returned by [irf()]. Run `methods(class = "mvgam_irf")`
+#' and `methods(class = "mvgam_irf_summary")` to see an overview of
+#' available methods.
 #'
-#' @details Generalized or Orthogonalized Impulse Response Functions can be
-#'   computed using the posterior estimates of Vector Autoregressive parameters.
-#'   This function generates a positive "shock" for a target process at time
-#'   `t = 0` and then calculates how each of the remaining processes in the
-#'   latent VAR are expected to respond over the forecast horizon `h`. The
-#'   function computes IRFs for all processes in the object and returns them in
-#'   an array that can be plotted using the S3 `plot` function. To inspect
-#'   community-level metrics of stability using latent VAR processes, you can
-#'   use the related [stability()] function.
+#' @details Generalized or Orthogonalized Impulse Response Functions
+#'   are computed from the posterior estimates of Vector Autoregressive
+#'   parameters. [irf()] applies a positive shock of one standard
+#'   deviation to one process and calculates how each process in the
+#'   latent VAR responds over `h` horizons, for every process in turn.
+#'   Horizon 1 is the time step of the shock. [stability()] computes
+#'   community-level metrics of stability from the same parameters.
 #'
-#'   A `mvgam_irf` object contains a `list` of posterior impulse response
-#'   functions, each stored as its own `list`
+#'   A shock response is a `K` by `K` matrix per horizon per posterior
+#'   draw. On a wide panel the draws run to hundreds of megabytes,
+#'   where a median and an interval are what a reader uses. [irf()]
+#'   returns the summary by default. The two forms carry different
+#'   classes:
 #'
-#' @seealso [mvgam], [VAR]
+#'   - `mvgam_irf_summary`, the default. A long-format `tibble`
+#'     inheriting from `mvgam_var_surface_summary`, with one row per
+#'     shock-response pair per horizon. `shock` names the pair as
+#'     `"<from> -> <to>"`, taking the model's own series names where
+#'     the latent processes are the series and `"Process_k"` where a
+#'     factor VAR's processes are latent factors instead. `horizon`
+#'     counts from 1, the time step of the shock. Three further
+#'     columns hold the posterior median and the interval bounds,
+#'     named for the percentiles asked for: `irfQ50`, `irfQ2.5` and
+#'     `irfQ97.5` by default. An
+#'     `irf_type` attribute records whether the responses are
+#'     orthogonalised.
 #'
-#' @references PH Pesaran & Shin Yongcheol (1998).
-#'   Generalized impulse response analysis in linear multivariate models.
-#'   Economics Letters 58: 17–29.
+#'   - `mvgam_irf`, returned under `summary = FALSE`. A `list` with one
+#'     element per posterior draw, each itself a `list` holding one
+#'     `h` by `K` matrix of responses per shocked process. Pass it to
+#'     `summary()` to reach the form above.
+#'
+#'   Both forms take `ndraws` and `draw_ids`. A subset of the posterior
+#'   shortens the computation.
+#'
+#' @section Methods:
+#' `summary()` turns the draws into the `mvgam_irf_summary` above, at
+#' the percentiles `probs` sets. `plot()` draws the response of each
+#' process to a shock to `series`, with its median and interval by
+#' horizon. A summary plots through [plot.mvgam_var_surface_summary()].
+#'
+#' @seealso [mvgam], [VAR], [irf], [stability]
+#'
+#' @references Pesaran HH and Shin Y (1998). Generalized impulse
+#'   response analysis in linear multivariate models. Economics Letters
+#'   58, 17-29. \doi{10.1016/S0165-1765(97)00214-0}
 #'
 #' @author Nicholas J Clark
 #'
 #' @name mvgam_irf-class
 NULL
 
-#' @title Posterior summary of impulse responses
-#'
-#' @description This function takes an \code{mvgam_irf} object and
-#'   calculates a posterior summary of the impulse responses of each
-#'   series to shocks from each of the other series, at all horizons
-#'
-#' @param object an object of class `mvgam_irf` obtained using the
-#'   \code{irf()} function. This object will contain draws from the posterior
-#'   distribution of the impulse responses.
-#'
-#' @param probs The upper and lower percentiles to be computed by the
-#'   `quantile` function, in addition to the median
-#'
-#' @param ... ignored
-#'
-#' @return A long-format `tibble` / `data.frame` reporting the posterior median,
-#'   upper and lower percentiles of the impulse responses of each series to
-#'   shocks from each of the other series at all horizons.
-#'
+#' @param object An `mvgam_irf` object from `irf(summary = FALSE)`.
+#' @param probs The lower and upper percentiles of the interval.
+#'   Defaults to `c(0.025, 0.975)`.
+#' @param ... Unused. Anything passed here is refused.
+#' @rdname mvgam_irf-class
 #' @method summary mvgam_irf
-#'
-#' @seealso \code{\link{irf}}, \code{\link{plot.mvgam_irf}}
-#'
-#' @author Nicholas J Clark
-#'
 #' @export
-summary.mvgam_irf = function(object, probs = c(0.025, 0.975), ...) {
-  if (length(probs) != 2L) {
-    stop("argument 'probs' must be a vector of length 2", call. = FALSE)
-  }
-  validate_proportional(min(probs))
-  validate_proportional(max(probs))
-
-  n_processes <- dim(object[[1]][[1]])[2]
-  h <- dim(object[[1]][[1]])[1]
-  n_draws <- length(object)
-
-  out <- do.call(
-    rbind,
-    lapply(1:n_processes, function(series) {
-      # Extract IRFs for the specific series
-      impulse_responses <- lapply(seq_along(object), function(j) {
-        object[[j]][series]
-      })
-
-      responses <- do.call(
-        rbind,
-        lapply(seq_along(impulse_responses), function(j) {
-          data.frame(
-            horizon = 1:h,
-            imp_resp = as.vector(impulse_responses[[j]][[1]]),
-            resp_var = paste0(
-              'Process_',
-              sort(rep(
-                1:n_processes,
-                NROW(impulse_responses[[j]][[1]])
-              ))
-            )
-          )
-        })
-      ) %>%
-        dplyr::mutate(shock = paste0('Process_', series, ' -> ', resp_var)) %>%
-
-        # Calculate posterior empirical quantiles of impulse responses
-        dplyr::group_by(shock, horizon) %>%
-        dplyr::summarise(
-          irfQ50 = median(imp_resp),
-          irfQlower = quantile(imp_resp, min(probs), na.rm = TRUE),
-          irfQupper = quantile(imp_resp, max(probs), na.rm = TRUE),
-          .groups = 'keep'
-        ) %>%
-        dplyr::ungroup()
-      colnames(responses) <- c(
-        'shock',
-        'horizon',
-        'irfQ50',
-        paste0('irfQ', 100 * min(probs)),
-        paste0('irfQ', 100 * max(probs))
+summary.mvgam_irf <- function(object, probs = c(0.025, 0.975), ...) {
+  checkmate::assert_class(object, "mvgam_irf")
+  rlang::check_dots_empty()
+  labels <- names(object[[1L]])
+  n_processes <- length(labels)
+  h <- NROW(object[[1L]][[1L]])
+  do.call(rbind, lapply(seq_len(n_processes), function(series) {
+    out <- tibble::tibble(
+      shock = paste0(labels[series], " -> ",
+                     rep(labels, each = h)),
+      horizon = rep(seq_len(h), times = n_processes),
+      median_interval_cols(
+        irf_draws(object, series, seq_len(n_processes)), probs, "irf"
       )
-      responses
-    })
-  )
-
-  return(out)
+    )
+    out
+  }))
 }
 
-#' Plot impulse responses from an `mvgam_irf` object
+#' The draws of the responses to one shock
 #'
-#' This function takes an \code{mvgam_irf} object and produces plots of
-#' Impulse Response Functions
-#'
-#' @param x \code{list} object of class \code{mvgam_irf}. See [irf()]
-#'
-#' @param series \code{integer} specifying which process series should be
-#'   given the shock
-#'
-#' @param ... ignored
-#'
-#' @return A `ggplot` object showing the expected response of each latent time
-#'   series to a shock of the focal `series`
-#'
-#' @author Nicholas J Clark
-#'
+#' @param x An `mvgam_irf` object
+#' @param series The process the shock originates in
+#' @param resp_ids The responding processes
+#' @return An `(ndraws x (h * length(resp_ids)))` matrix, with the
+#'   horizons of each response in consecutive columns
+#' @noRd
+irf_draws <- function(x, series, resp_ids) {
+  h <- NROW(x[[1L]][[1L]])
+  do.call(cbind, lapply(resp_ids, function(resp) {
+    t(vapply(x, function(draw) draw[[series]][, resp], numeric(h)))
+  }))
+}
+
+#' @param x An `mvgam_irf` object.
+#' @param series Position or name of the process given the shock.
+#' @param responses Optional positions or names of the processes drawn
+#'   as response panels. Defaults to every process.
+#' @rdname mvgam_irf-class
 #' @export
-plot.mvgam_irf = function(x, series = 1, ...) {
-  all_irfs <- x
-  validate_pos_integer(series)
-  n_processes <- dim(all_irfs[[1]][[1]])[2]
-  if (series > n_processes) {
-    stop(paste0("argument 'series' must be <= ", n_processes), call. = FALSE)
-  }
-  h <- dim(all_irfs[[1]][[1]])[1]
+plot.mvgam_irf <- function(x, series = 1, responses = NULL, ...) {
+  checkmate::assert_class(x, "mvgam_irf")
+  checkmate::assert_vector(series, len = 1L, any.missing = FALSE)
+  rlang::check_dots_empty()
+  set_color_scheme_local()
+  labels <- names(x[[1]])
+  series <- validate_var_plot_ids(series, labels, "series")
+  resp_ids <- validate_var_plot_ids(responses, labels, "responses")
+  h <- dim(x[[1]][[1]])[1]
 
-  # Extract IRFs for the specific series
-  impulse_responses <- lapply(seq_along(all_irfs), function(j) {
-    all_irfs[[j]][series]
-  })
+  # One panel per response, labelled as `summary()` labels the pair and
+  # ordered as the VAR numbers its processes
+  resp_keys <- paste0(labels[series], " -> ", labels[resp_ids])
+  draws_mat <- irf_draws(x, series, resp_ids)
+  times <- rep(seq_len(h), times = length(resp_ids))
+  group <- factor(rep(resp_keys, each = h), levels = resp_keys)
 
-  # Extract impulse responses to a shock in the focal series
-  # in tidy format for ggploting
-  responses <- do.call(
-    rbind,
-    lapply(seq_along(impulse_responses), function(j) {
-      data.frame(
-        horizon = 1:h,
-        imp_resp = as.vector(impulse_responses[[j]][[1]]),
-        resp_var = sort(rep(
-          paste0('Process_~', 1:n_processes),
-          NROW(impulse_responses[[j]][[1]])
-        ))
-      )
-    })
-  ) %>%
-    dplyr::mutate(
-      resp_var = paste0('Process_~', series, ' %->% ', resp_var)
-    ) %>%
+  band_probs <- c(0.2, 0.4, 0.6, 0.8)
+  ggplot2::ggplot() +
+    mvgam_band_layer(
+      draws_mat, times = times, probs = band_probs, group = group
+    ) +
+    mvgam_median_layer(draws_mat, times = times, group = group) +
+    reference_line(yintercept = 0) +
+    mvgam_facet_series(labeller = irf_panel_labeller()) +
+    scale_x_steps() +
+    ggplot2::labs(y = irf_axis_label(attr(x, "irf_type"))) +
+    mvgam_theme()
+}
 
-    # Calculate posterior empirical quantiles of impulse responses
-    dplyr::group_by(resp_var, horizon) %>%
-    dplyr::summarise(
-      med = median(imp_resp),
-      lower1 = quantile(imp_resp, 0.1, na.rm = TRUE),
-      lower2 = quantile(imp_resp, 0.2, na.rm = TRUE),
-      lower3 = quantile(imp_resp, 0.3, na.rm = TRUE),
-      lower4 = quantile(imp_resp, 0.4, na.rm = TRUE),
-      upper1 = quantile(imp_resp, 0.9, na.rm = TRUE),
-      upper2 = quantile(imp_resp, 0.8, na.rm = TRUE),
-      upper3 = quantile(imp_resp, 0.7, na.rm = TRUE),
-      upper4 = quantile(imp_resp, 0.6, na.rm = TRUE),
-      .groups = 'keep'
-    ) %>%
-    dplyr::ungroup()
+#' Panel titles of an impulse response plot
+#'
+#' A title names the pair as `"<from> -> <to>"`. On a hierarchical VAR
+#' each name joins a group and a subgroup. A title that outgrows its
+#' panel breaks after the arrow.
+#'
+#' @return A ggplot2 labeller
+#' @noRd
+irf_panel_labeller <- function() {
+  ggplot2::label_wrap_gen(width = 24)
+}
 
-  # Plot the IRFs
-  ggplot2::ggplot(data = responses, ggplot2::aes(x = horizon, y = med)) +
-    ggplot2::geom_ribbon(
-      mapping = ggplot2::aes(ymin = lower1, ymax = upper1),
-      fill = "#DCBCBC"
-    ) +
-    ggplot2::geom_ribbon(
-      mapping = ggplot2::aes(ymin = lower2, ymax = upper2),
-      fill = "#C79999"
-    ) +
-    ggplot2::geom_ribbon(
-      mapping = ggplot2::aes(ymin = lower3, ymax = upper3),
-      fill = "#B97C7C"
-    ) +
-    ggplot2::geom_ribbon(
-      mapping = ggplot2::aes(ymin = lower4, ymax = upper4),
-      fill = "#A25050"
-    ) +
-    ggplot2::geom_line(col = "#8F2727", linewidth = 1) +
-    ggplot2::geom_hline(yintercept = 0, linetype = "dashed", colour = "black") +
-    ggplot2::facet_wrap(
-      ~resp_var,
-      scales = 'free_y',
-      labeller = ggplot2::label_parsed
-    ) +
-    ggplot2::labs(
-      x = "Horizon",
-      y = paste0(attr(x, 'irf_type'), " impulse response")
-    ) +
-    ggplot2::theme_bw()
+#' Axis title of an impulse response plot
+#'
+#' @param type The `irf_type` attribute, `"Generalized"` or
+#'   `"Orthogonalized"`, or `NULL`
+#' @return Character string
+#' @noRd
+irf_axis_label <- function(type) {
+  checkmate::assert_string(type, null.ok = TRUE)
+  if (is.null(type)) "Impulse response" else paste(type, "impulse response")
 }

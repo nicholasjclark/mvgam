@@ -1,0 +1,470 @@
+#' Tidy comparison of forecast scores across mvgam models
+#'
+#' @description Scores the forecasts of several models of the same
+#'   held-out data with one rule, then stacks the results in one table
+#'   for comparison. Lower scores are better. The table has one row per
+#'   model, series and forecast horizon. A joint score (`"energy"`,
+#'   `"variogram"` or `"twenergy"`) scores all series together. Its
+#'   per-series rows hold `NA`. The rows with `series == "all_series"`
+#'   hold its value.
+#'
+#' @param ... Two or more `mvgam_forecast` objects from
+#'   [forecast.mvgam()]. A named argument, as in
+#'   `compare_scores(GAM = fc1, AR = fc2)`, names its model. An unnamed
+#'   one takes the expression passed, such as `"fc1"`.
+#' @param score Character name of the scoring rule. The section
+#'   'Available scores' of [score.mvgam_forecast()] lists them.
+#' @param model_names Optional character vector of model names, one per
+#'   forecast. It replaces the names taken from the call.
+#' @param score_args Optional named list of further arguments of
+#'   [score.mvgam_forecast()], such as
+#'   `score_args = list(interval_width = 0.6)`.
+#'
+#' @return A `tibble` of class `mvgam_compare_scores`. Its `print()`
+#'   method ranks the models by their mean score. Its columns are:
+#' \itemize{
+#'   \item `model`: a factor with one level per forecast.
+#'   \item `series`: a factor of series names, with an `"all_series"`
+#'     level for a joint score.
+#'   \item `eval_horizon`: the forecast horizon, 1 for the first
+#'     held-out time.
+#'   \item `score`: the value of the score.
+#'   \item `in_interval`: whether the observation fell in the central
+#'     interval, as [score.mvgam_forecast()] reports it.
+#' }
+#' `summary()` returns the scores wide, one column per model and one
+#' row per series and horizon, or per horizon for a joint score.
+#' `plot()` draws each model's score by horizon. A univariate score
+#' takes one panel per series and a joint score one panel. An ensemble
+#' plots as one more model.
+#'
+#' @author Nicholas J Clark
+#'
+#' @seealso [score.mvgam_forecast()], [compare_elpds()],
+#'   [forecast.mvgam()], [ensemble.mvgam_forecast()]
+#'
+#' @template ex-forecast-models
+#' @templateVar seed 1
+#' @examples
+#' \dontrun{
+#' fc_gam <- forecast(mod_gam, newdata = simdat$data_test)
+#' fc_ar <- forecast(mod_ar, newdata = simdat$data_test)
+#'
+#' # One row per model and horizon, scored by the discrete ranked
+#' # probability score (lower is better)
+#' scores <- compare_scores(fc_gam, fc_ar, score = "drps",
+#'                          model_names = c("GAM", "AR"))
+#' summary(scores)
+#'
+#' # The AR model's DRPS minus the GAM's. Negative values favour the
+#' # AR model
+#' plot(scores, relative = "GAM")
+#'
+#' # Next, ensemble() combines the two forecasts
+#' }
+#'
+#' @family forecasting
+#' @export
+compare_scores <- function(..., score = "crps", model_names = NULL,
+                            score_args = list()) {
+  checkmate::assert_string(score)
+  checkmate::assert_list(score_args)
+
+  forecasts <- list(...)
+  assert_compared_objects(forecasts, "mvgam_forecast", "compare_scores")
+
+  model_names <- compared_object_names(forecasts, substitute(...()),
+                                       model_names)
+
+  per_model <- lapply(seq_along(forecasts), function(i) {
+    # The local `score` argument shadows the generic of the same
+    # name. The namespaced call dispatches on the forecast class.
+    sc <- do.call(
+      mvgam::score,
+      c(list(forecasts[[i]], score = score), score_args)
+    )
+    # Joint scores keep their per-series rows with `NA` scores. Every
+    # model's frame then has the same series levels to facet on.
+    rows <- lapply(names(sc), function(s) {
+      df <- sc[[s]]
+      if (nrow(df) == 0L) return(NULL)
+      n <- nrow(df)
+      # Per-series rows from joint scores ("energy" / "variogram")
+      # carry coverage diagnostics but no score; the all_series row
+      # for univariate scores omits in_interval. Pad missing columns
+      # with NAs to keep the rbind row-counts consistent.
+      pad <- function(col, fill) {
+        if (is.null(col)) rep(fill, n) else col
+      }
+      data.frame(
+        model        = rep(model_names[i], n),
+        series       = rep(s, n),
+        eval_horizon = df$eval_horizon,
+        score        = pad(df$score,       NA_real_),
+        in_interval  = pad(df$in_interval, NA_real_),
+        stringsAsFactors = FALSE
+      )
+    })
+    do.call(rbind, rows)
+  })
+  out <- do.call(rbind, per_model)
+
+  out$model  <- factor(out$model,  levels = model_names)
+  out$series <- factor(out$series, levels = unique(out$series))
+  rownames(out) <- NULL
+  # Carry the score type as an attribute so plot.mvgam_compare_scores
+  # can dispatch univariate vs joint without re-inspecting the rows.
+  attr(out, "score") <- score
+  class(out) <- c("mvgam_compare_scores", "tbl_df", "tbl",
+                  "data.frame")
+  out
+}
+
+
+#' Tidy comparison of leave-future-out ELPDs across mvgam_lfo runs
+#'
+#' @description Stacks the per-step ELPDs from several `mvgam_lfo`
+#'   objects into one long-format `tibble`, with one row per model
+#'   and evaluation time.
+#'
+#' @inheritParams compare_scores
+#' @param ... Two or more `mvgam_lfo` objects from [lfo_cv()].
+#'   Argument names are taken from the call.
+#'
+#' @return A `tibble` with columns:
+#' \itemize{
+#'   \item `model` -- factor with one level per supplied LFO run.
+#'   \item `eval_time` -- the rolling-origin evaluation timepoint.
+#'   \item `elpd` -- per-step expected log predictive density.
+#'   \item `pareto_k` -- the Pareto-k diagnostic at that step.
+#'   \item `refit_here` -- logical, TRUE when the step triggered
+#'     a fresh refit (Pareto-k above threshold or initial fit).
+#' }
+#' `plot()` draws each model's ELPD by origin. Hollow points mark the
+#' origins where a Pareto k above the threshold forced a refit.
+#'
+#' @author Nicholas J Clark
+#'
+#' @seealso [lfo_cv()], [loo_compare.mvgam_lfo()],
+#'   [loo_model_weights.mvgam_lfo()], [compare_scores()]
+#'
+#' @template ex-forecast-models
+#' @templateVar seed 1
+#' @examples
+#' \dontrun{
+#' # Each origin after t = 70 forecasts the next time step. The
+#' # pointwise log densities feed stacking weights
+#' lfo_gam <- lfo_cv(mod_gam, min_t = 70L, save_log_lik = TRUE)
+#' lfo_ar <- lfo_cv(mod_ar, min_t = 70L, save_log_lik = TRUE)
+#'
+#' # One row per model and origin
+#' elpds <- compare_elpds(lfo_gam, lfo_ar, model_names = c("GAM", "AR"))
+#' head(elpds)
+#'
+#' # The running sum of the AR model's ELPD minus the GAM's. Hollow
+#' # points mark the origins where the model was refitted
+#' plot(elpds, relative = "GAM", cumulative = TRUE)
+#'
+#' # Next, loo_compare() sums the ELPDs with a standard error
+#' }
+#'
+#' @family model comparison
+#' @export
+compare_elpds <- function(..., model_names = NULL) {
+  lfos <- list(...)
+  assert_compared_objects(lfos, "mvgam_lfo", "compare_elpds")
+
+  assert_aligned_lfo(lfos)
+
+  model_names <- compared_object_names(lfos, substitute(...()),
+                                       model_names)
+
+  rows <- lapply(seq_along(lfos), function(i) {
+    m <- lfos[[i]]
+    data.frame(
+      model       = model_names[i],
+      eval_time   = m$eval_timepoints,
+      elpd        = m$elpds,
+      pareto_k    = m$pareto_ks,
+      refit_here  = m$refit_triggered,
+      stringsAsFactors = FALSE
+    )
+  })
+  out <- do.call(rbind, rows)
+  out$model <- factor(out$model, levels = model_names)
+  rownames(out) <- NULL
+  class(out) <- c("mvgam_compare_elpds", "tbl_df", "tbl",
+                  "data.frame")
+  out
+}
+
+
+#' @param relative Optional name of a model in `x$model`. Each score is
+#'   then drawn less that model's at the same series and horizon, with
+#'   a dashed zero line. Negative values favour the other model. The
+#'   baseline itself is left out.
+#' @param facet Logical. `TRUE` (the default) gives a univariate score
+#'   one panel per series. `FALSE` overlays the series, told apart by
+#'   line type. A joint score ignores it.
+#' @rdname compare_scores
+#' @method plot mvgam_compare_scores
+#' @export
+plot.mvgam_compare_scores <- function(x, relative = NULL,
+                                       facet = TRUE, ...) {
+  rlang::check_dots_empty()
+  set_color_scheme_local()
+  score_type <- attr(x, "score") %||% "score"
+  is_joint <- score_type %in% joint_forecast_scores
+  df <- if (is_joint) {
+    subset(x, series == "all_series")
+  } else {
+    subset(x, series != "all_series")
+  }
+  if (nrow(df) == 0L) {
+    stop(insight::format_error(c(
+      "No rows to plot for the requested score.",
+      x = paste0("score = '", score_type, "'."),
+      i = "Check the source forecasts have the expected series."
+    )), call. = FALSE)
+  }
+  y_lab <- score_label(score_type)
+  if (!is.null(relative)) {
+    df <- difference_from_baseline(df, relative, "score",
+                                   c("series", "eval_horizon"))
+    y_lab <- paste0("\u0394 ", y_lab, " vs ", relative)
+  }
+  p <- ggplot2::ggplot(
+    df,
+    ggplot2::aes(x = .data$eval_horizon, y = .data$score,
+                 colour = .data$model)
+  ) +
+    # A held-out occasion with a missing response has no score. The
+    # line breaks at that occasion without a notice.
+    ggplot2::geom_line(na.rm = TRUE) +
+    ggplot2::geom_point(size = 1.6, na.rm = TRUE) +
+    scale_x_steps("Forecast horizon") +
+    ggplot2::labs(y = y_lab, colour = NULL) +
+    mvgam_theme() +
+    mvgam_model_colour_scale(nlevels(df$model))
+  if (!is.null(relative)) {
+    p <- p + reference_line(yintercept = 0)
+  }
+  if (!is_joint && isTRUE(facet)) {
+    p <- p + mvgam_facet_series()
+  } else if (!is_joint && !isTRUE(facet)) {
+    p <- p + ggplot2::aes(linetype = .data$series)
+  }
+  p
+}
+
+
+#' @param x An `mvgam_compare_elpds` object.
+#' @param relative Optional name of a model in `x$model`. Each ELPD is
+#'   then drawn less that model's at the same origin, with a dashed zero
+#'   line. Positive values favour the other model. The baseline itself
+#'   is left out.
+#' @param cumulative Logical. `TRUE` draws the running sum of the ELPD
+#'   over the origins, the quantity `loo_compare()` sums. Defaults to
+#'   `FALSE`.
+#' @rdname compare_elpds
+#' @method plot mvgam_compare_elpds
+#' @export
+plot.mvgam_compare_elpds <- function(x, relative = NULL,
+                                      cumulative = FALSE, ...) {
+  rlang::check_dots_empty()
+  set_color_scheme_local()
+  df <- as.data.frame(x)
+  if (!is.null(relative)) {
+    df <- difference_from_baseline(df, relative, "elpd", "eval_time")
+  }
+  if (isTRUE(cumulative)) {
+    df <- df[order(df$model, df$eval_time), , drop = FALSE]
+    df$elpd <- stats::ave(df$elpd, df$model, FUN = cumsum)
+  }
+  y_lab <- if (isTRUE(cumulative)) "Cumulative ELPD"
+            else "Per-step ELPD"
+  if (!is.null(relative)) {
+    y_lab <- paste0("\u0394 ", y_lab, " vs ", relative)
+  }
+  # The legend labels each point shape by what happened at that step.
+  df$Refit <- factor(
+    ifelse(!is.na(df$refit_here) & df$refit_here,
+            "refit", "PSIS reused"),
+    levels = c("PSIS reused", "refit")
+  )
+  p <- ggplot2::ggplot(
+    df,
+    ggplot2::aes(x = .data$eval_time, y = .data$elpd,
+                 colour = .data$model)
+  ) +
+    ggplot2::geom_line() +
+    ggplot2::geom_point(
+      ggplot2::aes(shape = .data$Refit), size = 2.2
+    ) +
+    ggplot2::scale_shape_manual(
+      values = c("PSIS reused" = 16L, "refit" = 1L)
+    ) +
+    scale_x_steps("Evaluation time",
+                  whole = all(df$eval_time == round(df$eval_time))) +
+    ggplot2::labs(y = y_lab, colour = NULL, shape = NULL) +
+    mvgam_theme() +
+    mvgam_model_colour_scale(nlevels(df$model))
+  if (!is.null(relative)) {
+    p <- p + reference_line(yintercept = 0)
+  }
+  p
+}
+
+
+#' Each model's values minus a baseline model's
+#'
+#' `relative` in the plots of [compare_scores()] and [compare_elpds()]
+#' takes this route. The baseline's own rows are dropped, being zero.
+#'
+#' @param df Data frame holding a `model` factor
+#' @param relative Character name of the baseline model
+#' @param value Character name of the column to difference
+#' @param by Character names of the columns that identify a cell
+#' @return `df` without the baseline's rows, `value` differenced
+#' @noRd
+difference_from_baseline <- function(df, relative, value, by) {
+  checkmate::assert_data_frame(df)
+  checkmate::assert_string(relative)
+  checkmate::assert_string(value)
+  checkmate::assert_character(by, min.len = 1L)
+  if (!relative %in% levels(df$model)) {
+    stop(insight::format_error(c(
+      "'relative' must name a model in the comparison.",
+      x = paste0("Got '", relative, "'."),
+      i = paste0("Available: ", paste(levels(df$model), collapse = ", "),
+                 ".")
+    )), call. = FALSE)
+  }
+  base <- df[df$model == relative, c(by, value), drop = FALSE]
+  names(base)[names(base) == value] <- ".baseline"
+  df <- merge(df, base, by = by, all.x = TRUE)
+  df[[value]] <- df[[value]] - df$.baseline
+  df <- df[df$model != relative, setdiff(names(df), ".baseline"),
+           drop = FALSE]
+  df$model <- droplevels(df$model)
+  df
+}
+
+
+#' @param object An `mvgam_compare_scores` object.
+#' @rdname compare_scores
+#' @method summary mvgam_compare_scores
+#' @export
+summary.mvgam_compare_scores <- function(object, ...) {
+  rlang::check_dots_empty()
+  score_type <- attr(object, "score") %||% "score"
+  is_joint <- score_type %in% joint_forecast_scores
+  df <- if (is_joint) {
+    subset(object, series == "all_series",
+            select = c("model", "eval_horizon", "score"))
+  } else {
+    subset(object, series != "all_series",
+            select = c("model", "series", "eval_horizon", "score"))
+  }
+  idvars <- if (is_joint) "eval_horizon"
+              else c("series", "eval_horizon")
+  wide <- stats::reshape(
+    as.data.frame(df),
+    idvar     = idvars,
+    timevar   = "model",
+    direction = "wide",
+    sep       = "_"
+  )
+  # `reshape()` names the new columns "score_<model>". The prefix is
+  # dropped to name each column by its model.
+  names(wide) <- sub("^score_", "", names(wide))
+  tibble::as_tibble(wide)
+}
+
+
+#' @rdname compare_scores
+#' @param x An `mvgam_compare_scores` object.
+#' @param digits Integer number of significant digits. Defaults to 2.
+#' @method print mvgam_compare_scores
+#' @export
+print.mvgam_compare_scores <- function(x, digits = 2L, ...) {
+  checkmate::assert_int(digits, lower = 1L)
+  # The `all_series` rows hold the score of every series at each time:
+  # their sum for a univariate score and the joint score otherwise.
+  total <- x$series == "all_series"
+  means <- vapply(split(x$score[total], x$model[total]), mean_measured,
+                  numeric(1L))
+  tab <- data.frame(model = names(means), mean_score = means,
+                    difference = means - min(means, na.rm = TRUE))
+  cat_titled_table(
+    paste(score_label(attr(x, "score")), "of", nrow(tab),
+          "models, lower is better"),
+    tab[order(tab$mean_score), ], digits,
+    "'difference' is the gap to the best. plot() shows each horizon."
+  )
+  invisible(x)
+}
+
+
+#' A label for each compared object
+#'
+#' `model_names` takes precedence. Each object without one takes the
+#' name it was passed under, then its expression in the call.
+#'
+#' @param objects List of the compared objects
+#' @param exprs List or pairlist of the unevaluated argument
+#'   expressions, one per object
+#' @param model_names Character vector of labels, one per object, or
+#'   `NULL`
+#' @return Character vector of labels, one per object
+#' @noRd
+compared_object_names <- function(objects, exprs, model_names = NULL) {
+  checkmate::assert_list(objects)
+  checkmate::assert(
+    checkmate::check_list(exprs),
+    checkmate::check_class(exprs, "pairlist"),
+    checkmate::check_null(exprs)
+  )
+  if (!is.null(model_names)) {
+    checkmate::assert_character(model_names, len = length(objects),
+                                any.missing = FALSE)
+    return(model_names)
+  }
+  given <- names(objects) %||% character(length(objects))
+  ifelse(nzchar(given), given, vapply(exprs, deparse1, character(1L)))
+}
+
+
+#' Refuse a comparison without enough objects of one class
+#'
+#' Weighting accepts `min_n = 1`, giving one model all the weight.
+#'
+#' @param objects List of the compared objects
+#' @param cls Character class every object must inherit from
+#' @param fn Character name of the calling function, for the message
+#' @param min_n Integer minimum number of objects
+#' @return `TRUE`, invisibly, or an error
+#' @noRd
+assert_compared_objects <- function(objects, cls, fn, min_n = 2L) {
+  checkmate::assert_list(objects)
+  checkmate::assert_string(cls)
+  checkmate::assert_string(fn)
+  checkmate::assert_int(min_n, lower = 1L)
+  if (length(objects) < min_n) {
+    stop(insight::format_error(c(
+      paste0("'", fn, "()' compares at least ", min_n, " '", cls,
+             "' objects."),
+      x = paste0("Received ", length(objects), "."),
+      i = "Pass each object as a separate argument."
+    )), call. = FALSE)
+  }
+  for (i in seq_along(objects)) {
+    if (!inherits(objects[[i]], cls)) {
+      stop(insight::format_error(c(
+        paste0("Argument ", i, " must be an '", cls, "' object."),
+        x = paste0("Got class '", class(objects[[i]])[1L], "'.")
+      )), call. = FALSE)
+    }
+  }
+  invisible(TRUE)
+}

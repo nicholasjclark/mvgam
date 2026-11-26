@@ -2,130 +2,182 @@
 % Please edit documentation in R/forecast.mvgam.R
 \name{forecast.mvgam}
 \alias{forecast.mvgam}
-\title{Extract or compute hindcasts and forecasts for a fitted
-\code{mvgam} object}
+\title{Posterior forecasts for an mvgam state-space model}
 \usage{
-\method{forecast}{mvgam}(object, newdata, data_test, n_cores = 1, type = "response", ...)
+\method{forecast}{mvgam}(
+  object,
+  newdata = NULL,
+  ...,
+  type = c("response", "link", "expected", "trend", "latent_state"),
+  component = NULL,
+  ndraws = NULL,
+  draw_ids = NULL,
+  coef_uncertainty = TRUE,
+  trend_uncertainty = TRUE,
+  obs_uncertainty = TRUE,
+  resp = NULL,
+  re_formula = NULL,
+  allow_new_levels = FALSE,
+  sample_new_levels = "uncertainty"
+)
 }
 \arguments{
-\item{object}{\code{list} object of class \code{mvgam} or \code{jsdgam}.
-See \code{\link[=mvgam]{mvgam()}}}
+\item{object}{A fitted \link[=mvgam]{mvgam} object.}
 
-\item{newdata}{Optional \code{dataframe} or \code{list} of test data
-containing the same variables that were included in the original \code{data}
-used to fit the model. If included, the covariate information in
-\code{newdata} will be used to generate forecasts from the fitted model
-equations. If this same \code{newdata} was originally included in the call
-to \code{mvgam}, then forecasts have already been produced by the
-generative model and these will simply be extracted and plotted. However
-if no \code{newdata} was supplied to the original model call, an
-assumption is made that the \code{newdata} supplied here comes
-sequentially after the data supplied in the original model (i.e. we
-assume there is no time gap between the last observation of series 1 in
-the original data and the first observation for series 1 in
-\code{newdata})}
+\item{newdata}{Optional \code{data.frame} with the columns of the
+training data, one row per series and future time to forecast.
+When \code{NULL}, \code{forecast()} uses the held-out data given to
+\code{mvgam(newdata = )}. A fit without held-out data needs \code{newdata}.
 
-\item{data_test}{Deprecated. Still works in place of \code{newdata} but
-users are recommended to use \code{newdata} instead for more seamless
-integration into \code{R} workflows}
+The trend decides which future times are allowed:
+\itemize{
+\item \code{AR()}, \code{RW()}, \code{VAR()}, \code{LLT()} and \code{PW()} step once per
+time point. Their forecast times must continue each series at
+its own spacing, with no gap. After training ends at \code{t = 30},
+rows for \code{t = 41:42} alone are refused. The trend would step
+once and twice, though those times are 11 and 12 steps past the
+end of training. Supply every time in between, with or without
+a response.
+\item \code{CAR()} allows for the gap between times. Each series may
+have its own forecast times, all after the last fitted time.
+\item \code{ZMVN()} has no time dynamics and takes any later times.
+}
+\code{ZMVN()} and \code{PW()} need the same forecast times for every
+series.}
 
-\item{n_cores}{Deprecated. Parallel processing is no longer supported}
+\item{...}{Unused. Anything passed here is refused.}
 
-\item{type}{When this has the value \code{link} (default) the linear
-predictor is calculated on the link scale. If \code{expected} is used,
-predictions reflect the expectation of the response (the mean) but ignore
-uncertainty in the observation process. When \code{response} is used, the
-predictions take uncertainty in the observation process into account to
-return predictions on the outcome scale. When \code{variance} is used, the
-variance of the response with respect to the mean (mean-variance
-relationship) is returned. When \code{type = "terms"}, each component of the
-linear predictor is returned separately in the form of a \code{list} (possibly
-with standard errors, if \code{summary = TRUE}): this includes parametric model
-components, followed by each smooth component, but excludes any offset and
-any intercept. Two special cases are also allowed: type \code{latent_N} will
-return the estimated latent abundances from an N-mixture distribution,
-while type \code{detection} will return the estimated detection probability from
-an N-mixture distribution}
+\item{type}{The scale of the draws:
+\itemize{
+\item \code{"response"} (the default) samples from the observation family.
+\item \code{"expected"} returns the family's mean. A binomial mean is
+\code{trials * p} and a zero-inflated mean is \code{(1 - zi) * mu}.
+\item \code{"link"} returns the linear predictor on the link scale.
+\item \code{"trend"} returns the latent trend on the link scale.
+\item \code{"latent_state"} returns the latent state of an \code{\link[=occ]{occ()}} or
+\code{\link[=nmix]{nmix()}} fit: the occupancy probability, or the abundance \code{N}.
+The hindcast conditions each closure unit on its own visits, as
+\code{hindcast(type = "latent_state")} does. The forecast takes the
+state from the covariates and the propagated trend. A
+multi-season fit holds one unit per site in each season and
+returns the mean over those sites, which for \code{\link[=occ]{occ()}} is the
+expected share of sites occupied.
+}}
 
-\item{...}{Ignored}
+\item{component}{\code{NULL} (the default) for the summed trend, or the
+names of state components of the trend, with \code{type = "trend"}.
+Several names give the sum of their components. \code{\link[=LLT]{LLT()}} has
+\code{"level"}, the stochastic level, and \code{"slope"}, its growth per time
+step. A seasonal \code{\link[=LLT]{LLT()}} adds \code{"season"}. \code{"predictor"} holds the
+effects of the trend formula's covariates. \code{c("level", "predictor")} gives the level with those effects. A factor model
+projects each component through its loadings, as it projects the
+trend.}
+
+\item{ndraws}{Positive integer specifying number of posterior draws to
+use. NULL (default) uses all available draws.}
+
+\item{draw_ids}{Optional integer vector selecting a subset of posterior
+draw indices to use. NULL (default) uses all draws (subject to
+\code{ndraws}).}
+
+\item{coef_uncertainty}{Logical, \code{TRUE} by default. \code{FALSE} holds
+the coefficients of the observation and trend formulas at one
+posterior draw, the first that \code{ndraws} or \code{draw_ids} selects. That
+includes smooth, random-effect and \code{gp()} coefficients. An exact
+\code{gp()} term's draw at new values is held too. The forecast then
+leaves out their uncertainty.
+Turning off one source of uncertainty at a time shows how much each
+contributes to a forecast.}
+
+\item{trend_uncertainty}{Logical, \code{TRUE} by default. \code{FALSE} holds
+the parameters of the trend dynamics (\code{sigma}, AR, MA and VAR
+coefficients), the last fitted state and the trend formula's
+predictor at that same draw. Each draw still takes new
+innovations. The spread then shows innovation noise alone.}
+
+\item{obs_uncertainty}{Logical, \code{TRUE} by default. \code{FALSE} returns
+the family's mean under \code{type = "response"}, in place of a sampled
+observation.}
+
+\item{resp}{Character specifying which response variable for
+multivariate models. NULL (default) returns predictions for all
+responses.}
+
+\item{re_formula, allow_new_levels, sample_new_levels}{As in
+\code{\link[=posterior_epred.mvgam]{posterior_epred.mvgam()}}. A formula applies to the observation and
+the trend formulas alike.}
 }
 \value{
-An object of class \code{mvgam_forecast} containing hindcast and
-forecast distributions. See \code{\link{mvgam_forecast-class}} for
-details.
+An object of class \link[=mvgam]{mvgam_forecast-class}.
+Hindcasts and forecasts are returned as named lists of
+\verb{[ndraws, n_times]} matrices, one per series. A forecast of state
+components names them in its \code{component} slot.
 }
 \description{
-Extract or compute hindcasts and forecasts for a fitted
-\code{mvgam} object
-}
-\details{
-Posterior predictions are drawn from the fitted \code{mvgam} and
-used to simulate a forecast distribution
+Posterior forecasts at future time points, with posterior hindcasts
+at the training time points. Each draw propagates the fitted latent
+state through the trend's dynamics. The observation family then
+maps the trend to the response scale.
 }
 \examples{
 \dontrun{
-  # Simulate data with 3 series and AR trend model
-  simdat <- sim_mvgam(n_series = 3, trend_model = AR())
+set.seed(11)
+simdat <- sim_mvgam(family = poisson(), n_series = 1L,
+                     n_timepoints = 120L, trend_model = AR(),
+                     proportional_train = 0.75)
 
-  # Fit mvgam model
-  mod <- mvgam(
-    y ~ s(season, bs = 'cc', k = 6),
-    trend_model = AR(),
-    noncentred = TRUE,
-    data = simdat$data_train,
-    chains = 2,
-    silent = 2
-  )
+mod <- mvgam(
+  y ~ s(x, k = 5),
+  trend_formula = ~ AR(p = 1),
+  data    = simdat$data_train,
+  newdata = simdat$data_test,
+  family  = poisson(),
+  chains  = 2, silent = 2
+)
 
-  # Hindcasts on response scale
-  hc <- hindcast(mod)
-  str(hc)
+# The held-out data given to mvgam() set the forecast horizon
+fc <- forecast(mod)
+plot(fc)
 
-  # Use summary() to extract hindcasts / forecasts for custom plotting
-  head(summary(hc), 12)
+# The latent AR(1) trend alone, on the log scale
+plot(forecast(mod, type = "trend"))
 
-  # Or just use the plot() function for quick plots
-  plot(hc, series = 1)
-  plot(hc, series = 2)
-  plot(hc, series = 3)
+# The expected counts, without the Poisson sampling noise
+plot(forecast(mod, type = "expected"))
 
-  # Forecasts on response scale
-  fc <- forecast(
-    mod,
-    newdata = simdat$data_test
-  )
-  str(fc)
-  head(summary(fc), 12)
-  plot(fc, series = 1)
-  plot(fc, series = 2)
-  plot(fc, series = 3)
+# Next, score the forecast against the held-out counts
+head(score(fc, score = "crps")[[1]])
 
-  # Forecasts as expectations
-  fc <- forecast(
-    mod,
-    newdata = simdat$data_test,
-    type = 'expected'
-  )
-  head(summary(fc), 12)
-  plot(fc, series = 1)
-  plot(fc, series = 2)
-  plot(fc, series = 3)
+# The sources of the forecast's variance at each horizon
+plot(forecast_uncertainty(mod, ndraws = 200))
 
-  # Dynamic trend extrapolations
-  fc <- forecast(
-    mod,
-    newdata = simdat$data_test,
-    type = 'trend'
-  )
-  head(summary(fc), 12)
-  plot(fc, series = 1)
-  plot(fc, series = 2)
-  plot(fc, series = 3)
+# How a future with higher `x` would change the forecast
+higher <- simdat$data_test
+higher$x <- higher$x + 1
+plot(forecast_uncertainty(
+  mod, newdata = list(observed = simdat$data_test, higher = higher),
+  ndraws = 200
+))
 }
 
 }
 \seealso{
-\code{\link[=hindcast.mvgam]{hindcast.mvgam()}}, \code{\link[=plot.mvgam_forecast]{plot.mvgam_forecast()}},
-\code{\link[=summary.mvgam_forecast]{summary.mvgam_forecast()}}, \code{\link[=score.mvgam_forecast]{score.mvgam_forecast()}}
-\code{\link[=ensemble.mvgam_forecast]{ensemble.mvgam_forecast()}}
+\code{\link[=hindcast.mvgam]{hindcast.mvgam()}} returns the fitted latent states.
+\code{\link[=posterior_predict.mvgam]{posterior_predict.mvgam()}} and \code{\link[=posterior_epred.mvgam]{posterior_epred.mvgam()}} predict
+from the covariate part of the model. \code{forecast()}
+extrapolates the fitted latent state. \code{\link[=score.mvgam_forecast]{score.mvgam_forecast()}}
+scores a forecast against held-out data.
+\code{\link[=forecast_uncertainty]{forecast_uncertainty()}} splits its variance by source. The
+\href{https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html}{forecast evaluation article}
+scores, compares and combines the forecasts of three models of
+rodent counts.
+
+Other forecasting: 
+\code{\link{compare_scores}()},
+\code{\link{ensemble.mvgam_forecast}()},
+\code{\link{forecast_uncertainty}()},
+\code{\link{hindcast}()},
+\code{\link{lfo_cv.mvgam}()},
+\code{\link{score}()}
 }
+\concept{forecasting}

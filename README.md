@@ -1,3 +1,4 @@
+
 <!-- README.md is generated from README.Rmd. Please edit that file -->
 
 <img src="man/figures/mvgam_logo.png" width = 120 alt="mvgam R package logo"/>[<img src="https://raw.githubusercontent.com/stan-dev/logos/master/logo_tm.png" align="right" width=120 alt="Stan Logo"/>](https://mc-stan.org/)
@@ -6,7 +7,7 @@
 
 > **M**ulti**V**ariate (Dynamic) **G**eneralized **A**dditive **M**odels
 
-[![R-CMD-check](https://github.com/nicholasjclark/mvgam/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/nicholasjclark/mvgam/actions/)
+[![R-CMD-check](https://github.com/nicholasjclark/mvgam/workflows/R-CMD-check/badge.svg)](https://github.com/nicholasjclark/mvgam/actions/)
 [![Coverage
 status](https://codecov.io/gh/nicholasjclark/mvgam/graph/badge.svg?token=RCJ2B7S0BL)](https://app.codecov.io/gh/nicholasjclark/mvgam)
 [![Documentation](https://img.shields.io/badge/documentation-mvgam-orange.svg?colorB=brightgreen)](https://nicholasjclark.github.io/mvgam/)
@@ -17,541 +18,662 @@ Version](https://www.r-pkg.org/badges/version/mvgam)](https://cran.r-project.org
 [![CRAN
 Downloads](https://cranlogs.r-pkg.org/badges/grand-total/mvgam?color=brightgreen)](https://cran.r-project.org/package=mvgam)
 
-The `mvgam` 📦 fits Bayesian Dynamic Generalized Additive Models (DGAMs)
-that can include highly flexible nonlinear predictor effects, latent
-variables and multivariate time series models. The package does this by
-relying on functionalities from the impressive
-<a href="https://paulbuerkner.com/brms/"
+The `mvgam` 📦 fits Bayesian Dynamic Generalized Additive Models
+(DGAMs). A DGAM combines nonlinear predictor effects, latent variables
+and multivariate time series models in one state-space model. `mvgam`
+builds each model from <a href="https://paulbuerkner.com/brms/"
 target="_blank"><code>brms</code></a> and
 <a href="https://cran.r-project.org/package=mgcv"
-target="_blank"><code>mgcv</code></a> packages. Parameters are estimated
-using the probabilistic programming language
-[`Stan`](https://mc-stan.org/), giving users access to the most advanced
-Bayesian inference algorithms available. This allows `mvgam` to fit a
-very wide range of models, including:
+target="_blank"><code>mgcv</code></a> components and estimates its
+parameters in
+<a href="https://mc-stan.org/" target="_blank"><code>Stan</code></a>.
+The models it fits include:
 
--   <a
-    href="https://nicholasjclark.github.io/mvgam/articles/trend_formulas.html"
-    target="_blank">Multivariate State-Space Time Series Models</a>
--   <a
-    href="https://nicholasjclark.github.io/mvgam/reference/RW.html#ref-examples"
-    target="_blank">Continuous-Time Autoregressive Time Series Models</a>
--   <a
-    href="https://nicholasjclark.github.io/mvgam/articles/shared_states.html"
-    target="_blank">Shared Signal Time Series Models</a>
--   <a
-    href="https://nicholasjclark.github.io/mvgam/reference/lv_correlations.html"
-    target="_blank">Dynamic Factor Models</a>
--   <a href="https://nicholasjclark.github.io/mvgam/articles/nmixtures.html"
-    target="_blank">Hierarchical N-mixture Models</a>
--   <a href="https://www.youtube.com/watch?v=2POK_FVwCHk"
-    target="_blank">Hierarchical Generalized Additive Models</a>
--   <a href="https://nicholasjclark.github.io/mvgam/reference/jsdgam.html"
-    target="_blank">Joint Species Distribution Models</a>
+- <a href="https://nicholasjclark.github.io/mvgam/reference/mvgam.html"
+  target="_blank">Multivariate state-space time series models</a>
+- <a href="https://nicholasjclark.github.io/mvgam/articles/var.html"
+  target="_blank">Vector autoregressions</a>
+- <a
+  href="https://nicholasjclark.github.io/mvgam/reference/trend_constructors.html"
+  target="_blank">Continuous-time autoregressions for irregularly sampled
+  series</a>
+- <a href="https://nicholasjclark.github.io/mvgam/articles/dfm.html"
+  target="_blank">Dynamic factor models</a>
+- <a href="https://nicholasjclark.github.io/mvgam/articles/occupancy.html"
+  target="_blank">Hierarchical occupancy models</a>
+- <a href="https://nicholasjclark.github.io/mvgam/articles/nmix.html"
+  target="_blank">Hierarchical N-mixture models</a>
+- <a href="https://www.youtube.com/watch?v=2POK_FVwCHk"
+  target="_blank">Hierarchical generalized additive models</a>
+- <a href="https://nicholasjclark.github.io/mvgam/articles/jsdgam.html"
+  target="_blank">Joint species distribution models</a>
+
+To choose a model, <a
+href="https://nicholasjclark.github.io/mvgam/reference/mvgam_families.html"
+target="_blank"><code>?mvgam_families</code></a> matches each response
+type to an observation family. <a
+href="https://nicholasjclark.github.io/mvgam/reference/trend_constructors.html"
+target="_blank"><code>?trend_constructors</code></a> describes each
+latent process and when it suits.
 
 ## Installation
 
-You can install the stable package version from `CRAN` using:
-`install.packages('mvgam')`, or install the latest development version
-using: `devtools::install_github("nicholasjclark/mvgam")`. You will also
-need a working version of `Stan` installed (along with either `rstan`
-and/or `cmdstanr`). Please refer to installation links for `Stan` with
-`rstan` <a href="https://mc-stan.org/users/interfaces/rstan"
-target="_blank">here</a>, or for `Stan` with `cmdstandr`
-<a href="https://mc-stan.org/cmdstanr/" target="_blank">here</a>.
+Install the released version from `CRAN` with
+`install.packages("mvgam")`, or the development version with
+`devtools::install_github("nicholasjclark/mvgam")`. `mvgam` also needs a
+working installation of `Stan` through
+<a href="https://mc-stan.org/users/interfaces/rstan"
+target="_blank"><code>rstan</code></a> or
+<a href="https://mc-stan.org/cmdstanr/"
+target="_blank"><code>cmdstanr</code></a>.
+
+## Introductory seminar
+
+<div class="video-embed">
+
+<iframe style="aspect-ratio: 16 / 9; width: 100%;" src="https://www.youtube.com/embed/0zZopLlomsQ" data-external="1" title="Ecological forecasting with Dynamic Generalized Additive Models" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen>
+</iframe>
+
+</div>
+
+<p class="github-only">
+<a href="https://www.youtube.com/watch?v=0zZopLlomsQ"><img src="https://img.youtube.com/vi/0zZopLlomsQ/hqdefault.jpg" width="100%" alt="Introductory seminar on Ecological forecasting with Dynamic Generalized Additive Models"/></a>
+</p>
 
 ## Cheatsheet
 
 [![`mvgam` usage
-cheatsheet](https://github.com/nicholasjclark/mvgam/raw/master/misc/mvgam_cheatsheet.png)](https://github.com/nicholasjclark/mvgam/raw/master/misc/mvgam_cheatsheet.pdf)
+cheatsheet](https://nicholasjclark.github.io/mvgam/cheatsheets/mvgam_cheatsheet.png)](https://nicholasjclark.github.io/mvgam/cheatsheets/mvgam_cheatsheet.pdf)
 
-## A simple example
+[![`jsdgam` cheatsheet for joint species distribution
+models](https://nicholasjclark.github.io/mvgam/cheatsheets/jsdgam_cheatsheet.png)](https://nicholasjclark.github.io/mvgam/cheatsheets/jsdgam_cheatsheet.pdf)
 
-We can explore the package’s primary functions using one of it’s
-built-in datasets. Use `plot_mvgam_series()` to inspect features for
-time series from
+## A state-space model of rodent captures
+
+The `portal_data` from
 <a href="https://portal.weecology.org/" target="_blank">the Portal
-Project</a>, which represent counts of baited captures for four desert
-rodent species over time (see `?portal_data` for more details about the
-dataset).
+Project</a> hold monthly counts of baited captures for four desert
+rodent species, with minimum temperature and a 12-month moving average
+of NDVI (see `?portal_data`). `mvgam_data()` checks that the data suit
+an observation family and plots each series:
 
-    data(portal_data)
-    plot_mvgam_series(
-      data = portal_data, 
-      y = 'captures',
-      series = 'all'
+``` r
+data(portal_data)
+mvgam_data(portal_data, y = "captures", family = poisson())
+#> ✔ Data check passed for family 'poisson (link = log)'.
+#> • series: 4 levels
+#> • time:   1 to 80
+#> • n obs:  320 (68 NA)
+```
+
+<img src="man/figures/README-portal-data-1.png" alt="Exploratory plots of four rodent capture series" width="100%" />
+
+The counts have missing values, many zeros, seasonality and
+autocorrelation. To test forecasts against data the model has not seen,
+we held out months 61 to 65:
+
+``` r
+data_train <- subset(portal_data, time <= 60)
+data_test <- subset(portal_data, time > 60 & time <= 65)
+```
+
+To estimate how temperature and vegetation drive each species’
+abundance, we fitted a state-space GAM. Each species takes its own
+intercept in the observation model. Each species’ latent abundance takes
+its own smooth of minimum temperature, a smooth of NDVI shared by all
+four species and first-order autoregressive dynamics. `AR(cor = TRUE)`
+lets the four processes share correlated shocks:
+
+``` r
+mod <- mvgam(
+  captures ~ series,
+  trend_formula = ~ s(mintemp, k = 5, by = lv_axis()) +
+    s(ndvi_ma12, k = 5) +
+    AR(cor = TRUE),
+  data = data_train,
+  family = poisson(),
+  chains = 4, cores = 4, silent = 2
+)
+#> Warning: 125 of 4000 (3.0%) transitions ended with a divergence.
+#> See https://mc-stan.org/misc/warnings for details.
+summary(mod)
+#>  Family: poisson 
+#>   Links: mu = log 
+#> Formula: captures ~ series 
+#>    Data: data_train (Number of observations: 240) 
+#>  Series: 4 
+#>  Trends: AR(1); formula: ~s(mintemp, k = 5, by = lv_axis()) + s(ndvi_ma12, k = 5) 
+#>   Draws: 4 chains, each with iter = 2000; warmup = 1000; thin = 1; 
+#>          total post-warmup draws = 4000
+#> 
+#> == Observation Model ==
+#> Regression Coefficients:
+#>           Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
+#> Intercept     2.86      0.28     2.28     3.45 1.00     2393     1869
+#> seriesDO     -2.44      0.56    -3.64    -1.41 1.00     1886     1278
+#> seriesPB     -3.07      1.15    -5.68    -0.99 1.00      903      358
+#> seriesPP     -2.15      0.49    -3.17    -1.18 1.00     2200     1474
+#> 
+#> == Trend Model ==
+#> Smoothing Spline Hyperparameters:
+#>                         Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS
+#> sds(smintempseriesDM_1)     0.67      0.72     0.02     2.64 1.00     2697
+#> sds(smintempseriesDO_1)     1.23      1.15     0.05     4.31 1.00     2605
+#> sds(smintempseriesPB_1)     2.81      1.95     0.19     7.67 1.00     2514
+#> sds(smintempseriesPP_1)     1.54      1.37     0.06     5.04 1.00     2867
+#> sds(sndvi_ma12_1)           0.92      0.88     0.03     3.14 1.00     2757
+#>                         Tail_ESS
+#> sds(smintempseriesDM_1)     2193
+#> sds(smintempseriesDO_1)     2408
+#> sds(smintempseriesPB_1)     1945
+#> sds(smintempseriesPP_1)     2679
+#> sds(sndvi_ma12_1)           2470
+#> 
+#> Regression Coefficients:
+#>                     Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
+#> smintemp:seriesDM_1    -0.81      0.98    -2.86     1.32 1.00     3235     2463
+#> smintemp:seriesDO_1    -0.27      2.28    -5.33     4.12 1.00     2816     2193
+#> smintemp:seriesPB_1     1.37      4.00    -7.81     7.99 1.00     3325     2923
+#> smintemp:seriesPP_1     5.47      2.92     0.83    12.20 1.00     2837     2347
+#> sndvi_ma12_1            0.99      1.18    -1.37     3.48 1.00     2986     2583
+#> 
+#> Trend Specific Parameters:
+#>                 Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
+#> sigma_trend[DM]     0.20      0.04     0.13     0.30 1.00     2018     1154
+#> sigma_trend[DO]     0.34      0.12     0.16     0.62 1.00     2674     3208
+#> sigma_trend[PB]     0.51      0.16     0.26     0.86 1.00     2372     3217
+#> sigma_trend[PP]     0.74      0.16     0.48     1.09 1.00     1777     3036
+#> ar1_trend[DM]       0.86      0.08     0.66     0.98 1.00     1612     1688
+#> ar1_trend[DO]       0.73      0.27    -0.05     0.99 1.00     1350     1732
+#> ar1_trend[PB]       0.90      0.07     0.74     0.99 1.00      908      261
+#> ar1_trend[PP]       0.68      0.12     0.42     0.88 1.00     2010     1809
+#> 
+#> Draws were sampled using sampling(NUTS). For each parameter, Bulk_ESS
+#> and Tail_ESS are effective sample size measures, and Rhat is the potential
+#> scale reduction factor on split chains (at convergence, Rhat = 1).
+#> 
+#> Next steps:
+#>   - `pp_check(fit)`: posterior predictive checks
+#>   - `residual_cor(fit)`: implied correlations among series
+#>   - `forecast(fit, newdata = ...)`: out-of-sample forecasts
+#>   - `lfo_cv(fit)`: leave-future-out model comparison
+#>   - `conditional_effects(fit)`: covariate effects
+#> Use `how_to_cite(fit)` for a methods paragraph and `methods_md(fit)` for its equations.
+```
+
+`conditional_effects()` plots the smooths on the scale of the latent
+process:
+
+``` r
+conditional_effects(mod)
+```
+
+<img src="man/figures/README-portal-effects-1.png" alt="Smooth effects of minimum temperature and NDVI on each species' latent abundance" width="100%" /><img src="man/figures/README-portal-effects-2.png" alt="Smooth effects of minimum temperature and NDVI on each species' latent abundance" width="100%" /><img src="man/figures/README-portal-effects-3.png" alt="Smooth effects of minimum temperature and NDVI on each species' latent abundance" width="100%" />
+
+`forecast()` continues each latent process through the five held-out
+months. The plot sets the forecasts against the held-out counts:
+
+``` r
+fc <- forecast(mod, newdata = data_test)
+plot(fc)
+```
+
+<img src="man/figures/README-portal-forecast-1.png" alt="Hindcasts and forecasts of rodent captures with the held-out observations" width="100%" />
+
+`score()` and `compare_scores()` evaluate forecasts with proper scoring
+rules. The <a
+href="https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html"
+target="_blank">forecast evaluation article</a> compares models by their
+forecasts.
+
+Randomised quantile residuals plotted over time show any structure the
+model missed:
+
+``` r
+pp_check(mod, type = "resid_ribbon_grouped", group = "series",
+         x = "time", ndraws = 200)
+#> Observations with a missing response are omitted from the plot.
+#> This message is displayed once per session.
+```
+
+<img src="man/figures/README-portal-resid-1.png" alt="Randomised quantile residuals over time for each rodent species" width="100%" />
+
+## Vector autoregressions
+
+A vector autoregression (VAR) lets each latent process depend on the
+lagged values of every process. To show what `mvgam` recovers from such
+a system, we simulated monthly counts of a prey species and its predator
+over ten years. Predators suppress the prey a month later. Prey in turn
+raise the predators a month later:
+
+``` r
+set.seed(2025)
+n_months <- 120
+# Rows hold this month's processes, columns last month's
+A <- rbind(prey     = c(0.6, -0.5),
+           predator = c(0.4,  0.5))
+z <- matrix(0, n_months, 2)
+for (t in 2:n_months) {
+  z[t, ] <- A %*% z[t - 1, ] + rnorm(2, sd = 0.35)
+}
+predator_prey <- data.frame(
+  time = rep(seq_len(n_months), 2),
+  series = factor(rep(c("prey", "predator"), each = n_months),
+                  levels = c("prey", "predator")),
+  y = rpois(2 * n_months, exp(c(2.5 + z[, 1], 1.5 + z[, 2])))
+)
+```
+
+``` r
+mod_var <- mvgam(
+  y ~ series,
+  trend_formula = ~ VAR(),
+  data = predator_prey,
+  family = poisson(),
+  chains = 4, cores = 4, silent = 2
+)
+```
+
+`posterior_transition_matrix()` summarises the estimated coefficient
+matrix. Each cell gives the effect of a process last month (column) on a
+process this month (row):
+
+``` r
+A_post <- posterior_transition_matrix(mod_var)
+plot(A_post)
+```
+
+<img src="man/figures/README-var-matrix-1.png" alt="Posterior transition matrix of the predator-prey VAR" width="60%" />
+
+The model recovered the simulated interactions. The predators’ effect on
+the prey has a posterior mean of -0.58 against a true value of -0.50.
+The prey’s effect on the predators has a mean of 0.47 against 0.40.
+
+`irf()` traces how a shock to one process spreads through the system.
+Each panel follows one process after a shock of one standard deviation:
+
+``` r
+irfs <- irf(mod_var, h = 12)
+plot(irfs, series = 1)
+```
+
+<img src="man/figures/README-var-irf-1.png" alt="Impulse responses of both species to a shock to the prey" width="100%" />
+
+A shock to the prey raises the predators, whose response peaks 2 months
+later at 0.17 on the log scale. The same shock to the predators lowers
+the prey, reaching -0.18 after 3 months:
+
+``` r
+plot(irfs, series = 2)
+```
+
+<img src="man/figures/README-var-irf-predator-1.png" alt="Impulse responses of both species to a shock to the predator" width="100%" />
+
+`fevd()` splits the forecast variance of each process among the shocks
+that produce it:
+
+``` r
+fevds <- fevd(mod_var, h = 12)
+plot(fevds)
+```
+
+<img src="man/figures/README-var-fevd-1.png" alt="Forecast error variance decompositions of the predator-prey VAR" width="100%" />
+
+At a 12-month horizon, shocks to the predators account for 35% of the
+prey’s forecast variance. Shocks to the prey account for 29% of the
+predators’ forecast variance.
+
+The <a href="https://nicholasjclark.github.io/mvgam/articles/var.html"
+target="_blank">VAR article</a> covers higher-order and hierarchical
+VARs.
+
+## Describing a fitted model
+
+A fitted model combines published methods: an observation family, a
+trend model, priors and a sampler. `how_to_cite()` drafts a methods
+paragraph for the model and lists the references for each part:
+
+<details>
+<summary>
+The methods paragraph and references <code>how_to_cite(mod)</code>
+drafts
+</summary>
+
+``` r
+how_to_cite(mod)
+#> Methods text skeleton
+#> We used the R package mvgam (version 2.0.0; Clark & Wells, 2023) to
+#>   construct, fit and interrogate the model. mvgam fits Bayesian
+#>   state-space models that combine flexible predictor effects in both the
+#>   process and observation components, using functionality from the brms
+#>   (Burkner 2017) and mgcv (Wood 2017) packages. Observations followed the
+#>   poisson family with the log link. The latent process followed AR(1)
+#>   dynamics with correlated innovations. The mvgam-constructed model and
+#>   data were passed to Stan (Carpenter et al. 2017) via the cmdstanr
+#>   interface (Gabry et al. 2024). We ran 4 Hamiltonian Monte Carlo chains
+#>   for 1000 warmup iterations and 1000 sampling iterations. Rank-normalised
+#>   split Rhat and effective sample sizes (Vehtari et al. 2021) were used to
+#>   monitor convergence.
+#> 
+#> Primary references
+#> Burkner PC (2017). brms: An R Package for Bayesian Multilevel Models
+#>   Using Stan. Journal of Statistical Software, 80(1), 1-28.
+#>   https://doi.org/10.18637/jss.v080.i01
+#> Carpenter B, Gelman A, Hoffman MD, Lee D, Goodrich B, Betancourt M,
+#>   Brubaker M, Guo J, Li P and Riddell A (2017). Stan: A probabilistic
+#>   programming language. Journal of Statistical Software, 76(1), 1-32.
+#>   https://doi.org/10.18637/jss.v076.i01
+#> Clark NJ and Wells K (2023). Dynamic Generalized Additive Models (DGAMs)
+#>   for forecasting discrete ecological time series. Methods in Ecology and
+#>   Evolution, 14(3), 771-784. https://doi.org/10.1111/2041-210X.13974
+#> Gabry J, Cesnovar R, Johnson A and Bronder S (2024). cmdstanr: R
+#>   Interface to 'CmdStan'. https://mc-stan.org/cmdstanr/
+#> Vehtari A, Gelman A, Simpson D, Carpenter B and Burkner P (2021).
+#>   Rank-normalization, folding, and localization: An improved Rhat for
+#>   assessing convergence of MCMC. Bayesian Analysis, 16(2), 667-718.
+#>   https://doi.org/10.1214/20-BA1221
+#> Wood SN (2017). Generalized Additive Models: An Introduction with R (2nd
+#>   edition). Chapman and Hall/CRC.
+#> 
+#> Other useful references
+#> Arel-Bundock V, Greifer N and Heiss A (2024). How to interpret
+#>   statistical models using marginaleffects for R and Python. Journal of
+#>   Statistical Software, 111(9), 1-32.
+#>   https://doi.org/10.18637/jss.v111.i09
+#> Burkner PC, Gabry J and Vehtari A (2020). Approximate leave-future-out
+#>   cross-validation for Bayesian time series models. Journal of Statistical
+#>   Computation and Simulation, 90(14), 2499-2523.
+#>   https://doi.org/10.1080/00949655.2020.1783262
+#> Gabry J, Simpson D, Vehtari A, Betancourt M and Gelman A (2019).
+#>   Visualization in Bayesian workflow. Journal of the Royal Statistical
+#>   Society: Series A (Statistics in Society), 182(2), 389-402.
+#>   https://doi.org/10.1111/rssa.12378
+#> Vehtari A, Gelman A and Gabry J (2017). Practical Bayesian model
+#>   evaluation using leave-one-out cross-validation and WAIC. Statistics and
+#>   Computing, 27(5), 1413-1432. https://doi.org/10.1007/s11222-016-9696-4
+#> 
+#> Use `bibtex(x)` for a BibTeX block ready for your .bib file.
+```
+
+</details>
+
+`bibtex()` writes those references to a `.bib` file. `methods_md()`
+writes the model as Markdown equations with a glossary of symbols and
+the priors, ready for a methods section or an appendix:
+
+<details>
+<summary>
+The equations <code>methods_md(mod)</code> writes for the rodent model
+</summary>
+
+#### Data
+
+$\mathrm{captures}$: non-negative integer counts
+
+$N = 240$ observations, $S = 4$ series, $T = 60$ time points
+
+Predictors:
+
+- $\mathrm{ndvi\_ma12}$: continuous covariate
+- $\mathrm{mintemp}$: continuous covariate
+
+#### Model
+
+$$
+\begin{aligned}
+i &\in \{1, \ldots, 4\} \\
+t &\in \{1, \ldots, 60\} \\
+\mathrm{captures}_{i,t} &\sim \text{Poisson}(\mu_{i,t}) \\
+\log \mu_{i,t} &= \alpha + \beta_{\mathrm{series}[\mathrm{DO}]} \mathbb{1}[i = \mathrm{DO}] + \beta_{\mathrm{series}[\mathrm{PB}]} \mathbb{1}[i = \mathrm{PB}] + \beta_{\mathrm{series}[\mathrm{PP}]} \mathbb{1}[i = \mathrm{PP}] + \mu^{(\eta)}_{i,t} + \eta_{i,t} \\
+\mu^{(\eta)}_{i,t} &= \beta^{(\eta)}_{\mathrm{smintemp}:\mathrm{seriesDM\_1}} \mathrm{smintemp}_{i,t} \, \mathrm{seriesDM\_1}_{i,t} + \beta^{(\eta)}_{\mathrm{smintemp}:\mathrm{seriesDO\_1}} \mathrm{smintemp}_{i,t} \, \mathrm{seriesDO\_1}_{i,t} + \beta^{(\eta)}_{\mathrm{smintemp}:\mathrm{seriesPB\_1}} \mathrm{smintemp}_{i,t} \, \mathrm{seriesPB\_1}_{i,t} + \beta^{(\eta)}_{\mathrm{smintemp}:\mathrm{seriesPP\_1}} \mathrm{smintemp}_{i,t} \, \mathrm{seriesPP\_1}_{i,t} + \beta^{(\eta)}_{\mathrm{sndvi\_ma12\_1}} \mathrm{sndvi\_ma12\_1}_{i,t} + f^{(\eta)}_{\mathrm{mintemp} \mid \mathrm{series}}(\mathrm{mintemp}_{i,t}) + f^{(\eta)}_{\mathrm{ndvi\_ma12}}(\mathrm{ndvi\_ma12}_{i,t}) \\
+f^{(\eta)}_{\mathrm{mintemp} \mid \mathrm{series}}(\mathrm{mintemp}) &= \sum_{m=1}^{K_{\mathrm{mintemp}}} \beta^{(\mathrm{mintemp}, \eta)}_m B_m(\mathrm{mintemp}) \\
+f^{(\eta)}_{\mathrm{ndvi\_ma12}}(\mathrm{ndvi\_ma12}) &= \sum_{m=1}^{K_{\mathrm{ndvi\_ma12}}} \beta^{(\mathrm{ndvi\_ma12}, \eta)}_m B_m(\mathrm{ndvi\_ma12}) \\
+\eta_{i,t} &= \phi_{i,1} \eta_{i,t-1} + \epsilon^{(\eta)}_{i,t} \\
+\boldsymbol{\epsilon}_{t} &\sim \text{MVNormal}(\mathbf{0}, \boldsymbol{\Sigma}) \\
+\boldsymbol{\Sigma} &= \text{diag}(\boldsymbol{\sigma}_\eta) \, \boldsymbol{\Omega} \, \text{diag}(\boldsymbol{\sigma}_\eta)
+\end{aligned}
+$$
+
+where:
+
+- $i$ indexes series, $t$ indexes time
+- $\mu_{i,t}$: conditional mean of $\mathrm{captures}_{i,t}$
+- $\alpha$: population intercept
+- $\beta_{\mathrm{series}[\mathrm{DO}]}$: difference between level
+  $\mathrm{DO}$ and reference level $\mathrm{DM}$ of $\mathrm{series}$
+- $\beta_{\mathrm{series}[\mathrm{PB}]}$: difference between level
+  $\mathrm{PB}$ and reference level $\mathrm{DM}$ of $\mathrm{series}$
+- $\beta_{\mathrm{series}[\mathrm{PP}]}$: difference between level
+  $\mathrm{PP}$ and reference level $\mathrm{DM}$ of $\mathrm{series}$
+- $\eta_{i,t}$: latent state of series $i$ at time $t$
+- $\mu^{(\eta)}_{i,t}$: trend predictor from ‘trend_formula’
+- $\beta^{(\eta)}_{\mathrm{smintemp}:\mathrm{seriesDM\_1}}$: population
+  effect of $\mathrm{smintemp} \times \mathrm{seriesDM\_1}$
+- $\beta^{(\eta)}_{\mathrm{smintemp}:\mathrm{seriesDO\_1}}$: population
+  effect of $\mathrm{smintemp} \times \mathrm{seriesDO\_1}$
+- $\beta^{(\eta)}_{\mathrm{smintemp}:\mathrm{seriesPB\_1}}$: population
+  effect of $\mathrm{smintemp} \times \mathrm{seriesPB\_1}$
+- $\beta^{(\eta)}_{\mathrm{smintemp}:\mathrm{seriesPP\_1}}$: population
+  effect of $\mathrm{smintemp} \times \mathrm{seriesPP\_1}$
+- $\beta^{(\eta)}_{\mathrm{sndvi\_ma12\_1}}$: population effect of
+  $\mathrm{sndvi\_ma12\_1}$
+- $f^{(\eta)}_{\mathrm{mintemp} \mid \mathrm{series}}$: thin plate
+  regression spline in $\mathrm{mintemp}$, stratified by
+  $\mathrm{series}$, basis size $K_{\mathrm{mintemp}} = 5$, smoothing SD
+  $\sigma^{(s, \eta)}_{\mathrm{mintemp}}$
+- $f^{(\eta)}_{\mathrm{ndvi\_ma12}}$: thin plate regression spline in
+  $\mathrm{ndvi\_ma12}$, basis size $K_{\mathrm{ndvi\_ma12}} = 5$,
+  smoothing SD $\sigma^{(s, \eta)}_{\mathrm{ndvi\_ma12}}$
+- $\boldsymbol{\epsilon}_{t}$: process innovations at time $t$,
+  covariance $\boldsymbol{\Sigma}$, with $\boldsymbol{\sigma}_\eta$ the
+  vector of SDs $\sigma_{\eta,i}$
+- $\boldsymbol{\Omega}$: correlation matrix of the innovations
+- $\phi_{i,l}$: autoregressive coefficient at lag $l$
+
+#### Priors
+
+$$
+\begin{aligned}
+\alpha &\sim \text{StudentT}(3, 0.9, 2.5) \\
+\sigma^{(s, \eta)}_{\mathrm{mintemp}} &\sim \text{StudentT}(3, 0, 2.5) \\
+\sigma^{(s, \eta)}_{\mathrm{ndvi\_ma12}} &\sim \text{StudentT}(3, 0, 2.5) \\
+\sigma_{\eta,i} &\sim \text{InvGamma}(3, 1.07) \\
+\boldsymbol{\Omega} &\sim \text{LKJCorr}(2) \\
+\phi_{i,1} &\sim \text{Normal}(0, 0.5)
+\end{aligned}
+$$
+
+Every other parameter takes an improper flat prior on its support.
+
+#### Implementation
+
+Fitted with mvgam 2.0.0 (brms 2.23.0; Stan 2.38.0 via cmdstanr).
+Hamiltonian Monte Carlo: 4 chains, 1000 warmup + 1000 sampling
+iterations per chain.
+
+    mvgam(
+      formula       = captures ~ series,
+      trend_formula = ~s(mintemp, k = 5, by = lv_axis()) + s(ndvi_ma12, k = 5) + AR(cor = TRUE),
+      data          = data_train,
+      family        = poisson(),
+      backend       = "cmdstanr",
+      chains        = 4,
+      iter          = 2000,
+      warmup        = 1000
     )
 
-<img src="man/figures/README-unnamed-chunk-4-1.png" alt="Visualizing multivariate time series in R using mvgam" width="100%" />
+</details>
 
-    plot_mvgam_series(
-      data = portal_data, 
-      y = 'captures',
-      series = 1
-    )
+## Observation families
 
-<img src="man/figures/README-unnamed-chunk-4-2.png" alt="Visualizing multivariate time series in R using mvgam" width="100%" />
+`mvgam` began as a tool for forecasting ecological counts. Its
+observation families now span most of the response types met in
+ecological and environmental monitoring.
 
-    plot_mvgam_series(
-      data = portal_data, 
-      y = 'captures',
-      series = 4
-    )
+For continuous responses:
 
-<img src="man/figures/README-unnamed-chunk-4-3.png" alt="Visualizing multivariate time series in R using mvgam" width="100%" />
+- `gaussian()` for real-valued data
+- `student()` for real-valued data with heavy tails
+- `lognormal()` and `Gamma()` for strictly positive data
+- `exponential()` for waiting times
+- `Beta()` for proportions on `(0, 1)`
+- `tweedie()` for positive continuous data carrying an exact mass at
+  zero, such as catch per unit effort or rainfall
 
-These plots show that the time series are count responses, with missing
-data, many zeroes, seasonality and temporal autocorrelation all present.
-These features make time series analysis and forecasting very difficult
-using conventional software. But `mvgam` shines in these tasks.
+For counts and binary outcomes:
 
-For most forecasting exercises, we’ll want to split the data into
-training and testing folds:
+- `poisson()` for equidispersed counts
+- `negbinomial()` for overdispersed counts
+- `beta_nb()` for counts whose tails run heavier than a negative
+  binomial can reach
+- `bernoulli()` for binary data
+- `binomial()` and `beta_binomial()` for counts with a known number of
+  trials
+- `com_binomial()` for bounded counts that are under-, over- or
+  super-dispersed relative to a binomial
 
-    data_train <- portal_data %>%
-      dplyr::filter(time <= 60)
-    data_test <- portal_data %>%
-      dplyr::filter(time > 60 &
-                      time <= 65)
+A further group of families operates on *closure units*, where several
+rows of the data share a single latent state. `mvgam` groups the rows of
+a unit by their `series` and `time` values. Replicate visits to a site
+and the species of one assemblage then need no reshaping:
 
-Formulate an `mvgam` model; this model fits a State-Space GAM in which
-each species has its own intercept, linear association with `ndvi_ma12`
-and potentially nonlinear association with `mintemp`. These effects are
-estimated jointly with a full time series model for the temporal
-dynamics (in this case a Vector Autoregressive process). We assume the
-outcome follows a Poisson distribution and will condition the model in
-`Stan` using MCMC sampling with `Cmdstan`:
+- `nmix()` for repeat counts of an unknown abundance seen with imperfect
+  detection
+- `occ()` for repeat detection and non-detection visits to a site of
+  unknown occupancy
+- `multi()` and `diri()` for compositional counts and proportions that
+  sum within a unit
+- `categ()` for a single categorical outcome per unit
+- `mvn()` and `mvt()` for continuous multi-species responses with a
+  low-rank residual covariance, the latter permitting heavier tails
 
-    mod <- mvgam(
-      # Observation model is empty as we don't have any
-      # covariates that impact observation error
-      formula = captures ~ 0,
-      
-      # Process model contains varying intercepts, 
-      # varying slopes of ndvi_ma12 and varying smooths 
-      # of mintemp for each series. 
-      # Temporal dynamics are modelled with a Vector 
-      # Autoregression (VAR(1))
-      trend_formula = ~ 
-        trend +
-        s(trend, bs = 're', by = ndvi_ma12) +
-        s(mintemp, bs = 'bs', by = trend) - 1,
-      trend_model = VAR(cor = TRUE),
-      
-      # Obvservations are conditionally Poisson
-      family = poisson(),
+`?mvgam_families` lists the full set, grouped by the kind of response
+each one suits. To show a `Beta` model, we simulated proportions for
+three series. Each series has a smooth covariate effect and its own
+autoregressive trend:
 
-      # Condition on the training data
-      data = data_train,
-      backend = 'cmdstanr'
-    )
+``` r
+set.seed(100)
+beta_data <- sim_mvgam(
+  family = Beta(),
+  n_series = 3L,
+  n_timepoints = 80L,
+  trend_model = AR(),
+  prop_trend = 0.5
+)
+mvgam_data(beta_data$data_train, y = "y", family = Beta())
+#> ✔ Data check passed for family 'beta (link = logit)'.
+#> • series: 3 levels
+#> • time:   1 to 60
+#> • n obs:  180 (0 NA)
+```
 
-Using `print()` returns a quick summary of the object:
+<img src="man/figures/README-beta-sim-1.png" alt="Exploratory plots of three simulated series of proportions" width="100%" />
 
-    mod
-    #> GAM observation formula:
-    #> captures ~ 1
-    #> 
-    #> GAM process formula:
-    #> ~trend + s(trend, bs = "re", by = ndvi_ma12) + s(mintemp, bs = "bs", 
-    #>     by = trend) - 1
-    #> 
-    #> Family:
-    #> poisson
-    #> 
-    #> Link function:
-    #> log
-    #> 
-    #> Trend model:
-    #> VAR(cor = TRUE)
-    #> 
-    #> 
-    #> N latent factors:
-    #> 4 
-    #> 
-    #> N series:
-    #> 4 
-    #> 
-    #> N timepoints:
-    #> 60 
-    #> 
-    #> Status:
-    #> Fitted using Stan 
-    #> 4 chains, each with iter = 2000; warmup = 1500; thin = 1 
-    #> Total post-warmup draws = 2000
+``` r
+mod_beta <- mvgam(
+  y ~ s(x, by = series, k = 6),
+  trend_formula = ~ AR(p = 1),
+  data = beta_data$data_train,
+  newdata = beta_data$data_test,
+  family = Beta(),
+  chains = 4, cores = 4, silent = 2
+)
+#> Warning: 32 of 4000 (1.0%) transitions ended with a divergence.
+#> See https://mc-stan.org/misc/warnings for details.
+#> Warning: 4 of 4 chains had an E-BFMI less than 0.3.
+#> See https://mc-stan.org/misc/warnings for details.
+```
 
-Split Rhat and Effective Sample Size diagnostics show good convergence
-of model estimates
+The three series share one `Beta` precision parameter $\phi$. The
+summary reports it with the smooths and the trend parameters:
 
-    mcmc_plot(mod, 
-              type = 'rhat_hist')
-    #> `stat_bin()` using `bins = 30`. Pick better value `binwidth`.
+``` r
+summary(mod_beta)
+#>  Family: beta 
+#>   Links: mu = logit; phi = log 
+#> Formula: y ~ s(x, by = series, k = 6) 
+#>    Data: beta_data$data_train (Number of observations: 180) 
+#>  Series: 3 
+#>  Trends: AR(1) 
+#>   Draws: 4 chains, each with iter = 2000; warmup = 1000; thin = 1; 
+#>          total post-warmup draws = 4000
+#> 
+#> == Observation Model ==
+#> Smoothing Spline Hyperparameters:
+#>                         Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS
+#> sds(sxseriesseries_1_1)     4.81      2.31     1.73    10.50 1.04       91
+#> sds(sxseriesseries_2_1)     6.03      2.48     2.56    11.88 1.02      514
+#> sds(sxseriesseries_3_1)     8.88      3.43     3.99    17.29 1.07     1330
+#>                         Tail_ESS
+#> sds(sxseriesseries_1_1)     2473
+#> sds(sxseriesseries_2_1)     2357
+#> sds(sxseriesseries_3_1)     2012
+#> 
+#> Regression Coefficients:
+#>                     Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
+#> Intercept               0.19      0.16    -0.13     0.51 1.01      878     1997
+#> sx:seriesseries_1_1    10.67      7.38    -1.09    25.07 1.07       44      161
+#> sx:seriesseries_2_1    14.80      6.18     3.90    26.87 1.07       41       71
+#> sx:seriesseries_3_1    23.44      7.20    10.27    37.19 1.08       36       78
+#> 
+#> Further Distributional Parameters:
+#>     Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
+#> phi    11.86      7.84     5.27    35.93 1.15       19       17
+#> 
+#> == Trend Model ==
+#> Trend Specific Parameters:
+#>                       Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS
+#> sigma_trend[series_1]     0.74      0.22     0.34     1.15 1.09       34
+#> sigma_trend[series_2]     0.81      0.21     0.45     1.22 1.09       34
+#> sigma_trend[series_3]     0.47      0.17     0.18     0.80 1.09       32
+#> ar1_trend[series_1]       0.57      0.20     0.17     0.91 1.05       86
+#> ar1_trend[series_2]       0.72      0.11     0.47     0.91 1.01      695
+#> ar1_trend[series_3]       0.55      0.26    -0.10     0.92 1.03      251
+#>                       Tail_ESS
+#> sigma_trend[series_1]      437
+#> sigma_trend[series_2]      461
+#> sigma_trend[series_3]      469
+#> ar1_trend[series_1]       1029
+#> ar1_trend[series_2]       1834
+#> ar1_trend[series_3]       1243
+#> 
+#> Draws were sampled using sampling(NUTS). For each parameter, Bulk_ESS
+#> and Tail_ESS are effective sample size measures, and Rhat is the potential
+#> scale reduction factor on split chains (at convergence, Rhat = 1).
+#> 
+#> Next steps:
+#>   - `pp_check(fit)`: posterior predictive checks
+#>   - `forecast(fit, newdata = ...)`: out-of-sample forecasts
+#>   - `lfo_cv(fit)`: leave-future-out model comparison
+#>   - `conditional_effects(fit)`: covariate effects
+#> Use `how_to_cite(fit)` for a methods paragraph and `methods_md(fit)` for its equations.
+```
 
-<img src="man/figures/README-unnamed-chunk-9-1.png" alt="Rhats of parameters estimated with Stan in mvgam" width="100%" />
+The hindcasts and forecasts of each series, against the held-out
+observations:
 
-    mcmc_plot(mod, 
-              type = 'neff_hist')
-    #> `stat_bin()` using `bins = 30`. Pick better value `binwidth`.
+``` r
+plot(forecast(mod_beta))
+```
 
-<img src="man/figures/README-unnamed-chunk-10-1.png" alt="Effective sample sizes of parameters estimated with Stan in mvgam" width="100%" />
+<img src="man/figures/README-beta-forecast-1.png" alt="Hindcasts and forecasts of three series of proportions" width="100%" />
 
-Use `conditional_effects()` for a quick visualisation of the main terms
-in model formulae
-
-    conditional_effects(mod, 
-                        type = 'link')
-
-<img src="man/figures/README-unnamed-chunk-11-1.png" alt="Plotting GAM effects in mvgam and R" width="100%" /><img src="man/figures/README-unnamed-chunk-11-2.png" alt="Plotting GAM effects in mvgam and R" width="100%" /><img src="man/figures/README-unnamed-chunk-11-3.png" alt="Plotting GAM effects in mvgam and R" width="100%" />
-
-If you have the `gratia` package installed, it can also be used to plot
-partial effects of smooths
-
-    require(gratia)
-    draw(mod, 
-         trend_effects = TRUE)
-
-<img src="man/figures/README-unnamed-chunk-12-1.png" alt="Plotting GAM smooth functions in mvgam using gratia" width="100%" />
-
-Or design more targeted plots using `plot_predictions()` from the
-`marginaleffects` package
-
-    plot_predictions(
-      mod,
-      condition = c('ndvi_ma12',
-                    'series',
-                    'series'),
-      type = 'link'
-    )
-
-<img src="man/figures/README-unnamed-chunk-13-1.png" alt="Using marginaleffects and mvgam to plot GAM smooth functions in R" width="100%" />
-
-    plot_predictions(
-      mod,
-      condition = c('mintemp',
-                    'series',
-                    'series'),
-      type = 'link'
-    )
-
-<img src="man/figures/README-unnamed-chunk-14-1.png" alt="Using marginaleffects and mvgam to plot GAM smooth functions in R" width="100%" />
-
-We can also view the model’s posterior predictions for the entire series
-(testing and training). Forecasts can be scored using a range of proper
-scoring rules. See `?score.mvgam_forecast` for more details
-
-    fcs <- forecast(mod, 
-                    newdata = data_test)
-    plot(fcs, series = 1) +
-      plot(fcs, series = 2) +
-      plot(fcs, series = 3) +
-      plot(fcs, series = 4)
-    #> Out of sample DRPS:
-    #> 8.451467
-    #> Out of sample DRPS:
-    #> 5.168817
-    #> Out of sample DRPS:
-    #> 8.52922325
-    #> Out of sample DRPS:
-    #> 3.60317975
-
-<img src="man/figures/README-unnamed-chunk-15-1.png" alt="Plotting forecast distributions using mvgam in R" width="100%" />
-
-For Vector Autoregressions fit in `mvgam`, we can inspect <a
-href="https://ecogambler.netlify.app/blog/vector-autoregressions/#impulse-response-functions"
-target="_blank">impulse response functions and forecast error variance
-decompositions</a>. The `irf()` function runs an Impulse Response
-Function (IRF) simulation whereby a positive “shock” is generated for a
-target process at time `t = 0`. All else remaining stable, it then
-monitors how each of the remaining processes in the latent VAR would be
-expected to respond over the forecast horizon `h`. The function computes
-impulse responses for all processes in the object and returns them in an
-array that can be plotted using the S3 `plot()` function. Here we will
-use the generalized IRF, which makes no assumptions about the order in
-which the series appear in the VAR process, and inspect how each process
-is expected to respond to a sudden, positive pulse from the other
-processes over a horizon of 12 timepoints.
-
-    irfs <- irf(mod, 
-                h = 12, 
-                orthogonal = FALSE)
-    plot(irfs, 
-         series = 1)
-
-<img src="man/figures/README-unnamed-chunk-16-1.png" alt="Impulse response functions computed using mvgam in R" width="100%" />
-
-    plot(irfs, 
-         series = 3)
-
-<img src="man/figures/README-unnamed-chunk-16-2.png" alt="Impulse response functions computed using mvgam in R" width="100%" />
-
-Using the same logic as above, we can inspect forecast error variance
-decompositions (FEVDs) for each process using`fevd()`. This type of
-analysis asks how orthogonal shocks to all process in the system
-contribute to the variance of forecast uncertainty for a focal process
-over increasing horizons. In other words, the proportion of the forecast
-variance of each latent time series can be attributed to the effects of
-the other series in the VAR process. FEVDs are useful because some
-shocks may not be expected to cause variations in the short-term but may
-cause longer-term fluctuations
-
-    fevds <- fevd(mod, 
-                  h = 12)
-    plot(fevds)
-
-<img src="man/figures/README-unnamed-chunk-17-1.png" alt="Forecast error variance decompositions computed using mvgam in R" width="100%" />
-
-This plot shows that the variance of forecast uncertainty for each
-process is initially dominated by contributions from that same process
-(i.e. self-dependent effects) but that effects from other processes
-become more important over increasing forecast horizons. Given what we
-saw from the IRF plots above, these long-term contributions from
-interactions among the processes makes sense.
-
-Plotting randomized quantile residuals over `time` for each series can
-give useful information about what might be missing from the model. We
-can use the highly versatile `pp_check()` function to plot these:
-
-    pp_check(
-      mod, 
-      type = 'resid_ribbon_grouped',
-      group = 'series',
-      x = 'time',
-      ndraws = 200
-    )
-
-<img src="man/figures/README-unnamed-chunk-18-1.png" alt="" width="100%" />
-
-When describing the model, it can be helpful to use the `how_to_cite()`
-function to generate a scaffold for describing the model and sampling
-details in scientific communications
-
-    description <- how_to_cite(mod)
-
-    description
-
-    #> Methods text skeleton
-    #> We used the R package mvgam (version 1.1.594; Clark & Wells, 2023) to
-    #>   construct, fit and interrogate the model. mvgam fits Bayesian
-    #>   State-Space models that can include flexible predictor effects in both
-    #>   the process and observation components by incorporating functionalities
-    #>   from the brms (Burkner 2017), mgcv (Wood 2017) and splines2 (Wang & Yan,
-    #>   2023) packages. To encourage stability and prevent forecast variance
-    #>   from increasing indefinitely, we enforced stationarity of the Vector
-    #>   Autoregressive process following methods described by Heaps (2023) and
-    #>   Clark et al. (2025). The mvgam-constructed model and observed data were
-    #>   passed to the probabilistic programming environment Stan (version
-    #>   2.38.0; Carpenter et al. 2017, Stan Development Team 2026), specifically
-    #>   through the cmdstanr interface (Gabry & Cesnovar, 2021). We ran 4
-    #>   Hamiltonian Monte Carlo chains for 1500 warmup iterations and 500
-    #>   sampling iterations for joint posterior estimation. Rank normalized
-    #>   split Rhat (Vehtari et al. 2021) and effective sample sizes were used to
-    #>   monitor convergence.
-
-    #> 
-    #> Primary references
-    #> Clark, NJ and Wells K (2023). Dynamic Generalized Additive Models
-    #>   (DGAMs) for forecasting discrete ecological time series. Methods in
-    #>   Ecology and Evolution, 14, 771-784. doi.org/10.1111/2041-210X.13974
-    #> Burkner, PC (2017). brms: An R Package for Bayesian Multilevel Models
-    #>   Using Stan. Journal of Statistical Software, 80(1), 1-28.
-    #>   doi:10.18637/jss.v080.i01
-    #> Wood, SN (2017). Generalized Additive Models: An Introduction with R
-    #>   (2nd edition). Chapman and Hall/CRC.
-    #> Wang W and Yan J (2021). Shape-Restricted Regression Splines with R
-    #>   Package splines2. Journal of Data Science, 19(3), 498-517.
-    #>   doi:10.6339/21-JDS1020 https://doi.org/10.6339/21-JDS1020.
-    #> Heaps, SE (2023). Enforcing stationarity through the prior in vector
-    #>   autoregressions. Journal of Computational and Graphical Statistics 32,
-    #>   74-83.
-    #> Clark NJ, Ernest SKM, Senyondo H, Simonis J, White EP, Yenni GM,
-    #>   Karunarathna KANK (2025). Beyond single-species models: leveraging
-    #>   multispecies forecasts to navigate the dynamics of ecological
-    #>   predictability. PeerJ 13:e18929.
-    #> Carpenter B, Gelman A, Hoffman MD, Lee D, Goodrich B, Betancourt M,
-    #>   Brubaker M, Guo J, Li P and Riddell A (2017). Stan: A probabilistic
-    #>   programming language. Journal of Statistical Software 76.
-    #> Gabry J, Cesnovar R, Johnson A, and Bronder S (2026). cmdstanr: R
-    #>   Interface to 'CmdStan'. https://mc-stan.org/cmdstanr/,
-    #>   https://discourse.mc-stan.org.
-    #> Vehtari A, Gelman A, Simpson D, Carpenter B, and Burkner P (2021).
-    #>   Rank-normalization, folding, and localization: An improved Rhat for
-    #>   assessing convergence of MCMC (with discussion). Bayesian Analysis 16(2)
-    #>   667-718. https://doi.org/10.1214/20-BA1221.
-    #> 
-    #> Other useful references
-    #> Arel-Bundock V, Greifer N, and Heiss A (2024). How to interpret
-    #>   statistical models using marginaleffects for R and Python. Journal of
-    #>   Statistical Software, 111(9), 1-32.
-    #>   https://doi.org/10.18637/jss.v111.i09
-    #> Gabry J, Simpson D, Vehtari A, Betancourt M, and Gelman A (2019).
-    #>   Visualization in Bayesian workflow. Journal of the Royal Statatistical
-    #>   Society A, 182, 389-402. doi:10.1111/rssa.12378.
-    #> Vehtari A, Gelman A, and Gabry J (2017). Practical Bayesian model
-    #>   evaluation using leave-one-out cross-validation and WAIC. Statistics and
-    #>   Computing, 27, 1413-1432. doi:10.1007/s11222-016-9696-4.
-    #> Burkner PC, Gabry J, and Vehtari A. (2020). Approximate leave-future-out
-    #>   cross-validation for Bayesian time series models. Journal of Statistical
-    #>   Computation and Simulation, 90(14), 2499-2523.
-    #>   https://doi.org/10.1080/00949655.2020.1783262
-
-The post-processing methods we have shown above are just the tip of the
-iceberg. For a full list of methods to apply on fitted model objects,
-type `methods(class = "mvgam")`.
-
-## Extended observation families
-
-`mvgam` was originally designed to analyse and forecast non-negative
-integer-valued data. But further development of `mvgam` has resulted in
-support for a growing number of observation families. Currently, the
-package can handle data for the following:
-
--   `gaussian()` for real-valued data
--   `student_t()` for heavy-tailed real-valued data
--   `lognormal()` for non-negative real-valued data
--   `Gamma()` for non-negative real-valued data
--   `betar()` for proportional data on `(0,1)`
--   `bernoulli()` for binary data
--   `poisson()` for count data
--   `nb()` for overdispersed count data
--   `binomial()` for count data with known number of trials
--   `beta_binomial()` for overdispersed count data with known number of
-    trials
--   `nmix()` for count data with imperfect detection (unknown number of
-    trials)
-
-See `??mvgam_families` for more information. Below is a simple example
-for simulating and modelling proportional data with `Beta` observations
-over a set of seasonal series with independent Gaussian Process dynamic
-trends:
-
-    set.seed(100)
-    data <- sim_mvgam(
-      family = betar(),
-      T = 80,
-      trend_model = GP(),
-      prop_trend = 0.5,
-      seasonality = "shared"
-    )
-    plot_mvgam_series(
-      data = data$data_train, 
-      series = "all"
-    )
-
-<img src="man/figures/README-beta_sim-1.png" alt="" width="100%" />
-
-    mod <- mvgam(
-      y ~ s(season, bs = "cc", k = 7) +
-        s(season, by = series, m = 1, k = 5),
-      trend_model = GP(),
-      data = data$data_train,
-      newdata = data$data_test,
-      family = betar()
-    )
-
-Inspect the summary to see that the posterior now also contains
-estimates for the `Beta` precision parameters *ϕ*.
-
-    summary(mod, 
-            include_betas = FALSE)
-    #> GAM formula:
-    #> y ~ s(season, bs = "cc", k = 7) + s(season, by = series, m = 1, 
-    #>     k = 5)
-    #> 
-    #> Family:
-    #> beta
-    #> 
-    #> Link function:
-    #> logit
-    #> 
-    #> Trend model:
-    #> GP()
-    #> 
-    #> N series:
-    #> 3 
-    #> 
-    #> N timepoints:
-    #> 80 
-    #> 
-    #> Status:
-    #> Fitted using Stan 
-    #> 4 chains, each with iter = 1000; warmup = 500; thin = 1 
-    #> Total post-warmup draws = 2000
-    #> 
-    #> Observation precision parameter estimates:
-    #>        2.5%  50% 97.5% Rhat n_eff
-    #> phi[1]  7.8 12.0  18.0    1  1829
-    #> phi[2]  5.6  8.6  13.0    1  1023
-    #> phi[3]  4.1  6.0   8.7    1  1404
-    #> 
-    #> GAM coefficient (beta) estimates:
-    #>             2.5%  50% 97.5% Rhat n_eff
-    #> (Intercept) 0.11 0.45   0.7 1.01   602
-    #> 
-    #> Approximate significance of GAM smooths:
-    #>                             edf Ref.df Chi.sq p-value  
-    #> s(season)                3.9071      5  9.792  0.0653 .
-    #> s(season):seriesseries_1 1.0934      4 11.307  0.2695  
-    #> s(season):seriesseries_2 2.5629      4  2.227  0.4544  
-    #> s(season):seriesseries_3 0.8565      4  6.556  0.5358  
-    #> ---
-    #> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
-    #> 
-    #> marginal deviation:
-    #>              2.5%  50% 97.5% Rhat n_eff
-    #> alpha_gp[1] 0.150 0.40  0.88 1.00   828
-    #> alpha_gp[2] 0.570 0.93  1.50 1.00  1018
-    #> alpha_gp[3] 0.052 0.40  0.92 1.01   672
-    #> 
-    #> length scale:
-    #>           2.5%  50% 97.5% Rhat n_eff
-    #> rho_gp[1]  1.2  3.6    11 1.00  1482
-    #> rho_gp[2]  3.0 12.0    30 1.01   367
-    #> rho_gp[3]  1.3  4.9    26 1.00   532
-    #> 
-    #> Stan MCMC diagnostics:
-    #> ✔ No issues with effective samples per iteration
-    #> ✔ Rhat looks good for all parameters
-    #> ✔ No issues with divergences
-    #> ✔ No issues with maximum tree depth
-    #> 
-    #> Samples were drawn using sampling(hmc). For each parameter, n_eff is a
-    #>   crude measure of effective sample size, and Rhat is the potential scale
-    #>   reduction factor on split MCMC chains (at convergence, Rhat = 1)
-    #> 
-    #> Use how_to_cite() to get started describing this model
-
-Plot the hindcast and forecast distributions for each series
-
-    library(patchwork)
-    fc <- forecast(mod)
-    wrap_plots(
-      plot(fc, series = 1),
-      plot(fc, series = 2),
-      plot(fc, series = 3),
-      ncol = 2
-    )
-
-<img src="man/figures/README-beta_fc-1.png" alt="" width="100%" />
-
-There are many more extended uses of `mvgam`, including the ability to
-fit hierarchical State-Space GAMs that include dynamic and spatially
-varying coefficient models, dynamic factors, Joint Species Distribution
-Models and much more. See the
-<a href="https://nicholasjclark.github.io/mvgam/"
-target="_blank">package documentation</a> for more details. `mvgam` can
-also be used to generate all necessary data structures and modelling
-code necessary to fit DGAMs using `Stan`. This can be helpful if users
-wish to make changes to the model to better suit their own bespoke
-research / analysis goals. The <a href="https://discourse.mc-stan.org/"
+The <a href="https://nicholasjclark.github.io/mvgam/"
+target="_blank">package documentation</a> covers the other uses of
+`mvgam`, among them dynamic and spatially varying coefficients, dynamic
+factors and joint species distribution models. `stancode()` and
+`standata()` return the `Stan` program and data of any model for users
+who wish to adapt it. The <a href="https://discourse.mc-stan.org/"
 target="_blank"><code>Stan</code> Discourse</a> is a helpful place to
 troubleshoot.
 
 ## Citing `mvgam` and related software
 
-When using any software please make sure to appropriately acknowledge
-the hard work that developers and maintainers put into making these
-packages available. Citations are currently the best way to formally
-acknowledge this work (but feel free to ⭐ this repo as well).
+Research software is written and maintained by people whose only
+currency is citation. If `mvgam` contributed to an analysis, please cite
+it and the packages it depends on. A ⭐ on the repository is welcome
+too.
 
 When using `mvgam`, please cite the following:
 
@@ -566,61 +688,58 @@ As `mvgam` acts as an interface to `Stan`, please additionally cite:
 > Stan: A probabilistic programming language. *Journal of Statistical
 > Software*. 76(1). DOI: <https://doi.org/10.18637/jss.v076.i01>
 
-`mvgam` relies on several other `R` packages and, of course, on `R`
-itself. Use `how_to_cite()` to simplify the process of finding
-appropriate citations for your software setup.
+`how_to_cite(mod)` lists the further references for the family, trend
+model and sampler of a fitted model.
 
 ## Getting help
 
-If you encounter a clear bug, please file an issue with a minimal
-reproducible example on
-[GitHub](https://github.com/nicholasjclark/mvgam/issues). Please also
-feel free to use the [`mvgam` Discussion
-Board](https://github.com/nicholasjclark/mvgam/discussions) to hunt for
-or post other discussion topics related to the package, and do check out
-the [`mvgam`
-Changelog](https://nicholasjclark.github.io/mvgam/news/index.html) for
-any updates about recent upgrades that the package has incorporated.
+Bug reports belong on the [issue
+tracker](https://github.com/nicholasjclark/mvgam/issues). A minimal
+reproducible example makes a report fixable. Questions about model
+syntax, priors or interpretation are better suited to the [`mvgam`
+Discussion Board](https://github.com/nicholasjclark/mvgam/discussions),
+where an earlier thread has often covered the same ground already. The
+[Changelog](https://nicholasjclark.github.io/mvgam/news/index.html)
+records what changed in each release.
 
 ## Other resources
 
-A series of <a href="https://nicholasjclark.github.io/mvgam/"
-target="_blank">vignettes cover data formatting, forecasting and several
-extended case studies of DGAMs</a>. A number of other examples,
-including some step-by-step introductory webinars, have also been
-compiled:
+The <a href="https://nicholasjclark.github.io/mvgam/"
+target="_blank">package website</a> holds articles on data formatting,
+forecasting and several extended case studies. Further examples,
+including step-by-step introductory webinars:
 
--   <a
-    href="https://www.youtube.com/playlist?list=PLzFHNoUxkCvsFIg6zqogylUfPpaxau_a3"
-    target="_blank">Time series in R and Stan using the <code>mvgam</code>
-    package</a>
--   <a href="https://www.youtube.com/watch?v=0zZopLlomsQ"
-    target="_blank">Ecological Forecasting with Dynamic Generalized Additive
-    Models</a>
--   <a href="https://ecogambler.netlify.app/blog/distributed-lags-mgcv/"
-    target="_blank">Distributed lags (and hierarchical distributed lags)
-    using <code>mgcv</code> and <code>mvgam</code></a>
--   <a href="https://ecogambler.netlify.app/blog/vector-autoregressions/"
-    target="_blank">State-Space Vector Autoregressions in
-    <code>mvgam</code></a>
--   <a href="https://www.youtube.com/watch?v=RwllLjgPUmM"
-    target="_blank">Ecological Forecasting with Dynamic GAMs; a tutorial and
-    detailed case study</a>
--   <a href="https://ecogambler.netlify.app/blog/time-varying-seasonality/"
-    target="_blank">Incorporating time-varying seasonality in forecast
-    models</a>
+- <a
+  href="https://www.youtube.com/playlist?list=PLzFHNoUxkCvsFIg6zqogylUfPpaxau_a3"
+  target="_blank">Time series in R and Stan using the <code>mvgam</code>
+  package</a>
+- <a href="https://www.youtube.com/watch?v=0zZopLlomsQ"
+  target="_blank">Ecological Forecasting with Dynamic Generalized Additive
+  Models</a>
+- <a href="https://ecogambler.netlify.app/blog/distributed-lags-mgcv/"
+  target="_blank">Distributed lags (and hierarchical distributed lags)
+  using <code>mgcv</code> and <code>mvgam</code></a>
+- <a href="https://ecogambler.netlify.app/blog/vector-autoregressions/"
+  target="_blank">State-Space Vector Autoregressions in
+  <code>mvgam</code></a>
+- <a href="https://www.youtube.com/watch?v=RwllLjgPUmM"
+  target="_blank">Ecological Forecasting with Dynamic GAMs; a tutorial and
+  detailed case study</a>
+- <a href="https://ecogambler.netlify.app/blog/time-varying-seasonality/"
+  target="_blank">Incorporating time-varying seasonality in forecast
+  models</a>
 
 ## Interested in contributing?
 
 I’m actively seeking PhD students and other researchers to work in the
 areas of ecological forecasting, multivariate model evaluation and
 development of `mvgam`. Please reach out if you are interested
-(n.clark’at’uq.edu.au). Other contributions are also very welcome, but
-please see [The Contributor
+(n.clark’at’uq.edu.au). Other contributions are also very welcome. [The
+Contributor
 Instructions](https://github.com/nicholasjclark/mvgam/blob/master/.github/CONTRIBUTING.md)
-for general guidelines. Note that by participating in this project you
-agree to abide by the terms of its [Contributor Code of
-Conduct](https://dplyr.tidyverse.org/CODE_OF_CONDUCT).
+give general guidelines. By participating in this project you agree to
+abide by the terms of its [Contributor Code of
+Conduct](https://github.com/nicholasjclark/mvgam/blob/master/.github/CODE_OF_CONDUCT.md).
 
 ## License
 

@@ -1,0 +1,447 @@
+# One place decides what a parameter name means. These lock that in.
+#
+# Each predicate answers for several call sites. The tests state the
+# rule itself, which holds whichever of those callers changes next.
+
+
+test_that("a fit keeps the parameters brms keeps", {
+  # The working variables a model is built from are named by the
+  # response, distributional and non-linear parameters they belong to,
+  # and each is reported under another name: `zs_1_1` as `s_1_1`, the
+  # standardised deviates `z_1` as `r_g`, the correlation Cholesky
+  # `L_1` as `cor_g`.
+  dat <- data.frame(
+    y = rnorm(20L), x = rnorm(20L), z = rnorm(20L),
+    g = factor(rep(letters[1:4], each = 5L))
+  )
+  form <- brms::bf(y ~ s(x, k = 4) + (1 + x | g), sigma ~ z)
+  bfit <- brms::brm(form, data = dat, empty = TRUE)
+  sdata <- brms::standata(form, data = dat)
+
+  excluded <- mvgam_excluded_pars(bfit, standata = sdata)
+  expect_true(all(
+    c("zb", "zbs", "hs_local", "scales", "zs_1_1", "zb_sigma",
+      "z_1", "L_1", "Cor_1", "r_1") %in% excluded
+  ))
+  # What the fit reports is kept: the scaled smooth coefficients, the
+  # group-level scales and the coefficients themselves
+  expect_false(any(c("s_1_1", "sds_1", "sd_1", "cor_1", "r_1_1", "b",
+                     "Intercept", "lprior") %in% excluded))
+
+  # `all = TRUE` keeps everything that is conditional on it
+  kept_all <- mvgam_excluded_pars(bfit, standata = sdata,
+                                  save_pars = brms::save_pars(all = TRUE))
+  expect_false(any(c("zb", "zs_1_1", "z_1", "L_1") %in% kept_all))
+  # `manual` names individual parameters to keep
+  manual <- mvgam_excluded_pars(
+    bfit, standata = sdata, save_pars = brms::save_pars(manual = "zb")
+  )
+  expect_false("zb" %in% manual)
+
+  # The trend side spells the same names with mvgam's suffix
+  trend <- mvgam_excluded_pars(NULL, trend_model = bfit, standata = sdata)
+  expect_true(all(c("zb_trend", "z_1_trend", "Cor_1_trend") %in% trend))
+})
+
+
+test_that("a trend with no design declares no mu_trend", {
+  # A trend formula without terms leaves `mu_trend` at zero. Declared,
+  # it cost an allocation per gradient and stored zeros whose R-hat is
+  # undefined. A trend formula with terms builds it and adds it.
+  set.seed(3L)
+  dat <- data.frame(
+    y = rpois(60L, 4), x = rnorm(60L), time = rep(1:30, 2L),
+    series = factor(rep(c("a", "b"), each = 30L))
+  )
+  code_of <- function(trend) {
+    stancode(mvgam_formula(y ~ 1, trend_formula = trend), data = dat,
+             family = poisson(), validate = FALSE)
+  }
+  zero <- list(~ RW(), ~ AR(p = 2), ~ VAR(), ~ -1 + AR(cor = TRUE))
+  for (trend in zero) {
+    expect_false(grepl("\\bmu_trend\\b", code_of(trend)))
+  }
+  designed <- list(~ x + RW(), ~ s(x, k = 4) + AR())
+  for (trend in designed) {
+    expect_true(stan_pattern("trend[ : , s] += mu_trend[times_trend[ : , s]];",
+                             code_of(trend), fixed = TRUE))
+  }
+})
+
+
+test_that("parameters are ordered by class, bookkeeping last", {
+  pars <- c("lp__", "trend[1,1]", "sigma", "lprior", "b_x", "b_Intercept",
+            "sd_g__Intercept", "Intercept", "sds_1", "r_g[a,Intercept]",
+            "ar1_trend[1]", "log_jacobian_trend")
+  ordered <- pars[mvgam_par_order(pars)]
+  # An intercept opens its own class, and Stan's accumulators close
+  # the list
+  expect_identical(
+    ordered,
+    c("b_Intercept", "b_x", "sd_g__Intercept", "sds_1", "sigma",
+      "Intercept", "r_g[a,Intercept]", "ar1_trend[1]", "trend[1,1]",
+      "lprior", "log_jacobian_trend", "lp__")
+  )
+})
+
+
+test_that("a trend parameter is one whose name ends in the suffix", {
+  # Every trend parameter the package emits carries `_trend` at the end
+  # of the name, or immediately before the index.
+  emitted <- c(
+    "sigma_trend[1]", "ar1_trend[1]", "b_x_trend", "alpha_cor_trend",
+    "Sigma_group_trend[1,1]", "L_Omega_trend[1,1]", "lv_trend[1,1]",
+    "innovations_trend[1,1]", "sds_1_trend[1]", "r_1_1_trend[1]"
+  )
+  expect_true(all(is_trend_parameter(emitted)))
+
+  # A covariate is named by the user, and a user may name one after a
+  # trend. Asking whether the name merely contains `_trend` reads
+  # `b_pre_trend_score` as trend-side, which moves an
+  # observation-level coefficient out of the block it belongs in and
+  # leaves it out of the population-level effects entirely.
+  covariates <- c("b_pre_trend_score", "b_trending", "b_trend_x",
+                  "b_Intercept", "b_x", "sigma", "Intercept")
+  expect_false(any(is_trend_parameter(covariates)))
+})
+
+
+test_that("the trend suffix decides which block a parameter prints in", {
+  pars <- c("b_Intercept", "b_x", "b_pre_trend_score", "b_trending",
+            "sigma_trend[1]", "ar1_trend[1]", "b_x_trend")
+  # Observation-side effects keep the coefficients the user asked for.
+  expect_identical(
+    pars[mvgam_par_kind(pars) == "beta" &
+           mvgam_par_side(pars) == "observation"],
+    c("b_Intercept", "b_x", "b_pre_trend_score", "b_trending")
+  )
+  # The trend block holds only what the trend model emitted.
+  is_trend_block <- mvgam_par_side(pars) == "trend" &
+    mvgam_par_kind(pars) != "state"
+  expect_identical(
+    pars[is_trend_block],
+    c("sigma_trend[1]", "ar1_trend[1]", "b_x_trend")
+  )
+})
+
+
+test_that("one taxonomy answers for every consumer of a name", {
+  # The kind and the side are decided once, for the `variable =`
+  # keyword resolver, the summary blocks and the bucket builder alike.
+  pars <- c(
+    "b_Intercept", "b_x", "sigma", "shape",
+    "sds_1[1]", "s_1_1[1]", "sd_grp__Intercept", "r_grp[1,1]",
+    "b_x_trend", "Intercept_trend", "sigma_trend[1]", "ar1_trend[1]",
+    "sds_1_trend[1]", "sd_g__Intercept_trend",
+    "trend[1,1]", "lv_trend[1,1]", "mu_trend[1]",
+    "innovations_trend[1,1]", "scaled_innovations_trend[1,1]",
+    "init_trend[1,1]", "init_innovations_trend[1]",
+    "ma_innovations_trend[1,1]", "z_1[1,1]",
+    "innovations_start_trend[1,1]", "lv_dev_trend[1,1]",
+    "L_Omega_trend[1,1]", "A_trend[1,1,1]",
+    "Phi_trend[1,1,1]", "Sigma_trend[1,1]",
+    "lscale_1[1]", "zs_1_1[1]", "Z[1,1]", "Z_tilde[1,1]"
+  )
+  kind <- mvgam_par_kind(pars)
+  side <- mvgam_par_side(pars)
+  names(kind) <- pars
+
+  # Every state spelling the generated Stan emits is a state, on the
+  # one account rather than on three that disagreed.
+  expect_identical(
+    pars[kind == "state"],
+    c("trend[1,1]", "lv_trend[1,1]", "mu_trend[1]",
+      "innovations_trend[1,1]", "scaled_innovations_trend[1,1]",
+      "init_trend[1,1]", "init_innovations_trend[1]",
+      "innovations_start_trend[1,1]", "lv_dev_trend[1,1]")
+  )
+  # Stan saves every variable declared at the top level of
+  # transformed parameters. The working arrays among them carry no
+  # meaning outside the transformation that produced them, and
+  # `mvgam_user_pars()` drops them before a reader meets a name.
+  # `ma_innovations_trend` is the moving-average filter an
+  # `AR(ma = TRUE)` forms. A Cholesky factor prints a unit diagonal
+  # and a structurally zero upper triangle, and `A_trend` is the
+  # unconstrained matrix the stationarity transform turns into
+  # `Phi_trend`. `residual_cor()` takes each one from the raw draws.
+  expect_identical(
+    pars[kind == "internal"],
+    c("ma_innovations_trend[1,1]", "z_1[1,1]",
+      "L_Omega_trend[1,1]", "A_trend[1,1,1]")
+  )
+  # The per-cell matrices a reader interprets, which
+  # `summary()` prints only with `matrices = TRUE`.
+  expect_true(all(is_trend_matrix_param(
+    c("Phi_trend[1,1,1]", "Sigma_trend[1,1]", "Omega_trend[1,1]",
+      "Phi_group_trend[1,1,1]", "Sigma_group_trend[1,1,1]")
+  )))
+  # The scalar hyperparameters a summary keeps, and the rotated
+  # companion, which carries an identified form of its own.
+  expect_false(any(is_trend_matrix_param(
+    c("sigma_trend[1]", "ar1_trend[1]", "alpha_cor_trend",
+      "sigma_group_trend[1,1]", "Phi_trend_tilde[1,1,1]")
+  )))
+  # The same prefix means different things on the two sides.
+  expect_identical(unname(kind["sigma"]), "family")
+  expect_identical(unname(kind["sigma_trend[1]"]), "dynamics")
+  # The smooth block is three kinds, because its consumers want
+  # three different combinations. `?mvgam_draws` documents the
+  # `smooth_params` keyword as the smoothing standard deviations
+  # alone, `summary()` reports those with the basis coefficients,
+  # and the parameter buckets add the Gaussian-process
+  # hyperparameters. Stating the split here is what stops each
+  # caller encoding it in a regex of its own.
+  expect_identical(
+    pars[kind == "smooth_sd"],
+    c("sds_1[1]", "sds_1_trend[1]")
+  )
+  expect_identical(unname(kind["s_1_1[1]"]), "smooth_coef")
+  expect_identical(unname(kind["lscale_1[1]"]), "gp")
+  expect_identical(unname(kind["zs_1_1[1]"]), "smooth_coef")
+  # A group-level block's scales and the coefficients they govern are
+  # two kinds, which is how `tidy()` files them apart.
+  expect_identical(unname(kind["sd_grp__Intercept"]), "ranef_sd")
+  expect_identical(unname(kind["r_grp[1,1]"]), "ranef_coef")
+  expect_identical(unname(kind["sd_g__Intercept_trend"]), "ranef_sd")
+  # A rotated fit carries both loading bases and both are loadings;
+  # which one a reader sees is settled by the hide filter.
+  expect_identical(unname(kind["Z_tilde[1,1]"]), "loading")
+  # Loadings bridge the two sides and carry no suffix, so they are
+  # named before the side is consulted.
+  expect_identical(unname(kind["Z[1,1]"]), "loading")
+  expect_identical(unname(side[pars == "Z[1,1]"]), "observation")
+  # Nothing falls through unclassified.
+  expect_false(any(kind == "other"))
+})
+
+
+test_that("a symmetric matrix lists each off-diagonal cell once", {
+  local_mocked_bindings(
+    mvgam_beta_aliases = function(...) character(0L),
+    mvgam_ranef_aliases = function(...) character(0L),
+    mvgam_smooth_aliases = function(...) character(0L),
+    mvgam_special_aliases = function(...) character(0L),
+    mvgam_index_aliases = function(...) character(0L)
+  )
+  stub <- structure(list(), class = "mvgam")
+  pars <- c("Sigma_trend[1,1]", "Sigma_trend[2,1]", "Sigma_trend[1,2]",
+            "Sigma_trend[2,2]", "Sigma_group_trend[1,1,2]",
+            "Sigma_group_trend[1,2,1]", "Phi_trend[1,1,2]")
+  # A transition matrix is not symmetric and keeps every cell
+  expect_setequal(
+    names(mvgam_user_pars(stub, pars)),
+    c("Sigma_trend[1,1]", "Sigma_trend[2,1]", "Sigma_trend[2,2]",
+      "Sigma_group_trend[1,2,1]", "Phi_trend[1,1,2]")
+  )
+  # Naming a cell retrieves it
+  expect_setequal(names(mvgam_user_pars(stub, pars, all = TRUE)), pars)
+})
+
+
+test_that("tidy() files each block under broom.mixed's effects class", {
+  # A group-level block's standard deviations and correlations are
+  # `ran_pars` and its coefficients `ran_vals`; a smooth's penalty and
+  # a Gaussian process's scales split from their basis coefficients
+  # the same way. brms writes a centred intercept beside `b_Intercept`,
+  # one coefficient under two names, and the table reports it once.
+  raw <- c(
+    "b_Intercept", "Intercept", "b[1]", "sigma",
+    "sds_1[1]", "s_1_1[1]", "sdgp_1[1]", "zgp_1[1]",
+    "sd_1[1]", "cor_1[1]", "r_1_1[1]", "r_1_1[2]",
+    "b_Intercept_trend", "Intercept_trend", "ar1_trend[1]",
+    "sd_1_trend[1]", "r_1_1_trend[1]", "Xme_1[1]"
+  )
+  stub <- structure(
+    list(fit = posterior::as_draws_matrix(matrix(
+      0, nrow = 2L, ncol = length(raw), dimnames = list(NULL, raw)
+    ))),
+    class = "mvgam"
+  )
+  spec <- tidy_spec(categorize_mvgam_parameters(stub),
+                    stats::setNames(raw, raw))
+  filed <- function(type) spec$params[[match(type, spec$type)]]
+  effect <- function(type) spec$effect[[match(type, spec$type)]]
+
+  expect_identical(filed("observation_beta"), c("b_Intercept", "b[1]"))
+  expect_identical(filed("observation_family_extra_param"), "sigma")
+  expect_identical(filed("observation_smooth_param"),
+                   c("sds_1[1]", "sdgp_1[1]"))
+  expect_identical(filed("observation_smooth_coef"),
+                   c("s_1_1[1]", "zgp_1[1]"))
+  expect_identical(filed("random_effect_group_level"),
+                   c("sd_1[1]", "cor_1[1]"))
+  expect_identical(filed("random_effect_beta"), c("r_1_1[1]", "r_1_1[2]"))
+  expect_identical(filed("trend_beta"), "b_Intercept_trend")
+  expect_identical(filed("trend_model_param"), "ar1_trend[1]")
+  expect_identical(filed("trend_random_effect_group_level"), "sd_1_trend[1]")
+  expect_identical(filed("trend_random_effect_beta"), "r_1_1_trend[1]")
+  expect_identical(effect("random_effect_beta"), "ran_vals")
+  expect_identical(effect("random_effect_group_level"), "ran_pars")
+  expect_identical(effect("trend_random_effect_beta"), "ran_vals")
+
+  # The composer reads the trend's intercept on the data's scale, as it
+  # reads the observation model's.
+  expect_true("b_Intercept_trend" %in% side_parameters(stub, "trend"))
+  expect_true("b_Intercept" %in% side_parameters(stub, "obs"))
+  # A special term's latent values reach the composer and stay out of
+  # the table
+  expect_true("Xme_1[1]" %in% side_parameters(stub, "obs"))
+  expect_false("Xme_1[1]" %in% unlist(spec$params))
+
+  # The table itself: one intercept, and a request no parameter
+  # answers keeps its columns.
+  small <- c("b_Intercept", "Intercept", "sigma")
+  stub$fit <- posterior::as_draws_matrix(matrix(
+    stats::rnorm(6L), nrow = 2L, dimnames = list(NULL, small)
+  ))
+  # Row order is the spec's class order, and the family extras are
+  # its first class. A fixed effect takes its `fixef()` name.
+  expect_identical(tidy(stub)$term, c("sigma", "Intercept"))
+  none <- tidy(stub, effects = "ran_vals")
+  expect_identical(nrow(none), 0L)
+  expect_identical(names(none),
+                   c("term", "type", "estimate", "std.error", "conf.low",
+                     "conf.high"))
+})
+
+
+test_that("identified factor parameters are recognised in one place", {
+  # A free-loading factor fit is rotated to a canonical form and the
+  # result emitted alongside the raw draws it came from.
+  rotated <- c("Z[1,1]", "Z_tilde[1,1]", "lv_trend[1,1]",
+               "lv_trend_tilde[1,1]")
+  expect_true(has_identified_loadings(rotated))
+  expect_true(has_identified_factor_states(rotated))
+  # The pattern helpers answer from the same test, so they cannot
+  # disagree with it.
+  expect_equal(factor_loading_param_pattern(rotated), "^Z_tilde\\[")
+  expect_equal(factor_state_param_pattern(rotated), "^lv_trend_tilde\\[")
+  # A rotated fit carries both bases, and asking for the model
+  # basis must give the loadings the dynamics are stated for.
+  expect_equal(factor_loading_param_pattern(rotated, "model"),
+                 "^Z\\[")
+  expect_equal(
+    factor_loading_param_pattern(rotated, "identified"),
+    "^Z_tilde\\["
+  )
+
+  # A fixed-loading fit has neither, and falls back to the raw names.
+  raw <- c("Z[1,1]", "lv_trend[1,1]", "sigma_trend[1]")
+  expect_false(has_identified_loadings(raw))
+  expect_false(has_identified_factor_states(raw))
+  expect_equal(factor_loading_param_pattern(raw), "^Z\\[")
+  expect_equal(factor_state_param_pattern(raw), "^lv_trend\\[")
+
+  # A parameter merely containing the name is not the rotated form.
+  expect_false(has_identified_loadings("b_Z_tilde_score"))
+  expect_false(has_identified_factor_states("mu_lv_trend_tilde"))
+})
+
+test_that("series-indexed parameters take series names", {
+  local_mocked_bindings(fitted_series_levels = function(x) c("ant", "bee"),
+                        detect_factor_n_lv = function(...) NULL)
+  stub <- structure(list(standata = list(
+    row_features = matrix(0, 2, 2, dimnames = list(NULL, c("size", "hair")))
+  )), class = "mvgam")
+  raw <- c("Z[1,1]", "Z_tilde[2,1]", "theta_features[2]",
+           "theta_features[1]", "lv_trend[1,1]")
+  expect_identical(
+    mvgam_index_aliases(stub, raw),
+    c(theta_features_size = "theta_features[1]",
+      theta_features_hair = "theta_features[2]",
+      `Z[ant,1]` = "Z[1,1]", `Z_tilde[bee,1]` = "Z_tilde[2,1]")
+  )
+  # Without factors every dimension the program sizes by series takes
+  # series names. `b_trend` is sized by its coefficients and the lag of
+  # `Phi_trend` by the lags. Those indices stay numeric. So do all the
+  # indices of a state, being indexed by time too.
+  stub$stancode <- paste(
+    "vector<lower=0>[N_lv_trend] sigma_trend;",
+    "vector[K_trend] b_trend;",
+    "cov_matrix[N_lv_trend] Sigma_trend;",
+    "array[N_lags_trend] matrix[N_lv_trend, N_lv_trend] Phi_trend;",
+    "matrix[N_time_trend, N_lv_trend] lv_trend;",
+    # A declaration that defines its variable names it the same way
+    "vector<lower=0>[N_lv_trend] sigma_slope_trend\n  = s * raw;",
+    sep = "\n"
+  )
+  expect_identical(
+    mvgam_index_aliases(stub, c("sigma_trend[2]", "b_trend[1]",
+                                "Sigma_trend[2,1]", "Phi_trend[3,1,2]",
+                                "lv_trend[1,2]", "sigma_slope_trend[1]")),
+    c(`sigma_trend[bee]` = "sigma_trend[2]",
+      `Sigma_trend[bee,ant]` = "Sigma_trend[2,1]",
+      `Phi_trend[3,ant,bee]` = "Phi_trend[3,1,2]",
+      `sigma_slope_trend[ant]` = "sigma_slope_trend[1]")
+  )
+})
+
+
+test_that("a trend-free fit keeps its parameter names", {
+  local_mocked_bindings(fitted_series_levels = function(x) NULL)
+  stub <- structure(list(stancode = "vector[K] b;"), class = "mvgam")
+  expect_identical(mvgam_index_aliases(stub, "b[1]"), character(0L))
+})
+
+
+test_that("special-term draws take brms's names per design column", {
+  # `mo(m):f` has a column per level of `f` after the first. Each
+  # coefficient names its `mo()` simplexes in turn. The expected names
+  # are brms's own for this formula.
+  dat <- data.frame(y = 0, x = 1, sdx = 0.1, m = rep(1:3, 4L),
+                    f = gl(2L, 1L, 12L))
+  # `me(x, sdx)` alone has no simplex.
+  stub <- structure(list(obs_model = list(
+    formula = brms::bf(y ~ mo(m) + mo(m):f + me(x, sdx):mo(m) + me(x, sdx)),
+    data = dat
+  )), class = "mvgam")
+  raw <- c(paste0("bsp[", 1:4, "]"),
+           paste0("simo_", rep(1:3, each = 2L), "[", 1:2, "]"))
+  expect_identical(
+    names(mvgam_special_aliases(stub, raw)),
+    c("bsp_mom", "bsp_mexsdx", "bsp_mom:f2", "bsp_mom:mexsdx",
+      paste0(rep(c("simo_mom1", "simo_mom:f21", "simo_mom:mexsdx1"),
+                 each = 2L), "[", 1:2, "]"))
+  )
+})
+
+
+test_that("an autoregressive coefficient is told from its hyperparameters", {
+  expect_true(all(is_ar_coefficient(c("ar1_trend", "ar2_trend",
+                                      "ar12_trend"))))
+  # The hierarchical mean and spread of a coefficient are different
+  # parameters and carry their own priors.
+  expect_false(any(is_ar_coefficient(c("mu_ar1_trend", "sigma_ar1_trend"))))
+  # As are the indexed draws and anything merely starting the same way.
+  expect_false(any(is_ar_coefficient(c("ar1_trend[1]", "ar_trend",
+                                       "artefact_trend"))))
+})
+
+
+test_that("a smooth object takes the label brms gives it", {
+  # `brms:::frame_sm()` joins the covariates and the `by` variable,
+  # strips punctuation and appends each object's `by` level.
+  by <- list(term = "s(time, by = series)", covars = "time",
+             by_var = "series", bylevels = c("DM", "a-b"))
+  expect_equal(brms_smooth_labels(by),
+               c("stimeseriesDM", "stimeseriesaMb"))
+})
+
+
+test_that("every family and loadings-prior parameter has a kind", {
+  # A name of no kind reached no summary block and printed nowhere
+  family <- c("p", "Psi[2]", "quantile", "disc", "sigma_y2", "theta1")
+  expect_true(all(mvgam_par_kind(family) == "family"))
+  prior <- c("theta_features[1]", "theta_features_Femur.length",
+             "theta_dist_phylo", "Psi_diag[1]")
+  expect_true(all(mvgam_par_kind(prior) == "loadings_prior"))
+  working <- c("varrho_inv[1]", "Z_cols[1,1]", "L_Phi_loadings[1,1]",
+               "zme_1[1,1]", "Lme_1_trend[1,1]",
+               "rgp_1_trend[1]", "gp_pred_1_trend[3]")
+  expect_true(all(mvgam_par_kind(working) == "internal"))
+  # A trend-side measurement-error term is no trend dynamics
+  expect_identical(mvgam_par_kind(c("meanme_1_trend[1]", "sdme_1[1]")),
+                   c("measurement", "measurement"))
+  expect_identical(mvgam_par_kind(c("Xme_1_trend[2]", "Ymi_x[1]", "Yl_x[1]")),
+                   rep("latent", 3L))
+})

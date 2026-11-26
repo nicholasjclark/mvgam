@@ -1,0 +1,110 @@
+# Unit tests for the diagnostic resid pp_check builders, run
+# against hand-built residual / fitted draws matrices so no Stan
+# fit is required.
+
+# Reproducible (ndraws x nobs) draws matrix; default mimics
+# unit-variance DS residuals at a moderate sample size.
+.make_resid_draws <- function(
+  ndraws = 200L, nobs = 60L, sd = 1.0, seed = 1L
+) {
+  set.seed(seed)
+  matrix(stats::rnorm(ndraws * nobs, sd = sd), nrow = ndraws, ncol = nobs)
+}
+
+test_that("the pACF of a series with gaps stays a partial correlation", {
+  # `pacf()` fed a gappy ACF through its recursion and drew bands
+  # beyond [-1, 1]. The pACF drops the missing values.
+  mat <- .make_resid_draws(ndraws = 50L)
+  mat[, c(5:12, 30:36)] <- NA_real_
+  bands <- mvgam:::build_resid_lag_panel(mat, lag_type = "pacf")$data
+  expect_true(all(abs(c(bands$q025, bands$q975)) <= 1))
+})
+
+test_that("the semivariogram bins pairs by the time between them", {
+  # Residuals are 0 up to time 7 and 1 from time 12. A pair on one
+  # side differs by 0 and contributes 0. A pair across the step
+  # contributes 0.5. The missing first value enters no pair.
+  times <- c(0, 1, 3, 4, 7, 12, 13, 15, 16)
+  resid <- matrix(c(NA, 0, 0, 0, 0, 1, 1, 1, 1), nrow = 2L, ncol = 9L,
+                  byrow = TRUE)
+  bands <- mvgam:::build_resid_variogram_panel(resid, times)$data
+  # The observed span 1 to 16 admits lags up to 7.5. Lag 5 holds the
+  # crossing pair (7, 12) alone. Lag 6 holds (1, 7) and (7, 13).
+  expect_identical(bands$lag, c(1, 2, 3, 4, 5, 6))
+  expect_equal(bands$q025, c(0, 0, 0, 0, 0.5, 0.25))
+})
+
+test_that("resid_vs_fitted plots one point per obs or pools the draws", {
+  resid_mat <- .make_resid_draws(ndraws = 100L, nobs = 50L)
+  fitted_mat <- .make_resid_draws(
+    ndraws = 100L, nobs = 50L, sd = 5.0, seed = 2L
+  )
+  per_obs <- mvgam:::build_resid_vs_fitted_panel(
+    resid_mat, fitted_mat, per_obs = TRUE
+  )
+  pooled <- mvgam:::build_resid_vs_fitted_panel(
+    resid_mat, fitted_mat, per_obs = FALSE
+  )
+  expect_equal(nrow(per_obs$data), 50L)
+  expect_equal(nrow(pooled$data), 100L * 50L)
+})
+
+# End-to-end integration tests for `pp_check.mvgam` + the
+# composer require a real Stan fit because pp_check resolves
+# posterior::ndraws / formula::lhs / family at runtime against
+# the brmsfit. Those tests live in tests/local/, where the
+# val_*.rds fixtures are available; CI exercises the internal
+# builders above.
+
+
+test_that("resid_series_rows takes one series in time order", {
+  # Residual columns follow the rows of the training frame, which may
+  # interleave or shuffle the series. The ACF counted lags across
+  # species on a frame that listed every species at each time.
+  d <- data.frame(
+    time = c(3, 1, 2, 2, 1, 3),
+    series = factor(c("b", "a", "b", "a", "b", "a"), levels = c("b", "a")),
+    y = 1:6
+  )
+  fit <- structure(
+    list(data = d, formula = y ~ 1, family = stats::poisson(),
+         trend_metadata = mock_axis_record(d)),
+    class = "mvgam"
+  )
+  expect_identical(mvgam:::resid_series_rows(fit, d)$rows, c(5L, 3L, 1L))
+  # Series "b" at times 1, 2 and 3 is evenly spaced. At 1, 2 and 7 the
+  # ACF would treat gaps of 1 and 5 as one lag.
+  expect_false(mvgam:::resid_series_rows(fit, d)$irregular)
+  d$time[1L] <- 7
+  expect_true(mvgam:::resid_series_rows(fit, d)$irregular)
+  expect_error(mvgam:::resid_series_rows(fit, d, "all"), "one series")
+})
+
+
+test_that("a residual panel keeps its statistic as title under a series", {
+  acf <- mvgam:::build_resid_lag_panel(.make_resid_draws(ndraws = 20L),
+                                       lag_type = "acf")
+  labelled <- mvgam:::label_resid_series(
+    acf, list(label = "sp_2", n_series = 2L)
+  )
+  # The series name replaced "ACF", which left the lag panels of the
+  # stacked figure unnamed
+  expect_identical(labelled$labels$title, "ACF")
+  expect_identical(labelled$labels$subtitle, "Residuals for sp_2")
+})
+
+test_that("a group switches a check to its grouped variant", {
+  valid <- sub("^ppc_", "", bayesplot::available_ppc(""))
+  expect_identical(grouped_ppc_type("dens_overlay", valid),
+                   "dens_overlay_grouped")
+  expect_identical(grouped_ppc_type("rootogram", valid), "rootogram_grouped")
+  expect_identical(grouped_ppc_type("ribbon_grouped", valid), "ribbon_grouped")
+  expect_identical(grouped_ppc_type("fit_stat", valid, exempt = "fit_stat"),
+                   "fit_stat")
+  expect_identical(
+    grouped_ppc_type("resid_hist", c(valid, "resid_hist", "resid_hist_grouped")),
+    "resid_hist_grouped"
+  )
+  expect_error(grouped_ppc_type("loo_pit_qq", valid),
+               "draws a single panel", fixed = TRUE)
+})

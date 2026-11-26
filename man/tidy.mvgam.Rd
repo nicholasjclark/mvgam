@@ -4,92 +4,120 @@
 \alias{tidy.mvgam}
 \title{Tidy an \code{mvgam} object's parameter posteriors}
 \usage{
-\method{tidy}{mvgam}(x, probs = c(0.025, 0.5, 0.975), ...)
+\method{tidy}{mvgam}(
+  x,
+  effects = "all",
+  robust = FALSE,
+  conf.int = TRUE,
+  conf.level = 0.95,
+  rhat = FALSE,
+  ess = FALSE,
+  ...
+)
 }
 \arguments{
-\item{x}{An object of class \code{mvgam}.}
+\item{x}{A fitted \code{mvgam} object.}
 
-\item{probs}{The desired probability levels of the parameters' posteriors.
-Defaults to \code{c(0.025, 0.5, 0.975)}, i.e. 2.5\%, 50\%, and 97.5\%.}
+\item{effects}{\code{"all"} (the default) for every parameter, or one of
+\code{"fixed"}, \code{"ran_pars"} and \code{"ran_vals"} for the categories above,
+as in \code{broom.mixed::tidy.brmsfit()}.}
 
-\item{...}{Unused, included for generic consistency only.}
+\item{robust}{Logical. If \code{FALSE} (the default), uses mean and standard
+deviation for summaries. If \code{TRUE}, uses median and median absolute
+deviation (MAD).}
+
+\item{conf.int}{Logical. If \code{TRUE} (the default), include
+\code{conf.low} and \code{conf.high} posterior quantile columns.}
+
+\item{conf.level}{Numeric. Probability covered by the
+credible interval reported in \code{conf.low} / \code{conf.high}.
+Defaults to \code{0.95}.}
+
+\item{rhat}{Logical. If \code{TRUE}, add a \code{rhat} column with
+posterior::rhat() values.}
+
+\item{ess}{Logical. If \code{TRUE}, add an \code{ess_bulk} column with
+posterior::ess_bulk() values.}
+
+\item{...}{Unused. Anything passed here is refused.}
 }
 \value{
-A \code{tibble} containing:
-\itemize{
-\item "parameter": The parameter in question.
-\item "type": The component of the model that the parameter belongs to (see
-details).
-\item "mean": The posterior mean.
-\item "sd": The posterior standard deviation.
-\item percentile(s): Any percentiles of interest from these posteriors.
-}
+A tibble with one row per parameter and the columns
+\code{term}, \code{type}, \code{estimate} and \code{std.error}. \code{conf.int = TRUE} adds
+\code{conf.low} and \code{conf.high}. \code{rhat} and \code{ess} add \code{rhat} and
+\code{ess_bulk}.
 }
 \description{
-Get parameters' posterior statistics, implementing the generic \code{tidy} from
-the package \pkg{broom}.
+Posterior summaries of the parameters of a fitted \code{mvgam} model, as
+a tibble with the columns of \pkg{broom.mixed}: \code{term}, \code{estimate},
+\code{std.error}, \code{conf.low} and \code{conf.high}. A \code{type} column assigns
+each parameter to the observation model or the trend.
 }
 \details{
-The parameters are categorized by the column "type". For instance, the
-intercept of the observation model (i.e. the "formula" arg to \code{mvgam()}) has
-the "type" "observation_beta". The possible "type"s are:
+The \code{type} column places every parameter into one of the
+following categories, each with the \code{effects} class it belongs to:
 \itemize{
-\item observation_family_extra_param: any extra parameters for your observation
-model, e.g. sigma for a gaussian observation model. These parameters are
-not directly derived from the latent trend components (contrast to mu).
-\item observation_beta: betas from your observation model, excluding any
-smooths. If your formula was \code{y ~ x1 + s(x2, bs='cr')}, then your
-intercept and \code{x1}'s beta would be categorized as this.
-\item random_effect_group_level: Group-level random effects parameters, i.e.
-the mean and sd of the distribution from which the specific random
-intercepts/slopes are considered to be drawn from.
-\item random_effect_beta: betas for the individual random intercepts/slopes.
-\item trend_model_param: parameters from your \code{trend_model}.
-\item trend_beta: analog of "observation_beta", but for any \code{trend_formula}.
-\item trend_random_effect_group_level: analog of
-"random_effect_group_level", but for any \code{trend_formula}.
-\item trend_random_effect_beta: analog of "random_effect_beta", but for any
-\code{trend_formula}.
+\item \code{"observation_family_extra_param"} (\code{ran_pars}) -- auxiliary
+observation-family parameters such as \code{sigma}, \code{shape},
+\code{nu}, \code{phi}, \code{zi}, \code{hu}.
+\item \code{"observation_beta"} (\code{fixed}) -- population-level
+coefficients of the observation formula, with the intercept
+and the fixed parts of its smooths and monotonic terms.
+\item \code{"observation_smooth_param"} (\code{ran_pars}) -- the penalty of each
+smooth (\code{sds_}) and the marginal deviation and length scale of
+each Gaussian process.
+\item \code{"observation_smooth_coef"} (\code{ran_vals}) -- the penalised basis
+coefficients of the smooths and Gaussian processes.
+\item \code{"random_effect_group_level"} (\code{ran_pars}) -- the standard
+deviations and correlations of the observation formula's
+group-level terms.
+\item \code{"random_effect_beta"} (\code{ran_vals}) -- the group-level
+coefficients themselves, one per level and term.
+\item \code{"trend_model_param"} (\code{ran_pars}) -- parameters of the trend
+dynamics (\code{ar1_trend}, \code{theta1_trend}, \code{Sigma_trend},
+\code{k_trend}, \code{m_trend}, \code{delta_trend}, etc.) and the factor
+loadings.
+\item \code{"trend_beta"}, \code{"trend_smooth_param"}, \code{"trend_smooth_coef"},
+\code{"trend_random_effect_group_level"} and
+\code{"trend_random_effect_beta"} -- the same five blocks of the
+trend formula.
 }
 
-Additionally, GP terms can be incorporated in several ways, leading to
-different "type"s (or absence!):
-\itemize{
-\item \code{s(bs = "gp")}: No parameters returned.
-\item \code{gp()} in \code{formula}: "type" of "observation_param".
-\item \code{gp()} in \code{trend_formula}: "type" of "trend_formula_param".
-\item \code{GP()} in \code{trend_model}: "type" of "trend_model_param".
-}
+Fixed-effect terms take the names \code{\link[=fixef.mvgam]{fixef.mvgam()}} gives them, as
+\code{broom.mixed::tidy.brmsfit()} names them: \code{b_x} is \code{x} and
+\code{b_sigma_x} is \code{sigma_x}. Every other term keeps the name
+\code{\link[=variables.mvgam]{variables.mvgam()}} lists. brms samples a centred intercept and
+transforms it to the intercept on the data's scale. The table reports
+the coefficient once, as \code{Intercept}.
 }
 \examples{
 \dontrun{
-set.seed(0)
-simdat <- sim_mvgam(
-  T = 100,
-  n_series = 3,
-  trend_model = AR(),
-  prop_trend = 0.75,
-  family = gaussian()
-)
+set.seed(13)
+simdat <- sim_mvgam(family = poisson(), n_series = 1L,
+                     n_timepoints = 120L, trend_model = AR())
+mod <- mvgam(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1),
+              data    = simdat$data_train,
+              family  = poisson(),
+              chains  = 2, silent = 2)
 
-simdat$data_train$x <- rnorm(nrow(simdat$data_train))
-simdat$data_train$year_fac <- factor(simdat$data_train$year)
+# One row per parameter, with broom's column names
+td <- tidy(mod)
+td
 
-mod <- mvgam(
-  y ~ -1 + s(time, by = series, bs = 'cr', k = 20) + x,
-  trend_formula = ~ s(year_fac, bs = 're') - 1,
-  trend_model = AR(cor = TRUE),
-  family = gaussian(),
-  data = simdat$data_train,
-  silent = 2
-)
+# The `type` column separates the trend's parameters from the
+# observation model's
+td[td$type == "trend_model_param", ]
 
-tidy(mod, probs = c(0.2, 0.5, 0.8))
+# The fixed effects alone, with convergence diagnostics
+tidy(mod, effects = "fixed", rhat = TRUE, ess = TRUE)
+
+# Next, augment() adds fitted values and residuals to the data
 }
 
 }
 \seealso{
 Other tidiers: 
-\code{\link{augment.mvgam}()}
+\code{\link{augment.mvgam}()},
+\code{\link{glance.mvgam}()}
 }
 \concept{tidiers}

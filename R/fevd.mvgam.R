@@ -1,71 +1,49 @@
 #' Calculate latent VAR forecast error variance decompositions
 #'
 #' Compute forecast error variance decompositions from
-#' \code{mvgam} models with Vector Autoregressive dynamics
+#' \code{mvgam} models with Vector Autoregressive dynamics. A
+#' decomposition gives the share of each series' forecast uncertainty
+#' at horizons up to `h` that comes from the innovations of each
+#' series.
 #'
 #' @name fevd.mvgam
 #'
-#' @param object \code{list} object of class \code{mvgam} resulting from a call to [mvgam()]
-#' that used a Vector Autoregressive latent process model (either as `VAR(cor = FALSE)` or
-#' `VAR(cor = TRUE)`; see [VAR()] for details)
 #'
-#' @param h Positive \code{integer} specifying the forecast horizon over which to calculate
-#' the IRF
+#' @param h Positive integer. The number of forecast horizons to
+#'   decompose.
 #'
-#' @param ... ignored
+#' @param summary Logical; return the posterior median and interval of
+#'   each decomposition (the default), or the per-draw decompositions
+#'   themselves.
+#' @inheritParams irf.mvgam
 #'
-#' @return See \code{\link{mvgam_fevd-class}} for a full description of the quantities that are
-#' computed and returned by this function, along with key references.
+#' @param ... Unused. Anything passed here is refused.
+#'
+#' @return An object of \code{\link{mvgam_fevd-class}}, which describes
+#'   the quantities computed, with references.
 #'
 #' @author Nicholas J Clark
 #'
-#' @seealso [VAR()], [irf()], [stability()], \code{\link{mvgam_fevd-class}}
+#' @seealso [irf()] and [stability()] summarise the same VAR dynamics.
+#'   [forecast_uncertainty()] splits a forecast of any model by source.
+#'   The `r mvgam_article("var", "VAR article")` runs `fevd()` on a
+#'   plankton community.
 #'
-#' @references Lütkepohl, H. (2007).
-#' New Introduction to Multiple Time Series Analysis. 2nd ed. Springer-Verlag Berlin Heidelberg.
+#' @references Lutkepohl H (2005). New Introduction to Multiple Time Series
+#'   Analysis. Springer, Berlin. \doi{10.1007/978-3-540-27752-1}
 #'
+#' @template ex-var-model
 #' @examples
 #' \dontrun{
-#' # Simulate some time series that follow a latent VAR(1) process
-#' simdat <- sim_mvgam(
-#'   family = gaussian(),
-#'   n_series = 4,
-#'   trend_model = VAR(cor = TRUE),
-#'   prop_trend = 1
-#' )
-#' plot_mvgam_series(data = simdat$data_train, series = "all")
+#' # The share of each series' forecast-error variance due to each
+#' # shock, over an eight-step horizon
+#' fevd_obj <- fevd(var_mod, h = 8L)
+#' plot(fevd_obj)
 #'
-#' # Fit a model that uses a latent VAR(1)
-#' mod <- mvgam(
-#'   formula = y ~ -1,
-#'   trend_formula = ~ 1,
-#'   trend_model = VAR(cor = TRUE),
-#'   family = gaussian(),
-#'   data = simdat$data_train,
-#'   chains = 2,
-#'   silent = 2
-#' )
-#'
-#' # Plot the autoregressive coefficient distributions;
-#' # use 'dir = "v"' to arrange the order of facets
-#' # correctly
-#' mcmc_plot(
-#'   mod,
-#'   variable = 'A',
-#'   regex = TRUE,
-#'   type = 'hist',
-#'   facet_args = list(dir = 'v')
-#' )
-#'
-#' # Calulate forecast error variance decompositions for each series
-#' fevds <- fevd(mod, h = 12)
-#'
-#' # Plot median contributions to forecast error variance
-#' plot(fevds)
-#'
-#' # View a summary of the error variance decompositions
-#' summary(fevds)
+#' # Next: irf() traces each shock through the system over time
 #' }
+#'
+#' @family latent dynamics
 #' @export
 fevd <- function(object, ...) {
   UseMethod("fevd", object)
@@ -74,47 +52,30 @@ fevd <- function(object, ...) {
 #' @rdname fevd.mvgam
 #' @method fevd mvgam
 #' @export
-fevd.mvgam <- function(object, h = 10, ...) {
-  validate_pos_integer(h)
-  trend_model <- attr(object$model_data, "trend_model")
-  if (!trend_model %in% c("VAR", "VARcor", "VAR1", "VAR1cor")) {
-    stop(
-      "Only VAR(1) models currently supported for calculating FEVDs",
-      call. = FALSE
-    )
-  }
-  beta_vars <- mcmc_chains(object$model_output, "A")
-  sigmas <- mcmc_chains(object$model_output, "Sigma")
-  n_series <- object$n_lv
+fevd.mvgam <- function(object, h = 10, ndraws = NULL, draw_ids = NULL,
+                       summary = TRUE, probs = c(0.025, 0.975),
+                       future = FALSE, ...) {
+  checkmate::assert_int(h, lower = 1)
+  probs <- assert_var_surface_args(ndraws, draw_ids, summary, probs,
+                                   future)
+  rlang::check_dots_empty()
+  require_fitted_model(object, "fevd")
+  assert_var_trend(object, surface = "fevd()")
+  var_post <- extract_var_posterior(object, ndraws, draw_ids)
 
-  if (is.null(n_series)) {
-    n_series <- nlevels(object$obs_data$series)
-  }
-
-  all_fevds <- lapply(seq_len(NROW(beta_vars)), function(draw) {
-    # Get necessary VAR parameters into a simple list format
-    x <- list(
-      K = n_series,
-      A = matrix(
-        beta_vars[draw, ],
-        nrow = n_series,
-        ncol = n_series,
-        byrow = TRUE
-      ),
-      Sigma = matrix(
-        sigmas[draw, ],
-        nrow = n_series,
-        ncol = n_series,
-        byrow = TRUE
-      ),
-      p = 1
-    )
-
-    # Calculate the FEVD for this draw
-    gen_fevd(x, h = h)
-  })
+  all_fevds <- var_draw_surfaces(
+    var_post, function(x) gen_fevd(x, h = h), future
+  )
   class(all_fevds) <- "mvgam_fevd"
-  return(all_fevds)
+  if (!summary) {
+    return(all_fevds)
+  }
+  # As in `irf()`, the draws are one K by K matrix per horizon per
+  # draw. They are summarised unless `summary = FALSE`.
+  as_var_surface_summary(
+    summary(all_fevds, probs = probs), "mvgam_fevd_summary",
+    process_labels = var_post$labels
+  )
 }
 
 #### Functions to compute forecast error variance decompositions
@@ -122,24 +83,21 @@ fevd.mvgam <- function(object, h = 10, ...) {
 # package https://github.com/cran/vars ####
 #' Forecast error variance decomposition
 #' @noRd
-gen_fevd <- function(x, h = 6, ...) {
+gen_fevd <- function(x, h = 6) {
   K <- x$K
-  ynames <- paste0("process_", 1:K)
+  ynames <- x$labels
   msey <- var_fecov(x, h = h)
   Psi <- var_psi(x, h = h)
   mse <- matrix(NA, nrow = h, ncol = K)
   Omega <- array(0, dim = c(h, K, K))
+  # The numerator at each horizon is a cumulative sum of the squared
+  # orthogonalised weights, O(h * K^2) per draw.
+  psi_sq <- Psi^2
+  temp_cum <- matrix(0, K, K)
   for (i in 1:h) {
     mse[i, ] <- diag(msey[,, i])
-    temp <- matrix(0, K, K)
-    for (l in 1:K) {
-      for (m in 1:K) {
-        for (j in 1:i) {
-          temp[l, m] <- temp[l, m] + Psi[l, m, j]^2
-        }
-      }
-    }
-    temp <- temp / mse[i, ]
+    temp_cum <- temp_cum + psi_sq[,, i]
+    temp <- temp_cum / mse[i, ]
     for (j in 1:K) {
       Omega[i, , j] <- temp[j, ]
     }
@@ -155,19 +113,33 @@ gen_fevd <- function(x, h = 6, ...) {
 
 
 #' Forecast error covariance matrix
+#'
+#' Computes the cumulative h-step forecast error covariance
+#' \deqn{\Sigma_y(h) = \sum_{k=0}^{h-1} \Phi_k \, \Sigma_u \, \Phi_k'}
+#' where \eqn{\Phi_k} are the moving-average weights `var_phi()`
+#' returns for a VAR(p) or VARMA, with \eqn{\Phi_0 = I}.
+#' \eqn{\Sigma_u} is the innovation covariance (`x$Sigma`). The
+#' diagonal of \eqn{\Sigma_y(h)} is the FEVD denominator in
+#' `gen_fevd()`. Its numerator comes from `var_psi()`, which absorbs
+#' the Cholesky factor of \eqn{\Sigma_u} into the weights. The two
+#' then partition each response's variance.
+#'
 #' @noRd
 var_fecov <- function(x, h) {
-  sigma_yh <- array(NA, dim = c(x$K, x$K, h))
   Phi <- var_phi(x, h = h)
-  sigma_yh[,, 1] <- Phi[,, 1] %*% t(Phi[,, 1])
+  Sigma_u <- x$Sigma
+  # Each term `Phi_k Sigma_u Phi_k'` once, then a cumulative sum along
+  # the horizons, O(h * K^3) per draw
+  terms <- array(0, dim = c(x$K, x$K, h))
+  for (k in seq_len(h)) {
+    terms[,, k] <- Phi[,, k] %*% Sigma_u %*% t(Phi[,, k])
+  }
+  sigma_yh <- array(0, dim = c(x$K, x$K, h))
+  sigma_yh[,, 1] <- terms[,, 1]
   if (h > 1) {
     for (i in 2:h) {
-      temp <- matrix(0, nrow = x$K, ncol = x$K)
-      for (j in 2:i) {
-        temp <- temp + Phi[,, j] %*% t(Phi[,, j])
-      }
-      sigma_yh[,, i] <- temp + sigma_yh[,, 1]
+      sigma_yh[,, i] <- sigma_yh[,, i - 1] + terms[,, i]
     }
   }
-  return(sigma_yh)
+  sigma_yh
 }

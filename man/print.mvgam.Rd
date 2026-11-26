@@ -2,25 +2,24 @@
 % Please edit documentation in R/print.mvgam.R
 \name{print.mvgam}
 \alias{print.mvgam}
-\title{Print a fitted \pkg{mvgam} object}
+\title{Print an \pkg{mvgam} object}
 \usage{
 \method{print}{mvgam}(x, ...)
 }
 \arguments{
-\item{x}{\code{list} object returned from \code{mvgam}}
+\item{x}{\code{mvgam} object returned from \code{mvgam()}, fitted or
+built with \code{run_model = FALSE}}
 
-\item{...}{Ignored}
+\item{...}{Unused. Anything passed here is refused.}
 }
 \value{
-A \code{list} is printed on-screen
+The \code{mvgam} object is returned invisibly.
 }
 \description{
-This function takes a fitted \code{mvgam} or \code{jsdgam} object and prints
-a quick summary.
+Print an \pkg{mvgam} object
 }
-\details{
-A brief summary of the model's call is printed
-}
-\author{
-Nicholas J Clark
+\seealso{
+\code{\link[=summary.mvgam]{summary.mvgam()}} summarises the posterior of each
+parameter. \code{\link[=methods_md]{methods_md()}} writes the model as equations.
+\code{\link[=how_to_cite]{how_to_cite()}} drafts its methods paragraph.
 }

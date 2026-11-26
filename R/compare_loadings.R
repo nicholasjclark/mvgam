@@ -1,0 +1,282 @@
+#' Compare posterior loadings between two latent-factor fits
+#'
+#' @description
+#' Side-by-side comparison of the posterior-median species loadings
+#' from two latent-factor `mvgam` / `jsdgam` fits on the same set of
+#' species. Two fits need not order or orient their factors alike,
+#' and a direct overlay of their loadings would mislead.
+#' `compare_loadings()` applies the orthogonal Procrustes solution
+#' (Schoenemann 1966) that rotates the posterior-median loadings of
+#' `fit_b` to best match those of `fit_a` in the least-squares
+#' sense, then either overlays both
+#' onto a single biplot with displacement segments (default) or
+#' splits them into two facets sharing axes.
+#'
+#' Useful when teaching the effect of a structured loadings prior:
+#' fit one model with `loadings_prior = NULL` and a second with
+#' `traits =` or `phylo =`, then plot the comparison to show how
+#' the trait or phylogeny similarity reshapes the latent positions.
+#'
+#' Procrustes alignment is orthogonal: it rotates and reflects the
+#' loadings with their scale unchanged. A factor the model has shrunk
+#' towards zero has short loadings, close to the origin. The panel
+#' shows which species cluster together and how that arrangement moves
+#' between fits. [active_factors()] reports how many factors the data
+#' support.
+#'
+#' @param fit_a,fit_b Two fitted `mvgam` / `jsdgam` objects, each
+#'   with `n_lv >= 2` and the same species set in the same factor
+#'   order.
+#' @param labels Optional length-2 character vector of fit labels
+#'   shown in the legend / facet strips. Defaults to
+#'   `c("fit_a", "fit_b")`.
+#' @param which_lvs Integer vector of length 2 indicating which
+#'   two latent factors to plot. Defaults to `c(1, 2)`.
+#' @param align Logical. When `TRUE` (default) the posterior-median
+#'   loadings of `fit_b` are rotated onto those of `fit_a` by
+#'   orthogonal Procrustes before plotting. `FALSE` plots each fit
+#'   with the factors it reports.
+#' @param facet Logical. When `FALSE` (default) both fits are
+#'   overlaid on the same axes in different colours, with
+#'   segments connecting the same species across fits. When
+#'   `TRUE`, fits are drawn as side-by-side facets on shared axes.
+#' @param label_species Character. Controls which species are
+#'   labelled. `"all"` (default) labels every species; `"shift"`
+#'   labels the top 10 species by post-alignment displacement
+#'   between fits; `"none"` draws unlabelled points only.
+#' @param ... Unused. Anything passed here is refused.
+#'
+#' @return A `ggplot` object.
+#'
+#' @details
+#' The orthogonal Procrustes rotation is the closed-form solution
+#' \deqn{R = U V^T} where \eqn{U \Sigma V^T = SVD(Z_a^T Z_b)} and
+#' \eqn{Z_a, Z_b} are the posterior-median loading matrices
+#' restricted to `which_lvs`. The aligned `Z_b` is `Z_b %*% t(R)`.
+#' Alignment is a sufficient but not unique solution to factor
+#' rotation indeterminacy; alternative alignments (varimax on the
+#' joint matrix, sign-flip only) are possible but typically less
+#' interpretable for the prior-comparison use case here.
+#'
+#' Both fits must report the same species in the same factor
+#' order; the function errors otherwise. To compare fits with
+#' different species sets, subset before fitting.
+#'
+#' @author Nicholas J Clark
+#'
+#' @seealso [ordinate()], [residual_cor()], [active_factors()]
+#'
+#' @references
+#' Schoenemann PH (1966). A generalized solution of the orthogonal
+#' Procrustes problem. *Psychometrika* 31, 1-10.
+#' \doi{10.1007/BF02289451}
+#'
+#' Heaps SE and Jermyn IH (2024). Structured prior distributions
+#' for the covariance matrix in latent factor models. *Statistics
+#' and Computing* 34, 143. \doi{10.1007/s11222-024-10454-0}
+#'
+#' @examples
+#' \dontrun{
+#' # Counts of 10 species at 60 sites, driven by two latent factors
+#' simdat <- sim_jsdgam(family = poisson(), n_species = 10L,
+#'                      n_sites = 60L, n_lv = 2L, seed = 3L)
+#' mod <- jsdgam(y ~ env * series, data = simdat$data_train,
+#'               family = poisson(), n_lv = 2L, chains = 2, silent = 2)
+#'
+#' # A trait that tracks each species' true loading on the first factor
+#' set.seed(3)
+#' traits <- data.frame(
+#'   size = simdat$truth$loadings[, 1] + rnorm(10, sd = 0.2),
+#'   row.names = levels(simdat$data_train$series)
+#' )
+#' mod_traits <- jsdgam(y ~ env * series, data = simdat$data_train,
+#'                      family = poisson(), n_lv = 2L, traits = traits,
+#'                      chains = 2, silent = 2)
+#'
+#' # Grey segments join each species' loadings under the two priors
+#' compare_loadings(mod, mod_traits,
+#'                  labels = c("Default prior", "Trait prior"))
+#' }
+#'
+#' @family latent dynamics
+#' @export
+compare_loadings <- function(
+  fit_a, fit_b,
+  labels = c("fit_a", "fit_b"),
+  which_lvs = c(1L, 2L),
+  align = TRUE,
+  facet = FALSE,
+  label_species = c("all", "shift", "none"),
+  ...
+) {
+  checkmate::assert_class(fit_a, "mvgam")
+  checkmate::assert_class(fit_b, "mvgam")
+  checkmate::assert_character(labels, len = 2L, any.missing = FALSE)
+  checkmate::assert_integerish(
+    which_lvs, len = 2L, lower = 1L, any.missing = FALSE
+  )
+  checkmate::assert_flag(align)
+  checkmate::assert_flag(facet)
+  label_species <- match.arg(label_species)
+  rlang::check_dots_empty()
+  z_a <- factor_loading_medians(
+    fit_a, require_factor_n_lv(fit_a, "compare_loadings()")
+  )
+  z_b <- factor_loading_medians(
+    fit_b, require_factor_n_lv(fit_b, "compare_loadings()")
+  )
+  validate_loadings_alignment(z_a, z_b, which_lvs)
+
+  z_a <- z_a[, which_lvs, drop = FALSE]
+  z_b <- z_b[, which_lvs, drop = FALSE]
+  if (align) {
+    z_b <- procrustes_rotate(z_a, z_b)
+  }
+
+  species_names <- rownames(z_a)
+  fit_levels <- as.character(labels)
+  shift <- sqrt(rowSums((z_a - z_b)^2))
+  shift_rank <- rank(-shift, ties.method = "first")
+  to_label <- switch(
+    label_species,
+    all = rep(TRUE, length(species_names)),
+    shift = shift_rank <= 10L,
+    none = rep(FALSE, length(species_names))
+  )
+
+  df <- data.frame(
+    species = rep(species_names, 2L),
+    fit = factor(
+      rep(fit_levels, each = length(species_names)),
+      levels = fit_levels
+    ),
+    LV1 = c(z_a[, 1L], z_b[, 1L]),
+    LV2 = c(z_a[, 2L], z_b[, 2L]),
+    label = rep(ifelse(to_label, species_names, ""), 2L),
+    shift = rep(shift, 2L)
+  )
+
+  set_color_scheme_local()
+  axis_labs <- c(
+    sprintf("Z loading on LV%d", which_lvs[1L]),
+    sprintf("Z loading on LV%d", which_lvs[2L])
+  )
+
+  if (facet) {
+    p <- ggplot2::ggplot(
+      df,
+      ggplot2::aes(x = .data$LV1, y = .data$LV2, colour = .data$fit)
+    ) +
+      ggplot2::geom_point(size = 2.2, alpha = 0.85) +
+      ggplot2::facet_wrap(~ .data$fit) +
+      mvgam_model_colour_scale(2L, guide = "none")
+  } else {
+    seg_df <- data.frame(
+      species = species_names,
+      x = z_a[, 1L], y = z_a[, 2L],
+      xend = z_b[, 1L], yend = z_b[, 2L]
+    )
+    p <- ggplot2::ggplot() +
+      ggplot2::geom_segment(
+        data = seg_df,
+        mapping = ggplot2::aes(
+          x = .data$x, y = .data$y,
+          xend = .data$xend, yend = .data$yend
+        ),
+        colour = mvgam_neutral("faint"), linewidth = 0.3
+      ) +
+      ggplot2::geom_point(
+        data = df,
+        mapping = ggplot2::aes(
+          x = .data$LV1, y = .data$LV2, colour = .data$fit
+        ),
+        size = 2.2, alpha = 0.85
+      ) +
+      mvgam_model_colour_scale(2L)
+  }
+
+  if (label_species != "none") {
+    p <- p + mvgam_repel_layer(
+      data = df[df$label != "", , drop = FALSE],
+      mapping = ggplot2::aes(
+        x = .data$LV1, y = .data$LV2,
+        label = .data$label, colour = .data$fit
+      ),
+      size = 2.6, max.overlaps = Inf,
+      show.legend = FALSE
+    )
+  }
+
+  p +
+    ggplot2::labs(
+      x = axis_labs[1L], y = axis_labs[2L],
+      title = sprintf(
+        "Posterior-median species loadings: %s vs %s",
+        labels[1L], labels[2L]
+      )
+    ) +
+    mvgam_theme()
+}
+
+#' Refuse two loading matrices that cannot be compared
+#'
+#' The two fits must hold the same species in the same order. Each
+#' must have at least `max(which_lvs)` factors.
+#'
+#' @param z_a Numeric loading matrix of the first fit, species by
+#'   factor
+#' @param z_b Numeric loading matrix of the second fit, species by
+#'   factor
+#' @param which_lvs Integer vector of the two factors to plot
+#' @return `NULL`, invisibly, or an error
+#' @noRd
+validate_loadings_alignment <- function(z_a, z_b, which_lvs) {
+  checkmate::assert_matrix(z_a, mode = "numeric")
+  checkmate::assert_matrix(z_b, mode = "numeric")
+  checkmate::assert_integerish(which_lvs, lower = 1, min.len = 1L,
+                               any.missing = FALSE)
+  if (!identical(rownames(z_a), rownames(z_b))) {
+    stop(insight::format_error(c(
+      "Species do not align between the two fits.",
+      x = paste0(
+        "fit_a species: ",
+        paste(utils::head(rownames(z_a), 3), collapse = ", "), "..."
+      ),
+      x = paste0(
+        "fit_b species: ",
+        paste(utils::head(rownames(z_b), 3), collapse = ", "), "..."
+      ),
+      i = "Refit on the same species set in the same factor order."
+    )), call. = FALSE)
+  }
+  n_lv_min <- min(ncol(z_a), ncol(z_b))
+  if (max(which_lvs) > n_lv_min) {
+    stop(insight::format_error(c(
+      "Each fit must have at least 'max(which_lvs)' latent factors.",
+      x = sprintf(
+        "fit_a n_lv = %d, fit_b n_lv = %d, requested max = %d.",
+        ncol(z_a), ncol(z_b), max(which_lvs)
+      ),
+      i = "Choose a smaller pair in 'which_lvs' or refit with more factors."
+    )), call. = FALSE)
+  }
+  invisible(NULL)
+}
+
+
+#' Rotate one loading matrix onto another by orthogonal Procrustes
+#'
+#' @param z_a Numeric target loading matrix
+#' @param z_b Numeric loading matrix to rotate, with the dimensions of
+#'   `z_a`
+#' @return The rotated `z_b`. The rotation matrix itself is discarded.
+#' @noRd
+procrustes_rotate <- function(z_a, z_b) {
+  checkmate::assert_matrix(z_a, mode = "numeric")
+  checkmate::assert_matrix(z_b, mode = "numeric", nrows = nrow(z_a),
+                           ncols = ncol(z_a))
+  m <- crossprod(z_a, z_b)
+  s <- svd(m)
+  r <- s$u %*% t(s$v)
+  z_b %*% t(r)
+}

@@ -6,293 +6,549 @@
 #'
 #' @name stability.mvgam
 #'
-#' @param object \code{list} object of class \code{mvgam} resulting from a call
-#'   to [mvgam()] that used a Vector Autoregressive latent process model (either
-#'   as `VAR(cor = FALSE)` or `VAR(cor = TRUE)`)
+#' @param object An object of class \code{mvgam} fitted with a
+#'   `VAR(p = 1)` latent process model.
+#'   For `summary()`, an `mvgam_stability` object from
+#'   `stability(summary = FALSE)`.
+#' @param groups Hierarchical VAR fits only. The panels to summarise,
+#'   by name or by index into the levels of `gr`. The default `NULL`
+#'   summarises every panel. A non-hierarchical fit accepts `NULL`
+#'   alone.
 #'
-#' @param ... Ignored
+#' @param summary Logical. `TRUE` (the default) returns the posterior
+#'   median and interval of each metric. `FALSE` returns the metrics of
+#'   each draw. `plot()` draws histograms of either form.
+#' @inheritParams irf.mvgam
 #'
-#' @details These measures of stability can be used to assess how important
-#'   inter-series dependencies are to the variability of a multivariate system
-#'   and to ask how systems are expected to respond to environmental
-#'   perturbations. Using the formula for a latent VAR(1) as:
+#' @param ... Unused. Anything passed here is refused.
+#'
+#' @details These measures describe how much the lagged interactions
+#'   among the series contribute to the variability of the system. They
+#'   also describe how the system responds to a perturbation (Ives et
+#'   al. 2003). For a latent VAR(1)
 #'
 #'   \deqn{
-#'   \mu_t \sim \text{MVNormal}(A(\mu_{t - 1}), \Sigma)
+#'   x_t \sim \text{MVNormal}(A x_{t - 1}, \Sigma)
 #'   }
 #'
-#'   this function will calculate the long-term stationary forecast distribution
-#'   of the system, which has mean \eqn{\mu_{\infty}} and variance
-#'   \eqn{\Sigma_{\infty}}, to then calculate the following quantities:
+#'   the stationary covariance \eqn{\Sigma_{\infty}} solves
+#'   \eqn{\Sigma_{\infty} = A \Sigma_{\infty} A^\top + \Sigma}. Each
+#'   posterior draw of \eqn{A} and \eqn{\Sigma} gives one draw of every
+#'   metric:
 #'
 #'   \itemize{
-#'     \item `prop_int`: Proportion of the volume of the stationary forecast
-#'     distribution that is attributable to lagged interactions:
-#'     \deqn{ det(A)^2 }
+#'     \item `prop_int`: the proportion of the volume of the stationary
+#'     distribution that the lagged interactions generate,
+#'     \eqn{\det(A)^2}.
 #'
-#'     \item `prop_int_adj`: Same as `prop_int` but scaled by the number of
-#'     series \eqn{p}:
-#'     \deqn{ det(A)^{2/p} }
+#'     \item `prop_int_adj`: `prop_int` scaled by the number of series
+#'     \eqn{p}, \eqn{|\det(A)|^{2/p}}. It compares across systems of
+#'     different size.
 #'
-#'     \item `prop_int_offdiag`: Sensitivity of `prop_int` to inter-series
-#'     interactions (off-diagonals of \eqn{A}):
-#'     \deqn{ [2~det(A) (A^{-1})^T] }
+#'     \item `prop_int_offdiag`, `prop_int_diag`: the sensitivity of
+#'     `prop_int` to each cell of \eqn{A} is
+#'     \eqn{2 \det(A) (A^{-1})^\top}. `prop_int_offdiag` is the mean
+#'     absolute sensitivity of the off-diagonal cells (interactions
+#'     between series) as a share of that mean plus the mean absolute
+#'     sensitivity of the diagonal cells (self-regulation).
+#'     `prop_int_diag` is the remaining share.
 #'
-#'     \item `prop_int_diag`: Sensitivity of `prop_int` to intra-series
-#'     interactions (diagonals of \eqn{A}):
-#'     \deqn{ [2~det(A) (A^{-1})^T] }
+#'     \item `prop_cov_offdiag`, `prop_cov_diag`: the same split for the
+#'     sensitivity of \eqn{\det(\Sigma_{\infty})} to each cell of
+#'     \eqn{\Sigma_{\infty}}, \eqn{\det(\Sigma_{\infty})
+#'     (\Sigma_{\infty}^{-1})^\top}. Off-diagonal cells are counted
+#'     where \eqn{\Sigma} is estimated.
 #'
-#'     \item `prop_cov_offdiag`: Sensitivity of \eqn{\Sigma_{\infty}} to
-#'     inter-series error correlations:
-#'     \deqn{ [2~det(\Sigma_{\infty}) (\Sigma_{\infty}^{-1})^T] }
+#'     \item `reactivity`: the log of the largest singular value of
+#'     \eqn{A}, \eqn{\log \sigma_{max}(A)} (Neubert et al. 2009). A
+#'     positive value means some perturbation grows in the step after
+#'     it occurs, before the system returns to equilibrium.
 #'
-#'     \item `prop_cov_diag`: Sensitivity of \eqn{\Sigma_{\infty}} to error
-#'     variances:
-#'     \deqn{ [2~det(\Sigma_{\infty}) (\Sigma_{\infty}^{-1})^T] }
+#'     \item `mean_return_rate`: the largest modulus of the eigenvalues
+#'     of \eqn{A}. The distance of the mean from its stationary value
+#'     shrinks by this factor each step, asymptotically. A value nearer
+#'     1 means a slower return.
 #'
-#'     \item `reactivity`: Degree to which the system moves away from a stable
-#'     equilibrium following a perturbation. If \eqn{\sigma_{max}(A)} is the
-#'     largest singular value of \eqn{A}:
-#'     \deqn{ \log\sigma_{max}(A) }
-#'
-#'     \item `mean_return_rate`: Asymptotic return rate of the mean of the
-#'     transition distribution to the stationary mean:
-#'     \deqn{ \max(\lambda_{A}) }
-#'
-#'     \item `var_return_rate`: Asymptotic return rate of the variance of the
-#'     transition distribution to the stationary variance:
-#'     \deqn{ \max(\lambda_{A \otimes A}) }
+#'     \item `var_return_rate`: the same factor for the variance, the
+#'     largest modulus of the eigenvalues of \eqn{A \otimes A}, which
+#'     is `mean_return_rate` squared.
 #'   }
 #'
-#'   Major advantages of using \pkg{mvgam} to compute these metrics are that
-#'   well-calibrated uncertainties are available and that VAR processes are
-#'   forced to be stationary. These properties make it simple and insightful to
-#'   calculate and inspect aspects of both long-term and short-term stability.
+#'   The prior on \eqn{A} keeps every draw stationary (Heaps 2023).
+#'   \eqn{\Sigma_{\infty}} and every metric then exist in every draw.
 #'
-#'   You can also inspect interactions among the time series in a latent VAR
-#'   process using \code{\link{irf}} for impulse response functions or
-#'   \code{\link{fevd}} for forecast error variance decompositions.
+#'   [irf()] and [fevd()] describe the same dynamics as responses to
+#'   shocks.
 #'
-#' @return A \code{data.frame} containing posterior draws for each stability
-#'   metric.
+#' @return A \code{data.frame} with the posterior median and interval of
+#'   each stability metric, or under `summary = FALSE` an object of class
+#'   `mvgam_stability` holding one row of metrics per posterior draw.
+#'   `summary()` turns the draws into the summary, one row per metric,
+#'   or per panel and metric on a hierarchical VAR. `plot()` draws a
+#'   histogram of each metric, with a dashed line at zero on the
+#'   reactivity panel, above which the system amplifies a shock before
+#'   it decays. A hierarchical VAR draws a median and interval for each
+#'   panel. A summary plots the histograms from the bins it recorded, or
+#'   under `intervals = TRUE` a median and interval.
 #'
 #' @references
 #'   AR Ives, B Dennis, KL Cottingham & SR Carpenter (2003). Estimating
 #'   community stability and ecological interactions from time-series data.
-#'   *Ecological Monographs*, 73, 301–330.
+#'   *Ecological Monographs*, 73, 301-330.
+#'
+#'   MG Neubert, H Caswell & AR Solow (2009). Detecting reactivity.
+#'   *Ecology*, 90, 2683-2688.
+#'
+#'   SE Heaps (2023). Enforcing stationarity through the prior in vector
+#'   autoregressions. *Journal of Computational and Graphical
+#'   Statistics*, 32, 74-83.
 #'
 #' @author Nicholas J Clark
 #'
-#' @seealso
-#'   \code{\link{VAR}},
-#'   \code{\link{irf}},
-#'   \code{\link{fevd}}
+#' @seealso [irf()] and [fevd()] summarise the same VAR dynamics.
+#'   The `r mvgam_article("var", "VAR article")` runs `stability()` on
+#'   a plankton community. The
+#'   `r mvgam_article("hierarchical_var", "hierarchical VAR article")`
+#'   reports the metrics for each group of a hierarchical VAR.
 #'
+#' @template ex-var-model
 #' @examples
 #' \dontrun{
-#' # Simulate some time series that follow a latent VAR(1) process
-#' simdat <- sim_mvgam(
-#'   family = gaussian(),
-#'   n_series = 4,
-#'   trend_model = VAR(cor = TRUE),
-#'   prop_trend = 1
-#' )
+#' # Posterior medians and intervals of the stability metrics
+#' stab <- stability(var_mod)
+#' stab[stab$metric %in% c("reactivity", "mean_return_rate"), ]
 #'
-#' plot_mvgam_series(data = simdat$data_train, series = 'all')
+#' # The full posterior of each metric
+#' plot(stability(var_mod, summary = FALSE))
 #'
-#' # Fit a model that uses a latent VAR(1)
-#' mod <- mvgam(
-#'   y ~ -1,
-#'   trend_formula = ~ 1,
-#'   trend_model = VAR(cor = TRUE),
-#'   family = gaussian(),
-#'   data = simdat$data_train,
-#'   chains = 2,
-#'   silent = 2
-#' )
-#'
-#' # Calculate stability metrics for this system
-#' metrics <- stability(mod)
-#'
-#' # Proportion of stationary forecast distribution attributable to interactions
-#' hist(
-#'   metrics$prop_int,
-#'   xlim = c(0, 1),
-#'   xlab = 'Prop_int',
-#'   main = '',
-#'   col = '#B97C7C',
-#'   border = 'white'
-#' )
-#'
-#' # Inter- vs intra-series interaction contributions
-#' layout(matrix(1:2, nrow = 2))
-#' hist(
-#'   metrics$prop_int_offdiag,
-#'   xlim = c(0, 1),
-#'   xlab = '',
-#'   main = 'Inter-series interactions',
-#'   col = '#B97C7C',
-#'   border = 'white'
-#' )
-#'
-#' hist(
-#'   metrics$prop_int_diag,
-#'   xlim = c(0, 1),
-#'   xlab = 'Contribution to interaction effect',
-#'   main = 'Intra-series interactions (density dependence)',
-#'   col = 'darkblue',
-#'   border = 'white'
-#' )
-#' layout(1)
-#'
-#' # Inter- vs intra-series contributions to forecast variance
-#' layout(matrix(1:2, nrow = 2))
-#' hist(
-#'   metrics$prop_cov_offdiag,
-#'   xlim = c(0, 1),
-#'   xlab = '',
-#'   main = 'Inter-series covariances',
-#'   col = '#B97C7C',
-#'   border = 'white'
-#' )
-#'
-#' hist(
-#'   metrics$prop_cov_diag,
-#'   xlim = c(0, 1),
-#'   xlab = 'Contribution to forecast variance',
-#'   main = 'Intra-series variances',
-#'   col = 'darkblue',
-#'   border = 'white'
-#' )
-#' layout(1)
-#'
-#' # Reactivity: system response to perturbation
-#' hist(
-#'   metrics$reactivity,
-#'   main = '',
-#'   xlab = 'Reactivity',
-#'   col = '#B97C7C',
-#'   border = 'white',
-#'   xlim = c(
-#'     -1 * max(abs(metrics$reactivity)),
-#'     max(abs(metrics$reactivity))
-#'   )
-#' )
-#' abline(v = 0, lwd = 2.5)
+#' # Next: irf() traces a shock through the system over time
 #' }
 #'
+#' @family latent dynamics
 #' @export
 stability <- function(object, ...) {
   UseMethod("stability", object)
 }
 
+#' Solve the discrete Lyapunov equation by doubling
+#'
+#' Solves `X = B X B' + Sigma` for `X` when `B` has spectral radius
+#' below 1 (Kitagawa 1977; Anderson 1979). The stationarity prior of
+#' Heaps (2023) guarantees that radius. Doubling sums the series
+#' `sum_{k>=0} B^k Sigma (B')^k`. After `k` steps the partial sum
+#' covers `2^k` terms and the multiplier is `B^{2^k}`, which decays
+#' like `rho(B)^{2^k}`. Each solve costs O(K^3 log(1/tol)). The
+#' Kronecker form `solve(I - B %x% B)` costs O(K^6).
+#'
+#' @param B Numeric K x K transition matrix
+#' @param Sigma Numeric K x K innovation covariance matrix
+#' @param tol Numeric; doubling stops once every entry of the
+#'   multiplier falls below it in absolute value
+#' @param max_iter Integer maximum number of doubling steps
+#' @return Numeric K x K stationary covariance matrix `X`
+#' @noRd
+solve_dlyap <- function(B, Sigma, tol = 1e-12, max_iter = 100L) {
+  X <- Sigma
+  A <- B
+  for (iter in seq_len(max_iter)) {
+    X <- X + A %*% X %*% t(A)
+    A <- A %*% A
+    if (max(abs(A)) < tol) break
+  }
+  X
+}
+
 #'@rdname stability.mvgam
 #'@method stability mvgam
 #'@export
-stability.mvgam = function(object, ...) {
-  # Check trend_model
-  trend_model <- attr(object$model_data, 'trend_model')
-  if (!trend_model %in% c('VAR', 'VARcor', 'VAR1', 'VAR1cor')) {
-    stop(
-      'Only VAR(1) models currently supported for calculating stability metrics',
-      call. = FALSE
-    )
+stability.mvgam <- function(object, groups = NULL, ndraws = NULL,
+                            draw_ids = NULL, summary = TRUE,
+                            probs = c(0.025, 0.975), future = FALSE,
+                            ...) {
+  probs <- assert_var_surface_args(ndraws, draw_ids, summary, probs,
+                                   future)
+  rlang::check_dots_empty()
+  assert_var_trend(object, surface = "stability()")
+  # The Ives et al. (2003) metrics and reactivity describe first-order
+  # dynamics. A higher-order or moving-average VAR has no single
+  # transition matrix they apply to.
+  meta <- object$trend_metadata
+  if (length(meta$ar_lags %||% 1L) > 1L || length(meta$ma_lags) > 0L) {
+    stop(insight::format_error(c(
+      "'stability()' is not supported for VAR(p > 1) or VARMA trends.",
+      i = "The stability metrics are defined for one VAR(1) transition matrix.",
+      i = "'irf()' and 'fevd()' describe the dynamics of this fit."
+    )), call. = FALSE)
   }
-
-  # Take posterior draws of the interaction matrix
-  B_post <- mcmc_chains(object$model_output, 'A')
-
-  # Take posterior draws of Sigma
-  Sigma_post <- mcmc_chains(object$model_output, 'Sigma')
-
-  # Number of series in the VAR process
-  n_series <- object$n_lv
-
-  if (is.null(n_series)) {
-    n_series <- nlevels(object$obs_data$series)
+  # The panels of a hierarchical VAR do not interact. Over the whole
+  # block-diagonal system, reactivity and the return rates are those of
+  # the most extreme panel. `prop_int` would multiply the panels'
+  # determinants together. Each panel is summarised alone.
+  hierarchical <- !is.null(object$standata$N_groups_trend)
+  group_names <- resolve_var_groups(
+    object, if (hierarchical) groups %||% "all" else groups
+  )
+  blocks <- if (hierarchical) {
+    all_groups <- group_labels(object, var_dim(object, "N_groups_trend"))
+    get_group_info(object$standata)$members[
+      match(group_names, all_groups)
+    ]
   }
+  # Each draw costs a Lyapunov solve at O(K^3 log(1/tol)). A stationary
+  # variance built from one draw's transition matrix and another's
+  # covariance describes no posterior sample. The coefficients and the
+  # innovation covariance come from the same subset of draws.
+  var_post <- extract_var_posterior(object, ndraws, draw_ids)
+  blocks <- blocks %||% list(seq_len(var_post$K))
 
   metrics <- do.call(
     rbind,
-    lapply(seq_len(NROW(B_post)), function(i) {
-      B <- matrix(B_post[i, ], nrow = n_series, ncol = n_series, byrow = TRUE)
-      p <- dim(B)[1]
-
-      # If we want to get the variance of the stationary distribution (Sigma_inf)
-      Sigma <- matrix(
-        Sigma_post[i, ],
-        nrow = n_series,
-        ncol = n_series,
-        byrow = TRUE
-      )
-      vecS_inf <- solve(diag(p * p) - kronecker(B, B)) %*% as.vector(Sigma)
-      Sigma_inf <- matrix(vecS_inf, nrow = p)
-
-      # The difference in volume between Sigma_inf and Sigma is:
-      # det(Sigma_inf - Sigma) = det(Sigma_inf) * det(B) ^ 2
-      # according to Ives et al 2003 (eqn 24)
-
-      # We can take partial derivatives to determine which elements of
-      # Sigma_inf contribute most to rates of change in the
-      # proportion of Sigma_inf that is due to process error
-      # Thanks to Mark Scheuerell for providing inspirational code
-      # https://github.com/mdscheuerell/safs-quant-sem-2022/blob/main/lwa_analysis.R
-      int_env <- det(Sigma_inf) * t(solve(Sigma_inf))
-
-      # Proportion of inter-series covariance to
-      # to overall environmental variation contribution (i.e. how important are
-      # correlated errors for controlling the shape of the stationary forecast
-      # distribution?)
-      dat <- data.frame(
-        prop_cov_offdiag = mean(abs(int_env[lower.tri(int_env)])) /
-          (mean(abs(diag(int_env))) + mean(abs(int_env[lower.tri(int_env)])))
-      )
-
-      # Proportion of error variances to stationary forecast distribution
-      dat$prop_cov_diag <- 1 - dat$prop_cov_offdiag
-
-      # Proportion of volume of Sigma_inf attributable to series interactions,
-      # measuring the degree to which interactions increase
-      # the variance of the stationary distribution (Sigma_inf) relative
-      # to the variance of the process error (Sigma)
-      # lower values = more stability
-      dat$prop_int = abs(det(B))^2
-
-      # Ives et al 2003 suggest to scale this by the number of series for more direct
-      # comparisons among different studies
-      dat$prop_int_adj <- abs(det(B))^(2 / p)
-
-      # Sensitivity of the species interaction proportion to particular
-      # interactions is also calculated using partial derivatives
-      # (note the use of 2 here because we squared det(B) in the above eqn)
-      int_sens <- 2 * det(B) * t(solve(B))
-
-      # Proportion of interspecific contributions to
-      # to overall interaction contribution
-      dat$prop_int_offdiag <- mean(abs(int_sens[lower.tri(int_sens)])) /
-        (mean(abs(diag(int_sens))) + mean(abs(int_sens[lower.tri(int_sens)])))
-
-      # Proportion of density dependent contributions to
-      # to overall interaction contribution
-      dat$prop_int_diag <- 1 - dat$prop_int_offdiag
-
-      # Reactivity, measuring the degree to which the system moves
-      # away from a stable equilibrium following a perturbation
-      # values > 0 suggest the system is reactive, whereby a
-      # perturbation of the system in one period can be amplified in the next period
-      # Following Neubert et al 2009 Ecology (Detecting reactivity)
-      dat$reactivity <- log(max(svd(B)$d))
-
-      # Return rate of transition distribution to the stationary distribution
-      # Asymptotic return rate of the mean
-      # lower values = more stability
-      dat$mean_return_rate <- max(abs(eigen(B)$values))
-
-      # Asymptotic return rate of the variance
-      # lower values = more stability
-      dat$var_return_rate <- max(abs(eigen(B %x% B)$values))
-      dat
-    })
+    mvgam_maybe_future_lapply(var_post$ndraws, function(i) {
+      do.call(rbind, lapply(blocks, function(members) {
+        stability_metrics(
+          var_post$A[i, members, members, 1L],
+          var_post$Sigma[i, members, members]
+        )
+      }))
+    }, future = future)
   )
-  return(metrics)
+  if (hierarchical) {
+    metrics <- data.frame(
+      group = factor(rep(group_names, var_post$ndraws),
+                     levels = group_names),
+      metrics
+    )
+  }
+  class(metrics) <- c("mvgam_stability", class(metrics))
+  if (summary) {
+    return(summary(metrics, probs = probs))
+  }
+  metrics
+}
+
+
+#' Stability metrics of one VAR(1) transition matrix
+#'
+#' @param B Transition matrix (K x K)
+#' @param Sigma Innovation covariance (K x K)
+#' @return One-row `data.frame` of the metrics `stability()` documents
+#' @noRd
+stability_metrics <- function(B, Sigma) {
+  B <- as.matrix(B)
+  Sigma <- as.matrix(Sigma)
+  p <- nrow(B)
+
+  # The stationary variance solves the discrete Lyapunov equation
+  # Sigma_inf = B Sigma_inf B' + Sigma. Symmetrising it keeps
+  # floating-point asymmetry out of `solve()` and `det()` below.
+  Sigma_inf <- solve_dlyap(B, Sigma)
+  Sigma_inf <- (Sigma_inf + t(Sigma_inf)) / 2
+
+  # The sensitivity of det(Sigma_inf) to each of its cells (Ives et al.
+  # 2003, eqn 24). Mark Scheuerell's analysis of Lake Washington
+  # plankton
+  # (https://github.com/mdscheuerell/safs-quant-sem-2022/blob/main/lwa_analysis.R)
+  # computes the same partial derivatives.
+  int_env <- det(Sigma_inf) * t(solve(Sigma_inf))
+  # Off-diagonal cells count where Sigma is estimated. A VAR fitted
+  # with `cor = FALSE` holds its off-diagonal covariances at zero.
+  off_cov <- abs(int_env[lower.tri(int_env) & Sigma != 0])
+  prop_cov_offdiag <- offdiag_share(off_cov, abs(diag(int_env)))
+
+  # The sensitivity of det(B)^2 to each cell of B. B is not symmetric,
+  # and every off-diagonal cell counts.
+  int_sens <- 2 * det(B) * t(solve(B))
+  prop_int_offdiag <- offdiag_share(abs(int_sens[row(B) != col(B)]),
+                                    abs(diag(int_sens)))
+
+  # Reactivity follows Neubert et al. (2009). The eigenvalues of
+  # B %x% B are the pairwise products of those of B. The largest
+  # modulus among them is the square of the mean return rate.
+  mean_return_rate <- max(Mod(eigen(B, only.values = TRUE)$values))
+  data.frame(
+    prop_cov_offdiag = prop_cov_offdiag,
+    prop_cov_diag = 1 - prop_cov_offdiag,
+    prop_int = abs(det(B))^2,
+    prop_int_adj = abs(det(B))^(2 / p),
+    prop_int_offdiag = prop_int_offdiag,
+    prop_int_diag = 1 - prop_int_offdiag,
+    reactivity = log(max(svd(B)$d)),
+    mean_return_rate = mean_return_rate,
+    var_return_rate = mean_return_rate^2
+  )
+}
+
+
+#' Share of the mean absolute off-diagonal sensitivity
+#'
+#' @param off Absolute sensitivities of the off-diagonal cells
+#' @param diag_vals Absolute sensitivities of the diagonal cells
+#' @return `mean(off) / (mean(off) + mean(diag_vals))`, with an empty
+#'   set counting as zero
+#' @noRd
+offdiag_share <- function(off, diag_vals) {
+  mean_off <- if (length(off)) mean(off) else 0
+  mean_diag <- if (length(diag_vals)) mean(diag_vals) else 0
+  if ((mean_off + mean_diag) > 0) mean_off / (mean_off + mean_diag) else 0
+}
+
+
+#' @param robust Logical, for `summary()`. `TRUE` (the default) reports
+#'   the median and median absolute deviation. `FALSE` reports the mean
+#'   and standard deviation.
+#' @param bins Number of histogram bins, which `summary()` records for
+#'   `plot()`.
+#' @rdname stability.mvgam
+#' @method summary mvgam_stability
+#' @export
+summary.mvgam_stability <- function(object, probs = c(0.025, 0.975),
+                                    robust = TRUE, bins = 30L, ...) {
+  checkmate::assert_class(object, "mvgam_stability")
+  checkmate::assert_numeric(probs, len = 2L, lower = 0, upper = 1,
+                            any.missing = FALSE, sorted = TRUE)
+  checkmate::assert_flag(robust)
+  checkmate::assert_int(bins, lower = 5L)
+  rlang::check_dots_empty()
+  draws <- as.data.frame(object)
+  metrics <- setdiff(colnames(draws), "group")
+  # A metric with an `NA` draw reports `NA`
+  summarise_block <- function(d) {
+    data.frame(
+      metric = metrics,
+      mvgam_post_summary(as.matrix(d[, metrics, drop = FALSE]),
+                         robust = robust, probs = probs),
+      check.names = FALSE, stringsAsFactors = FALSE, row.names = NULL
+    )
+  }
+  if (is.null(draws$group)) {
+    out <- summarise_block(draws)
+    # Reactivity is asked for to learn whether its mass crosses zero,
+    # which a median and an interval leave open. The binned draws keep
+    # the shape of each metric in a few hundred numbers. `plot()` draws
+    # them as histograms.
+    attr(out, "bin_counts") <- lapply(
+      stats::setNames(metrics, metrics),
+      function(v) bin_draws(draws[[v]], bins)
+    )
+    n_per_block <- nrow(draws)
+  } else {
+    blocks <- split(draws, draws$group)
+    out <- do.call(rbind, lapply(names(blocks), function(g) {
+      data.frame(group = factor(g, levels = levels(draws$group)),
+                 summarise_block(blocks[[g]]),
+                 check.names = FALSE)
+    }))
+    n_per_block <- nrow(blocks[[1L]])
+  }
+  attr(out, "ndraws") <- n_per_block
+  class(out) <- c("mvgam_stability_summary", class(out))
+  out
+}
+
+
+#' Bin a vector of draws for later display
+#'
+#' A histogram needs the counts and the edges of its bins, a fraction
+#' of the size of the draws. A metric that never varies gets one bin
+#' of zero width.
+#'
+#' @param draws Numeric vector of posterior draws
+#' @param bins Number of bins
+#' @return List with `breaks` and `counts`
+#'
+#' @noRd
+bin_draws <- function(draws, bins) {
+  draws <- draws[is.finite(draws)]
+  if (!length(draws)) {
+    return(list(breaks = c(0, 0), counts = 0L))
+  }
+  rng <- range(draws)
+  if (isTRUE(all.equal(rng[1L], rng[2L]))) {
+    return(list(breaks = c(rng[1L], rng[1L]), counts = length(draws)))
+  }
+  breaks <- seq(rng[1L], rng[2L], length.out = bins + 1L)
+  h <- graphics::hist(draws, breaks = breaks, plot = FALSE)
+  list(breaks = h$breaks, counts = as.integer(h$counts))
+}
+
+
+#' @param intervals Logical, for a summary. `TRUE` draws each metric as
+#'   a median and interval. `FALSE` (the default) draws its binned
+#'   posterior.
+#' @rdname stability.mvgam
+#' @method plot mvgam_stability_summary
+#' @export
+plot.mvgam_stability_summary <- function(
+  x,
+  variables = c("reactivity", "mean_return_rate", "var_return_rate"),
+  intervals = FALSE,
+  ...
+) {
+  checkmate::assert_class(x, "mvgam_stability_summary")
+  checkmate::assert_flag(intervals)
+  rlang::check_dots_empty()
+  keep <- resolve_stability_metrics(variables, x$metric)
+  set_color_scheme_local()
+  counts <- attr(x, "bin_counts")
+  if (intervals || is.null(counts)) {
+    return(stability_intervals(x[x$metric %in% keep, , drop = FALSE], keep))
+  }
+  stability_histogram(counts[keep])
+}
+
+
+#' @param x An `mvgam_stability` object or its summary.
+#' @param variables Character vector of the metrics to draw. Defaults
+#'   to reactivity and the mean and variance return rates. Any column
+#'   of `x` can be named.
+#' @rdname stability.mvgam
+#' @method plot mvgam_stability
+#' @export
+plot.mvgam_stability <- function(
+  x,
+  variables = c("reactivity", "mean_return_rate", "var_return_rate"),
+  bins = 30L,
+  ...
+) {
+  checkmate::assert_class(x, "mvgam_stability")
+  checkmate::assert_int(bins, lower = 5L)
+  rlang::check_dots_empty()
+  keep <- resolve_stability_metrics(variables, setdiff(colnames(x), "group"))
+  if (!is.null(x$group)) {
+    return(plot(summary(x), variables = keep))
+  }
+  set_color_scheme_local()
+  stability_histogram(lapply(stats::setNames(keep, keep), function(v) {
+    bin_draws(x[[v]], bins)
+  }))
+}
+
+
+#' Posterior medians and intervals of stability metrics
+#'
+#' One panel per metric. A hierarchical VAR's summary puts each panel
+#' of the VAR on its own row, in the order of the levels of `gr`.
+#'
+#' @param dat Rows of a `mvgam_stability_summary` for the metrics drawn
+#' @param keep The metrics drawn, in panel order
+#' @return A `ggplot` object
+#' @noRd
+stability_intervals <- function(dat, keep) {
+  dat$metric <- factor(dat$metric, levels = keep)
+  dat$row <- if (is.null(dat$group)) {
+    factor("")
+  } else {
+    factor(dat$group, levels = rev(levels(dat$group)))
+  }
+  bounds <- grep("^Q", colnames(dat), value = TRUE)
+  ggplot2::ggplot(dat, ggplot2::aes(x = .data$Estimate, y = .data$row)) +
+    reference_line(data = stability_threshold(keep)) +
+    ggplot2::geom_pointrange(
+      ggplot2::aes(xmin = .data[[bounds[1L]]], xmax = .data[[bounds[2L]]]),
+      colour = mvgam_colour("mid_highlight")
+    ) +
+    ggplot2::facet_wrap(
+      ~ metric, scales = "free_x", nrow = 1L,
+      labeller = ggplot2::as_labeller(stability_metric_labels(keep))
+    ) +
+    ggplot2::labs(x = "Posterior estimate", y = NULL) +
+    mvgam_theme() +
+    ggplot2::theme(panel.spacing.x = ggplot2::unit(1.5, "lines"))
+}
+
+
+#' The stability metrics a plot was asked for
+#'
+#' Every requested metric must be in the object. An absent one is
+#' refused by name.
+#'
+#' @param variables The metrics requested
+#' @param available The metrics the object holds
+#' @return `variables`, deduplicated
+#' @noRd
+resolve_stability_metrics <- function(variables, available) {
+  checkmate::assert_character(variables, min.len = 1L, any.missing = FALSE)
+  unknown <- setdiff(variables, available)
+  if (length(unknown)) {
+    stop(insight::format_error(c(
+      "Some requested 'variables' are not stability metrics.",
+      x = paste0(
+        "Not found: ", paste0("'", unknown, "'", collapse = ", "), "."
+      ),
+      i = paste0(
+        "Available metrics: ", paste(available, collapse = ", "), "."
+      )
+    )), call. = FALSE)
+  }
+  unique(variables)
+}
+
+
+#' Faceted histogram of binned stability metrics
+#'
+#' Each bar is drawn at its own midpoint and width, which keeps an
+#' uneven final bin its true width.
+#'
+#' @param counts Named list of `bin_draws()` results, one per metric
+#' @return A `ggplot` object
+#' @noRd
+stability_histogram <- function(counts) {
+  long <- do.call(rbind, lapply(names(counts), function(v) {
+    b <- counts[[v]]
+    if (is.null(b) || !length(b$counts)) {
+      return(NULL)
+    }
+    lower <- utils::head(b$breaks, -1L)
+    upper <- utils::tail(b$breaks, -1L)
+    data.frame(metric = v, mid = (lower + upper) / 2,
+               width = upper - lower, count = b$counts,
+               stringsAsFactors = FALSE)
+  }))
+  long$metric <- factor(long$metric, levels = names(counts))
+  ggplot2::ggplot(long, ggplot2::aes(x = .data$mid, y = .data$count)) +
+    ggplot2::geom_col(
+      ggplot2::aes(width = .data$width),
+      fill = mvgam_colour("mid_highlight"),
+      colour = "white"
+    ) +
+    reference_line(data = stability_threshold(names(counts))) +
+    ggplot2::facet_wrap(
+      ~ metric, scales = "free", nrow = 1L,
+      labeller = ggplot2::as_labeller(stability_metric_labels(names(counts)))
+    ) +
+    ggplot2::labs(x = "Value", y = "Posterior draws") +
+    mvgam_theme()
+}
+
+
+#' The zero line of the reactivity panel
+#'
+#' Zero is a threshold for reactivity alone. A line at zero on a
+#' return rate panel would stretch its axis to a value no draw takes.
+#'
+#' @param metrics The metrics drawn, in panel order
+#' @return A frame of the panel and position of each line
+#' @noRd
+stability_threshold <- function(metrics) {
+  data.frame(
+    metric = factor(intersect("reactivity", metrics), levels = metrics),
+    x = 0
+  )
+}
+
+
+#' Display names of stability metrics
+#'
+#' @param metrics Metric names as `stability()` returns them
+#' @return Named character vector of display names. A metric without
+#'   one keeps its own name.
+#' @noRd
+stability_metric_labels <- function(metrics) {
+  display <- c(reactivity = "Reactivity",
+               mean_return_rate = "Mean return rate",
+               var_return_rate = "Variance return rate")
+  out <- stats::setNames(metrics, metrics)
+  known <- metrics %in% names(display)
+  out[known] <- display[metrics[known]]
+  out
 }

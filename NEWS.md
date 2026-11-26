@@ -1,11 +1,58 @@
-# mvgam 1.1.595
+# mvgam 2.0.0
+
+mvgam now builds its models through 'brms'. The observation model takes the full 'brms' formula syntax. `trend_formula` specifies the latent process. Most 1.1.x code needs rewriting. Start with `vignette("mvgam_overview")` and `vignette("data")`. The [articles](https://nicholasjclark.github.io/mvgam/articles/) work through each model class.
+
+## Breaking changes
+* Trend constructors go inside `trend_formula`, as in `trend_formula = ~ AR(p = 1)`. `n_lv` and `trend_map` are arguments of the trend constructors
+* Removed arguments: `trend_model`, `use_lv`, `prior_simulation`, `return_model_data`, `save_all_pars`, `parallel`
+* Data for a model with a trend need a factor series column, even for one series
+* Renamed families: `nb()` is `negbinomial()`, `student_t()` is `student()`, `betar()` is `Beta()`
+* The default family is `gaussian()`. `jsdgam()` defaults to `binomial()`
+* Removed functions, with their replacements: `get_mvgam_priors()` (`get_prior()`), `plot_mvgam_*()` (`plot()`), `compare_mvgams()` (`loo_compare()`), `eval_mvgam()` and `roll_eval_mvgam()` (`lfo_cv()`), `lv_correlations()` (`residual_cor()`), `add_residuals()` (`augment()`), `code()` (`stancode()`), `ppc()` (`pp_check()`)
+* `gp()` and `mo()` replace `GP()`, `dynamic()`, `s(bs = "moi")`, `s(bs = "mod")`
+* Renamed arguments: `incl_autocor` (was `trend_state`), `process_error` (was `resample_innovations`), `centred` (was `noncentred`)
+* Parameter names follow 'brms', as do `summary()`, `coef()`, `fixef()`. Trend parameters are indexed by series name, as in `sigma_trend[DM]`
+* Posterior summaries by default from `irf()`, `fevd()`, `stability()`. Pass `summary = FALSE` for draws
+* mvgam no longer re-exports `te()` and `ti()`. `series_to_mvgam()` no longer takes `xts` input
+* `sim_mvgam()` is built around named scenarios. `series_to_mvgam()` returns one data frame unless `h` or `train_prop` is given
+
+## New features
+* `mvbind()` and `mvbf()` responses share one latent process. See the [multivariate](https://nicholasjclark.github.io/mvgam/articles/mvbf.html) and [integrated distribution model](https://nicholasjclark.github.io/mvgam/articles/idm.html) articles
+* Imperfect detection through `occ()` and `nmix()`, each with a multi-season variant. `forecast(type = "latent_state")` forecasts occupancy or abundance. See the [occupancy](https://nicholasjclark.github.io/mvgam/articles/occupancy.html) and [N-mixture](https://nicholasjclark.github.io/mvgam/articles/nmix.html) articles
+* `jsdgam()` takes traits, trait slopes, a phylogeny and the composition families (`diri()`, `multi()`, `categ()`). Summaries of the fit: `species_effects()`, `community()`, `residual_cor()`. See the [JSDM article](https://nicholasjclark.github.io/mvgam/articles/jsdgam.html)
+* New dynamics: moving average terms and coefficient pooling in `AR()` and `VAR()`, hierarchical VARs, the local linear trend `LLT()`, an extended `CAR()`. See the [VAR](https://nicholasjclark.github.io/mvgam/articles/var.html) and [hierarchical VAR](https://nicholasjclark.github.io/mvgam/articles/hierarchical_var.html) articles
+* Structured factor loadings through `loadings_prior`. Tools to interpret the loadings: `active_factors()`, `shared_variation()`, `compare_loadings()`, `ordinate()`. See `vignette("dfm")`
+* New families: `tweedie()`, `beta_nb()`, `com_binomial()` (mathematics by @jbogomolovas2), `mvn()`, `mvt()`
+* The 'brms' post-processing methods work on mvgam fits. Examples: `posterior_predict()`, `log_lik()`, `update()`, `hypothesis()`, `bridge_sampler()`
+* `forecast_uncertainty()` splits forecast variance by source and horizon. `compare_scores()` and `compare_elpds()` compare models. See the [forecast evaluation article](https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html)
+* Checks of a model and its data before fitting or prediction: `mvgam_formula()`, `mvgam_data()`, `check_newdata()`
+* `methods_md()` writes a model description. `bibtex()` extracts the citation
+* Fits with 'cmdstanr' 1.0, which drops `cmdstan_model(compile = FALSE)`
+* `pp_check()` given a `group` draws the type's `_grouped` variant, one panel per group (#49)
+
+## Changed defaults
+* The `posterior_*()` methods and `fitted()` default to `process_error = FALSE`, matching `predict()`
+* Predictions with `incl_autocor = TRUE` refuse times outside the fitted times. Use `forecast()`
+* Trend scale priors follow the response's spread on the link scale, as 'brms' defaults do
+
+## Deprecations
+* `samples` and `burnin` (use `iter` and `warmup`), `lfo_cv(data = )` (use `newdata`), `incl_dynamics` (use `incl_autocor`), `by = trend` (use `by = lv_axis()`)
+
+## Bug fixes
+* Binomial predictions with varying trial counts stay within each observation's total (thanks to @jbogomolovas2)
+* `ensemble()` combines `hindcast()` results
+* `update()` works when a trend argument came from a variable
+* Fixes to the Brier and variogram scores
+* Fixes to by-factor Gaussian Process predictions and to residual plots with missing values (thanks to @StefanoMezzini)
+
+# mvgam 1.1.594
 
 ## New functionalities
 * Restructured `summary.mvgam()` to now return an object of class `mvgam_summary` that can be re-used for later purposes, or that can be printed with `print.mvgam_summary()` (#119)
 * Added a new function `ordinate.jsdgam()` to plot two-dimensional ordinations of site and species scores from latent factor models estimated in `jsdgam()`
 * `residual_cor()` now supports models fitted with `mvgam()` in which latent factors were used or in which correlated dynamic processes were used
 * Added a `summary.mvgam_forecast()` function to compute and return prediction intervals of posterior hindcasts and forecasts in a `data.frame` format. This will make it easier for users to create their own custom plots of hindcast and forecast distributions (#108)
-* Added a [`mvgam_use_cases`](https://nicholasjclark.github.io/mvgam/reference/mvgam_use_cases.html) help file to provide links to online resources that discuss how to use 'mvgam' in practice
+* Added a `mvgam_use_cases` help file to provide links to online resources that discuss how to use 'mvgam' in practice
 
 ## Changing defaults
 * The `forecast()` method is now imported from 'generics' to help avoid conflict issues with other forecasting packages
@@ -17,8 +64,6 @@
 * Bug fix to ensure offsets supplied with `offset(...)` in formulae are correctly incorporated when using `gp()` terms
 * Bug fix to ensure piecewise trends are correctly predicted when using `process_error = TRUE` in `predict()`
 * Bug fix to ensure variance of continuous time autoregressive processes (using `CAR()`) scales appropriately with time lags (#107)
-* Bug fix to ensure `summary.mvgam()` uses the correct `max_treedepth` value when checking Stan diagnostics, rather than always assuming the default of 10 (thanks to @StefanoMezzini for reporting)
-* Bug fix to ensure `NA` residual values are handled properly when plotting residuals (this occurs because response values are allowed to be missing; (thanks to @StefanoMezzini for reporting)
 
 ## Deprecations
 * Altered the structure of objects of class `mvgam_forecast` so that the `train_times` and `test_times` slots now contain lists of length `n_series`. This allows for continuous time data to be better handled, where some series may have been sampled at different timepoints
@@ -51,7 +96,7 @@
 * Added a `fevd.mvgam()` method to compute forecast error variance decompositions from models fit with Vector Autoregressive dynamics (#21 and #76)
 
 ## Deprecations
-* Arguments `use_stan`, `jags_path`, `data_train`, `data_test`, `adapt_delta`, `max_treedepth` and `drift` have been removed from primary functions to streamline documentation and reflect the package's mission to deprecate 'JAGS' as a suitable backend. Both `adapt_delta` and `max_treedepth` should now be supplied in a named `list()` to the new argument `control`
+* Arguments removed from primary functions: `use_stan`, `jags_path`, `data_train`, `data_test`, `adapt_delta`, `max_treedepth`, `drift`. The removal streamlines documentation and reflects the package's mission to deprecate 'JAGS' as a suitable backend. Both `adapt_delta` and `max_treedepth` should now be supplied in a named `list()` to the new argument `control`
 
 ## Bug fixes
 * Bug fix to ensure `marginaleffects::comparisons` functions appropriately recognise internal `rowid` variables
@@ -64,7 +109,7 @@
 # mvgam 1.1.3
 ## New functionalities
 * Allow intercepts to be included in process models when `trend_formula` is supplied. This breaks the assumption that the process has to be zero-centred, adding more modelling flexibility but also potentially inducing nonidentifiabilities with respect to any observation model intercepts. Thoughtful priors are a must for these models
-* Added `standata.mvgam_prefit`, `stancode.mvgam` and `stancode.mvgam_prefit` methods for better alignment with 'brms' workflows
+* Added methods for better alignment with 'brms' workflows: `standata.mvgam_prefit`, `stancode.mvgam`, `stancode.mvgam_prefit`
 * Added 'gratia' to *Enhancements* to allow popular methods such as `draw()` to be used for 'mvgam' models if 'gratia' is already installed
 * Added an `ensemble.mvgam_forecast()` method to generate evenly weighted combinations of probabilistic forecast distributions
 * Added an `irf.mvgam()` method to compute Generalized and Orthogonalized Impulse Response Functions (IRFs) from models fit with Vector Autoregressive dynamics
@@ -74,7 +119,7 @@
 
 ## Bug fixes
 * Added a new check to ensure that exception messages are only suppressed by the `silent` argument if the user's version of 'cmdstanr' is adequate
-* Updated dependency for 'brms' to version >= '2.21.0' so that `read_csv_as_stanfit` can be imported, which should future-proof the conversion of 'cmdstanr' models to `stanfit` objects (#70)
+* Updated dependency for 'brms' to version >= '2.21.0'. Its `read_csv_as_stanfit` now converts 'cmdstanr' models to `stanfit` objects (#70)
 
 # mvgam 1.1.2
 ## New functionalities
@@ -84,7 +129,7 @@
 * Added an option to use `trend_model = 'None'` in State-Space models, increasing flexibility by ensuring the process error evolves as white noise (#51)
 * Added an option to use the non-centred parameterisation for some autoregressive trend models,
 which speeds up mixing most of the time
-* Updated support for multithreading so that all observation families (apart from `nmix()`) can now be modeled with multiple threads
+* Multithreading now supports all observation families apart from `nmix()`
 * Changed default priors on autoregressive coefficients (AR1, AR2, AR3) to enforce
 stationarity, which is a much more sensible prior in the majority of contexts
 

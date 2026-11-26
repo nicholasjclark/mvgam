@@ -1,0 +1,444 @@
+# Smooth and Gaussian-process terms, and the three methods that
+# enumerate and evaluate them.
+#
+# One fit carries every smooth shape the rest of the suite does not:
+#
+#   y ~ s(z, by = grp) + t2(z, w) + gp(w, by = cat)
+#
+# A by-factor smooth, a tensor product and a by-factor Gaussian
+# process, side by side. Fitting them together rather than one per
+# model is what makes the claims below possible: `smooths()`,
+# `posterior_smooths()` and `conditional_smooths()` each have to pick
+# the right term out of three, and a method that returned the first
+# term whatever it was asked for passes on any single-smooth model.
+#
+# The shapes this file does not fit are the ones already fitted by
+# the files that own them, so nothing is refitted to be looked at
+# twice:
+#
+#   s(z) alone            test-draws-alignment.R
+#   a two-covariate s()   test-trend-pw.R
+#   gp(x)                 test-trend-ar-multilag.R
+#   gp(x1, x2)            test-trend-arma.R
+#   a trend-side smooth   test-draws-alignment.R
+#   s(x, by = lv_axis())  test-factor-lv-axis.R, test-grain-closure-units.R
+#
+# `assert_by_factor_variation()` is the reason the by-factor terms
+# are here at all. A by-factor contribution can be carried by one
+# prediction route and dropped by another, and a fit that dropped it
+# everywhere still returns the right shape from all of them, so six
+# routes are driven at once.
+
+suppressMessages({
+  devtools::load_all(".", quiet = TRUE)
+  library(posterior)
+  library(testthat)
+  library(marginaleffects)
+})
+
+# Several blocks below state what the package does not yet do, and
+# testthat stops a file after ten failures by default, which would
+# leave the blocks after them unrun and looking clean. The limit is
+# read when the reporter is built, before this file is sourced, so it
+# has to come from the environment:
+#   TESTTHAT_MAX_FAILS=1000 Rscript -e "..."
+
+# A by-factor term contributes to six prediction routes, and a fit
+# that dropped it from one of them returns the right shape from all
+# six. Each route is asked for two grids differing only in the
+# by-factor level, so a route that collapsed the contrast to Monte
+# Carlo noise is the one that fails.
+assert_by_factor_variation <- function(mvgam_fit, grid_A, grid_B,
+                                       response = "y",
+                                       ndraws = 50L,
+                                       linpred_tol = 1e-3,
+                                       epred_tol = 1e-3,
+                                       fitted_tol = 1e-3,
+                                       predict_tol = 0.05,
+                                       loglik_tol = 1e-3,
+                                       me_tol = 1e-3) {
+  # Tolerances at 1e-3 sit far above MC noise at ndraws = 50 for the
+  # deterministic posterior_linpred / posterior_epred / fitted /
+  # log_lik calls; the by-factor structural contrast is on the order
+  # of the per-level basis coefficients, which exceed 1e-2 in any
+  # non-degenerate fit. posterior_predict adds family noise so its
+  # per-column mean stabilises at O(1/sqrt(ndraws)); the 0.05
+  # tolerance and bumped ndraws = 200 reflect that.
+  variation_max <- function(A, B) {
+    max(abs(colMeans(A) - colMeans(B)))
+  }
+
+  lp_A <- posterior_linpred(mvgam_fit, newdata = grid_A, ndraws = ndraws)
+  lp_B <- posterior_linpred(mvgam_fit, newdata = grid_B, ndraws = ndraws)
+  testthat::expect_gt(variation_max(lp_A, lp_B), linpred_tol)
+
+  ep_A <- posterior_epred(mvgam_fit, newdata = grid_A, ndraws = ndraws)
+  ep_B <- posterior_epred(mvgam_fit, newdata = grid_B, ndraws = ndraws)
+  testthat::expect_gt(variation_max(ep_A, ep_B), epred_tol)
+
+  # fitted() returns a matrix whose first column is named "Estimate"
+  # (mirrors brms convention; see R/fitted.R docs).
+  ft_A <- fitted(mvgam_fit, newdata = grid_A, ndraws = ndraws)
+  ft_B <- fitted(mvgam_fit, newdata = grid_B, ndraws = ndraws)
+  testthat::expect_gt(
+    max(abs(ft_A[, "Estimate"] - ft_B[, "Estimate"])), fitted_tol
+  )
+
+  pp_A <- posterior_predict(mvgam_fit, newdata = grid_A, ndraws = 200L)
+  pp_B <- posterior_predict(mvgam_fit, newdata = grid_B, ndraws = 200L)
+  testthat::expect_gt(variation_max(pp_A, pp_B), predict_tol)
+
+  # The marginaleffects entry point reaches get_predict.mvgam, which
+  # predictions(), slopes(), comparisons() and conditional_effects()
+  # all dispatch through. Stacking the two grids into one call
+  # returns one row index per grid row, so the per-level contrast is
+  # read off a single estimate vector.
+  prev_mc <- options(marginaleffects_model_classes = "mvgam")
+  on.exit(options(prev_mc), add = TRUE)
+  me_grid <- rbind(grid_A, grid_B)
+  me_preds <- marginaleffects::predictions(
+    mvgam_fit,
+    newdata = me_grid,
+    type = "response"
+  )
+  n_A <- nrow(grid_A)
+  me_A <- me_preds$estimate[seq_len(n_A)]
+  me_B <- me_preds$estimate[-seq_len(n_A)]
+  testthat::expect_gt(max(abs(me_A - me_B)), me_tol)
+
+  # log_lik feeds loo / waic. Identical response values on both grids
+  # so any shift in the per-observation log density comes from the
+  # linear predictor moving across the by-factor level. The grids are
+  # overwritten locally, which leaves the caller's copies untouched.
+  grid_A[[response]] <- rep(1L, nrow(grid_A))
+  grid_B[[response]] <- rep(1L, nrow(grid_B))
+  ll_A <- log_lik(mvgam_fit, newdata = grid_A, ndraws = ndraws)
+  ll_B <- log_lik(mvgam_fit, newdata = grid_B, ndraws = ndraws)
+  testthat::expect_true(all(is.finite(ll_A)))
+  testthat::expect_true(all(is.finite(ll_B)))
+  testthat::expect_gt(variation_max(ll_A, ll_B), loglik_tol)
+
+  invisible(NULL)
+}
+
+
+sm_data <- local({
+  cached <- NULL
+  function() {
+    if (!is.null(cached)) return(cached)
+    set.seed(42L)
+    n <- 60L
+    ar_coef <- 0.7
+    sigma <- 0.5
+    latent <- numeric(n)
+    latent[1L] <- rnorm(1L, 0, sigma / sqrt(1 - ar_coef^2))
+    for (t in 2L:n) {
+      latent[t] <- ar_coef * latent[t - 1L] + rnorm(1L, 0, sigma)
+    }
+    z <- seq(-2, 2, length.out = n)
+    w <- seq(-1, 1, length.out = n)
+    # Three grouping levels for the smooth and two for the GP, so a
+    # by-factor block counted against the wrong factor is the wrong
+    # size rather than merely the wrong contents.
+    grp <- factor(rep(letters[1:3], length.out = n), levels = letters[1:3])
+    cat_f <- factor(rep(c("A", "B"), length.out = n), levels = c("A", "B"))
+    cached <<- data.frame(
+      y = rpois(n, exp(1.6 + latent + 0.5 * sin(z * pi) +
+                         0.4 * w * as.integer(cat_f))),
+      z = z, w = w, grp = grp, cat = cat_f,
+      time = seq_len(n),
+      series = factor("s1")
+    )
+    cached
+  }
+})
+
+
+sm_fit <- local({
+  cached <- NULL
+  function() {
+    if (!is.null(cached)) return(cached)
+    cached <<- cached_fit("val_mvgam_smooth_surfaces.rds", function() {
+      mvgam(
+        formula = y ~ s(z, by = grp, k = 5) + t2(z, w, k = c(4, 4)) +
+          gp(w, by = cat, k = 5),
+        trend_formula = ~ AR(p = 1),
+        data = sm_data(), family = poisson(),
+        chains = 2L, iter = 1000L, warmup = 500L,
+        silent = 2, backend = "cmdstanr"
+      )
+    })
+    cached
+  }
+})
+
+
+test_that("the frame separates the two grouping factors", {
+  d <- sm_data()
+  # Three levels against two, so a by-factor block counted against
+  # the wrong factor has the wrong length and cannot pass by luck.
+  expect_identical(nlevels(d$grp), 3L)
+  expect_identical(nlevels(d$cat), 2L)
+  expect_false(nlevels(d$grp) == nlevels(d$cat))
+  expect_identical(nrow(d), 60L)
+})
+
+
+test_that("smooths names the two mgcv terms, and not the GP", {
+  mv <- sm_fit()
+  # The expected list comes from the fit's own formula, so this
+  # asks whether `smooths()` reports what the model was given
+  # rather than whether two packages agree.
+  expected <- attr(
+    terms(brms::brmsterms(mv$formula)$dpars$mu$sm), "term.labels"
+  )
+  got <- smooths(mv)
+  expect_setequal(got, expected)
+  # A GP is not an mgcv smooth, so `smooths()` names the by-factor
+  # smooth and the tensor and leaves `gp(w, by = cat)` out: the GP
+  # is reached through its own machinery. Two, not three, and which
+  # two is the claim.
+  expect_length(got, 2L)
+  expect_true(any(grepl("^s\\(z", got)))
+  expect_true(any(grepl("^t2\\(z", got)))
+  expect_false(any(grepl("^gp\\(", got)))
+})
+
+
+test_that("posterior_smooths evaluates the term it was asked for", {
+  mv <- sm_fit()
+  d <- sm_data()
+  terms_avail <- smooths(mv)
+  etas <- lapply(terms_avail, function(tm) {
+    posterior_smooths(mv, smooth = tm)
+  })
+  names(etas) <- terms_avail
+  for (tm in terms_avail) {
+    expect_identical(dim(etas[[tm]]),
+                     c(as.integer(ndraws(mv)), nrow(d)))
+    expect_true(all(is.finite(etas[[tm]])))
+    # A smooth that never reached the draws returns zeros, which
+    # keeps the dimensions above.
+    expect_gt(stats::sd(apply(etas[[tm]], 2L, stats::median)), 1e-6)
+  }
+  # The three terms are different functions of the data. A method
+  # that returned the first basis block whatever it was asked for
+  # would return three identical matrices and satisfy every claim
+  # above.
+  for (i in seq_along(terms_avail)[-1L]) {
+    expect_false(isTRUE(all.equal(etas[[1L]], etas[[i]])))
+  }
+
+  # Column order follows the frame's own rows, which a shuffled
+  # frame is what tests: a smooth evaluated by position rather than
+  # by content answers in the original order.
+  tm <- terms_avail[1L]
+  perm <- c(seq(2L, nrow(d)), 1L)
+  eta_s <- posterior_smooths(mv, smooth = tm,
+                             newdata = d[perm, , drop = FALSE])
+  expect_equal(apply(eta_s, 2L, stats::median),
+               apply(etas[[tm]], 2L, stats::median)[perm],
+               tolerance = 1e-8)
+})
+
+
+test_that("posterior_smooths honours ndraws and draw_ids", {
+  mv <- sm_fit()
+  tm <- smooths(mv)[1L]
+  ids <- c(3L, 11L, 42L)
+  by_id <- posterior_smooths(mv, smooth = tm, draw_ids = ids)
+  expect_identical(nrow(by_id), length(ids))
+  # Naming the same draws twice returns the same numbers, so the
+  # selection is by index and not a fresh sample each call.
+  expect_equal(by_id, posterior_smooths(mv, smooth = tm,
+                                        draw_ids = ids))
+  expect_identical(nrow(posterior_smooths(mv, smooth = tm,
+                                          ndraws = 7L)), 7L)
+  expect_error(posterior_smooths(mv, smooth = "s(nonexistent)"))
+})
+
+
+test_that("s(z, by = grp) gives each of the three levels a curve", {
+  mv <- sm_fit()
+  lev <- levels(sm_data()$grp)
+  cs <- conditional_smooths(mv)
+  by_term <- Filter(function(d) "grp" %in% colnames(d), cs)
+  expect_length(by_term, 1L)
+  d <- by_term[[1L]]
+  expect_setequal(as.character(unique(d$grp)), lev)
+  # One block of grid rows per level, so three levels means three
+  # times the single-curve row count. A model that fitted one
+  # shared curve returns a third of this.
+  expect_identical(nrow(d), 100L * length(lev))
+  curves <- split(d$estimate__, d$grp)
+  expect_length(curves, length(lev))
+  for (k in seq_along(curves)) {
+    expect_gt(stats::sd(curves[[k]]), 1e-6)
+    expect_gt(mean(d$upper__[d$grp == lev[k]] -
+                     d$lower__[d$grp == lev[k]]), 0)
+  }
+  # The levels differ from one another. A smooth whose coefficients
+  # never reach the grid draws every level as one flat curve.
+  expect_false(isTRUE(all.equal(curves[[1L]], curves[[2L]])))
+  expect_false(isTRUE(all.equal(curves[[2L]], curves[[3L]])))
+})
+
+
+test_that("t2(z, w) is a surface over both covariates", {
+  mv <- sm_fit()
+  cs <- conditional_smooths(mv)
+  tens <- Filter(function(d) all(c("z", "w") %in% colnames(d)), cs)
+  expect_length(tens, 1L)
+  d <- tens[[1L]]
+  # A tensor's grid is a grid: both margins appear and the row
+  # count is their product. A tensor collapsed to one covariate
+  # returns a grid of 100 and passes any is-it-there check.
+  expect_true(all(c("effect1__", "effect2__") %in% colnames(d)))
+  expect_identical(nrow(d), 100L * 100L)
+  expect_identical(length(unique(d$z)), 100L)
+  expect_identical(length(unique(d$w)), 100L)
+
+  # And it moves along both margins. One that varied with `z` alone
+  # would be an s(z) wearing a tensor's shape.
+  along_w <- vapply(split(d$estimate__, d$z), stats::sd, numeric(1L))
+  along_z <- vapply(split(d$estimate__, d$w), stats::sd, numeric(1L))
+  expect_gt(mean(along_w), 1e-6)
+  expect_gt(mean(along_z), 1e-6)
+})
+
+
+test_that("conditional_smooths returns one entry per smooth term", {
+  mv <- sm_fit()
+  cs <- conditional_smooths(mv)
+  expect_length(cs, length(smooths(mv)))
+  for (d in cs) {
+    expect_true(all(c("effect1__", "estimate__", "se__",
+                      "lower__", "upper__") %in% colnames(d)))
+    # Finding 34 is what happens when the frame is right and
+    # nothing checks it was evaluated: a constant estimate with a
+    # zero-width band satisfies the column list and the row count.
+    expect_gt(stats::sd(d$estimate__), 1e-6)
+    expect_true(all(d$se__ > 0))
+    expect_true(all(d$lower__ <= d$estimate__))
+    expect_true(all(d$estimate__ <= d$upper__))
+  }
+  # Asking for one term returns that term alone.
+  one <- conditional_smooths(mv, smooths = smooths(mv)[1L])
+  expect_length(one, 1L)
+})
+
+
+test_that("gp(w, by = cat) reaches every prediction route", {
+  mv <- sm_fit()
+  d <- sm_data()
+  n <- 6L
+  # Two grids alike in every column but the by-factor, so any
+  # difference between their predictions is that term and nothing
+  # else. Every covariate the model reads has to be present, since
+  # a frame missing one is refused before a prediction is made.
+  grid_A <- data.frame(
+    z = seq(min(d$z), max(d$z), length.out = n),
+    w = seq(min(d$w), max(d$w), length.out = n),
+    grp = factor(levels(d$grp)[1L], levels = levels(d$grp)),
+    cat = factor("A", levels = levels(d$cat)),
+    series = factor("s1", levels = levels(d$series)),
+    time = seq_len(n)
+  )
+  grid_B <- grid_A
+  grid_B$cat <- factor("B", levels = levels(d$cat))
+  expect_gt(stats::sd(grid_A$w), 0)
+
+  # posterior_linpred, posterior_epred, fitted, posterior_predict,
+  # log_lik and the marginaleffects entry point all have to tell the
+  # two levels apart. A by-factor contribution dropped from any one
+  # of them fails here and nowhere else.
+  assert_by_factor_variation(mv, grid_A, grid_B)
+})
+
+
+test_that("the layout arguments reach the drawn smooth", {
+  # `surface` and `facets` decide how a two-dimensional smooth is
+  # rendered, and an argument of that kind is the sort that goes
+  # inert without anyone noticing: the call still returns a frame of
+  # the right shape under either value. The tensor term is what makes
+  # the two distinguishable, so the claim is that they differ.
+  mv <- sm_fit()
+  tensor <- conditional_smooths(mv)
+  flat <- conditional_smooths(mv, surface = FALSE)
+  two_d <- grep("^mu: t2", names(tensor), value = TRUE)
+  expect_length(two_d, 1L)
+
+  # The grid a surface is drawn over is far denser than a set of
+  # faceted lines, and the attribute records which was built.
+  expect_true(isTRUE(attr(tensor[[two_d]], "surface")))
+  expect_false(isTRUE(attr(flat[[two_d]], "surface")))
+  expect_gt(nrow(tensor[[two_d]]), nrow(flat[[two_d]]))
+
+  # And the geometry follows it: contours for the surface, lines for
+  # the faceted form.
+  geom_of <- function(cs) {
+    pl <- plot(cs)
+    idx <- which(names(cs) == two_d)
+    vapply(pl[[idx]]$layers, function(l) class(l$geom)[1L],
+           character(1L))
+  }
+  expect_true(any(grepl("Contour", geom_of(tensor))))
+  expect_false(any(grepl("Contour", geom_of(flat))))
+
+  # `facets` only means anything once the surface is off, and it
+  # decides how many slices of the second covariate are drawn.
+  expect_identical(
+    nrow(conditional_smooths(mv, surface = FALSE, facets = 2L)[[two_d]]),
+    nrow(flat[[two_d]]) %/% 3L * 2L
+  )
+})
+
+
+test_that("the general surface answers on a smooth-carrying fit", {
+  # Nine blocks above ask what this file was written for, and none of
+  # them leaves the smooth machinery. These are the calls a reader
+  # makes around it.
+  mv <- sm_fit()
+
+
+  # The model's predictors are the covariates its smooths are built
+  # on. `time` is the axis the trend is indexed by, and a consumer
+  # offered it will take a slope over an occasion number.
+  preds <- insight::find_predictors(mv)$conditional
+  expect_setequal(preds, c("z", "w", "grp", "cat"))
+
+  # An argument nothing reads leaves the method running on the
+  # default it was asked to override.
+  expect_error(posterior_smooths(mv, smooth = smooths(mv)[1L],
+                                 zzz_unknown = 1))
+  expect_error(conditional_smooths(mv, zzz_unknown = 1))
+})
+
+
+test_that("the by-factor GP carries one length-scale per level", {
+  mv <- sm_fit()
+  # `gp()` is isotropic by default, so a second covariate would not
+  # add a length-scale; a second by-factor level does. Two levels of
+  # `cat` therefore give two, indexed `lscale_<id>[level, dim]`.
+  lscale <- grep("^lscale_", variables(mv), value = TRUE)
+  expect_length(lscale, nlevels(sm_data()$cat))
+  dm <- as_draws_matrix(mv)
+  for (p in lscale) expect_true(all(as.numeric(dm[, p]) > 0))
+  # The two levels are estimated separately, so a program that
+  # declared two and filled both from one level would tie them.
+  expect_false(isTRUE(all.equal(as.numeric(dm[, lscale[1L]]),
+                                as.numeric(dm[, lscale[2L]]))))
+})
+
+
+test_that("each smooth object is named as brms names it", {
+  # `brms:::rename_sm()` labels an object by its term and `by` level
+  # and numbers its penalties; summary() reports those alone.
+  expect_equal(
+    rownames(summary(sm_fit())$smooth),
+    c("sds(szgrpa_1)", "sds(szgrpb_1)", "sds(szgrpc_1)",
+      "sds(t2zw_1)", "sds(t2zw_2)", "sds(t2zw_3)")
+  )
+})
+
+cat("\nDone.\n")

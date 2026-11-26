@@ -1,68 +1,55 @@
-#' Create a matrix of output plots from a \code{mvgam} object
+#' Pairs plot of mvgam parameters
 #'
-#' A \code{\link[graphics:pairs]{pairs}}
-#' method that is customized for MCMC output.
+#' Scatters the posterior draws of each pair of parameters, with each
+#' parameter's marginal posterior on the diagonal, as
+#' [bayesplot::mcmc_pairs()] draws them. Divergent transitions are
+#' marked. A ridge or a funnel between two parameters shows that the
+#' data separate them poorly.
 #'
-#' @param x An object of class \code{mvgam} or \code{jsdgam}
+#' Without `variable`, the plot shows the parameters
+#' [mcmc_plot.mvgam()] shows: the population coefficients, the family
+#' parameters, the variance components and the trend's dynamics and
+#' loadings. The per-basis smooth coefficients (`s_*`) and the
+#' group-level deviations (`r_*`) run to hundreds on a spline or
+#' hierarchical fit. They are drawn when `variable` names them.
+#'
+#' @param x A fitted `mvgam` or `jsdgam` object
 #' @inheritParams mcmc_plot.mvgam
-#' @param ... Further arguments to be passed to
-#'   \code{\link[bayesplot:MCMC-scatterplots]{mcmc_pairs}}.
+#' @param ... Further arguments to [bayesplot::mcmc_pairs()], such as
+#'   `off_diag_args`.
 #'
-#' @return Plottable objects whose classes depend on the arguments supplied.
-#' See \code{\link[bayesplot:MCMC-scatterplots]{mcmc_pairs}} for details.
-#' @details For a detailed description see
-#'   \code{\link[bayesplot:MCMC-scatterplots]{mcmc_pairs}}.
+#' @return A `bayesplot_grid` object
+#'
+#' @seealso [mcmc_plot.mvgam()] draws the other bayesplot MCMC plots.
+#'   [mvgam_draws] lists the shortcuts `variable` accepts.
 #'
 #' @examples
 #' \dontrun{
-#' simdat <- sim_mvgam(n_series = 1, trend_model = 'AR1')
-#' mod <- mvgam(y ~ s(season, bs = 'cc'),
-#'              trend_model = AR(),
-#'              noncentred = TRUE,
-#'              data = simdat$data_train,
-#'              chains = 2)
-#' pairs(mod)
-#' pairs(mod, variable = c('ar1', 'sigma'), regex = TRUE)
+#' set.seed(13)
+#' simdat <- sim_mvgam(family = gaussian(), n_series = 1L,
+#'                      n_timepoints = 120L, trend_model = AR(),
+#'                      prop_trend = 0.5)
+#' mod <- mvgam(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1),
+#'               data    = simdat$data_train,
+#'               family  = gaussian(),
+#'               chains  = 2, silent = 2)
+#'
+#' # A Gaussian response adds white noise to the latent AR(1) process.
+#' # The data split the total variance between the observation noise
+#' # `sigma` and the process noise `sigma_trend` through the
+#' # autocorrelation alone. A larger `sigma` leaves less variance for
+#' # `sigma_trend`. The pair then forms a negative ridge. Divergences
+#' # gather where `sigma` nears zero.
+#' pairs(mod, variable = c("obs_params", "trend_params"))
+#'
+#' # Next, mcmc_plot(mod, type = "rank_overlay") checks that the chains
+#' # mix
 #' }
 #'
+#' @family posterior summaries
 #' @export
-pairs.mvgam <- function(
-  x,
-  variable = NULL,
-  regex = FALSE,
-  use_alias = TRUE,
-  ...
-) {
-  # Set red colour scheme
-  col_scheme <- attr(color_scheme_get(), 'scheme_name')
-  color_scheme_set('red')
-
-  # Set default params to plot
-  # By default, don't plot the Betas as there can be hundreds
-  # of them in spline models
-  if (is.null(variable)) {
-    all_pars <- variables(x)
-    variable <- c(
-      all_pars$observation_pars[, 1],
-      all_pars$observation_smoothpars[, 1],
-      all_pars$observation_re_params[, 1],
-      all_pars$trend_pars[, 1],
-      all_pars$trend_smoothpars[, 1],
-      all_pars$trend_re_params[, 1]
-    )
-    regex <- FALSE
-  }
-  draws <- as.array(
-    x,
-    variable = variable,
-    regex = regex,
-    use_alias = use_alias
-  )
-
-  # Generate plot and reset colour scheme
-  out_plot <- bayesplot::mcmc_pairs(draws, ...)
-  color_scheme_set(col_scheme)
-
-  # Return the plot
-  return(out_plot)
+pairs.mvgam <- function(x, variable = NULL, regex = FALSE, ...) {
+  require_fitted_model(x, "pairs")
+  mcmc_plot.mvgam(x, type = "pairs", variable = variable, regex = regex,
+                  ...)
 }

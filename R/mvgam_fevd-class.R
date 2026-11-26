@@ -1,179 +1,218 @@
 #' `mvgam_fevd` object description
 #'
-#' A \code{mvgam_fevd} object returned by function [fevd()]. Run
-#' `methods(class = "mvgam_fevd")` to see an overview of available methods.
+#' The objects returned by [fevd()]. Run
+#' `methods(class = "mvgam_fevd")` and
+#' `methods(class = "mvgam_fevd_summary")` to see an overview of
+#' available methods.
 #'
-#' @details A forecast error variance decomposition is useful for quantifying
-#'   the amount of information each series that in a Vector Autoregression
-#'   contributes to the forecast distributions of the other series in the
-#'   autoregression. This object contains the forecast error variance
-#'   decomposition using the orthogonalised impulse response coefficient
-#'   matrices \eqn{\Psi_h}, which can be used to quantify the contribution of
-#'   series \eqn{j} to the h-step forecast error variance of series \eqn{k}:
+#' @details A forecast error variance decomposition quantifies how much
+#'   of the forecast uncertainty in one series of a Vector
+#'   Autoregression is attributable to each of the others. It is built
+#'   from the orthogonalised impulse response coefficient matrices
+#'   \eqn{\Psi_h}, which give the contribution of series \eqn{j} to the
+#'   h-step forecast error variance of series \eqn{k}:
 #'   \deqn{
 #'   \sigma_k^2(h) = \sum_{j=1}^K(\psi_{kj, 0}^2 + \ldots + \psi_{kj,
 #'   h-1}^2) \quad
 #'   }
-#'   If the orthogonalised impulse reponses \eqn{(\psi_{kj, 0}^2 + \ldots +
-#'   \psi_{kj, h-1}^2)} are divided by the variance of the forecast error
-#'   \eqn{\sigma_k^2(h)}, this yields an interpretable percentage representing
-#'   how much of the forecast error variance for \eqn{k} can be explained by an
-#'   exogenous shock to \eqn{j}. This percentage is what is calculated and
-#'   returned in objects of class `mvgam_fevd`, where the posterior
-#'   distribution of variance decompositions for each variable in the original
-#'   model is contained in a separate slot within the returned `list` object
+#'   Dividing the orthogonalised responses \eqn{(\psi_{kj, 0}^2 +
+#'   \ldots + \psi_{kj, h-1}^2)} by the forecast error variance
+#'   \eqn{\sigma_k^2(h)} gives the proportion of the forecast error
+#'   variance for \eqn{k} explained by an exogenous shock to \eqn{j}.
+#'   These objects hold that proportion.
 #'
-#' @seealso [mvgam()], [VAR()]
+#'   The orthogonalisation takes the lower Cholesky factor of the
+#'   innovation covariance. The decomposition then depends on the order
+#'   of the series. The first series takes all of its own one-step
+#'   forecast error variance. Each later series shares its one-step
+#'   variance with the series before it. The order is that of the
+#'   levels of the series factor.
 #'
-#' @references Lütkepohl, H (2006). New Introduction to Multiple Time Series
-#'   Analysis. Springer, New York.
+#'   A decomposition is a `K` by `K` matrix per horizon per posterior
+#'   draw, which on a wide panel runs to hundreds of megabytes. A reader
+#'   needs only a median and an interval from them. [fevd()] returns
+#'   that summary. The two forms have different classes:
+#'
+#'   - `mvgam_fevd_summary`, the default. A long-format `tibble`
+#'     inheriting from `mvgam_var_surface_summary`, with one row per
+#'     shock-response pair per horizon. `shock` names the pair as
+#'     `"<from> -> <to>"`, taking the model's own series names where
+#'     the latent processes are the series and `"Process_k"` where a
+#'     factor VAR's processes are latent factors instead. `horizon`
+#'     counts the steps from the forecast origin. Three columns hold
+#'     the posterior median and the interval bounds, named for the
+#'     percentiles asked for: `fevdQ50`, `fevdQ2.5` and `fevdQ97.5` by
+#'     default.
+#'
+#'   - `mvgam_fevd`, returned under `summary = FALSE`. A `list` with
+#'     one element per posterior draw, each holding the decomposition
+#'     matrices for that draw. Pass it to `summary()` to reach the form
+#'     above.
+#'
+#'   Both forms take `ndraws` and `draw_ids`. A subset of the posterior
+#'   computes faster.
+#'
+#' @section Methods:
+#' `summary()` turns the draws into the `mvgam_fevd_summary` above, at
+#' the percentiles `probs` sets. `plot()` stacks the median share of
+#' each source in one panel per target, by horizon. A summary plots
+#' through [plot.mvgam_var_surface_summary()].
+#'
+#' @seealso [mvgam()], [VAR()], [fevd()], [irf()]
+#'
+#' @references Lutkepohl H (2005). New Introduction to Multiple Time Series
+#'   Analysis. Springer, Berlin. \doi{10.1007/978-3-540-27752-1}
 #'
 #' @author Nicholas J Clark
 #'
 #' @name mvgam_fevd-class
 NULL
 
-#' @title Posterior summary of forecast error variance decompositions
-#'
-#' @description This function takes an \code{mvgam_fevd} object and calculates
-#'   a posterior summary of the error variance decompositions of each series,
-#'   at all horizons
-#'
-#' @param object an object of class `mvgam_fevd` obtained using the
-#'   \code{fevd()} function. This object will contain draws from the posterior
-#'   distribution of the forecast error variance decompositions.
-#'
-#' @param probs The upper and lower percentiles to be computed by the
-#'   `quantile` function, in addition to the median
-#'
-#' @param ... ignored
-#'
-#' @return A long-format `tibble` / `data.frame` reporting the posterior median,
-#'   upper and lower percentiles of the error variance decompositions of each
-#'   series at all horizons.
-#'
+#' @param object An `mvgam_fevd` object from `fevd(summary = FALSE)`.
+#' @param probs The lower and upper percentiles of the interval.
+#'   Defaults to `c(0.025, 0.975)`.
+#' @param ... Unused. Anything passed here is refused.
+#' @rdname mvgam_fevd-class
 #' @method summary mvgam_fevd
-#'
-#' @seealso \code{\link{fevd}}, \code{\link{plot.mvgam_fevd}}
-#'
-#' @author Nicholas J Clark
-#'
 #' @export
-summary.mvgam_fevd = function(object, probs = c(0.025, 0.975), ...) {
-  if (length(probs) != 2L) {
-    stop("argument 'probs' must be a vector of length 2", call. = FALSE)
-  }
-  validate_proportional(min(probs))
-  validate_proportional(max(probs))
-
-  # Calculate posterior quantiles of error variance contributions
-  ynames <- names(object[[1]])
-  out <- do.call(
-    rbind,
-    lapply(seq_len(length(object)), function(draw) {
-      fevd_df(object[[draw]], ynames = ynames) %>%
-        dplyr::mutate(draw = draw)
-    })
-  ) %>%
-    dplyr::group_by(horizon, target, draw) %>%
-    dplyr::mutate(total_evd = sum(evd)) %>%
-    dplyr::ungroup() %>%
-    dplyr::mutate(evd = evd / total_evd) %>%
-    dplyr::group_by(horizon, target, Series) %>%
-    dplyr::mutate(
-      fevdQ50 = median(evd),
-      fevd_Qlower = quantile(evd, min(probs), na.rm = TRUE),
-      fevd_Qupper = quantile(evd, max(probs), na.rm = TRUE)
-    ) %>%
-    dplyr::ungroup() %>%
-    dplyr::mutate(
-      shock = gsub('process', 'Process', paste0(Series, ' -> ', target))
-    ) %>%
-    dplyr::select(shock, horizon, fevdQ50, fevd_Qlower, fevd_Qupper) %>%
-    dplyr::distinct()
-  colnames(out) <- c(
-    'shock',
-    'horizon',
-    'fevdQ50',
-    paste0('fevdQ', 100 * min(probs)),
-    paste0('fevdQ', 100 * max(probs))
+summary.mvgam_fevd <- function(object, probs = c(0.025, 0.975), ...) {
+  checkmate::assert_class(object, "mvgam_fevd")
+  rlang::check_dots_empty()
+  surface <- fevd_draws(object)
+  tibble::tibble(
+    shock = paste0(surface$keys$Series, " -> ", surface$keys$target),
+    horizon = surface$keys$horizon,
+    median_interval_cols(surface$draws, probs, "fevd")
   )
-
-  return(out)
 }
 
-#'Plot forecast error variance decompositions from an `mvgam_fevd` object
-#'
-#'This function takes an \code{mvgam_fevd} object and produces
-#'a plot of the posterior median contributions to forecast variance for each series
-#'in the fitted Vector Autoregression
-#'
-#'@importFrom ggplot2 ggplot aes geom_bar facet_wrap labs
-#'
-#'@param x \code{list} object of class \code{mvgam_fevd}. See [fevd()]
-#'
-#'@param ... ignored
-#'
-#'@return A \code{\link[ggplot2]{ggplot}} object,
-#'  which can be further customized using the \pkg{ggplot2} package
-#'
-#'@author Nicholas J Clark
-#'
-#'@export
-plot.mvgam_fevd = function(x, ...) {
-  # Calculate posterior median error variance contributions
+#' @param x An `mvgam_fevd` object.
+#' @param series Optional positions or names of the target processes
+#'   drawn as panels. Defaults to every process.
+#' @param contributing Optional positions or names of the source
+#'   processes stacked in each panel. Their shares are renormalised to
+#'   sum to one. Defaults to every process.
+#' @rdname mvgam_fevd-class
+#' @importFrom ggplot2 ggplot aes geom_bar facet_wrap labs
+#' @export
+plot.mvgam_fevd <- function(x, series = NULL, contributing = NULL, ...) {
+  checkmate::assert_class(x, "mvgam_fevd")
+  rlang::check_dots_empty()
   ynames <- names(x[[1]])
-  do.call(
-    rbind,
-    lapply(seq_len(length(x)), function(draw) {
-      fevd_df(x[[draw]], ynames = ynames)
-    })
-  ) %>%
-    dplyr::group_by(horizon, target, Series) %>%
-    dplyr::summarise(mean_evd = median(evd)) %>%
-    dplyr::ungroup() %>%
-    dplyr::group_by(horizon, target) %>%
-    dplyr::mutate(
-      total_evd = sum(mean_evd),
-      mean_evd = mean_evd / total_evd
-    ) %>%
-    dplyr::ungroup() %>%
-    dplyr::mutate(
-      Series = gsub('process', 'Process', Series),
-      target = gsub('process', 'Process', target)
-    ) -> mean_evds
-
-  # Plot as a ggplot object
-  ggplot2::ggplot(
-    mean_evds,
-    ggplot2::aes(fill = Series, y = mean_evd, x = horizon)
-  ) +
-    ggplot2::geom_bar(position = "stack", stat = "identity") +
-    ggplot2::facet_wrap(~target) +
-    ggplot2::theme_bw() +
-    ggplot2::labs(
-      x = 'Forecast horizon',
-      y = 'Median contribution to forecast variance'
-    )
+  target_keep <- validate_var_plot_ids(series, ynames, "series")
+  source_keep <- validate_var_plot_ids(
+    contributing, ynames, "contributing"
+  )
+  surface <- fevd_draws(x)
+  shares <- surface$keys
+  shares$share <- apply(surface$draws, 2L, stats::median)
+  plot_fevd_shares(shares, ynames[target_keep], ynames[source_keep])
 }
 
-#'@noRd
-fevd_df = function(x, ynames) {
-  do.call(
-    rbind,
-    lapply(seq_len(length(x)), function(process) {
-      data.frame(
-        horizon = 1:NROW(x[[process]]),
-        evd = as.vector(x[[process]]),
-        Series = paste0(
-          'process_',
-          sort(rep(
-            1:length(ynames),
-            NROW(x[[process]])
-          ))
-        ),
-        target = ynames[process]
-      )
-    })
+#' Stacked median shares of forecast error variance, a panel per target
+#'
+#' The shares of the sources drawn are renormalised within each target
+#' and horizon. The stack of each bar then sums to one when
+#' `contributing` drops sources. The processes keep the order the VAR
+#' numbers them in, which is the fit's series axis.
+#'
+#' @param shares Frame of `horizon`, the source `Series`, the `target`
+#'   and `share`, the median share of each pair
+#' @param target_names Targets drawn as panels, in the VAR's order
+#' @param source_names Sources stacked in each bar, in the VAR's order
+#' @return A `ggplot` object
+#' @noRd
+plot_fevd_shares <- function(shares, target_names, source_names) {
+  checkmate::assert_data_frame(shares)
+  checkmate::assert_names(names(shares),
+                          must.include = c("horizon", "Series", "target",
+                                           "share"))
+  shares <- shares[shares$target %in% target_names &
+                     shares$Series %in% source_names, , drop = FALSE]
+  shares$share <- shares$share /
+    stats::ave(shares$share, shares$target, shares$horizon, FUN = sum)
+  shares$Series <- factor(shares$Series, levels = source_names)
+  shares$target <- factor(shares$target, levels = target_names)
+
+  set_color_scheme_local()
+  ggplot2::ggplot(
+    shares,
+    ggplot2::aes(fill = .data$Series, y = .data$share, x = .data$horizon)
+  ) +
+    share_bars(length(source_names)) +
+    share_axis("y") +
+    ggplot2::facet_wrap(~ target) +
+    scale_x_steps("Forecast horizon") +
+    ggplot2::labs(y = "Median share of forecast variance") +
+    mvgam_theme()
+}
+
+#' The fill scale of a variance's sources
+#'
+#' Up to three sources take the shades of the red scheme the irf and
+#' stability plots draw with. More sources take the Okabe-Ito hues. A
+#' long label, such as a tensor product's call, wraps to keep the panels
+#' their width.
+#'
+#' @param n_sources Number of sources
+#' @return A `ggplot` scale
+#' @noRd
+share_fill_scale <- function(n_sources) {
+  mvgam_model_colour_scale(
+    n_sources, name = "Source", aesthetics = "fill",
+    labels = function(x) {
+      vapply(strwrap(x, width = 24L, simplify = FALSE), paste, character(1L),
+             collapse = "\n")
+    }
   )
+}
+
+#' Stacked bars of a variance's sources
+#'
+#' The first source stacks nearest the axis.
+#'
+#' @inheritParams share_fill_scale
+#' @return List of `ggplot` layers
+#' @noRd
+share_bars <- function(n_sources) {
+  list(
+    ggplot2::geom_bar(position = ggplot2::position_stack(reverse = TRUE),
+                      stat = "identity", colour = "white", linewidth = 0.2),
+    share_fill_scale(n_sources)
+  )
+}
+
+#' The percentage axis of stacked shares
+#'
+#' @param axis `"x"` or `"y"`
+#' @return A `ggplot` scale
+#' @noRd
+share_axis <- function(axis) {
+  scale <- switch(axis, x = ggplot2::scale_x_continuous,
+                  y = ggplot2::scale_y_continuous)
+  scale(labels = function(x) paste0(round(100 * x), "%"), expand = c(0, 0))
+}
+
+#' The draws of every variance share, one column per cell
+#'
+#' @param x An `mvgam_fevd` object
+#' @return List of two elements. `keys` is a frame naming each cell's
+#'   `horizon`, source `Series` and `target`. `draws` is an
+#'   `(ndraws x n_cells)` matrix of shares in the same order.
+#' @noRd
+fevd_draws <- function(x) {
+  # Each target's shares are an `(h x K)` matrix, horizons down the
+  # rows and source processes across the columns.
+  ynames <- names(x[[1L]])
+  h <- NROW(x[[1L]][[1L]])
+  n <- length(ynames)
+  keys <- data.frame(
+    horizon = rep(seq_len(h), times = n * n),
+    Series = rep(rep(ynames, each = h), times = n),
+    target = rep(ynames, each = h * n)
+  )
+  draws <- t(vapply(x, function(draw) {
+    unlist(lapply(draw, as.vector), use.names = FALSE)
+  }, numeric(nrow(keys))))
+  list(keys = keys, draws = draws)
 }

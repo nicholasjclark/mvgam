@@ -1,0 +1,272 @@
+# CI unit tests for `score.mvgam_forecast()`. Mock `mvgam_forecast`
+# objects pin the return shape, the dispatch, the validation guards
+# and the aggregation over series. The local suite scores real fits.
+
+
+# Build a mock `mvgam_forecast` with two series, `h` test points
+# per series and `ndraws` posterior draws per cell.
+make_mock_forecast <- function(n_series = 2L, h = 5L,
+                                 ndraws = 30L, type = "response",
+                                 family = "gaussian",
+                                 with_test = TRUE) {
+  series_names <- factor(
+    paste0("s", seq_len(n_series)),
+    levels = paste0("s", seq_len(n_series))
+  )
+  forecasts <- lapply(seq_len(n_series), function(s) {
+    matrix(stats::rnorm(ndraws * h, mean = s, sd = 1),
+            nrow = ndraws, ncol = h)
+  })
+  names(forecasts) <- levels(series_names)
+  test_observations <- if (with_test) {
+    out <- lapply(seq_len(n_series), function(s) rep(s, h))
+    names(out) <- levels(series_names)
+    out
+  } else {
+    NULL
+  }
+  structure(
+    list(
+      type = type,
+      series_names = series_names,
+      forecasts = if (with_test) forecasts else NULL,
+      hindcasts = list(),
+      test_observations = test_observations,
+      test_times = NULL,
+      train_observations = list(),
+      train_times = list(),
+      family = family
+    ),
+    class = "mvgam_forecast"
+  )
+}
+
+
+# ----- Return-shape contract --------------------------------------
+
+test_that("Univariate scorers return per-series df + all_series", {
+  skip_if_not_installed("scoringRules")
+  fc <- make_mock_forecast(n_series = 2L, h = 5L)
+  out <- score(fc, "crps")
+  expect_named(out, c("s1", "s2", "all_series"))
+  expect_identical(
+    sort(names(out[["s1"]])),
+    sort(c("score", "in_interval", "interval_width",
+            "eval_horizon", "score_type"))
+  )
+  expect_identical(out[["s1"]]$eval_horizon, 1:5)
+})
+
+
+test_that("all_series row-sums the per-series score column", {
+  skip_if_not_installed("scoringRules")
+  fc <- make_mock_forecast(n_series = 2L, h = 4L)
+  out <- score(fc, "crps")
+  expect_identical(nrow(out$all_series), 4L)
+  expect_true(all(out$all_series$score_type == "sum_crps"))
+  expect_equal(
+    out$all_series$score,
+    out$s1$score + out$s2$score
+  )
+  # A horizon observed in one series sums that series alone. A horizon
+  # observed in none has no score.
+  fc$test_observations$s1[2:3] <- NA
+  fc$test_observations$s2[3] <- NA
+  gap <- score(fc, "crps")
+  expect_equal(gap$all_series$score[2L], gap$s2$score[2L])
+  expect_identical(gap$all_series$score[3L], NA_real_)
+})
+
+
+test_that("Multivariate scorers return per-series coverage + joint", {
+  skip_if_not_installed("scoringRules")
+  fc <- make_mock_forecast(n_series = 2L, h = 4L)
+  out <- score(fc, "energy")
+  expect_named(out, c("s1", "s2", "all_series"))
+  # Per-series rows hold an NA score and a coverage indicator.
+  expect_true(all(is.na(out$s1$score)))
+  expect_true(all(out$s1$in_interval %in% c(0, 1)))
+  # all_series carries the joint multivariate score.
+  expect_identical(nrow(out$all_series), 4L)
+  expect_true(all(out$all_series$score_type == "energy"))
+  expect_true(all(is.finite(out$all_series$score)))
+})
+
+
+# ----- Dispatch routing -------------------------------------------
+
+test_that("Every scorer routes without error and returns the expected shape", {
+  skip_if_not_installed("scoringRules")
+  set.seed(42L)
+  fc <- make_mock_forecast(n_series = 2L, h = 3L, ndraws = 40L)
+  univariate <- c("crps", "drps", "sis", "logs", "dss",
+                   "qs", "twcrps")
+  for (s in univariate) {
+    out <- score(fc, score = s)
+    expect_named(out, c("s1", "s2", "all_series"))
+    expect_identical(unique(out$s1$score_type), s)
+    expect_identical(unique(out$all_series$score_type),
+                       paste0("sum_", s))
+  }
+  multivariate <- c("energy", "variogram", "twenergy")
+  for (s in multivariate) {
+    out <- score(fc, score = s)
+    expect_named(out, c("s1", "s2", "all_series"))
+    expect_identical(unique(out$all_series$score_type), s)
+    expect_identical(nrow(out$all_series), 3L)
+  }
+})
+
+
+test_that("qs uses quantile_level and twcrps uses lower/upper", {
+  skip_if_not_installed("scoringRules")
+  set.seed(11L)
+  fc <- make_mock_forecast(n_series = 1L, h = 3L, ndraws = 80L)
+  s_median <- score(fc, "qs", quantile_level = 0.5)$s1$score
+  s_upper <- score(fc, "qs", quantile_level = 0.95)$s1$score
+  expect_false(isTRUE(all.equal(s_median, s_upper)))
+
+  s_plain <- score(fc, "crps")$s1$score
+  s_tw <- score(fc, "twcrps")$s1$score
+  expect_equal(s_tw, s_plain, tolerance = 1e-8)
+})
+
+
+# ----- Brier family guard ----------------------------------------
+
+test_that("Brier requires a 'bernoulli' family", {
+  fc <- make_mock_forecast(family = "gaussian")
+  expect_error(score(fc, "brier"), "bernoulli")
+})
+
+
+test_that("Brier scores each horizon's forecast probability", {
+  fc <- make_mock_forecast(family = "bernoulli", h = 3L,
+                             ndraws = 40L)
+  # Expected-value draws in (0, 1) against an observed 1
+  fc$forecasts <- lapply(fc$forecasts, stats::plogis)
+  fc$test_observations <- lapply(fc$test_observations, function(v) {
+    rep(1L, length(v))
+  })
+  out <- score(fc, "brier")
+  expect_identical(unique(out$s1$score_type), "brier")
+  expect_equal(out$s1$score, (1 - colMeans(fc$forecasts$s1))^2)
+})
+
+
+# ----- Validation / error paths -----------------------------------
+
+test_that("Link-scale forecasts are refused", {
+  for (type in c("link", "trend")) {
+    fc <- make_mock_forecast(type = type)
+    expect_error(score(fc, "crps"), paste0("A '", type, "' forecast"))
+  }
+})
+
+
+test_that("Missing forecasts / test_observations errors crisply", {
+  fc <- make_mock_forecast(with_test = FALSE)
+  expect_error(score(fc, "crps"), "no held-out forecasts")
+})
+
+
+test_that("Empty per-series forecasts produce empty per-series df", {
+  skip_if_not_installed("scoringRules")
+  fc <- make_mock_forecast(n_series = 2L, h = 3L)
+  fc$forecasts[["s1"]] <- matrix(NA_real_, nrow = 30L, ncol = 0L)
+  fc$test_observations[["s1"]] <- numeric(0L)
+  out <- score(fc, "crps")
+  expect_identical(nrow(out$s1), 0L)
+  expect_identical(nrow(out$s2), 3L)
+  # all_series only aggregates non-empty per-series entries.
+  expect_identical(nrow(out$all_series), 3L)
+  expect_equal(out$all_series$score, out$s2$score)
+})
+
+
+test_that("Multivariate scoring on inconsistent horizons errors", {
+  fc <- make_mock_forecast(n_series = 2L, h = 4L)
+  # Trim series 1's forecast horizon to 3 (mismatched).
+  fc$forecasts[["s1"]] <- fc$forecasts[["s1"]][, 1:3, drop = FALSE]
+  fc$test_observations[["s1"]] <-
+    fc$test_observations[["s1"]][1:3]
+  expect_error(
+    score(fc, "energy"),
+    "Multivariate scoring requires a shared forecast horizon"
+  )
+})
+
+
+test_that("series forecast at their own times are summed by time", {
+  skip_if_not_installed("scoringRules")
+  fc <- make_mock_forecast(n_series = 2L, h = 3L)
+  # Both series hold three forecasts. They share only time 12
+  fc$test_times <- list(s1 = c(11, 12, 15), s2 = c(12, 13, 14))
+  out <- score(fc, "crps")
+  # One row per time any series is forecast at: 11, 12, 13, 14, 15
+  expect_equal(
+    out$all_series$score,
+    c(out$s1$score[1L], out$s1$score[2L] + out$s2$score[1L],
+      out$s2$score[2L], out$s2$score[3L], out$s1$score[3L])
+  )
+  # Equal counts at different times are no shared horizon
+  expect_error(
+    score(fc, "energy"),
+    "Multivariate scoring requires a shared forecast horizon"
+  )
+})
+
+
+# ----- Routing parity vs direct kernel calls ----------------------
+
+test_that("joint scores equal their kernels, on the log scale too", {
+  skip_if_not_installed("scoringRules")
+  set.seed(99L)
+  fc <- make_mock_forecast(n_series = 2L, h = 3L, ndraws = 40L)
+  truths <- do.call(rbind, fc$test_observations)
+  via_dispatch <- score(fc, "energy")$all_series$score
+  direct <- multivariate_score("energy", truths, fc$forecasts)
+  expect_equal(via_dispatch, direct)
+  # The joint scores take the log scale. The threshold-weighted one
+  # refuses it
+  fc$forecasts <- lapply(fc$forecasts, abs)
+  expect_equal(
+    score(fc, "variogram", log = TRUE)$all_series$score,
+    multivariate_score("variogram", log_offset(truths),
+                          lapply(fc$forecasts, log_offset))
+  )
+  expect_error(score(fc, "twenergy", log = TRUE), "does not apply")
+  # The DRPS sums over the integer support of a count
+  expect_error(score(fc, "drps", log = TRUE), "does not apply")
+})
+
+
+test_that("variogram weights follow the scored series", {
+  skip_if_not_installed("scoringRules")
+  fc <- make_mock_forecast(n_series = 3L, h = 3L)
+  fc$forecasts$s1 <- matrix(NA_real_, nrow = 30L, ncol = 0L)
+  fc$test_observations$s1 <- numeric(0L)
+  # Series s1 holds no forecasts. Its weight drops with it
+  expect_equal(
+    score(fc, "variogram", weights = c(5, 1, 2))$all_series$score,
+    multivariate_score("variogram",
+                       do.call(rbind, fc$test_observations[2:3]),
+                       fc$forecasts[2:3], weights = c(1, 2))
+  )
+  expect_error(score(fc, "variogram", weights = c(1, 2)), "length")
+  expect_error(score(fc, "energy", weights = c(1, 1, 1)),
+               "'variogram' score only")
+})
+
+test_that("print() of a score shows each series' mean score", {
+  skip_if_not_installed("scoringRules")
+  fc <- make_mock_forecast(n_series = 2L, h = 4L)
+  sc <- score(fc, score = "crps")
+  expect_s3_class(sc, "mvgam_score")
+  out <- capture.output(print(sc))
+  # The s1 row prints its mean CRPS over the four horizons, formatted
+  # with the other means of its column
+  means <- vapply(sc, function(d) mean(d$score), numeric(1L))
+  row1 <- grep("^ *s1 ", out, value = TRUE)
+  expect_match(row1, format(signif(means, 2))[["s1"]], fixed = TRUE)
+})

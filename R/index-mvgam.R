@@ -1,272 +1,194 @@
-#' Index \code{mvgam} objects
+#' Parameter names of a fitted mvgam model
 #'
-#' @aliases variables
+#' `variables()` lists the name of every quantity in a fitted model's
+#' draws. [hypothesis.mvgam()], [as_draws()], [as.data.frame.mvgam()],
+#' [mcmc_plot.mvgam()] and [posterior_average.mvgam()] accept these
+#' names. [summary.mvgam()] and [posterior_summary()] label their rows
+#' with them.
 #'
-#' Index variables and their `mgcv` coefficient names
+#' @section How parameters are named:
+#' Observation parameters take their \pkg{brms} names, such as `b_x`,
+#' `sds_sx_1`, `sd_site__Intercept` and `r_site[a,Intercept]`. The
+#' trend model's parameters take the same names with a `_trend`
+#' suffix, such as `b_x_trend` or `sds_sx_1_trend`.
 #'
-#' @param x A \code{mvgam} object or another \R object for which
-#' the methods are defined.
+#' An index that runs over the series takes the series' name, as
+#' \pkg{brms} labels a grouping factor's levels. A model with series
+#' `DM` and `DO` has `sigma_trend[DM]`, `ar1_trend[DM]` and the
+#' innovation covariance `Sigma_trend[DM,DO]`. A VAR's coefficients
+#' keep the lag as a number, as in `Phi_trend[1,DM,DO]`, as do the
+#' changepoints of `PW()` in `delta_trend[3,DM]`. Factor loadings are
+#' `Z_tilde[DM,1]`, with the factor as the second index. In a factor
+#' model the dynamics belong to the factors, as in `ar1_trend[1]`.
+#' The latent state matrices keep numeric indices, as in
+#' `trend[12,1]` for time 12 of the first series.
 #'
-#' @param ... Arguments passed to individual methods (if applicable).
+#' A bare name such as `variable = "sigma_trend"` selects every element
+#' of a vector, as in \pkg{posterior}. Because `variables()` includes
+#' the latent states, its output runs to hundreds of names on most
+#' fits. `grep()` narrows it, as in
+#' `grep("^(sigma|ar1)_trend", variables(fit), value = TRUE)`.
 #'
-#' @name index-mvgam
-NULL
-
-#' @rdname index-mvgam
+#' @param x A fitted `mvgam` object.
+#' @param ... Unused. Anything passed here is refused.
 #'
-#' @importFrom posterior variables
+#' @return A character vector of parameter names.
 #'
-#' @param x \code{list} object returned from \code{mvgam}. See [mvgam()]
-#'
-#' @method variables mvgam
-#'
-#' @return a `list` object of the variables that can be extracted, along
-#' with their aliases
-#'
-#' @author Nicholas J Clark
+#' @seealso [mvgam_draws] to extract draws by name,
+#'   [hypothesis.mvgam()] to test them, [summary.mvgam()] and
+#'   [posterior_summary()] to summarise them.
 #'
 #' @examples
 #' \dontrun{
-#' # Simulate data and fit a model
-#' simdat <- sim_mvgam(
-#'   n_series = 1,
-#'   trend_model = AR()
-#' )
+#' set.seed(13)
+#' simdat <- sim_mvgam(family = poisson(), n_series = 2L,
+#'                     trend_model = AR())
+#' mod <- mvgam(y ~ x,
+#'              trend_formula = ~ AR(),
+#'              data = simdat$data_train,
+#'              family = poisson(),
+#'              chains = 2, silent = 2)
 #'
-#' mod <- mvgam(
-#'   y ~ s(season, bs = 'cc', k = 6),
-#'   trend_model = AR(),
-#'   data = simdat$data_train,
-#'   chains = 2,
-#'   silent = 2
-#' )
+#' # The trend dynamics, indexed by series
+#' grep("^(sigma|ar1)_trend", variables(mod), value = TRUE)
 #'
-#' # Extract model variables
-#' variables(mod)
+#' # Every element of a vector by its bare name
+#' as_draws_df(mod, variable = "sigma_trend")
+#'
+#' # Two series' autoregressive coefficients compared
+#' hypothesis(mod, "ar1_trend[series_1] > ar1_trend[series_2]",
+#'            class = NULL)
+#'
+#' # Next, plot chosen parameters with mcmc_plot(mod, variable = ...)
 #' }
 #'
+#' @author Nicholas J Clark
+#'
+#' @name index-mvgam
+#' @aliases variables
+#' @importFrom posterior variables
+#' @family posterior summaries
+#' @method variables mvgam
 #' @export
 #' @export variables
-variables.mvgam = function(x, ...) {
-  parnames <- dimnames(x$model_output)$parameters
+variables.mvgam <- function(x, ...) {
+  checkmate::assert_class(x, "mvgam")
+  require_fitted_model(x, "variables")
+  rlang::check_dots_empty()
 
-  # Observation distribution parameters
-  if (
-    any(grepl(
-      paste(c('sigma_obs', 'phi', 'nu', 'shape'), collapse = '|'),
-      parnames
-    ))
-  ) {
-    observation_pars <- data.frame(
-      orig_name = parnames[grepl(
-        paste(c('sigma_obs', 'phi', 'nu', 'shape'), collapse = '|'),
-        parnames
-      )],
-      alias = NA
-    )
-  } else {
-    observation_pars <- NULL
+  # The exclusion list, the brms-style renames, the empty-observation
+  # placeholder and the rotation-indeterminate factor block are all
+  # settled by `mvgam_user_pars()`, which every other user-facing
+  # reader of the posterior goes through.
+  names(mvgam_user_pars(x))
+}
+
+
+#' The parameters a diagnostic plot shows when none is named
+#'
+#' `mcmc_plot()` and `pairs()` both start here. The set holds the
+#' parameters a user interprets. These are the population block with
+#' the basis coefficients brms writes for it, the family's parameters,
+#' the trend's dynamics and loadings, the smoothing and
+#' Gaussian-process scales and the group-level scales. The set leaves
+#' out three groups. The per-level and per-basis coefficients (`r_*`,
+#' `s_*`, `zs_*`, `zgp_*`) run to hundreds on a spline or hierarchical
+#' fit. The trend's states are latent quantities. `b_Intercept`
+#' reports brms's centred intercept on the data's scale. Naming any of
+#' those in `variable` still selects it.
+#'
+#' @param x A fitted `mvgam` object
+#' @return Character vector of the parameter names to plot
+#' @noRd
+default_plot_variables <- function(x) {
+  checkmate::assert_class(x, "mvgam")
+  pars <- names(mvgam_user_pars(x))
+  shown <- c("beta", "basis", "simplex", "family", "dynamics", "loading",
+             "loadings_prior", "smooth_sd", "gp", "ranef_sd")
+  pars[mvgam_par_kind(pars) %in% shown]
+}
+
+
+#' The parameters of a fit, by side and by kind
+#'
+#' Sorts the Stan names the fit's draws carry into the buckets
+#' `tidy()` and `side_parameters()` use. Each side has the family's
+#' parameters or the trend's dynamics, its population block, its
+#' smooths and its group-level terms. `mvgam_par_kind()` and
+#' `mvgam_par_side()` assign each name. The factor loadings belong to
+#' the trend's dynamics bucket. The trend's states are no parameter and
+#' belong to no bucket.
+#'
+#' @param x A fitted `mvgam` object
+#' @param latents Whether to add each side's `latent` values, which
+#'   predictions use and the tables leave out
+#' @return A named list of character vectors of Stan names, each
+#'   possibly empty: `observation_pars`, `observation_betas`,
+#'   `observation_smoothpars`, `observation_re_params`, `trend_pars`,
+#'   `trend_betas`, `trend_smoothpars` and `trend_re_params`. Under
+#'   `latents = TRUE` it adds `observation_latents` and `trend_latents`.
+#'   A population block holds brms's centred intercept and the uncentred
+#'   `b_Intercept` both.
+#' @noRd
+categorize_mvgam_parameters <- function(x, latents = FALSE) {
+  checkmate::assert_class(x, "mvgam")
+  checkmate::assert_flag(latents)
+
+  # The names Stan wrote, which the prediction pipeline subsets the
+  # draws by. The names a user reads are `mvgam_user_pars()`'s.
+  all_pars <- fit_variables(x$fit)
+  kind <- mvgam_par_kind(all_pars)
+  side <- by_par_stem(all_pars, mvgam_par_side)
+  pick <- function(kinds, on_side) {
+    all_pars[kind %in% kinds & side == on_side]
   }
+  betas <- c("beta", "basis", "simplex", "intercept")
+  smooths <- c("smooth_sd", "smooth_coef", "gp", "gp_coef")
+  ranef <- c("ranef_sd", "ranef_coef")
 
-  # Linear predictor parameters
-  observation_linpreds <- data.frame(
-    orig_name = parnames[
-      grepl('mus[', parnames, fixed = TRUE) &
-        !grepl('trend_mus[', parnames, fixed = TRUE)
-    ],
-    alias = NA
+  out <- list(
+    observation_pars = pick("family", "observation"),
+    observation_betas = pick(betas, "observation"),
+    observation_smoothpars = pick(smooths, "observation"),
+    observation_re_params = pick(ranef, "observation"),
+    # The raw loadings and the broadcast coefficient copies are
+    # left out, as `variables()` leaves them out: what reports each
+    # quantity is in the same posterior under another name.
+    trend_pars = all_pars[kind %in% c("dynamics", "loading",
+                                      "loadings_prior") &
+                            !is_hidden_par(all_pars)],
+    trend_betas = pick(betas, "trend"),
+    trend_smoothpars = pick(smooths, "trend"),
+    trend_re_params = pick(ranef, "trend")
   )
-
-  if (!is.null(x$trend_call) & !inherits(x, 'jsdgam')) {
-    trend_linpreds <- data.frame(
-      orig_name = parnames[grepl('trend_mus[', parnames, fixed = TRUE)],
-      alias = NA
-    )
-  } else {
-    trend_linpreds <- NULL
+  if (latents) {
+    out$observation_latents <- pick("latent", "observation")
+    out$trend_latents <- pick("latent", "trend")
   }
+  out
+}
 
-  # Posterior predictions
-  posterior_preds <- data.frame(
-    orig_name = parnames[grepl('ypred[', parnames, fixed = TRUE)],
-    alias = NA
-  )
 
-  # Beta coefficient parameters
-  b_names <- colnames(mcmc_chains(x$model_output, 'b'))
-  mgcv_names <- names(coef(x$mgcv_model))
-  observation_betas <- data.frame(orig_name = b_names, alias = mgcv_names)
-
-  if (!is.null(x$trend_call) & !inherits(x, 'jsdgam')) {
-    b_names <- colnames(mcmc_chains(x$model_output, 'b_trend'))
-    mgcv_names <- gsub(
-      'series',
-      'trend',
-      paste0(names(coef(x$trend_mgcv_model)), '_trend')
-    )
-    trend_betas <- data.frame(orig_name = b_names, alias = mgcv_names)
-  } else {
-    trend_betas <- NULL
-  }
-
-  # Population parameters from hierarchical (random) effects
-  if (any(unlist(purrr::map(x$mgcv_model$smooth, inherits, 'random.effect')))) {
-    re_labs <- unlist(lapply(
-      purrr::map(x$mgcv_model$smooth, 'term'),
-      paste,
-      collapse = ','
-    ))[
-      unlist(purrr::map(x$mgcv_model$smooth, inherits, 'random.effect'))
-    ]
-    observation_re_params <- data.frame(
-      orig_name = c(
-        rownames(mcmc_summary(x$model_output, 'mu_raw', ISB = TRUE)),
-        rownames(mcmc_summary(x$model_output, 'sigma_raw', ISB = TRUE))
-      ),
-      alias = c(paste0('mean(', re_labs, ')'), paste0('sd(', re_labs, ')'))
-    )
-  } else {
-    observation_re_params <- NULL
-  }
-
-  trend_re_params <- NULL
-  if (!is.null(x$trend_call) & !inherits(x, 'jsdgam')) {
-    if (
-      any(unlist(purrr::map(
-        x$trend_mgcv_model$smooth,
-        inherits,
-        'random.effect'
-      )))
-    ) {
-      re_labs <- unlist(lapply(
-        purrr::map(x$trend_mgcv_model$smooth, 'term'),
-        paste,
-        collapse = ','
-      ))[
-        unlist(purrr::map(x$trend_mgcv_model$smooth, inherits, 'random.effect'))
-      ]
-      re_labs <- gsub('series', 'trend', re_labs)
-      trend_re_params <- data.frame(
-        orig_name = c(
-          rownames(mcmc_summary(x$model_output, 'mu_raw_trend', ISB = TRUE)),
-          rownames(mcmc_summary(x$model_output, 'sigma_raw_trend', ISB = TRUE))
-        ),
-        alias = c(
-          paste0('mean(', re_labs, ')_trend'),
-          paste0('sd(', re_labs, ')_trend')
-        )
-      )
-    } else {
-      trend_re_params <- NULL
-    }
-  }
-
-  # Smoothing parameters
-  if (any(grepl('rho[', parnames, fixed = TRUE))) {
-    observation_smoothpars <- data.frame(
-      orig_name = parnames[grepl('rho[', parnames, fixed = TRUE)],
-      alias = paste0(x$sp_names, '_rho')
-    )
-  } else {
-    observation_smoothpars <- NULL
-  }
-
-  if (
-    any(grepl('rho_trend[', parnames, fixed = TRUE)) & !inherits(x, 'jsdgam')
-  ) {
-    trend_smoothpars <- data.frame(
-      orig_name = parnames[grepl('rho_trend[', parnames, fixed = TRUE)],
-      alias = paste0(x$trend_sp_names, '_rho_trend')
-    )
-  } else {
-    trend_smoothpars <- NULL
-  }
-
-  # Trend state parameters
-  if (
-    any(
-      grepl('trend[', parnames, fixed = TRUE) &
-        !grepl('_trend[', parnames, fixed = TRUE)
-    ) &
-      !inherits(x, 'jsdgam')
-  ) {
-    trend_states <- grepl('trend[', parnames, fixed = TRUE) &
-      !grepl('_trend[', parnames, fixed = TRUE)
-    trends <- data.frame(orig_name = parnames[trend_states], alias = NA)
-  } else {
-    trends <- NULL
-  }
-
-  # Trend dynamics parameters
-  if (
-    any(
-      grepl(
-        paste(
-          c(
-            'sigma',
-            'alpha_gp',
-            'rho_gp',
-            'ar1',
-            'ar2',
-            'ar3',
-            'A',
-            'Sigma',
-            'error',
-            'alpha_cor',
-            'theta',
-            'k_trend',
-            'delta_trend',
-            'm_trend'
-          ),
-          collapse = '|'
-        ),
-        parnames
-      ) &
-        !grepl('sigma_obs', parnames, fixed = TRUE) &
-        !grepl('sigma_raw', parnames, fixed = TRUE)
-    )
-  ) {
-    trend_pars <- grepl(
-      paste(
-        c(
-          'sigma',
-          'alpha_gp',
-          'rho_gp',
-          'ar1',
-          'ar2',
-          'ar3',
-          'A',
-          'Sigma',
-          'error',
-          'alpha_cor',
-          'theta',
-          'k_trend',
-          'delta_trend',
-          'm_trend'
-        ),
-        collapse = '|'
-      ),
-      parnames
-    ) &
-      !grepl('sigma_obs', parnames, fixed = TRUE) &
-      !grepl('sigma_raw', parnames, fixed = TRUE)
-    trend_pars <- data.frame(orig_name = parnames[trend_pars], alias = NA)
-  } else {
-    trend_pars <- NULL
-  }
-
-  return(list(
-    observation_pars = observation_pars,
-    observation_linpreds = observation_linpreds,
-    observation_betas = observation_betas,
-    observation_smoothpars = observation_smoothpars,
-    observation_re_params = observation_re_params,
-    posterior_preds = posterior_preds,
-    trend_pars = trend_pars,
-    trend_linpreds = trend_linpreds,
-    trend_betas = trend_betas,
-    trend_smoothpars = trend_smoothpars,
-    trend_re_params = trend_re_params,
-    trends = trends
-  ))
+#' The parameter names of one side of a fit
+#'
+#' The observation side holds the family's parameters, the
+#' population-level coefficients, the smooths, the group-level terms
+#' and the special terms' latent values of the observation model. The
+#' trend side holds the same of the trend model with its dynamics and
+#' loadings. The trend's state arrays are derived quantities and belong
+#' to neither.
+#'
+#' @param mvgam_fit A fitted `mvgam` object
+#' @param side `"obs"` or `"trend"`
+#' @return Character vector of Stan names, empty when the side has none
+#' @noRd
+side_parameters <- function(mvgam_fit, side) {
+  checkmate::assert_class(mvgam_fit, "mvgam")
+  checkmate::assert_choice(side, c("obs", "trend"))
+  prefix <- if (identical(side, "obs")) "observation" else "trend"
+  buckets <- categorize_mvgam_parameters(mvgam_fit, latents = TRUE)[
+    paste0(prefix, c("_pars", "_betas", "_smoothpars", "_re_params",
+                     "_latents"))
+  ]
+  as.character(unlist(buckets, use.names = FALSE))
 }

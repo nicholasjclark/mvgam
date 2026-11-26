@@ -1,0 +1,1913 @@
+# One factor model, six observation families.
+#
+# A `jsdgam` puts the same latent structure under every family it
+# supports: K species load on N_lv factors through Z, each site
+# draws its own factor scores, and the observation family is the
+# only thing that changes. So the questions worth asking of such a
+# fit are the same each time over -- is the species axis the one
+# the user declared, does each row read the latent cell the sampler
+# gave it, do the hindcast arms and the loadings and the residual
+# correlation all agree about which species is which -- and only
+# the response scale, the nuisance parameter and the
+# identification constraint differ.
+#
+# Those shared questions live in `jsdgam_battery()` and are asked
+# once per family. What belongs to one family alone is written out
+# below it: the negative binomial's shape, the multivariate
+# Student-t's scale and tail, and the sum-to-zero constraint and
+# unit simplex a Dirichlet composition has to respect. The six
+# families span the three shapes a jsdgam response takes -- a
+# count, an unbounded continuous vector, and a composition -- so a
+# fault in the shared machinery cannot hide behind one of them.
+#
+# The simulations are shared. `sim_jsdgam()` draws the site-by-species
+# matrix for every family in this file, and each spec names the
+# species count, the site count, the seed and the family parameters
+# it takes. What differs between families is the observation draw,
+# which `sim_jsdgam()` selects from the family object.
+#
+# Two of the shared claims are structural rather than
+# family-specific, so every family is held to them: that a frame maps
+# to trend cells with no posterior in hand, and that the rotated
+# loadings are the ones the diagnostics report.
+#
+# Three kinds of assertion are deliberately absent, because each
+# passes on the failure it appears to guard. A method is never held
+# only to its class, since `plot()` and `pp_check()` return a
+# ggplot whether or not anything was drawn on it; `expect_drawn()`
+# builds the object and requires a layer with rows. A tidier is
+# never held only to `is.data.frame()`, which a frame of no rows
+# satisfies. And a summarising method is never held only to its
+# shape: `fitted()` and `residuals()` are tied by value to the
+# draws they summarise, so a method reaching a different surface
+# fails rather than returning the right rectangle of wrong numbers.
+#
+# Not asserted, and deliberately: `forecast(type = "response")` on
+# a softmax family. A composition drawn one species at a time is
+# not a composition, and what such an arm should return is a
+# question for the families rather than for the axis.
+#
+# Fits cache under fixtures/val_mvgam_jsdgam_mv_<family>.rds.
+# Delete one to refit it. Full cold run ~30-45 min.
+#
+# Run with:
+#   Rscript -e "devtools::load_all('.'); testthat::test_file('tests/local/test-family-jsdgam.R')"
+
+suppressMessages({
+  devtools::load_all(".", quiet = TRUE)
+  library(posterior)
+  library(testthat)
+})
+
+# Several blocks below state what the package does not yet do, and
+# testthat stops a file after ten failures by default, which would
+# leave the blocks after them unrun and looking clean. The limit is
+# read when the reporter is built, before this file is sourced, so it
+# has to come from the environment:
+#   TESTTHAT_MAX_FAILS=1000 Rscript -e "..."
+
+
+
+# The pairs of per-species matrices holding identical values. A list
+# of the right names and dimensions that carries one shared matrix
+# passes every shape check, and a fit giving two species one latent
+# column produces exactly that. Checking only the opening pair misses
+# a collision between the last two.
+#
+# Comparing the matrices states the claim that comparing their means
+# only approximates: a count family's per-species means are rationals
+# over one denominator and two of them tie by chance, which fails an
+# assertion nothing is wrong with.
+identical_species_pairs <- function(mats) {
+  same <- character(0)
+  for (i in seq_along(mats)) {
+    for (j in seq_along(mats)) {
+      if (j <= i) next
+      if (isTRUE(all.equal(mats[[i]], mats[[j]]))) {
+        same <- c(same, paste(names(mats)[i], names(mats)[j], sep = "="))
+      }
+    }
+  }
+  same
+}
+
+
+# One simulation for every family in the file. `sim_jsdgam()` draws
+# the site-by-species matrix and returns the long frame `jsdgam()`
+# takes, and this maps its names onto the four fields the
+# assertions below use.
+#
+# Two latent factors for every family, which keeps the loadings
+# matrix the same shape across the file.
+jsdm_sim <- function(spec) {
+  s <- sim_jsdgam(
+    family      = eval(spec$family),
+    n_species   = spec$n_species,
+    n_sites     = spec$n_sites,
+    n_lv        = 2L,
+    family_pars = spec$sim_pars,
+    seed        = spec$seed
+  )
+  long_dat <- s$data_train
+  # A fourth-corner fit takes two traits per species: a linear `size`
+  # and a smoothed `mass`. Each site holds three covariates: a habitat
+  # factor and two numeric gradients.
+  if (isTRUE(spec$trait_slopes)) {
+    long_dat$size <- as.numeric(long_dat$series) / s$n_species
+    long_dat$mass <- cos(as.numeric(long_dat$series))
+    sites <- sort(unique(long_dat$time))
+    site_x <- withr::with_seed(spec$seed, {
+      cbind(stats::rnorm(length(sites)), stats::runif(length(sites), -2, 2))
+    })
+    long_dat$x2 <- site_x[match(long_dat$time, sites), 1L]
+    long_dat$x3 <- site_x[match(long_dat$time, sites), 2L]
+    long_dat$hab <- factor(c("a", "b")[long_dat$time %% 2L + 1L])
+  }
+  list(
+    long_dat       = long_dat,
+    K              = s$n_species,
+    N_lv           = s$n_lv,
+    species_levels = levels(s$data_train$series),
+    truth          = s$truth
+  )
+}
+
+
+# The columns a cached fit was built from. Comparing the response
+# alone admits a stale fit: two simulators on one seed can draw the
+# same values and give the species different names, and the cached
+# posterior then carries an axis the frame does not name. A discrete
+# family hides that. `rmultinom()` and `sample.int()` return the same
+# draw under a change too small to move a count. The derived truth
+# list is no better as a key. Its field order moves with no value
+# changing.
+sim_frame_key <- function(d) {
+  list(
+    y      = d$y,
+    series = as.character(d$series),
+    levels = levels(d$series),
+    env    = d$env,
+    time   = d$time,
+    size   = d$size,
+    mass   = d$mass,
+    x2     = d$x2,
+    x3     = d$x3,
+    hab    = as.character(d$hab)
+  )
+}
+
+
+# A prediction frame given the covariates beyond `env` a fit names: each
+# species' traits and one value of each site covariate
+with_site_covariates <- function(nd, d) {
+  if ("size" %in% names(d) && "series" %in% names(nd)) {
+    at <- match(nd$series, d$series)
+    nd$size <- d$size[at]
+    nd$mass <- d$mass[at]
+  }
+  if ("x2" %in% names(d)) {
+    nd$x2 <- 0
+    nd$x3 <- 0
+    nd$hab <- factor("a", levels = levels(d$hab))
+  }
+  nd
+}
+
+
+# ---- Family specifications -------------------------------------------
+#
+# `epred_ok` and `predict_ok` state the response scale each family
+# answers on, which is the one thing a shape check cannot see: a
+# draw taken on the linear-predictor scale has the right dimensions
+# and finite values and is not a proportion, a count or a category.
+#
+# `optional_methods` names the post-fit methods this family is held
+# to beyond the shared set. A method absent from the vector is one
+# no existing fixture drove; it is a gap recorded rather than a
+# claim made.
+
+SPECS <- list(
+  nb = list(
+    family = quote(brms::negbinomial()),
+    # The fourth-corner model: each species' intercept and `env` slope
+    # regress on its trait
+    trait_slopes = TRUE,
+    n_species = 5L, n_sites = 60L, seed = 608L,
+    sim_pars = list(size = 4),
+    loadings_identified = TRUE, na_response = NA_integer_,
+    has_psi = FALSE,
+    epred_ok = function(x) all(x > 0),
+    predict_ok = function(x) all(x >= 0) && all(x == floor(x)),
+    has_latent_state = FALSE,
+    fc_types = c("link", "expected", "trend", "response"),
+    fc_response_ok = function(x) all(x >= 0) && all(x == floor(x)),
+    pp_check_extra = "rootogram",
+    plot_types = c("residuals", "factors"),
+    optional_methods = c("linpred", "residuals", "mcmc_plot",
+                         "marginaleffects"),
+    ce_response_ok = NULL,
+    # A count family's expectation is continuous even though its
+    # draws are whole, so an all-integer estimate is a draw being
+    # reported as the mean and a tolerance alone would hide it.
+    me_integer_tell = TRUE
+  ),
+  mvt = list(
+    family = quote(mvt()),
+    # Five species on two factors satisfies
+    # `(n_species - n_lv)^2 >= n_species + n_lv`. At four species
+    # the package warns that the per-species scale is unidentified,
+    # and this file allows no warnings.
+    n_species = 5L, n_sites = 30L, seed = 605L,
+    sim_pars = list(Psi = 0.5, nu = 5),
+    identity_link = TRUE,
+    loadings_identified = TRUE, na_response = NA_real_,
+    has_psi = TRUE,
+    epred_ok = NULL, predict_ok = NULL,
+    has_latent_state = FALSE,
+    fc_types = c("link", "expected", "trend", "response"),
+    fc_response_ok = NULL,
+    pp_check_extra = "resid_qq",
+    plot_types = c("residuals", "factors"),
+    optional_methods = c("linpred", "residuals", "mcmc_plot",
+                         "marginaleffects",
+                         "forecast_response_agrees"),
+    ce_response_ok = NULL,
+    me_integer_tell = FALSE
+  ),
+  mvn = list(
+    family = quote(mvn()),
+    n_species = 5L, n_sites = 40L, seed = 907L,
+    sim_pars = list(Psi = 0.5),
+    identity_link = TRUE,
+    loadings_identified = TRUE, na_response = NA_real_,
+    has_psi = TRUE,
+    epred_ok = NULL, predict_ok = NULL,
+    has_latent_state = FALSE,
+    fc_types = c("link", "expected", "trend", "response"),
+    fc_response_ok = NULL,
+    pp_check_extra = "resid_qq",
+    plot_types = c("residuals", "factors"),
+    optional_methods = c("linpred", "residuals", "mcmc_plot",
+                         "marginaleffects",
+                         "forecast_response_agrees"),
+    ce_response_ok = NULL,
+    me_integer_tell = FALSE
+  ),
+  diri = list(
+    family = quote(diri()),
+    n_species = 4L, n_sites = 30L, seed = 601L,
+    sim_pars = list(phi = 30),
+    loadings_identified = TRUE, na_response = NA_real_,
+    has_psi = FALSE,
+    epred_ok = function(x) all(x >= 0 & x <= 1),
+    predict_ok = function(x) all(x >= 0 & x <= 1),
+    has_latent_state = FALSE,
+    fc_types = c("link", "expected", "trend", "response"),
+    fc_response_ok = function(x) all(x >= 0 & x <= 1),
+    pp_check_extra = NULL,
+    plot_types = "factors",
+    optional_methods = c("residuals", "forecast_response_agrees"),
+    ce_response_ok = NULL,
+    me_integer_tell = FALSE
+  ),
+  multi = list(
+    family = quote(multi()),
+    n_species = 4L, n_sites = 40L, seed = 605L,
+    sim_pars = list(unit_total = 30L),
+    loadings_identified = TRUE, na_response = NA_integer_,
+    has_psi = FALSE,
+    epred_ok = function(x) all(x >= 0),
+    predict_ok = function(x) all(x >= 0) && all(x == floor(x)),
+    has_latent_state = FALSE,
+    fc_types = c("link", "expected", "trend", "response"),
+    fc_response_ok = function(x) all(x >= 0) && all(x == floor(x)),
+    pp_check_extra = NULL,
+    plot_types = "factors",
+    optional_methods = c("residuals", "forecast_response_agrees"),
+    ce_response_ok = NULL,
+    me_integer_tell = FALSE
+  ),
+  categ = list(
+    family = quote(categ()),
+    n_species = 4L, n_sites = 40L, seed = 607L,
+    sim_pars = list(),
+    # One species per unit records no within-unit co-occurrence,
+    # which identifies no ordering of the loadings. The post-fit
+    # claims below are what this family is held to.
+    loadings_identified = FALSE, na_response = NA_integer_,
+    has_psi = FALSE,
+    epred_ok = function(x) all(x >= 0 & x <= 1),
+    predict_ok = function(x) all(x %in% c(0, 1)),
+    has_latent_state = FALSE,
+    fc_types = c("link", "expected", "trend", "response"),
+    fc_response_ok = function(x) all(x %in% c(0, 1)),
+    pp_check_extra = NULL,
+    plot_types = "factors",
+    optional_methods = c("residuals", "forecast_response_agrees"),
+    ce_response_ok = NULL,
+    me_integer_tell = FALSE
+  )
+)
+
+
+# ---- Fit ------------------------------------------------------------
+
+# The two formulas every fit in this file uses, written at the top
+# level. A formula carries the environment it was written in.
+# `saveRDS()` writes a local frame by value and a named environment by
+# reference. Written inside `fit_jsdm()`, each fixture embedded that
+# call's locals, among them the fit itself and the contents of the
+# previous file: the six reached 1.5 GB against 11 MB for the jsdgam
+# fixture in `test-grain-closure-units.R`, which builds its fit at the
+# top level.
+JSDM_FORMULA <- y ~ env * series
+JSDM_FACTOR_FORMULA <- ~ -1
+TRAIT_FORMULA <- y ~ env + hab + I(env^2) + s(x2, k = 4, by = hab) +
+  gp(x3, k = 5)
+TRAIT_SLOPES <- ~ size + s(mass, k = 3)
+
+# A cached fit belongs to the simulation whose frame it was built from.
+# Editing a simulator changes that frame, and the stored posterior then
+# describes data the file does not generate.
+fit_jsdm <- function(nm, spec, sim) {
+  cached_fit(
+    paste0("val_mvgam_jsdgam_mv_", nm, ".rds"),
+    function() {
+      jsdgam(
+        formula = if (isTRUE(spec$trait_slopes)) TRAIT_FORMULA else JSDM_FORMULA,
+        trait_slopes = if (isTRUE(spec$trait_slopes)) TRAIT_SLOPES,
+        factor_formula = JSDM_FACTOR_FORMULA,
+        data = sim$long_dat,
+        unit = time, species = series,
+        family = eval(spec$family),
+        n_lv = sim$N_lv,
+        chains = 2L,
+        iter = 1000L, warmup = 500L,
+        silent = 2,
+        backend = "cmdstanr",
+        seed = spec$seed
+      )
+    },
+    # The model is part of the key. A formula edit then refits. The
+    # formulas enter as text, which leaves out their environments.
+    key = list(
+      data = sim_frame_key(sim$long_dat),
+      model = vapply(
+        if (isTRUE(spec$trait_slopes)) {
+          list(TRAIT_FORMULA, TRAIT_SLOPES)
+        } else {
+          list(JSDM_FORMULA)
+        },
+        deparse1, character(1L)
+      ),
+      factor_formula = deparse1(JSDM_FACTOR_FORMULA),
+      family = deparse1(spec$family),
+      seed = spec$seed
+    )
+  )
+}
+
+
+# ---- The shared battery ----------------------------------------------
+
+jsdgam_battery <- function(nm, spec, sim, fit) {
+  d <- sim$long_dat
+  K <- sim$K
+  N_lv <- sim$N_lv
+  lev <- sim$species_levels
+  n_obs <- nrow(d)
+  says <- function(claim) paste0(nm, ": ", claim)
+
+  dm <- as_draws_matrix(fit$fit)
+  post_cor <- residual_cor(fit)$cor
+  post_off <- post_cor[upper.tri(post_cor)]
+  Z_mean <- apply(
+    mvgam:::extract_Z_loadings(dm, n_obs_series = K, n_lv = N_lv),
+    c(2L, 3L), mean
+  )
+
+  # `loadings_identified` states whether this family's design
+  # identifies the loadings firmly enough for an ordering to be
+  # compared. A single-trial categorical records one species per unit
+  # and no within-unit co-occurrence, which identifies no ordering
+  # however many units are simulated. The post-fit claims cover such a
+  # family instead.
+  #
+  # No floor on the level of agreement appears here. How closely two
+  # accounts of one quantity agree depends on how well that fixture
+  # sampled, and a number taken from one posterior becomes a target to
+  # tune the next fixture against.
+  if (isTRUE(spec$loadings_identified)) {
+    test_that(says("the reported correlation matches the loadings"), {
+      # `residual_cor()` and the loadings are two accounts of the same
+      # quantity reached by different code. Permuting the loadings'
+      # rows has to make the agreement worse: a permuted Z matching
+      # the reported matrix as well as the true ordering does would
+      # mean neither account carries information about which species
+      # is which.
+      implied_cov <- tcrossprod(Z_mean)
+      if (isTRUE(spec$has_psi)) {
+        psi_cols <- grep("^Psi\\[", colnames(dm), value = TRUE)
+        implied_cov <- implied_cov +
+          diag(colMeans(dm[, psi_cols, drop = FALSE])^2)
+      }
+      agreement <- function(M) {
+        cc <- cov2cor(M + diag(1e-8, K))
+        stats::cor(cc[upper.tri(cc)], post_off)
+      }
+      base <- agreement(implied_cov)
+      for (perm in list(c(2:K, 1L), rev(seq_len(K)))) {
+        shuffled <- tcrossprod(Z_mean[perm, , drop = FALSE])
+        if (isTRUE(spec$has_psi)) {
+          shuffled <- shuffled +
+            diag(diag(implied_cov - tcrossprod(Z_mean)))
+        }
+        expect_gt(base, agreement(shuffled))
+      }
+    })
+  }
+
+  test_that(says("the species axis is the one the frame declared"), {
+    axes <- mvgam:::mvgam_axes(fit)
+    expect_identical(as.character(axes$series$levels), lev)
+    expect_identical(as.integer(axes$series$n), K)
+    expect_identical(as.integer(fit$standata$N_lv_trend), N_lv)
+    expect_identical(as.integer(fit$standata$N_series_trend), K)
+  })
+
+  test_that(says("naming a hidden parameter retrieves it"), {
+    # The default parameter set leaves out Stan's working arrays, the
+    # accumulators and the rotation-indeterminate factor block.
+    # Naming one explicitly is how a user retrieves a quantity the
+    # default omits, which is what `all` in `mvgam_user_pars()`
+    # provides. Applying the exclusion whatever the caller asked for
+    # left an explicitly named parameter unreachable, with the
+    # refusal naming no parameter the posterior holds.
+    default_pars <- names(mvgam:::mvgam_user_pars(fit))
+    all_pars <- names(mvgam:::mvgam_user_pars(fit, all = TRUE))
+    hidden <- setdiff(all_pars, default_pars)
+    expect_gt(length(hidden), 0L)
+    expect_identical(intersect(hidden, default_pars), character(0))
+
+    # A factor model hides its raw loadings, whose rotation no prior
+    # fixes. `variables()` omits them and a caller naming them gets
+    # them back.
+    expect_false(any(grepl("^Z\\[", variables(fit))))
+    expect_true(any(grepl("^Z\\[", hidden)))
+
+    # Asked for by its exact name, a hidden parameter comes back
+    # carrying its own posterior, draw for draw. A column of the
+    # right width holding some other parameter's values satisfies
+    # every shape check and fails this one.
+    all_map <- mvgam:::mvgam_user_pars(fit, all = TRUE)
+    probe <- hidden[[1L]]
+    drawn <- as.data.frame(fit, variable = probe)
+    expect_equal(
+      drawn[[probe]],
+      as.numeric(as_draws_matrix(fit$fit)[, all_map[[probe]]])
+    )
+  })
+
+  test_that(says("every prediction surface covers every row"), {
+    ep <- posterior_epred(fit, draw_ids = 1:20)
+    pp <- posterior_predict(fit, draw_ids = 1:20)
+    expect_identical(dim(ep), c(20L, n_obs))
+    expect_identical(dim(pp), c(20L, n_obs))
+    expect_true(all(is.finite(ep)))
+    expect_true(all(is.finite(pp)))
+    if (!is.null(spec$epred_ok)) expect_true(spec$epred_ok(ep))
+    if (!is.null(spec$predict_ok)) expect_true(spec$predict_ok(pp))
+
+    # `fitted()` summarises the draws `posterior_epred()` returns at
+    # the fitted state. Its Estimate column is their column mean.
+    ft <- fitted(fit, draw_ids = 1:20)
+    ep_state <- posterior_epred(fit, draw_ids = 1:20,
+                                incl_autocor = TRUE)
+    expect_equal(unname(ft[, "Estimate"]), unname(colMeans(ep_state)),
+                 tolerance = 1e-8)
+    expect_true(all(ft[, "Q2.5"] <= ft[, "Estimate"]))
+    expect_true(all(ft[, "Estimate"] <= ft[, "Q97.5"]))
+
+    pd <- predict(fit, draw_ids = 1:20)
+    expect_identical(nrow(pd), n_obs)
+
+    if ("linpred" %in% spec$optional_methods) {
+      lp <- posterior_linpred(fit, draw_ids = 1:20)
+      expect_identical(dim(lp), c(20L, n_obs))
+      expect_true(all(is.finite(lp)))
+      # Under a non-identity link the two scales are different
+      # quantities, so a linpred that echoed the expectation would
+      # pass every shape check and fail here. `mvn` and `mvt` carry
+      # the identity link, where the two agreeing is the contract
+      # rather than a fault, so they are asked for that instead.
+      if (isTRUE(spec$identity_link)) {
+        expect_equal(unname(lp), unname(ep))
+      } else {
+        expect_false(isTRUE(all.equal(unname(lp), unname(ep))))
+      }
+    }
+    if ("residuals" %in% spec$optional_methods) {
+      rs <- residuals(fit, draw_ids = 1:20)
+      expect_identical(nrow(rs), n_obs)
+      expect_true(all(is.finite(rs[, "Estimate"])))
+      expect_true(all(rs[, "Q2.5"] <= rs[, "Estimate"]))
+      expect_true(all(rs[, "Estimate"] <= rs[, "Q97.5"]))
+      # The roxygen promises the matrix returned for each draw
+      # "carries the full posterior uncertainty in the residual
+      # distribution". A column with no spread is a residual that did
+      # not move with the draw it came from, and the interval check
+      # above is satisfied by a constant.
+      expect_gt(min(rs[, "Est.Error"]), 0)
+      # A randomised quantile residual is standard normal by
+      # construction, so its location and scale are a claim about
+      # the family's distribution function rather than about this
+      # fit. That makes them the checks a wrongly parameterised
+      # transform fails: reading the frame's pooled predictive
+      # instead of each draw's own gives a spread of 2.1 for `mvt`
+      # and 2.6 for `diri`, and every check above is satisfied by
+      # both.
+      dr <- as.numeric(residuals(fit, summary = FALSE))
+      fin <- dr[is.finite(dr)]
+      expect_gt(length(fin), 0.99 * length(dr))
+      expect_lt(abs(mean(fin)), 0.25)
+      expect_lt(abs(stats::sd(fin) - 1), 0.25)
+    }
+
+    # Column j of every surface above is row j of the frame, so the
+    # species the fit resolves for each row has to be the species the
+    # frame states there. A permutation keeps every dimension, leaves
+    # every value finite and uses every species exactly once.
+    os <- mvgam:::get_observation_structure(fit, newdata = d)
+    expect_identical(as.character(os$series), as.character(d$series))
+    expect_identical(os$series_levels, lev)
+    expect_identical(as.integer(os$series_int),
+                     match(as.character(d$series), lev))
+    # And the time index runs in the frame's own order, not the order
+    # the rows happened to be assembled in.
+    expect_identical(as.integer(os$time),
+                     match(d$time, sort(unique(d$time))))
+  })
+
+  test_that(says("a conditional prediction reads the fitted state"), {
+    # `incl_autocor = TRUE` asks for the latent state the sampler put
+    # at each row, where `FALSE` integrates it out, and the fitted
+    # state sits far closer to the data it was fitted to. A method
+    # that used one predictor for both requests would give the two
+    # the same error.
+    #
+    # The claim is the direction. Conditioning has to bring the
+    # prediction closer to the data it was fitted to, and how much
+    # closer depends on how much the response says about the latent
+    # state: a single-trial categorical records one species per unit
+    # and improves by a little where a negative binomial improves by a
+    # lot. Holding every family to one share of the marginal error
+    # would state that difference as a defect.
+    ok <- !is.na(d$y)
+    sq_err <- function(m) mean((colMeans(m)[ok] - d$y[ok])^2)
+    for (method in list(posterior_epred, posterior_predict)) {
+      marginal <- method(fit, newdata = d, draw_ids = 1:100)
+      conditional <- method(fit, newdata = d, draw_ids = 1:100,
+                            incl_autocor = TRUE)
+      expect_lt(sq_err(conditional), sq_err(marginal))
+    }
+  })
+
+  test_that(says("the axis maps a frame without touching the draws"), {
+    # Which species a row belongs to, and which occasions a frame
+    # supplies, are settled from the axis record alone. Nothing here
+    # reads a posterior, so a failure is structural rather than a
+    # sampling one. The forecast grid is included because that is
+    # where the raw-column read lived.
+    ids <- mvgam:::axis_row_series(fit, d)
+    expect_identical(levels(ids), lev)
+    expect_identical(as.character(ids), as.character(d$series))
+
+    # Answered row by row, not by position.
+    set.seed(31L)
+    perm <- sample(nrow(d))
+    expect_identical(
+      as.character(mvgam:::axis_row_series(fit, d[perm, , drop = FALSE])),
+      as.character(d$series)[perm]
+    )
+
+    # A species the model never had is refused, and named.
+    bad <- d
+    bad$series <- as.character(bad$series)
+    bad$series[bad$series == lev[2L]] <- "y_ghost"
+    err <- expect_error(
+      mvgam:::validate_prediction_factor_levels(bad, fit$trend_metadata)
+    )
+    expect_match(conditionMessage(err), "y_ghost", fixed = TRUE)
+
+    # Each training arm carries the user's own time values, in order,
+    # and that species' own observations.
+    training <- mvgam:::build_training_arms(fit, lev)
+    expect_identical(names(training$times), lev)
+    user_times <- sort(unique(as.integer(d$time)))
+    for (s in lev) {
+      expect_identical(as.integer(training$times[[s]]), user_times)
+      expect_equal(training$observations[[s]],
+                   d$y[as.character(d$series) == s])
+    }
+
+    # A frame past the training grid yields exactly the new
+    # occasions, per species, in the user's numbering; one inside it
+    # yields none.
+    future_times <- max(user_times) + seq_len(4L)
+    future <- expand.grid(
+      time = future_times,
+      series = factor(lev, levels = lev),
+      stringsAsFactors = FALSE
+    )
+    future$env <- 0
+    grid <- mvgam:::resolve_forecast_grid(fit, future, training, lev)
+    expect_identical(names(grid$times), lev)
+    for (s in lev) {
+      expect_identical(as.integer(grid$times[[s]]), future_times)
+    }
+    # The training frame itself names no occasion beyond the grid, so
+    # there is no horizon in it to resolve. An empty grid used to be
+    # returned, which handed a caller a forecast object holding
+    # nothing.
+    expect_error(
+      mvgam:::resolve_forecast_grid(fit, d, training, lev),
+      "ends at or before the last training time"
+    )
+  })
+
+  test_that(says("each row reads the latent cell the sampler drew"), {
+    # The one comparison here that does not ask two derivations
+    # whether they agree with each other. `obs_trend_time` and
+    # `obs_trend_series` are the cell this fit gave each row and
+    # `trend[t, s]` is what it sampled there, so a species reading
+    # another's column returns a real state of the right shape and
+    # only a value comparison sees it.
+    t_rec <- as.integer(fit$standata$obs_trend_time)
+    s_rec <- as.integer(fit$standata$obs_trend_series)
+    expect_length(t_rec, n_obs)
+    want <- vapply(paste0("trend[", t_rec, ",", s_rec, "]"),
+                   function(k) mean(dm[, k]), numeric(1))
+    got <- colMeans(
+      mvgam:::extract_trend_latent_states(fit, newdata = d,
+                                          full_draws = dm)
+    )
+    expect_equal(unname(got), unname(want))
+    # And the states differ across cells, so a route returning one
+    # constant for every row cannot satisfy the comparison above by
+    # matching a constant `want`.
+    expect_gt(stats::sd(want), 1e-6)
+  })
+
+  test_that(says("a shuffled frame answers the same, in the new order"), {
+    # Every other check here hands back the training frame in the
+    # order it was built. A prediction that places rows by position
+    # rather than by content agrees with all of them, and disagrees
+    # here.
+    set.seed(13L)
+    perm <- sample(nrow(d))
+    base <- posterior_epred(fit, newdata = d, draw_ids = 1:10,
+                            incl_autocor = TRUE)
+    shuf <- posterior_epred(fit, newdata = d[perm, , drop = FALSE],
+                            draw_ids = 1:10, incl_autocor = TRUE)
+    expect_equal(unname(base[, perm, drop = FALSE]), unname(shuf))
+    # A frame whose columns were all equal would satisfy that under
+    # any permutation, so the values have to move across rows.
+    expect_gt(stats::sd(colMeans(base)), 1e-8)
+  })
+
+  test_that(says("a subset of the frame reads the same cells"), {
+    # The shape every per-series arm passes down, and the shape that
+    # exposed the defect this battery guards: the species index was
+    # taken from the levels the frame carried rather than the levels
+    # the fit was built on, so a subset numbered its species 1
+    # whatever it was and read the first species' latent column.
+    #
+    # The subset is whole sites rather than one species, which the
+    # single-species form was until measurement showed it is not a
+    # question the composition families can answer. Dirichlet,
+    # multinomial and categorical share a softmax normaliser across
+    # the species at a site, so a frame carrying one of them has a
+    # different denominator and must give a different number; asking
+    # them to agree is asking them to ignore the constraint that
+    # makes them compositions. Whole sites keep the normaliser
+    # intact, so the claim holds for all seven families and still
+    # fails on a prediction placed by position.
+    full <- posterior_epred(fit, newdata = d, draw_ids = 1:10,
+                            incl_autocor = TRUE)
+    ts <- sort(unique(d$time))
+    rows <- which(d$time %in% ts[seq(1L, length(ts), by = 2L)])
+    sub <- d[rows, , drop = FALSE]
+    expect_setequal(as.character(unique(sub$series)), lev)
+    got <- posterior_epred(fit, newdata = sub, draw_ids = 1:10,
+                           incl_autocor = TRUE)
+    expect_equal(unname(got), unname(full[, rows, drop = FALSE]))
+    # The species have to differ, or reading the wrong one would
+    # satisfy every comparison above.
+    per_species <- vapply(lev, function(s) {
+      mean(full[, as.character(d$series) == s])
+    }, numeric(1))
+    expect_equal(length(unique(round(per_species, 10L))), length(lev))
+  })
+
+  test_that(says("levels declared in another order still map right"), {
+    # The mapping is by label, so re-declaring the same species in a
+    # different order must not move the answers. Taking the axis from
+    # the frame's own `levels()` instead makes them move.
+    base <- posterior_epred(fit, newdata = d, draw_ids = 1:10,
+                            incl_autocor = TRUE)
+    nd <- d
+    nd$series <- factor(as.character(nd$series), levels = rev(lev))
+    got <- posterior_epred(fit, newdata = nd, draw_ids = 1:10,
+                           incl_autocor = TRUE)
+    expect_equal(unname(got), unname(base))
+  })
+
+  test_that(says("a frame naming an unknown species is refused"), {
+    nd <- d
+    nd$series <- factor(
+      ifelse(seq_len(nrow(nd)) == 1L, "y_unseen", as.character(nd$series)),
+      levels = c(lev, "y_unseen")
+    )
+    err <- expect_error(
+      posterior_epred(fit, newdata = nd, draw_ids = 1:5),
+      "'series' in 'newdata' has levels absent from the training data"
+    )
+    # check_newdata() runs the same check on a fitted model.
+    expect_error(check_newdata(nd, fit), "y_unseen", fixed = TRUE)
+    # The frame keeps its columns. A trait fit adds those it derived.
+    expect_identical(names(check_newdata(d, fit)),
+                     union(names(d), names(fit$trait_columns$derived)))
+    # A refusal that does not name the offending level, or list the
+    # ones that would have worked, leaves the user to find which of
+    # their species the model has never seen.
+    expect_match(conditionMessage(err), "y_unseen", fixed = TRUE)
+    for (s in lev) {
+      expect_match(conditionMessage(err), s, fixed = TRUE)
+    }
+  })
+
+  test_that(says("hindcast arms are the species, in order, and distinct"), {
+    arms <- hindcast(fit, ndraws = 20L)$hindcasts
+    expect_identical(names(arms), lev)
+    expect_true(all(vapply(arms, function(a) NROW(a) > 0L, logical(1))))
+    expect_identical(identical_species_pairs(arms), character(0))
+    # Each arm holds that species' own occasions, so a hindcast cut
+    # by the wrong axis has the wrong width.
+    n_times <- length(unique(d$time))
+    for (s in lev) expect_identical(ncol(arms[[s]]), n_times)
+  })
+
+  test_that(says("forecast is keyed by the species axis"), {
+    # `unit = time` makes the sites this fit's grid, so extending it
+    # is structurally a forecast even though a further site is not a
+    # later occasion. The keying and the width are what a wrongly
+    # resolved axis gets wrong.
+    h <- 4L
+    nd <- expand.grid(
+      time = max(d$time) + seq_len(h),
+      series = factor(lev, levels = lev),
+      stringsAsFactors = FALSE
+    )
+    nd$env <- 0
+    nd <- with_site_covariates(nd, d)
+    nd$y <- spec$na_response
+    for (ty in spec$fc_types) {
+      fc <- forecast(fit, newdata = nd, ndraws = 20L, type = ty)
+      expect_identical(names(fc$forecasts), lev)
+      for (s in lev) {
+        expect_identical(dim(fc$forecasts[[s]]), c(20L, h))
+        expect_true(all(is.finite(fc$forecasts[[s]])))
+      }
+      # The species have to be told apart on every scale, which the
+      # matrices state and their means only approximate.
+      expect_identical(
+        identical_species_pairs(fc$forecasts), character(0)
+      )
+    }
+    # `type = "expected"` is the family's mean, so it lands on the
+    # scale `posterior_epred()` occupies over the training grid: the
+    # two are one quantity, reached over the grid and over its
+    # extension. A forecast arm outside that scale is the inverse
+    # link having been skipped, and `is.finite()` cannot see it.
+    if (!is.null(spec$epred_ok)) {
+      fc_exp <- do.call(cbind, forecast(
+        fit, newdata = nd, ndraws = 20L, type = "expected"
+      )$forecasts)
+      expect_true(spec$epred_ok(fc_exp))
+    }
+    if (!is.null(spec$fc_response_ok)) {
+      # A drawn value has to be on the family's own scale; the
+      # expectation under another name would pass every check above.
+      drawn <- do.call(cbind, forecast(
+        fit, newdata = nd, ndraws = 20L, type = "response"
+      )$forecasts)
+      expect_true(spec$fc_response_ok(drawn))
+    }
+    if ("forecast_response_agrees" %in% spec$optional_methods) {
+      # `hindcast(type = "response")` answers for this family and
+      # `forecast(type = "response")` refuses it. They are the same
+      # quantity reached over the training grid and over its
+      # extension, so one of the two is wrong: either the family can
+      # be drawn from and the forecast arm should not refuse, or it
+      # cannot and the hindcast arm is calling something a response
+      # draw that is not one. This asserts they agree rather than
+      # picking a side.
+      hc_resp <- hindcast(fit, ndraws = 20L, type = "response")
+      expect_identical(names(hc_resp$hindcasts), lev)
+      fc_resp <- forecast(fit, newdata = nd, ndraws = 20L,
+                          type = "response")
+      expect_identical(names(fc_resp$forecasts), lev)
+    }
+  })
+
+  test_that(says("residual_cor is labelled by the species axis"), {
+    # The matrix the recovery number above is read off. A correct
+    # matrix under the wrong labels reads, to anyone using it,
+    # exactly like a wrong matrix, and the correlation is identical
+    # either way.
+    expect_identical(rownames(post_cor), lev)
+    expect_identical(colnames(post_cor), lev)
+    expect_equal(unname(diag(post_cor)), rep(1, K))
+    # A correlation matrix is symmetric; an asymmetry means the two
+    # indices were resolved by different routes.
+    expect_equal(unname(post_cor), unname(t(post_cor)))
+    expect_true(all(post_off >= -1 & post_off <= 1))
+    # An identity matrix satisfies every line above and says the
+    # species share nothing, which is not the model that was fitted.
+    expect_gt(max(abs(post_off)), 0.05)
+  })
+
+  test_that(says("a partial correlation exists only at full rank"), {
+    # `Z Sigma Z'` over K species and N_lv factors has rank N_lv, so
+    # below K it has no inverse and the identity a partial
+    # correlation is read off does not exist for this fit at any
+    # data. `solve()` reported that as a LAPACK reciprocal condition
+    # number, which says nothing about the model that produced it.
+    # Every fit in this battery carries fewer factors than species.
+    expect_lt(N_lv, K)
+    # mvn() and mvt() add each species' residual variance to the
+    # diagonal, which gives the covariance full rank
+    if (family_has_component_scale(fit$family)) {
+      pc <- residual_cor(fit, partial = TRUE)$cor
+      expect_true(all(is.finite(pc)))
+      return(invisible())
+    }
+    expect_error(
+      residual_cor(fit, partial = TRUE),
+      "full-rank residual covariance"
+    )
+    # The message carries the two numbers a reader needs and the
+    # method that answers the question they were asking.
+    expect_error(residual_cor(fit, partial = TRUE), as.character(K))
+    expect_error(residual_cor(fit, partial = TRUE), "shared_variation")
+    # The default path is untouched: only the inverse is unavailable.
+    expect_identical(dim(residual_cor(fit)$cor), c(K, K))
+  })
+
+  test_that(says("the factor methods report the fit's own loadings"), {
+    # These are the methods a jsdgam exists for, and each reads the
+    # loadings against the species axis. A wrong axis gives every one
+    # of them a real answer about the wrong species.
+    af <- active_factors(fit)
+    # One row per latent factor. The species grain would give one row
+    # per species.
+    expect_identical(nrow(af$per_factor), N_lv)
+
+    sv <- shared_variation(fit)
+    # The names this is read by, in the order the loadings run. A
+    # correct decomposition under permuted names attributes each
+    # species' shared variance to another species.
+    expect_identical(as.character(sv$series_names), lev)
+    expect_identical(as.integer(sv$n_series), K)
+    expect_identical(as.integer(sv$n_lv), N_lv)
+    # Delta is a covariance, so it is symmetric with positive
+    # variances on its diagonal. A frame of finite numbers is not.
+    expect_identical(dim(sv$delta), c(K, K))
+    expect_equal(unname(sv$delta), unname(t(sv$delta)))
+    expect_true(all(diag(sv$delta) > 0))
+
+    # The biplot puts one point per species; a plot drawn off a
+    # collapsed axis carries fewer.
+    ord_layers <- expect_drawn(ordinate(fit))
+    expect_true(any(vapply(ord_layers, function(x) nrow(x) == K,
+                           logical(1))))
+
+    # Both fits have to reach the panel. The title names them and the
+    # point layer carries one loading per species per fit, so a
+    # comparison that silently dropped one is a plot of the right
+    # shape holding half the data.
+    cl <- compare_loadings(fit, fit, labels = c("first", "second"))
+    pts <- expect_drawn(cl)
+    expect_match(cl$labels$title, "first", fixed = TRUE)
+    expect_match(cl$labels$title, "second", fixed = TRUE)
+    expect_true(any(vapply(pts, function(x) nrow(x) == 2L * K,
+                           logical(1))))
+    # Facetting is a different layout rather than the same plot
+    # returned twice, which is what `facet` is asked for.
+    faceted <- compare_loadings(fit, fit,
+                                labels = c("first", "second"),
+                                facet = TRUE)
+    expect_drawn(faceted)
+    expect_false(identical(class(faceted$facet)[1L],
+                           class(cl$facet)[1L]))
+
+    expect_identical(dim(Z_mean), c(K, N_lv))
+    # No two species share a loading vector, which is what a
+    # collapsed axis produces while leaving every dimension correct.
+    same <- character(0)
+    for (i in seq_len(K)) {
+      for (j in seq_len(K)) {
+        if (j <= i) next
+        if (isTRUE(all.equal(Z_mean[i, ], Z_mean[j, ]))) {
+          same <- c(same, paste(lev[i], lev[j], sep = "="))
+        }
+      }
+    }
+    expect_identical(same, character(0))
+    # And the loadings are not all near zero, which would make the
+    # distinctness above hold on numerical noise alone.
+    expect_gt(max(abs(Z_mean)), 0.1)
+  })
+
+  test_that(says("the rotated loadings are what the diagnostics report"), {
+    # A factor model's raw `Z` is rotation-indeterminate, so its
+    # draws describe nothing a user should read: any rotation of the
+    # loadings with the matching counter-rotation of the factors
+    # gives the same likelihood, and the chains wander between them.
+    # Once `Z_tilde` is in the posterior it is the identified
+    # surface, and the diagnostic entry points hide the raw block
+    # rather than reporting an r-hat on a quantity with no fixed
+    # value.
+    v <- variables(fit)
+    expect_true(any(grepl("^Z_tilde\\[", v)))
+    expect_false(any(grepl("^Z\\[", v)))
+    # The trend scale and correlation factors are absorbed into the
+    # loadings here, so they are hidden on the same grounds.
+    expect_false(any(grepl("^sigma_trend\\[", v)))
+    expect_false(any(grepl("^L_Omega_trend\\[", v)))
+
+    # Every entry point agrees, not just `variables()`. An r-hat
+    # computed on the unrotated block is the misleading number this
+    # prevents.
+    expect_false(any(grepl("^Z\\[", rownames(posterior_summary(fit)))))
+    expect_false(any(grepl("^Z\\[", names(rhat(fit)))))
+
+    # The hiding is a default, not a removal: naming the block is the
+    # documented way to reach the raw draws, and both halves of that
+    # contract are asserted because either one alone passes on the
+    # other's failure. A selection that returned only `Z_tilde` would
+    # satisfy "some Z came back" while the escape hatch was gone.
+    # The softmax families carry a third block under the same
+    # prefix, so the two named ones are counted rather than the
+    # total.
+    cols <- posterior::variables(
+      as_draws_array(fit, variable = "Z", regex = TRUE)
+    )
+    expect_identical(sum(grepl("^Z\\[", cols)), K * N_lv)
+    expect_identical(sum(grepl("^Z_tilde\\[", cols)), K * N_lv)
+  })
+
+  test_that(says("summary and the criticism methods run on this fit"), {
+    txt <- capture.output(summary(fit))
+    expect_true(any(grepl("env", txt, fixed = TRUE)))
+
+    ll <- log_lik(fit, draw_ids = 1:20)
+    expect_identical(dim(ll), c(20L, n_obs))
+    # Which columns carry a density is the family's own grain, and
+    # there are two here. The per-row families score every row. A
+    # composition scores one joint density per site and carries it
+    # on the site's first row, so the site's other rows hold no
+    # density of their own. Requiring every cell to be finite would
+    # demand the second kind report a certainty it does not have,
+    # which is what filling those cells with zero used to do.
+    scored <- which(colSums(is.finite(ll)) > 0L)
+    expect_gt(length(scored), 0L)
+    expect_true(all(is.finite(ll[, scored, drop = FALSE])))
+    expect_identical(
+      length(scored),
+      if (mvgam:::is_simplex_response_family(fit$family)) {
+        mvgam:::closure_unit_arrays_for(fit)$N_unit
+      } else {
+        n_obs
+      }
+    )
+    # A density that came back constant across rows is not this
+    # model's, whatever its shape.
+    expect_gt(stats::sd(colMeans(ll[, scored, drop = FALSE])), 1e-8)
+
+    # `loo()` warns when a Pareto-k crosses its threshold, which is
+    # the one diagnostic saying whether the approximation can be
+    # trusted. Capturing it rather than suppressing it keeps the
+    # signal: an unrelated notice fails instead of passing unseen.
+    caught <- with_warnings(loo(fit))
+    ic <- caught$value
+    seen <- caught$warnings
+    expect_true(is.finite(ic$estimates["elpd_loo", "Estimate"]))
+    # The diagnostics have to be there and cover every observation
+    # the density answered for, or the estimate above is summarising
+    # a different set of points. That is the scored columns rather
+    # than the frame's width: holding it to `ncol(ll)` demanded one
+    # diagnostic per row from a family whose density is per site,
+    # and so required the padding that made `loo()` report 120
+    # observations for thirty independent densities.
+    expect_identical(length(ic$diagnostics$pareto_k), length(scored))
+    expect_true(all(is.finite(ic$diagnostics$pareto_k)))
+    expect_true(all(grepl("Pareto", seen)))
+  })
+
+  test_that(says("the three routes to a latent state give one answer"), {
+    # Sharing the closure-unit data pipeline is not the same as
+    # having a latent state to report. `occ()` and `nmix()` do;
+    # `mvn()`, `mvt()` and `diri()` reuse the pipeline and do not.
+    #
+    # Which families have one is declared per family above rather
+    # than read from the registry that decides, so the claim is not
+    # the decision restated. Two of these routes checked only whether
+    # the family was closure-unit, let these families through to a
+    # dispatcher with no branch, and answered with a source file to
+    # edit, so all three are held to the same answer.
+    expect_false(spec$has_latent_state)
+    routes <- list(
+      hindcast = function() hindcast(fit, type = "latent_state"),
+      predict = function() predict(fit, type = "latent_state",
+                                   ndraws = 5L),
+      conditional_effects = function()
+        conditional_effects(fit, type = "latent_state")
+    )
+    # The refusal names the family and what it does offer, rather
+    # than naming the package's own internals.
+    for (r in names(routes)) {
+      expect_error(routes[[r]](),
+                   "is not available for this family")
+    }
+
+    # `summary()` closes with a list of next steps, and it must not
+    # send a reader to a call every one of those routes refuses.
+    txt <- paste(
+      utils::capture.output(summary(fit)),
+      collapse = " "
+    )
+    expect_false(grepl("latent_state", txt, fixed = TRUE))
+  })
+
+  test_that(says("pp_check, plotting and conditional_effects render"), {
+    expect_drawn(pp_check(fit, ndraws = 20L))
+    if (!is.null(spec$pp_check_extra)) {
+      expect_drawn(pp_check(fit, type = spec$pp_check_extra,
+                            ndraws = 20L))
+    }
+    for (ty in spec$plot_types) {
+      expect_drawn(plot(fit, type = ty))
+    }
+    if ("mcmc_plot" %in% spec$optional_methods) {
+      expect_drawn(mcmc_plot(fit))
+    }
+
+    ce <- conditional_effects(fit)
+    # Every observation formula here holds `env`. The default list must
+    # offer it. A default list that lost it draws a correct
+    # panel of the wrong thing.
+    env_panels <- grep("env", names(ce), value = TRUE)
+    expect_gt(length(env_panels), 0L)
+    for (eff in names(ce)) {
+      cd <- ce[[eff]]$data
+      expect_true(all(c("estimate", "conf.low", "conf.high") %in%
+                        names(cd)))
+      expect_true(all(is.finite(cd$estimate)))
+      # An interval drawn the wrong way round renders as a ribbon of
+      # the right shape around the right line.
+      expect_true(all(cd$conf.low <= cd$estimate))
+      expect_true(all(cd$estimate <= cd$conf.high))
+      # A zero-width interval means the draws were collapsed before
+      # the panel was built.
+      expect_gt(max(cd$conf.high - cd$conf.low), 0)
+      # A panel whose effect names the series is cut by every level of
+      # the model's axis.
+      if (grepl("series", eff, fixed = TRUE)) {
+        expect_setequal(as.character(unique(cd$series)), lev)
+      }
+      if (!is.null(spec$ce_response_ok)) {
+        expect_true(spec$ce_response_ok(cd$estimate))
+      }
+    }
+    # A covariate panel whose estimate does not move is a predictor
+    # that reached the plot without reaching the linear predictor.
+    for (eff in env_panels) {
+      expect_gt(stats::sd(ce[[eff]]$data$estimate), 1e-8)
+    }
+  })
+
+  test_that(says("the factor panel draws the occasions supplied"), {
+    # The factor panel labels its x axis `Time`, the occasions the user
+    # gave. A panel drawing each occasion's rank matches it on a grid
+    # numbered from one. The multivariate-normal frame here is numbered
+    # from three, which separates the two.
+    ut <- range(as.numeric(d$time))
+    panel_x <- function(p) {
+      xs <- unlist(lapply(
+        ggplot2::ggplot_build(p)$data,
+        function(l) if ("x" %in% names(l)) l$x else NULL
+      ))
+      range(xs[is.finite(xs)])
+    }
+    for (ty in intersect(spec$plot_types, "factors")) {
+      expect_equal(panel_x(plot(fit, type = ty)), ut)
+    }
+    # The units are sites in arbitrary order. A trend or hindcast drawn
+    # along them would look like a time series. Both plots refuse.
+    expect_error(plot(fit, type = "trend"), "along time is not supported")
+    expect_error(plot(hindcast(fit, ndraws = 20L), series = 1L),
+                 "along time is not supported")
+  })
+
+  test_that(says("the draws and the tidiers keep this fit's row order"), {
+    v <- variables(fit)
+    expect_true(any(grepl("^Z(_tilde)?\\[", v)))
+
+    td <- expect_tidy_glance(fit)
+    # `effects = "all"` is documented to return every parameter, and
+    # the loadings are what a jsdgam is fitted to estimate, so a
+    # table without them is not a tidy summary of this fit.
+    expect_true(any(grepl("^Z_tilde", td$term)))
+    # The same table must not report what the diagnostics hide.
+    # `variables()`, `posterior_summary()` and `rhat()` all drop
+    # `L_Omega_trend` on a factor fit because it is absorbed into the
+    # loadings and has no fixed value under rotation. A tidier that
+    # reports it hands the user a number the package refuses to put
+    # an r-hat on.
+    expect_false(any(grepl("^L_Omega_trend", td$term)))
+    # Fixed effects take their `fixef()` names, as broom.mixed names
+    # them: `b_` and the smooth's `bs_` prefixes dropped
+    expect_true(all(td$term %in% c(v, mvgam:::fixef_name(v))))
+
+    aug <- augment(fit)
+    expect_identical(nrow(aug), n_obs)
+    # Row for row, in the frame's own order. A tidier that re-sorts
+    # its output pairs each fitted value with another row's
+    # observation while every column keeps the right length.
+    expect_identical(as.character(aug$series), as.character(d$series))
+    expect_equal(as.numeric(aug$time), as.numeric(d$time))
+    expect_equal(as.numeric(aug$.observed), as.numeric(d$y))
+
+    # `augment()` has to carry the residual at the grain
+    # `residuals()` computed it on. Which grain that is comes from
+    # `residuals()` itself rather than from the predicate deciding
+    # it, so the claim is that the two agree rather than that either
+    # matches a name.
+    #
+    # Recycling is invisible in every check above: the column is the
+    # right length, in the frame's order, and finite. What separates
+    # them is whether the species at one site share a value. A
+    # randomised quantile residual is continuous, so rows that agree
+    # exactly were copied rather than drawn.
+    resid_cols <- ncol(residuals(fit, summary = FALSE, ndraws = 5L))
+    per_row <- identical(as.integer(resid_cols), as.integer(n_obs))
+    distinct_per_site <- tapply(aug$.resid, as.character(aug$site),
+                                function(z) length(unique(z)))
+    if (per_row) {
+      # Each species at a site was scored on its own row.
+      expect_true(all(distinct_per_site > 1L))
+      # `.unit` states that rows sharing it share a residual, which
+      # is not true of a per-row family.
+      expect_false(".unit" %in% names(aug))
+    } else {
+      # A unit-grain residual is recycled across the unit's rows, and
+      # `.unit` is what makes that legible.
+      expect_true(all(distinct_per_site == 1L))
+      expect_true(".unit" %in% names(aug))
+    }
+  })
+
+  if ("marginaleffects" %in% spec$optional_methods) {
+    test_that(says("marginaleffects reaches this fit and separates species"), {
+      withr::local_options(marginaleffects_model_classes = "mvgam")
+      grid <- expand.grid(
+        env = c(-1, 1), series = factor(lev, levels = lev),
+        stringsAsFactors = FALSE
+      )
+      grid$time <- min(d$time)
+      grid <- with_site_covariates(grid, d)
+      grid$y <- spec$na_response
+      # mvgam parts company with brms and marginaleffects on what
+      # `type` means, and does so deliberately: `"expected"` is the
+      # family's mean and `"response"` samples the family, so the
+      # latter reports a predictive median. Each type is pinned to
+      # its own quantity, because comparing one against the other's
+      # is what made a whole number read as a defect once already.
+      pr_e <- marginaleffects::predictions(fit, newdata = grid,
+                                           type = "expected")
+      expect_identical(nrow(pr_e), nrow(grid))
+      expect_true(all(is.finite(pr_e$estimate)))
+      if (!is.null(spec$epred_ok)) {
+        expect_true(spec$epred_ok(pr_e$estimate))
+      }
+      # The expectation reached through marginaleffects is the one
+      # `posterior_epred()` returns, summarised the way
+      # marginaleffects summarises it. Its own brms method reduces
+      # the draws with `collapse::fmedian`, so the point estimate is
+      # a posterior median and comparing it against a mean measures
+      # the skew of the posterior rather than whether the two routes
+      # agree. On the negative binomial fit that gap reaches 0.15
+      # while the median agrees to zero.
+      ep_draws <- posterior_epred(fit, newdata = grid, ndraws = NULL)
+      ep_grid <- apply(ep_draws, 2L, stats::median)
+      expect_equal(as.numeric(pr_e$estimate), as.numeric(ep_grid),
+                   tolerance = 1e-8)
+
+      pr_r <- marginaleffects::predictions(fit, newdata = grid,
+                                           type = "response")
+      expect_identical(nrow(pr_r), nrow(grid))
+      if (isTRUE(spec$me_integer_tell)) {
+        # Sampled counts separate the two types. The median of integer
+        # draws is a whole number, or a half one over an even number of
+        # draws. The median of expectations is neither.
+        halves <- function(x) all(2 * x == floor(2 * x))
+        expect_true(halves(pr_r$estimate))
+        expect_false(halves(pr_e$estimate))
+      }
+      # Each species takes its own slope, through `env * series` or
+      # through its trait and deviation. A design that dropped either
+      # returns one slope shared by all.
+      # A threshold near machine zero would pass on numerical noise,
+      # so the claim is that the species differ by an amount
+      # comparable to the slopes themselves.
+      slopes <- vapply(lev, function(s) {
+        e <- pr_e$estimate[grid$series == s]
+        e[2L] - e[1L]
+      }, numeric(1))
+      expect_gt(stats::sd(slopes), 0.05 * mean(abs(slopes)))
+    })
+  }
+
+  invisible(NULL)
+}
+
+
+# ---- Run the battery once per family ---------------------------------
+
+built <- new.env(parent = emptyenv())
+
+for (nm in names(SPECS)) {
+  spec <- SPECS[[nm]]
+  sim <- jsdm_sim(spec)
+  fit <- fit_jsdm(nm, spec, sim)
+  assign(nm, list(spec = spec, sim = sim, fit = fit), envir = built)
+  jsdgam_battery(nm, spec, sim, fit)
+}
+
+
+# ---- What belongs to one family alone --------------------------------
+
+
+test_that("nb: the shape parameter recovers the simulated size", {
+  # The shape sets how far counts scatter around their mean. brms
+  # names it `shape`, the size of `rnbinom()`. A model that used it
+  # as its inverse would place the truth far outside the posterior.
+  obj <- get("nb", envir = built)
+  shape_post <- as.numeric(as_draws_matrix(obj$fit$fit)[, "shape"])
+  band <- stats::quantile(shape_post, c(0.005, 0.995))
+  expect_true(SPECS$nb$sim_pars$size > band[[1L]] &&
+                SPECS$nb$sim_pars$size < band[[2L]])
+})
+
+
+test_that("mvt: Psi and nu hold the constraints they declare", {
+  # A scale or tail parameter outside its declared bounds leaves
+  # every other number in this file intact.
+  obj <- get("mvt", envir = built)
+  dm <- as_draws_matrix(obj$fit$fit)
+  psi_cols <- grep("^Psi\\[", colnames(dm), value = TRUE)
+  expect_length(psi_cols, obj$sim$K)
+  expect_true(all(dm[, psi_cols] > 0))
+
+  expect_true("nu" %in% colnames(dm))
+  nu_draws <- as.numeric(dm[, "nu"])
+  # The Student-t degrees of freedom have a hard floor at 2; a
+  # posterior with mass below it means the constraint is not applied.
+  expect_true(all(nu_draws >= 2))
+  expect_true("nu" %in% variables(obj$fit))
+})
+
+
+test_that("mvn: Psi is separable from the factor covariance", {
+  # Five species on two factors satisfies `(K - m)^2 >= K + m`, the
+  # condition under which a per-species residual scale is separable
+  # from the factor covariance. This block checks the fixture's own
+  # premise, which the package itself warns about when a design
+  # fails it.
+  obj <- get("mvn", envir = built)
+  expect_gte((obj$sim$K - obj$sim$N_lv)^2, obj$sim$K + obj$sim$N_lv)
+  dm <- as_draws_matrix(obj$fit$fit)
+  psi_cols <- grep("^Psi\\[", colnames(dm), value = TRUE)
+  expect_length(psi_cols, obj$sim$K)
+  # A residual scale is positive, and a posterior that has wandered
+  # onto the factor covariance's share of the variance shows up here
+  # before it shows up in the mean.
+  expect_true(all(dm[, psi_cols] > 0))
+})
+
+
+test_that("mvn: the post-fit surface treats it as what it is", {
+  # `mvn()` shares the closure-unit data pipeline with `occ()` and
+  # `nmix()` and models nothing about detection over a closed unit.
+  # Every path that branched on the shared spelling reached this family
+  # with code written for the other one: the residual plot asked for
+  # a check its own family refuses, `augment()` demanded a `cap`
+  # column, and the latent-state route fell into a dispatcher with no
+  # branch and answered with a source file for the user to edit.
+  obj <- get("mvn", envir = built)
+  fit <- obj$fit
+
+  expect_drawn(plot(fit, type = "residuals"))
+  aug <- augment(fit)
+  expect_identical(nrow(aug), nrow(obj$sim$long_dat))
+  expect_false("cap" %in% names(aug))
+
+  # Refused, but by naming the family and what it does offer rather
+  # than by naming the package's own internals.
+  expect_error(hindcast(fit, type = "latent_state"),
+               "is not available for this family")
+  expect_error(hindcast(fit, type = "latent_state"), "mvn")
+})
+
+
+test_that("mvn: one quantity over the grid and over its extension", {
+  # `hindcast(type = "response")` and `forecast(type = "response")`
+  # are one quantity reached two ways, so a family one of them can
+  # draw from is a family the other must not refuse. The forecast arm
+  # refused every closure-unit family outright, which reached this
+  # one because it shares their data pipeline.
+  obj <- get("mvn", envir = built)
+  fit <- obj$fit
+  d <- obj$sim$long_dat
+  lev <- obj$sim$species_levels
+  h <- 3L
+  nd <- expand.grid(
+    time = max(d$time) + seq_len(h),
+    series = factor(lev, levels = lev),
+    stringsAsFactors = FALSE
+  )
+  nd$env <- 0
+  nd$y <- NA_real_
+
+  hc <- hindcast(fit, ndraws = 20L, type = "response")
+  expect_identical(names(hc$hindcasts), lev)
+  # Twenty draws leave the two spreads within sampling error of each
+  # other, and 500 separate them.
+  fc_resp <- forecast(fit, newdata = nd, ndraws = 500L, type = "response")
+  expect_identical(names(fc_resp$forecasts), lev)
+
+  # An mvn expectation is its linear predictor, so the expected arm
+  # sits inside the drawn arm's spread rather than beside it: the
+  # draws are the expectation plus a Normal(0, Psi) residual.
+  fc_exp <- forecast(fit, newdata = nd, ndraws = 500L, type = "expected")
+  drawn <- do.call(cbind, fc_resp$forecasts)
+  expected <- do.call(cbind, fc_exp$forecasts)
+  expect_true(all(is.finite(drawn)) && all(is.finite(expected)))
+  expect_gt(sd(as.numeric(drawn)), sd(as.numeric(expected)))
+})
+
+
+test_that("diri: the concentration parameter recovers the truth", {
+  # phi sets how tightly the compositions concentrate around their
+  # expectation. This fit models no predictor on phi, which leaves it
+  # one scalar on the response scale.
+  obj <- get("diri", envir = built)
+  phi_post <- as.numeric(as_draws_matrix(obj$fit$fit)[, "phi"])
+  band <- stats::quantile(phi_post, c(0.005, 0.995))
+  expect_true(SPECS$diri$sim_pars$phi > band[[1L]] &&
+                SPECS$diri$sim_pars$phi < band[[2L]])
+})
+
+
+test_that("diri: the loadings are pinned to sum to zero over species", {
+  # A softmax is invariant to a constant added across species, so an
+  # unpinned Z leaves the model identified only up to that shift and
+  # the loadings wander between chains. The constraint is shared by
+  # every softmax family, so pinning it here pins it for all of them.
+  obj <- get("diri", envir = built)
+  Z_arr <- mvgam:::extract_Z_loadings(
+    as_draws_matrix(obj$fit$fit),
+    n_obs_series = obj$sim$K, n_lv = obj$sim$N_lv
+  )
+  Z_mean <- apply(Z_arr, c(2L, 3L), mean)
+  expect_lt(max(abs(colSums(Z_mean))), 1e-6)
+  # The columns sum to zero because they are constrained, not
+  # because they are empty.
+  expect_gt(max(abs(Z_mean)), 0.1)
+  # The constraint holds draw by draw, not only on the average. A
+  # posterior mean can sum to zero from a pair of draws that shift
+  # in opposite directions while neither is itself pinned.
+  per_draw <- apply(Z_arr, 1L, function(z) max(abs(colSums(z))))
+  expect_lt(max(per_draw), 1e-6)
+})
+
+
+test_that("diri: the data and the expectation are both compositions", {
+  # The fixture's own premise, checked rather than assumed: if the
+  # simulation drifted off the simplex, every number above describes
+  # a different model. And a per-species inverse link applied
+  # without the shared normaliser gives four independent proportions
+  # that do not sum to one, every one of them still inside the unit
+  # interval.
+  obj <- get("diri", envir = built)
+  d <- obj$sim$long_dat
+  per_site <- tapply(d$y, d$time, sum)
+  expect_equal(as.numeric(per_site), rep(1, length(per_site)),
+               tolerance = 1e-8)
+  expect_true(all(d$y > 0 & d$y < 1))
+
+  ep <- posterior_epred(obj$fit, draw_ids = 1:20)
+  site_sums <- tapply(colMeans(ep), d$time, sum)
+  expect_equal(as.numeric(site_sums), rep(1, length(site_sums)),
+               tolerance = 1e-6)
+  # And a draw is a composition too, not merely bounded.
+  pp <- posterior_predict(obj$fit, draw_ids = 1:20)
+  for (i in seq_len(nrow(pp))) {
+    expect_equal(as.numeric(tapply(pp[i, ], d$time, sum)),
+                 rep(1, length(per_site)), tolerance = 1e-6)
+  }
+})
+
+
+test_that("diri: the forecast expectation is a composition", {
+  # `posterior_epred()` over the training grid and
+  # `forecast(type = "expected")` over its extension are one
+  # quantity, so they occupy one scale. A softmax normalises across
+  # the site's species, which no per-row inverse link can do, and
+  # skipping it returned the linear predictor itself: negative
+  # numbers where a probability was asked for. A bound alone would
+  # pass on a link arm that happened to be small, so the claim is
+  # that the species shares sum to one at every forecast site.
+  obj <- get("diri", envir = built)
+  d <- obj$sim$long_dat
+  lev <- levels(d$series)
+  h <- 3L
+  nd <- expand.grid(
+    time = max(d$time) + seq_len(h),
+    series = factor(lev, levels = lev),
+    stringsAsFactors = FALSE
+  )
+  nd$env <- 0
+  nd$y <- NA_real_
+
+  arms <- forecast(obj$fit, newdata = nd, ndraws = 20L,
+                   type = "expected")$forecasts
+  expect_identical(names(arms), lev)
+  site_sums <- Reduce(`+`, arms)
+  expect_equal(as.numeric(site_sums), rep(1, 20L * h),
+               tolerance = 1e-10)
+
+  # A drawn composition is a composition too, which the expectation
+  # under another name would also satisfy, so the draws are required
+  # to differ from the arm above rather than only to sum to one.
+  drawn <- forecast(obj$fit, newdata = nd, ndraws = 20L,
+                    type = "response")$forecasts
+  expect_equal(as.numeric(Reduce(`+`, drawn)), rep(1, 20L * h),
+               tolerance = 1e-10)
+  expect_gt(max(abs(do.call(cbind, drawn) - do.call(cbind, arms))), 0)
+})
+
+
+test_that("diri: a unit missing a component is not scored", {
+  # Drop one species from one site. The rows that remain still
+  # renormalise to a softmax summing to one, so the density and the
+  # quantile residual both have something finite to compute -- and
+  # it would be a statement about a composition the data never
+  # observed, since the shares left behind sum to less than one.
+  # Stan's `dirichlet_lpdf` rejects that pair outright, so nothing
+  # here may quietly score it.
+  obj <- get("diri", envir = built)
+  d <- obj$sim$long_dat
+  gap <- d
+  gap$y[1L] <- NA_real_
+  # A composition scores one joint density per site and parks it on
+  # that site's first row, which is why `loo()` reports one
+  # observation per site rather than one per species. Both facts are
+  # read off the user's own frame: the sites are its times, and each
+  # site's first row is the first the frame gives that time.
+  parked <- !duplicated(d$time)
+  gapped <- d$time == d$time[1L]
+
+  ll <- log_lik(obj$fit, newdata = gap, draw_ids = 1:5)
+  # The gapped site keeps no density on any of its rows, and every
+  # other site keeps exactly the one on its parked row.
+  expect_true(all(is.na(ll[, gapped])))
+  expect_true(all(is.finite(ll[, parked & !gapped])))
+  expect_true(all(is.na(ll[, !parked])))
+
+  # A per-row quantile residual is the marginal of one component and
+  # does not condition on the siblings, so the rows that kept their
+  # response keep a residual and only the emptied row loses one.
+  rs <- residuals(obj$fit, newdata = gap, draw_ids = 1:5,
+                  summary = FALSE)
+  expect_true(all(is.na(rs[, 1L])))
+  expect_true(all(is.finite(rs[, -1L])))
+
+  # The control: with every component present every site is scored.
+  ll_full <- log_lik(obj$fit, newdata = d, draw_ids = 1:5)
+  expect_true(all(is.finite(ll_full[, parked])))
+  expect_true(all(is.na(ll_full[, !parked])))
+
+  # The softmax the density is taken against spans the site's
+  # components rather than the ones that came back. Over the
+  # survivors alone it would renormalise to one, and the observed
+  # shares it is scored against sum to less than one.
+  comp <- mvgam:::extract_simplex_response_components(
+    obj$fit, newdata = gap, draw_ids = 1:5
+  )
+  site_1 <- which(gapped)
+  expect_equal(sum(comp$prob_row[1L, site_1]), 1, tolerance = 1e-10)
+  expect_lt(sum(comp$prob_row[1L, site_1[-1L]]), 1)
+  expect_lt(sum(gap$y[site_1[-1L]]), 1)
+})
+
+
+# ----------------------------------------------------------------------
+# The factor-count ceiling
+# ----------------------------------------------------------------------
+
+test_that("n_lv reaches the ceiling the validator sets", {
+  # `validate_n_lv_ceiling()` admits `n_lv = n_species` on purpose:
+  # the loadings prior decides whether that boundary samples, and
+  # refusing it here would turn away a model the prior makes
+  # admissible. `?jsdgam` describes a stricter rule for every prior
+  # but the MGP one, so this pins the behaviour rather than the
+  # sentence, and fails if a reader ever implements the sentence.
+  set.seed(99L)
+  n_sp <- 4L
+  sp <- paste0("sp", seq_len(n_sp))
+  d_lv <- expand.grid(site = seq_len(30L),
+                      species = factor(sp, levels = sp))
+  d_lv$env <- stats::rnorm(nrow(d_lv))
+  d_lv$y <- stats::rpois(nrow(d_lv), exp(1 + 0.3 * d_lv$env))
+  build <- function(...) {
+    jsdgam(formula = y ~ env, factor_formula = ~ -1, data = d_lv,
+           unit = site, species = species, family = poisson(),
+           run_model = FALSE, silent = 2, ...)
+  }
+
+  # The saturated model is admissible under every prior.
+  for (extra in list(list(), list(loadings_prior = "mgp"))) {
+    m <- do.call(build, c(list(n_lv = n_sp), extra))
+    expect_identical(as.integer(m$standata$N_lv_trend), n_sp)
+  }
+
+  # One factor past the species count adds no rank, and the refusal
+  # gives the reason.
+  err <- expect_error(build(n_lv = n_sp + 1L),
+                      "at most the number of species")
+  expect_match(conditionMessage(err), "rank at most", fixed = TRUE)
+})
+
+
+test_that("the jsdm methods refuse an argument nothing reads", {
+  # Each of these names every argument it takes and forwards none of
+  # them onward, so a name left in `...` is read by no one. A
+  # misspelling then returns a plot or a table built on the default
+  # the caller was trying to override. `forecast()` and `hindcast()`
+  # already refuse this through `rlang::check_dots_empty()`; the
+  # claim is that the rest of the closed-argument surface does too.
+  obj <- get("nb", envir = built)$fit
+  expect_error(ordinate(obj, zzz_unknown = 1))
+  expect_error(residual_cor(obj, zzz_unknown = 1))
+  expect_error(shared_variation(obj, zzz_unknown = 1))
+  expect_error(active_factors(obj, zzz_unknown = 1))
+})
+
+
+test_that("every surface the help page sends a reader to answers", {
+  # `?jsdgam` lists these under seealso, so each is a promise made to
+  # someone who has just fitted a joint species model.
+  nb <- get("nb", envir = built)
+  obj <- nb$fit
+  rc <- residual_cor(obj)
+  expect_identical(dimnames(rc$cor),
+                   list(nb$sim$species_levels, nb$sim$species_levels))
+  # Under unit factor innovations the residual covariance is the
+  # shared variation `Z Z'`. The two methods reach it by separate
+  # routes and must report the same posterior mean.
+  expect_equal(shared_variation(obj)$delta, rc$cov)
+  expect_drawn(ordinate(obj))
+  expect_identical(nrow(active_factors(obj)$per_factor),
+                   as.integer(obj$standata$N_lv_trend))
+  expect_drawn(compare_loadings(obj, obj))
+})
+
+
+test_that("update() refits a jsdgam through jsdgam() and the refit predicts", {
+  obj <- get("nb", envir = built)
+  fit <- obj$fit
+  lev <- obj$sim$species_levels
+  one <- update(fit, n_lv = 1L, chains = 1L, iter = 400L)
+  expect_s3_class(one, "jsdgam")
+  expect_identical(one$jsdgam_args$n_lv, 1L)
+  expect_identical(as.integer(one$standata$N_lv_trend), 1L)
+  expect_identical(posterior::ndraws(posterior::as_draws_matrix(one$fit)),
+                   200L)
+  expect_identical(as.character(mvgam:::mvgam_axes(one)$series$levels), lev)
+  expect_identical(dim(residual_cor(one)$cor), c(obj$sim$K, obj$sim$K))
+  expect_identical(dim(posterior_epred(one, draw_ids = 1:5)),
+                   c(5L, nrow(obj$sim$long_dat)))
+
+  # The factor count is Stan data, and the refit reused the program.
+  # A family adding a parameter changes it.
+  expect_identical(mvgam_normalise_stancode(one$stancode),
+                   mvgam_normalise_stancode(fit$stancode))
+  expect_error(update(fit, family = poisson(), recompile = FALSE),
+               "not supported for this update")
+})
+
+
+test_that("each part's response-scale share is the fit's own: each jsdgam family", {
+  for (nm in names(SPECS)) {
+    expect_epred_parts(get(nm, envir = built)$fit)
+  }
+})
+
+
+test_that("community richness sums each species' chance of a count", {
+  fit <- get("nb", envir = built)$fit
+  d <- get("nb", envir = built)$sim$long_dat
+  site <- function(env, time = 1) {
+    with_site_covariates(data.frame(env = env, time = time), d)
+  }
+  ids <- 1:6
+  shape <- as.vector(as_draws_matrix(fit)[ids, "shape"])
+  # By hand at the fitted factors: one less the negative binomial zero
+  fitted <- community(fit, latent = "conditional", draw_ids = ids)
+  lp <- posterior_linpred(fit, newdata = fitted$frame, draw_ids = ids,
+                          incl_autocor = TRUE)
+  expect_equal(fitted$presence, 1 - dnbinom(0, size = shape, mu = exp(lp)))
+  # By hand over the factors: the integral against their variance
+  set.seed(1)
+  averaged <- community(fit, draw_ids = ids, n_nodes = 2000L)
+  lp <- posterior_linpred(fit, newdata = averaged$frame, draw_ids = ids)
+  cov <- trend_series_cov_draws(fit, ids)
+  series <- as.integer(axis_row_series(fit, averaged$frame))
+  by_hand <- vapply(c(3L, 20L), function(j) {
+    integrate(function(u) {
+      (1 - dnbinom(0, size = shape[2L], mu = exp(lp[2L, j] + u))) *
+        dnorm(u, 0, sqrt(cov[2L, series[j], series[j]]))
+    }, -Inf, Inf)$value
+  }, numeric(1L))
+  expect_equal(averaged$presence[2L, c(3L, 20L)], by_hand, tolerance = 0.03)
+  # Communities share their latent nodes. Equal rows give equal draws.
+  gradient <- site(c(-1, 1, 1))
+  along <- community(fit, newdata = gradient, draw_ids = ids)
+  expect_identical(along$richness[, 2L], along$richness[, 3L])
+  # By hand: a pair's joint presence over its latent covariance, by
+  # Gauss-Hermite quadrature on a 30 by 30 grid
+  set.seed(2)
+  one <- community(fit, newdata = site(0.5),
+                   draw_ids = ids, n_nodes = 4000L)
+  lp <- posterior_linpred(fit, newdata = one$frame, draw_ids = ids)
+  pair <- c(3L, 4L)
+  # Gauss-Hermite rule for a standard normal by Golub-Welsch: the
+  # eigenvalues of the Jacobi matrix are the nodes. Each weight is the
+  # squared first component of its eigenvector.
+  jacobi <- matrix(0, 30L, 30L)
+  jacobi[cbind(1:29, 2:30)] <- jacobi[cbind(2:30, 1:29)] <- sqrt(1:29)
+  eig <- eigen(jacobi, symmetric = TRUE)
+  rule <- list(nodes = eig$values, weights = eig$vectors[1L, ]^2)
+  grid <- expand.grid(a = seq_len(30L), b = seq_len(30L))
+  z <- cbind(rule$nodes[grid$a], rule$nodes[grid$b])
+  weight <- rule$weights[grid$a] * rule$weights[grid$b]
+  u <- z %*% chol(cov[2L, pair, pair])
+  p <- 1 - dnbinom(0, size = shape[2L],
+                   mu = exp(sweep(u, 2L, lp[2L, pair], `+`)))
+  by_hand <- sum(weight * p[, 1L] * p[, 2L]) -
+    sum(weight * p[, 1L]) * sum(weight * p[, 2L])
+  expect_equal(one$cooccurrence[2L, pair[1L], pair[2L]], by_hand,
+               tolerance = 0.1)
+  # By hand at a typical site: Hill numbers and mean traits from the
+  # relative expected counts
+  species <- fitted_series_levels(fit)
+  # `size` is the trait the fit regresses its slopes on
+  traits <- data.frame(series = species, size = seq_along(species) / 5,
+                       guild = rep(c("a", "b"), length.out = length(species)))
+  typical <- community(fit, newdata = site(0.3),
+                       traits = traits, latent = "zero", draw_ids = ids)
+  auto <- community(fit, newdata = site(0.3),
+                    traits = "auto", latent = "zero", draw_ids = ids)
+  expect_identical(auto$diversity$size, typical$diversity$size)
+  share <- posterior_epred(fit, newdata = typical$frame, draw_ids = ids)
+  share <- share / rowSums(share)
+  expect_equal(drop(typical$diversity$`Hill q = 1`),
+               exp(-rowSums(share * log(share))))
+  expect_equal(drop(typical$diversity$`Hill q = 2`), 1 / rowSums(share^2))
+  expect_equal(drop(typical$diversity$size), drop(share %*% traits$size))
+  expect_equal(drop(typical$diversity$guild.a),
+               drop(share %*% (traits$guild == "a")))
+  # The rvars index each draw by community, then species or measure
+  row <- which(along$frame$env == -1 &
+                 along$frame[[along$species_column]] == species[3L])
+  expect_identical(
+    unname(posterior::draws_of(as_draws_rvars(along)$presence)[
+      , 1L, species[3L]
+    ]),
+    along$presence[, row]
+  )
+  expect_identical(
+    unname(posterior::draws_of(as_draws_rvars(typical)$diversity)[
+      , 1L, "size"
+    ]),
+    drop(typical$diversity$size)
+  )
+  # A fitted state exists at the fitted times alone
+  expect_error(community(fit, newdata = site(0, time = 999),
+                         latent = "conditional", draw_ids = ids),
+               "fitted at each time")
+})
+
+
+test_that("species_effects reports the fourth-corner slopes", {
+  fit <- get("nb", envir = built)$fit
+  d <- get("nb", envir = built)$sim$long_dat
+  ids <- 1:6
+  se <- species_effects(fit, variables = c("env", "hab"), draw_ids = ids)
+  species <- levels(d$series)
+  fd <- mvgam:::fitted_data(fit)
+  # By hand, through brms's own predictor on the observation model. The
+  # derived columns are built here from each frame's own variables.
+  expect_setequal(names(fit$trait_columns$derived),
+                  c("habb", "IenvE2", "haba_size", "habb_size",
+                    "hab_series"))
+  by_hand <- function(nd) {
+    nd$habb <- as.numeric(nd$hab == "b")
+    nd$IenvE2 <- nd$env^2
+    nd$haba_size <- (nd$hab == "a") * nd$size
+    nd$habb_size <- (nd$hab == "b") * nd$size
+    nd$hab_series <- factor(paste(nd$hab, nd$series, sep = "_"),
+                            levels = levels(fd$hab_series))
+    nd
+  }
+  # brms 2.23.0 drops `gp(x3)` from the rows `gp(x3, by = series)`
+  # covers (paul-buerkner/brms#1979). Its Stan code adds both.
+  testthat::local_mocked_bindings(predictor_gp = brms_predictor_gp_added,
+                                  .package = "brms")
+  obs <- as_brms(fit, "obs")
+  lp <- function(nd) {
+    brms::posterior_linpred(obs, newdata = by_hand(nd), draw_ids = ids)
+  }
+  # mvgam's predictor is brms's, its GP terms summed as Stan sums them
+  expect_lt(max(predictor_gap(fit, fd, ids = ids)), 1e-8)
+  per_species <- function(m) {
+    vapply(species, function(s) rowMeans(m[, fd$series == s]),
+           numeric(length(ids)))
+  }
+  shift <- function(nd, column, by) {
+    nd[[column]] <- nd[[column]] + by
+    nd
+  }
+  # Each species' env slope: marginaleffects' centred difference over
+  # its fitted rows
+  step <- 1e-4 * diff(range(fd$env))
+  env_slope <- function(nd) {
+    per_species((lp(shift(nd, "env", step / 2)) -
+                   lp(shift(nd, "env", -step / 2))) / step)
+  }
+  expect_equal(unname(se$draws$species[, , "env"]),
+               unname(env_slope(fd)), tolerance = 1e-8)
+  # Each fitted row at hab = b less at hab = a. Switching hab also
+  # switches the smooths of `s(x2, by = hab)`, their trait crossings and
+  # the species smooths of `hab_series`.
+  at_hab <- function(nd, level) {
+    nd$hab <- factor(level, levels = levels(fd$hab))
+    lp(nd)
+  }
+  hab_contrast <- function(nd) {
+    per_species(at_hab(nd, "b") - at_hab(nd, "a"))
+  }
+  expect_equal(unname(se$draws$species[, , "hab: b - a"]),
+               unname(hab_contrast(fd)), tolerance = 1e-8)
+  # The trait panel: the species' mean change in each response per unit
+  # of a trait, over the step species_effects() shifts the trait by
+  for (trait in c("size", "mass")) {
+    step_t <- 1e-3 * stats::sd(unique(fd[[trait]]))
+    moved <- shift(fd, trait, step_t)
+    expect_equal(
+      unname(se$draws$traits[, trait, "env"]),
+      unname(rowMeans(env_slope(moved) - env_slope(fd)) / step_t),
+      tolerance = 1e-5
+    )
+    expect_equal(
+      unname(se$draws$traits[, trait, "hab: b - a"]),
+      unname(rowMeans(hab_contrast(moved) - hab_contrast(fd)) / step_t),
+      tolerance = 1e-5
+    )
+  }
+  # The methods paragraph names the trait regression and, for `s(x2)`,
+  # the hierarchical smooths
+  expect_true(all(c("ovaskainen_hmsc_2017", "pedersen_hgam") %in%
+                    names(how_to_cite(fit)$bibtex)))
+  # The equations scale the level-b smooth by its derived column, which
+  # the predictors define. The species SDs take the group's own prior.
+  md <- paste(methods_md(fit), collapse = "\n")
+  expect_match(md, paste0("\\mathrm{habb\\_size}_{i,t} \\, ",
+                          "f_{\\mathrm{x2} \\mid \\mathrm{habb\\_size}}"),
+               fixed = TRUE)
+  expect_match(md, "$\\mathrm{habb\\_size}$: product of hab = b and size",
+               fixed = TRUE)
+  expect_match(md, "$\\mathrm{hab\\_series}$: factor crossing hab with series",
+               fixed = TRUE)
+  expect_match(md, paste0("\\sigma^{(\\beta_{\\mathrm{env}})}_",
+                          "{\\mathrm{series}} &\\sim \\text{StudentT}",
+                          "(3, 0, 2.5)"), fixed = TRUE)
+  expect_match(md, "\\beta_{(\\mathrm{env}^2)} (\\mathrm{env}^2)_{i,t}",
+               fixed = TRUE)
+  expect_match(md, "$\\mathrm{size}$: continuous trait, one value per species",
+               fixed = TRUE)
+  # A smooth scaled by a numeric column is drawn at three of its values,
+  # each labelled to three decimals
+  cs <- conditional_smooths(fit, ndraws = 5L)
+  by_b <- cs[[grep("by = habb_size", names(cs), fixed = TRUE)]]
+  expect_identical(
+    levels(by_b$cond__),
+    as.character(round(mean(fd$habb_size) +
+                         c(-1, 0, 1) * stats::sd(fd$habb_size), 3L))
+  )
+  # Each default panel draws one curve per species. The grid leaves the
+  # trait to each species' own value, which a grid holding its mean
+  # would replace for four of the five.
+  # The trait crossings of `s(x2, by = hab)` join its panel through
+  # their sources. A bare `x2` panel would hold hab at level a.
+  expect_identical(names(conditional_effects(fit)),
+                   c("env:series", "hab:series", "x2:series:hab",
+                     "x3:series"))
+  withr::local_options(marginaleffects_model_classes = "mvgam")
+  expect_false("size" %in% names(marginaleffects::datagrid(
+    model = fit, series = levels(d$series)
+  )))
+  # A trait is constant within each species, which leaves it no slope
+  expect_error(species_effects(fit, variables = "size"),
+               "'size' is a trait of 'trait_slopes'")
+  # A frame without the trait takes each species' own from the fit
+  rows <- d[d$time %in% 1:2, ]
+  expect_identical(
+    posterior_linpred(fit, newdata = rows[setdiff(names(rows), "size")],
+                      draw_ids = ids),
+    posterior_linpred(fit, newdata = rows, draw_ids = ids)
+  )
+  # `y ~ env * series` makes the series a term. The axis is refused.
+  expect_error(species_effects(get("mvn", envir = built)$fit,
+                               variables = "series"),
+               "Not a covariate: 'series'")
+})
+
+
+test_that("diri: species_effects centres each draw across the species", {
+  # The softmax ignores the shared slope `b_env`. Each species' slope
+  # less the mean over species is what the data inform.
+  fit <- get("diri", envir = built)$fit
+  ids <- 1:6
+  se <- species_effects(fit, variables = "env", draw_ids = ids)
+  dm <- as_draws_matrix(fit)[ids, ]
+  species <- levels(get("diri", envir = built)$sim$long_dat$series)
+  own <- vapply(species, function(k) {
+    term <- paste0("b_env:series", k)
+    as.numeric(dm[, "b_env"]) +
+      if (term %in% colnames(dm)) as.numeric(dm[, term]) else 0
+  }, numeric(length(ids)))
+  expect_equal(unname(se$draws$species[, , "env"]),
+               unname(own - rowMeans(own)), tolerance = 1e-8)
+})
+
+
+test_that("diri: variance shares and forecast spread centre each site", {
+  # The softmax ignores the shared slope `b_env`. Each species'
+  # predictor less the site's mean over species is what the data inform.
+  fit <- get("diri", envir = built)$fit
+  ids <- 1:6
+  frame <- mvgam:::fitted_data(fit)
+  dm <- as_draws_matrix(fit)[ids, ]
+  coef_of <- function(name) {
+    if (name %in% colnames(dm)) as.numeric(dm[, name]) else 0
+  }
+  centre <- function(m) t(apply(m, 1L, function(r) r - ave(r, frame$time)))
+  # By hand: each row's intercept and slope from the coefficients
+  env_part <- vapply(seq_len(nrow(frame)), function(j) {
+    k <- paste0("series", frame$series[j])
+    coef_of("b_Intercept") + coef_of(paste0("b_", k)) +
+      (coef_of("b_env") + coef_of(paste0("b_env:", k))) * frame$env[j]
+  }, numeric(length(ids)))
+  env_c <- centre(env_part)
+  # `incl_autocor` adds the fitted factors, the associations
+  assoc <- centre(posterior_linpred(fit, newdata = frame, draw_ids = ids,
+                                    incl_autocor = TRUE)) - env_c
+  rv <- function(m) apply(m, 1L, stats::var)
+  vp <- variance_partition(fit, draw_ids = ids)
+  expect_equal(unname(vp$community[, "environment"]),
+               rv(env_c) / (rv(env_c) + rv(assoc)), tolerance = 1e-8)
+
+  d <- get("diri", envir = built)$sim$long_dat
+  lev <- levels(d$series)
+  nd <- expand.grid(time = max(d$time) + 1:3,
+                    series = factor(lev, levels = lev))
+  nd$env <- c(-1, 0.5, 1)[nd$time - max(d$time)]
+  nd$y <- NA_real_
+  fu <- forecast_uncertainty(fit, newdata = nd, draw_ids = ids,
+                             n_replicates = 2L, n_boot = 2L)
+  expect_equal(as.vector(Reduce(`+`, fu$draws)), rep(0, 3L * length(ids)),
+               tolerance = 1e-8)
+})

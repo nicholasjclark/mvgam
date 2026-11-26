@@ -7,76 +7,112 @@
 \usage{
 fevd(object, ...)
 
-\method{fevd}{mvgam}(object, h = 10, ...)
+\method{fevd}{mvgam}(
+  object,
+  h = 10,
+  ndraws = NULL,
+  draw_ids = NULL,
+  summary = TRUE,
+  probs = c(0.025, 0.975),
+  future = FALSE,
+  ...
+)
 }
 \arguments{
-\item{object}{\code{list} object of class \code{mvgam} resulting from a call to \code{\link[=mvgam]{mvgam()}}
-that used a Vector Autoregressive latent process model (either as \code{VAR(cor = FALSE)} or
-\code{VAR(cor = TRUE)}; see \code{\link[=VAR]{VAR()}} for details)}
+\item{object}{An object of class \code{mvgam} fitted with a \code{VAR()}
+latent process model}
 
-\item{...}{ignored}
+\item{...}{Unused. Anything passed here is refused.}
 
-\item{h}{Positive \code{integer} specifying the forecast horizon over which to calculate
-the IRF}
+\item{h}{Positive integer. The number of forecast horizons to
+decompose.}
+
+\item{ndraws}{Positive integer specifying number of posterior draws to
+use. NULL (default) uses all available draws.}
+
+\item{draw_ids}{Optional integer vector selecting a subset of posterior
+draw indices to use. NULL (default) uses all draws (subject to
+\code{ndraws}).}
+
+\item{summary}{Logical; return the posterior median and interval of
+each decomposition (the default), or the per-draw decompositions
+themselves.}
+
+\item{probs}{The lower and upper percentiles of the interval reported
+with the median when \code{summary = TRUE}.}
+
+\item{future}{\code{Logical}. When \code{TRUE}, the per-draw computation
+runs under the \code{\link[future:plan]{future::plan()}} the caller
+has set. The default \code{sequential} plan runs as base \code{lapply()}
+does. \code{plan(multisession, workers = N)} splits the draws across
+\code{N} R processes. Without the \pkg{future} package the draws
+run in turn, with a message.}
 }
 \value{
-See \code{\link{mvgam_fevd-class}} for a full description of the quantities that are
-computed and returned by this function, along with key references.
+An object of \code{\link{mvgam_fevd-class}}, which describes
+the quantities computed, with references.
 }
 \description{
 Compute forecast error variance decompositions from
-\code{mvgam} models with Vector Autoregressive dynamics
+\code{mvgam} models with Vector Autoregressive dynamics. A
+decomposition gives the share of each series' forecast uncertainty
+at horizons up to \code{h} that comes from the innovations of each
+series.
 }
 \examples{
 \dontrun{
-# Simulate some time series that follow a latent VAR(1) process
-simdat <- sim_mvgam(
-  family = gaussian(),
-  n_series = 4,
-  trend_model = VAR(cor = TRUE),
-  prop_trend = 1
-)
-plot_mvgam_series(data = simdat$data_train, series = "all")
-
-# Fit a model that uses a latent VAR(1)
-mod <- mvgam(
-  formula = y ~ -1,
-  trend_formula = ~ 1,
-  trend_model = VAR(cor = TRUE),
-  family = gaussian(),
-  data = simdat$data_train,
-  chains = 2,
-  silent = 2
-)
-
-# Plot the autoregressive coefficient distributions;
-# use 'dir = "v"' to arrange the order of facets
-# correctly
-mcmc_plot(
-  mod,
-  variable = 'A',
-  regex = TRUE,
-  type = 'hist',
-  facet_args = list(dir = 'v')
-)
-
-# Calulate forecast error variance decompositions for each series
-fevds <- fevd(mod, h = 12)
-
-# Plot median contributions to forecast error variance
-plot(fevds)
-
-# View a summary of the error variance decompositions
-summary(fevds)
+# Ten years of monthly counts of a prey species and its predator.
+# Predators suppress the prey a month later. Prey raise the
+# predators a month later.
+set.seed(2025)
+n_months <- 120
+A <- rbind(prey     = c(0.6, -0.5),
+           predator = c(0.4,  0.5))
+z <- matrix(0, n_months, 2)
+for (t in 2:n_months) {
+  z[t, ] <- A \%*\% z[t - 1, ] + rnorm(2, sd = 0.35)
 }
+predator_prey <- data.frame(
+  time = rep(seq_len(n_months), 2),
+  series = factor(rep(c("prey", "predator"), each = n_months),
+                  levels = c("prey", "predator")),
+  y = rpois(2 * n_months, exp(c(2.5 + z[, 1], 1.5 + z[, 2])))
+)
+var_mod <- mvgam(y ~ series, trend_formula = ~ VAR(),
+                 data = predator_prey, family = poisson(),
+                 chains = 2, silent = 2)
+}
+\dontrun{
+# The share of each series' forecast-error variance due to each
+# shock, over an eight-step horizon
+fevd_obj <- fevd(var_mod, h = 8L)
+plot(fevd_obj)
+
+# Next: irf() traces each shock through the system over time
+}
+
 }
 \references{
-Lütkepohl, H. (2007).
-New Introduction to Multiple Time Series Analysis. 2nd ed. Springer-Verlag Berlin Heidelberg.
+Lutkepohl H (2005). New Introduction to Multiple Time Series
+Analysis. Springer, Berlin. \doi{10.1007/978-3-540-27752-1}
 }
 \seealso{
-\code{\link[=VAR]{VAR()}}, \code{\link[=irf]{irf()}}, \code{\link[=stability]{stability()}}, \code{\link{mvgam_fevd-class}}
+\code{\link[=irf]{irf()}} and \code{\link[=stability]{stability()}} summarise the same VAR dynamics.
+\code{\link[=forecast_uncertainty]{forecast_uncertainty()}} splits a forecast of any model by source.
+The \href{https://nicholasjclark.github.io/mvgam/articles/var.html}{VAR article} runs \code{fevd()} on a
+plankton community.
+
+Other latent dynamics: 
+\code{\link{active_factors}()},
+\code{\link{compare_loadings}()},
+\code{\link{irf.mvgam}()},
+\code{\link{ordinate}()},
+\code{\link{posterior_transition_matrix}()},
+\code{\link{residual_cor}()},
+\code{\link{shared_variation}()},
+\code{\link{stability.mvgam}()}
 }
 \author{
 Nicholas J Clark
 }
+\concept{latent dynamics}

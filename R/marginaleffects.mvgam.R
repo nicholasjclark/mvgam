@@ -1,566 +1,390 @@
-#' Helper functions for \pkg{marginaleffects} calculations in \pkg{mvgam} models
+#' marginaleffects methods for mvgam objects
 #'
-#' @importFrom stats coef model.frame
-#' @importFrom insight find_predictors get_data
-#' @importFrom marginaleffects get_coef set_coef get_vcov get_predict
-#' @importFrom utils getFromNamespace
+#' These methods let [marginaleffects::predictions()],
+#' [marginaleffects::slopes()] and [marginaleffects::comparisons()]
+#' take an mvgam fit. `get_predict()` returns the posterior draws in
+#' the `posterior_draws` attribute. marginaleffects computes every
+#' summary from those draws. The uncertainty comes from the draws
+#' alone. marginaleffects also calls `get_coef()`, `get_vcov()` and
+#' `set_coef()`. Their output leaves every result unchanged.
 #'
-#' @inheritParams marginaleffects::get_coef
-#' @inheritParams marginaleffects::set_coef
-#' @inheritParams marginaleffects::get_vcov
-#' @inheritParams marginaleffects::get_predict
-#' @inheritParams insight::get_data
-#' @inheritParams insight::find_predictors
+#' @section Prediction scale:
+#' mvgam registers three `type` values with marginaleffects:
+#' \itemize{
+#'   \item `"expected"`: the expectation `E[Y]`. Most other model
+#'     classes call this `"response"`.
+#'   \item `"response"`: predictive draws with observation noise, on
+#'     the outcome scale. A count family gives integers.
+#'   \item `"link"`: the linear predictor.
+#' }
+#' marginaleffects takes `"response"` as the default. Pass
+#' `type = "expected"` for the expectation. `comparisons()` and
+#' `slopes()` replace `"response"` with `"expected"`. A contrast
+#' differences two predictions. Observation noise in each would widen
+#' it. A slope also divides that noise by a small step. The result
+#' keeps the label `"response"`. `predictions()` on `"response"` keeps
+#' the observation noise. marginaleffects summarises the draws by
+#' their posterior median. For a right-skewed predictive distribution
+#' the median falls below the mean.
 #'
-#' @param mfx Ignored
-#' @param newparams Ignored
-#' @param ndraws Ignored
-#' @param se.fit Ignored
+#' An [occ()] or [nmix()] fit takes two more types. `"detection"` gives
+#' the detection probability of each visit. `"latent_N"` gives the
+#' latent state that mvgam's own methods call `"latent_state"`.
+#' marginaleffects checks `type` against its own list, which records
+#' that state as `"latent_N"`. Each row of a grid from
+#' [marginaleffects::datagrid()] becomes its own closure unit.
 #'
-#' @param trend_effects `logical`, extract from the process model component
-#' (only applicable if a `trend_formula` was specified in the model)
+#' @section The latent trend:
+#' By default (`process_error = FALSE`) each prediction takes the
+#' covariate part of the trend: the effects in its formula, without
+#' its innovations. Each posterior draw keeps its own coefficients. The
+#' result shows the effect of the covariates with the latent process
+#' at its mean. Its credible band leaves out the uncertainty of the
+#' latent state.
 #'
-#' @param process_error `logical`. If `TRUE`, uncertainty in the latent
-#' process (or trend) model is incorporated in predictions
+#' Under a nonlinear link this falls short of the model's own `E[Y]`.
+#' Averaging over the innovations of an AR(1) trend raises a log-link
+#' expectation by the factor
+#' \eqn{\exp(\sigma^2 / (2(1 - \rho^2)))}. `process_error = TRUE` adds
+#' the innovations. Slopes and comparisons then describe `E[Y]`, with
+#' wider bands.
 #'
-#' @return Objects suitable for internal 'marginaleffects' functions to proceed.
-#' See [marginaleffects::get_coef()], [marginaleffects::set_coef()],
-#' [marginaleffects::get_vcov()], [marginaleffects::get_predict()],
-#' [insight::get_data()] and [insight::find_predictors()] for details
+#' When the trend explains most of the variation in a series, the
+#' covariates have little left to explain under either setting.
+#' [hindcast.mvgam()] and [forecast.mvgam()] return the state the
+#' model inferred.
 #'
 #' @name mvgam_marginaleffects
 #'
-#' @author Nicholas J Clark
+#' @seealso [conditional_effects.mvgam()] for quick effect plots,
+#'   [posterior_epred.mvgam()] for the predictions these methods take.
+#'
+#' @examples
+#' \dontrun{
+#' library(marginaleffects)
+#' set.seed(1)
+#' simdat <- sim_mvgam(family = poisson(), n_series = 1L,
+#'                     n_timepoints = 60L, trend_model = AR())
+#' mod <- mvgam(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1),
+#'              data = simdat$data_train, family = poisson(),
+#'              chains = 2, seed = 2, silent = 2)
+#'
+#' # Average change in the expected count per unit of x
+#' avg_slopes(mod, variables = "x", type = "expected")
+#'
+#' # The same slope with the trend's innovations averaged in
+#' avg_slopes(mod, variables = "x", type = "expected",
+#'            process_error = TRUE)
+#'
+#' # Expected counts across the range of x
+#' plot_predictions(mod, condition = "x", type = "expected")
+#' }
+#'
+#' @references
+#' Arel-Bundock, V., Greifer, N. and Heiss, A. (2024). How to
+#' interpret statistical models using marginaleffects for R and
+#' Python. \emph{Journal of Statistical Software}, 111(9):1-32.
+#' \doi{10.18637/jss.v111.i09}
+#'
+#' @keywords internal
 NULL
 
-#' @export
-#' @importFrom marginaleffects predictions
-marginaleffects::predictions
 
-#' @export
-#' @importFrom marginaleffects avg_predictions
-marginaleffects::avg_predictions
-
-#' @export
-#' @importFrom marginaleffects plot_predictions
-marginaleffects::plot_predictions
-
-#' @export
-#' @importFrom marginaleffects slopes
-marginaleffects::slopes
-
-#' @export
-#' @importFrom marginaleffects plot_slopes
-marginaleffects::plot_slopes
-
-#' @export
-#' @importFrom marginaleffects comparisons
-marginaleffects::comparisons
-
-#' @export
-#' @importFrom marginaleffects plot_comparisons
-marginaleffects::plot_comparisons
-
-#' @export
-#' @importFrom marginaleffects datagrid
-marginaleffects::datagrid
-
-#' @export
-#' @importFrom marginaleffects hypotheses
-marginaleffects::hypotheses
-
-#' @export
 #' @importFrom marginaleffects get_predict
-marginaleffects::get_predict
-
 #' @export
-#' @importFrom insight get_data
-insight::get_data
-
-#' Functions needed for working with \pkg{marginaleffects}
-#' @rdname mvgam_marginaleffects
-#' @export
-get_coef.mvgam <- function(model, trend_effects = FALSE, ...) {
-  # Check trend_effects
-  if (trend_effects) {
-    if (is.null(model$trend_call)) {
-      stop('no trend_formula exists so there no trend-level coefficients')
-    }
+get_predict.mvgam <- function(model,
+                              newdata = insight::get_data(model),
+                              type = "response",
+                              ...,
+                              ndraws = NULL,
+                              draw_ids = NULL,
+                              re_formula = NULL,
+                              allow_new_levels = FALSE,
+                              sample_new_levels = "uncertainty",
+                              incl_autocor = FALSE,
+                              resp = NULL,
+                              process_error = FALSE) {
+  checkmate::assert_class(model, "mvgam")
+  checkmate::assert_data_frame(newdata, min.rows = 1L)
+  # conditional_effects() and species_effects() set the response, the
+  # trend setting and the draws as an attribute of their copy of the
+  # model. marginaleffects would warn on each as an argument.
+  preset <- attr(model, "mvgam_predict_args", exact = TRUE)
+  if (!is.null(preset)) {
+    resp <- resp %||% preset$resp
+    process_error <- preset$process_error
+    draw_ids <- draw_ids %||% preset$draw_ids
+  }
+  checkmate::assert_logical(process_error, len = 1L)
+  # `marginaleffects::datagrid()` drops every column the formula does
+  # not name. A closure-unit family's grid then lacks the identifiers
+  # its per-unit pipeline needs. The completion fills them with
+  # defaults. A frame the caller assembled keeps its own. The test
+  # runs once, on the frame as it arrived. The completion writes the
+  # columns the test inspects.
+  is_grid <- !closure_units_are_intact(model, newdata)
+  newdata <- jsdgam_prediction_columns(model, newdata)
+  newdata <- complete_closure_unit_newdata(model, newdata, is_grid)
+  # A composition belongs to a whole site. Its grid is completed to
+  # whole sites and predicted. The rows asked for are then taken back.
+  # `asked` stays NULL for every other family.
+  asked <- NULL
+  grid <- newdata
+  completed <- complete_simplex_grid(model, newdata, is_grid)
+  if (!is.null(completed)) {
+    newdata <- completed$data
+    asked <- completed$take
+  }
+  # marginaleffects checks `type` against its own dictionary, which
+  # names the latent state `latent_N`. `latent_state` serves a direct
+  # call.
+  checkmate::assert_choice(
+    type,
+    c("response", "link", "expected", "detection",
+      "latent_N", "latent_state")
+  )
+  # The contrast or slope of the response is that of its expectation.
+  # The observation noise of each prediction would only widen it.
+  if (identical(type, "response") && called_from_comparisons()) {
+    type <- "expected"
   }
 
-  if (!trend_effects) {
-    b <- coef(model$mgcv_model)
-  } else {
-    b <- coef(model$trend_mgcv_model)
-  }
-  return(b)
-}
-
-#' @rdname mvgam_marginaleffects
-#' @export
-set_coef.mvgam <- function(model, coefs, trend_effects = FALSE, ...) {
-  # Check trend_effects
-  if (trend_effects) {
-    if (is.null(model$trend_call)) {
-      stop('no trend_formula exists so there no trend-level coefficients')
-    }
-  }
-
-  out <- model
-
-  if (!trend_effects) {
-    out$mgcv_model$coefficients <- coefs
-  } else {
-    out$trend_mgcv_model$coefficients <- coefs
-  }
-  return(out)
-}
-
-#' @rdname mvgam_marginaleffects
-#' @export
-get_vcov.mvgam <- function(model, vcov = NULL, ...) {
-  if (!is.null(vcov) && !is.logical(vcov)) {
-    insight::format_warning(
-      "The `vcov` argument is not supported for models of this class."
-    )
-  }
-  return(NULL)
-}
-
-#' @rdname mvgam_marginaleffects
-#' @export
-get_predict.mvgam <- function(
-  model,
-  newdata,
-  type = 'response',
-  mfx,
-  newparams,
-  ndraws,
-  se.fit,
-  process_error = FALSE,
-  ...
-) {
-  preds <- predict(
+  # marginaleffects passes bookkeeping of its own through `...`, such
+  # as `mfx` and `modeldata`. The prediction methods take the
+  # arguments named here alone.
+  shared <- list(
     object = model,
     newdata = newdata,
-    type = type,
-    process_error = process_error,
-    summary = FALSE,
-    ...
+    ndraws = ndraws,
+    draw_ids = draw_ids,
+    re_formula = re_formula,
+    allow_new_levels = allow_new_levels,
+    sample_new_levels = sample_new_levels,
+    incl_autocor = incl_autocor,
+    resp = resp,
+    process_error = process_error
   )
-  if ("rowid" %in% colnames(newdata)) {
-    out <- data.frame(
-      rowid = newdata[["rowid"]],
-      estimate = apply(preds, 2, median)
+  draws <- switch(type,
+    link         = do.call(posterior_linpred, shared),
+    expected     = do.call(posterior_epred, shared),
+    response     = do.call(posterior_predict, shared),
+    latent_N     = ,
+    latent_state = expected_latent_state(
+      model, newdata, resolve_draw_ids(model, ndraws, draw_ids)
+    ),
+    detection    = do.call(
+      predict, c(shared, list(type = "detection", summary = FALSE))
     )
-  } else {
-    out <- data.frame(
-      rowid = seq_len(NCOL(preds)),
-      estimate = apply(preds, 2, median)
-    )
+  )
+
+  if (is_per_response(draws)) {
+    stop(insight::format_error(c(
+      "marginaleffects takes one response of a multivariate fit.",
+      i = paste0("Pass 'resp' as one of ",
+                 paste0("'", names(draws), "'", collapse = ", "), ".")
+    )), call. = FALSE)
   }
 
-  attr(out, "posterior_draws") <- t(preds)
-  return(out)
+  # A closure unit's latent state is one value its rows share. It is
+  # mapped to the rows of `newdata` before the slice below indexes
+  # them.
+  draws <- closure_unit_draws_to_rows(model, newdata, draws)
+
+  if (!is.null(asked)) {
+    draws <- if (length(dim(draws)) == 3L) {
+      draws[, asked, , drop = FALSE]
+    } else {
+      draws[, asked, drop = FALSE]
+    }
+    newdata <- grid
+  }
+
+  rowid <- newdata[["rowid"]] %||% seq_len(nrow(newdata))
+
+  # marginaleffects computes slopes and comparisons with data.table
+  # syntax on the returned table.
+  if (length(dim(draws)) == 2L) {
+    if (nrow(newdata) != ncol(draws)) {
+      stop(insight::format_error(c(
+        "The draws need one column per row of 'newdata'.",
+        x = paste0("The draws have ", ncol(draws), " columns and ",
+                   "'newdata' has ", nrow(newdata), " rows."),
+        i = "Pass the same 'newdata' that produced the draws."
+      )), call. = FALSE)
+    }
+    out <- data.table::data.table(
+      rowid = rowid,
+      group = "main_marginaleffect",
+      estimate = apply(draws, 2L, stats::median)
+    )
+    attr(out, "posterior_draws") <- t(draws)
+    return(out)
+  }
+
+  if (length(dim(draws)) == 3L) {
+    # An ordinal or categorical expectation is `[ndraws, nobs, ncat]`.
+    # It becomes one row per observation and category. The labels are
+    # the response levels of `get_group_names.mvgam()`, else the
+    # array's dimnames, else the category numbers.
+    med <- apply(draws, c(2L, 3L), stats::median)
+    ncat <- dim(draws)[3L]
+    cat_names <- get_group_names(model)
+    if (is.null(cat_names) || length(cat_names) != ncat ||
+        identical(cat_names, "main_marginaleffect")) {
+      cat_names <- dimnames(draws)[[3L]] %||% as.character(seq_len(ncat))
+    }
+    out <- data.table::data.table(
+      rowid = rep(rowid, times = length(cat_names)),
+      group = rep(cat_names, each = nrow(med)),
+      estimate = as.vector(med)
+    )
+    flat <- do.call(
+      cbind,
+      lapply(seq_len(dim(draws)[3L]), function(i) draws[, , i])
+    )
+    attr(out, "posterior_draws") <- t(flat)
+    return(out)
+  }
+
+  stop_mvgam_fault(
+    "Posterior draws must be a matrix or a three-dimensional array.",
+    paste0("Got ", length(dim(draws)), " dimension(s).")
+  )
 }
 
-#' Functions needed for getting data / objects with \pkg{insight}
-#' @rdname mvgam_marginaleffects
+
+#' Whether `marginaleffects::comparisons()` is on the call stack
+#'
+#' The `comparisons()` and `slopes()` families, `avg_` and `plot_`
+#' forms included, all evaluate through `comparisons()`. Each frame's
+#' function is compared with it, whatever name the caller used.
+#'
+#' @return Logical
+#' @noRd
+called_from_comparisons <- function() {
+  comparisons_fn <- marginaleffects::comparisons
+  for (i in seq_len(sys.nframe())) {
+    if (identical(sys.function(i), comparisons_fn)) {
+      return(TRUE)
+    }
+  }
+  FALSE
+}
+
+
+#' @importFrom marginaleffects get_coef
 #' @export
-get_data.mvgam = function(x, source = "environment", verbose = TRUE, ...) {
-  resp_terms <- as.character(rlang::f_lhs(x$call))
-  if (length(resp_terms) == 1L) {
-    resp <- resp_terms
-  } else {
-    if (any(grepl('cbind', resp_terms))) {
-      resp_terms <- resp_terms[-grepl('cbind', resp_terms)]
-      resp <- resp_terms[1]
-    }
+get_coef.mvgam <- function(model, trend_effects = FALSE, ...) {
+  checkmate::assert_class(model, "mvgam")
+  draws <- population_draws(model, trend_effects)
+  if (ncol(draws) == 0L) {
+    return(setNames(numeric(0L), character(0L)))
   }
-
-  mf <- tryCatch(
-    {
-      # Drop response observations if a trend call was used because often
-      # there won't be an easy way to match them up (for example if multiple
-      # series depend on a shared latent trend)
-      if (!is.null(x$trend_call)) {
-        # Original series, time and outcomes
-        orig_dat <- data.frame(
-          series = x$obs_data$series,
-          time = x$obs_data$index..time..index,
-          y = x$obs_data$y
-        )
-
-        # Add indicators of trend names as factor levels using the trend_map
-        trend_indicators <- vector(length = length(orig_dat$time))
-        for (i in 1:length(orig_dat$time)) {
-          trend_indicators[i] <- x$trend_map$trend[which(
-            x$trend_map$series == orig_dat$series[i]
-          )]
-        }
-        trend_indicators <- factor(
-          paste0('trend', trend_indicators),
-          levels = paste0('trend', unique(x$trend_map$trend))
-        )
-
-        # Trend-level data, before any slicing that took place
-        orig_dat %>%
-          dplyr::bind_cols(data.frame(
-            trend_series = trend_indicators,
-            row_num = 1:length(x$obs_data$index..time..index)
-          )) -> trend_level_data
-
-        # # We only kept one time observation per trend
-        trend_level_data %>%
-          dplyr::group_by(trend_series, time) %>%
-          dplyr::slice_head(n = 1) %>%
-          dplyr::pull(row_num) -> idx
-
-        # Extract model.frame for trend_level effects and add the
-        # trend indicators
-        mf_data <- model.frame(x, trend_effects = TRUE)
-        mf_data$trend_series <- trend_level_data$trend_series[idx]
-        mf_data$time <- trend_level_data$time[idx]
-
-        if ('series' %in% names(mf_data)) {
-          mf_data %>%
-            dplyr::select(-series) -> mf_data
-        }
-
-        # Now join with the original data so the original observations can
-        # be included
-        trend_level_data %>%
-          dplyr::left_join(mf_data, by = c('trend_series', 'time')) %>%
-          dplyr::select(-trend_series, -row_num, -trend_y) -> mf_data
-
-        # Extract any predictors from the observation level model and
-        # bind to the trend level model.frame
-        mf_obs <- model.frame(x, trend_effects = FALSE)
-        mf_data <- cbind(mf_obs, mf_data) %>%
-          subset(., select = which(!duplicated(names(.))))
-
-        # Now get the observed response, in case there are any
-        # NAs there that need to be updated
-        mf_data[, resp] <- x$obs_data$y
-      } else {
-        mf_data <- model.frame(x, trend_effects = FALSE)
-        mf_data[, resp] <- x$obs_data[[resp]]
-      }
-      mf_data
-    },
-    error = function(x) {
-      NULL
-    }
-  )
-
-  prep_data <- utils::getFromNamespace(".prepare_get_data", "insight")
-  out <- prep_data(x, mf, effects = "all", verbose = verbose)
-
-  # Remove colnames with cbind in them as these can be artifacts in
-  # binomial model data preparations
-  if (any(grepl('cbind', colnames(out)))) {
-    out %>%
-      dplyr::select(-matches('cbind')) -> out
-  }
-
-  return(out)
+  setNames(colMeans(draws), colnames(draws))
 }
 
-#' @rdname mvgam_marginaleffects
+
+#' @importFrom marginaleffects get_vcov
 #' @export
-get_data.mvgam_prefit = function(
-  x,
-  source = "environment",
-  verbose = TRUE,
-  ...
-) {
-  resp_terms <- as.character(rlang::f_lhs(x$call))
-  if (length(resp_terms) == 1L) {
-    resp <- resp_terms
-  } else {
-    if (any(grepl('cbind', resp_terms))) {
-      resp_terms <- resp_terms[-grepl('cbind', resp_terms)]
-      resp <- resp_terms[1]
-    }
+get_vcov.mvgam <- function(model, vcov = NULL, ...) {
+  # marginaleffects passes `vcov = TRUE` on every call. `TRUE` means
+  # the model's own uncertainty, which the posterior draws carry. A
+  # named estimator is refused with a warning.
+  if (!is.null(vcov) && !is.logical(vcov)) {
+    insight::format_warning(c(
+      "The 'vcov' argument is not supported for mvgam objects.",
+      i = "Uncertainty is propagated through the posterior draws."
+    ))
   }
-
-  mf <- tryCatch(
-    {
-      # Drop response observations if a trend call was used because often
-      # there won't be an easy way to match them up (for example if multiple
-      # series depend on a shared latent trend)
-      if (!is.null(x$trend_call)) {
-        # Original series, time and outcomes
-        orig_dat <- data.frame(
-          series = x$obs_data$series,
-          time = x$obs_data$index..time..index,
-          y = x$obs_data$y
-        )
-
-        # Add indicators of trend names as factor levels using the trend_map
-        trend_indicators <- vector(length = length(orig_dat$time))
-        for (i in 1:length(orig_dat$time)) {
-          trend_indicators[i] <- x$trend_map$trend[which(
-            x$trend_map$series == orig_dat$series[i]
-          )]
-        }
-        trend_indicators <- as.factor(paste0('trend', trend_indicators))
-
-        # Trend-level data, before any slicing that took place
-        trend_level_data <- data.frame(
-          trend_series = trend_indicators,
-          series = orig_dat$series,
-          time = orig_dat$time,
-          y = orig_dat$y,
-          row_num = 1:length(x$obs_data$index..time..index)
-        )
-
-        # # We only kept one time observation per trend
-        trend_level_data %>%
-          dplyr::group_by(trend_series, time) %>%
-          dplyr::slice_head(n = 1) %>%
-          dplyr::pull(row_num) -> idx
-
-        # Extract model.frame for trend_level effects and add the
-        # trend indicators
-        mf_data <- model.frame(x, trend_effects = TRUE)
-        mf_data$trend_series <- trend_level_data$trend_series[idx]
-        mf_data$time <- trend_level_data$time[idx]
-
-        if ('series' %in% names(mf_data)) {
-          mf_data %>%
-            dplyr::select(-series) -> mf_data
-        }
-
-        # Now join with the original data so the original observations can
-        # be included
-        trend_level_data %>%
-          dplyr::left_join(mf_data, by = c('trend_series', 'time')) %>%
-          dplyr::select(-trend_series, -row_num, -trend_y) -> mf_data
-
-        # Extract any predictors from the observation level model and
-        # bind to the trend level model.frame
-        mf_obs <- model.frame(x, trend_effects = FALSE)
-        mf_data <- cbind(mf_obs, mf_data) %>%
-          subset(., select = which(!duplicated(names(.))))
-
-        # Now get the observed response, in case there are any
-        # NAs there that need to be updated
-        mf_data[, resp] <- x$obs_data$y
-      } else {
-        mf_data <- model.frame(x, trend_effects = FALSE)
-        mf_data[, resp] <- x$obs_data[[resp]]
-      }
-      mf_data
-    },
-    error = function(x) {
-      NULL
-    }
-  )
-
-  prep_data <- utils::getFromNamespace(".prepare_get_data", "insight")
-  out <- prep_data(x, mf, effects = "all", verbose = verbose)
-
-  # Remove colnames with cbind in them as these can be artifacts in
-  # binomial model data preparations
-  if (any(grepl('cbind', colnames(out)))) {
-    out %>%
-      dplyr::select(-matches('cbind')) -> out
-  }
-
-  return(out)
+  NULL
 }
 
-#' @rdname mvgam_marginaleffects
+
+#' @importFrom marginaleffects set_coef
 #' @export
-find_predictors.mvgam = function(
-  x,
-  effects = c('fixed', 'random', 'all'),
-  component = c(
-    'all',
-    'conditional',
-    'zi',
-    'zero_inflated',
-    'dispersion',
-    'instruments',
-    'correlation',
-    'smooth_terms'
-  ),
-  flatten = FALSE,
-  verbose = TRUE,
-  ...
-) {
-  obs_preds <- insight::find_predictors(
-    x$mgcv_model,
-    effects = effects,
-    component = component,
-    flatten = flatten
-  )
-  if (!is.null(x$trend_call)) {
-    preds <- list()
-    trend_preds <- insight::find_predictors(
-      x$trend_mgcv_model,
-      effects = effects,
-      component = component,
-      flatten = flatten
-    )
-
-    if (flatten) {
-      preds <- unique(c(obs_preds, trend_preds))
-    } else {
-      preds$conditional <- unique(c(
-        obs_preds$conditional,
-        trend_preds$conditional
-      ))
-    }
-  } else {
-    preds <- obs_preds
-  }
-
-  if (x$family == 'nmix') {
-    if (flatten) {
-      preds <- c(preds, 'cap')
-    } else {
-      preds$conditional <- c(preds$conditional, 'cap')
-    }
-  }
-
-  # Check for offsets and add appropriately
-  if (!is.null(attr(terms(x$call), "offset"))) {
-    off_names <- grep(
-      'offset',
-      rownames(attr(terms.formula(x$call), 'factors')),
-      value = TRUE
-    )
-    off_names <- sub(
-      "offset\\((.*)\\)$",
-      "\\1",
-      grep('offset', off_names, value = TRUE)
-    )
-
-    if (flatten) {
-      for (i in 1:length(off_names)) {
-        preds <- c(preds, off_names[i])
-      }
-    } else {
-      for (i in 1:length(off_names)) {
-        preds$conditional <- c(preds$conditional, off_names[i])
-      }
-    }
-  }
-
-  # Any other required variables, needed for grouped models
-  if (!inherits(attr(x$model_data, 'trend_model'), 'mvgam_trend')) {
-    trend_model <- list(
-      trend_model = attr(x$model_data, 'trend_model'),
-      unit = 'time',
-      gr = 'NA',
-      subgr = 'series'
-    )
-  } else {
-    trend_model <- attr(x$model_data, 'trend_model')
-  }
-  other_vars <- c(trend_model$unit, trend_model$gr, trend_model$subgr)
-  if (!is.null(attr(x$model_data, 'prepped_trend_model'))) {
-    prepped_model <- attr(x$model_data, 'prepped_trend_model')
-    other_vars <- c(
-      other_vars,
-      c(prepped_model$unit, prepped_model$gr, prepped_model$subgr)
-    )
-  }
-
-  if (flatten) {
-    other_vars <- setdiff(unique(other_vars), c('NA', preds))
-    preds <- c(preds, other_vars)
-  } else {
-    other_vars <- setdiff(unique(other_vars), c('NA', preds$conditional))
-    preds$conditional <- c(preds$conditional, other_vars)
-  }
-
-  return(preds)
+set_coef.mvgam <- function(model, coefs, ...) {
+  # marginaleffects takes the uncertainty from the `posterior_draws`
+  # attribute of get_predict(). Coefficients set here go unused.
+  model
 }
 
-#' @rdname mvgam_marginaleffects
+
+# Labels for the `group` column of the table get_predict() returns.
+# An ordinal model has one row per category, labelled by the levels
+# of its response. Every other model has the one group
+# "main_marginaleffect".
+#' @importFrom marginaleffects get_group_names
 #' @export
-find_predictors.mvgam_prefit = function(
-  x,
-  effects = c('fixed', 'random', 'all'),
-  component = c(
-    'all',
-    'conditional',
-    'zi',
-    'zero_inflated',
-    'dispersion',
-    'instruments',
-    'correlation',
-    'smooth_terms'
-  ),
-  flatten = FALSE,
-  verbose = TRUE,
-  ...
-) {
-  obs_preds <- insight::find_predictors(
-    x$mgcv_model,
-    effects = effects,
-    component = component,
-    flatten = flatten
-  )
-  if (!is.null(x$trend_call)) {
-    preds <- list()
-    trend_preds <- insight::find_predictors(
-      x$trend_mgcv_model,
-      effects = effects,
-      component = component,
-      flatten = flatten
-    )
-
-    if (flatten) {
-      preds <- unique(c(obs_preds, trend_preds))
-    } else {
-      preds$conditional <- unique(c(
-        obs_preds$conditional,
-        trend_preds$conditional
-      ))
-    }
-  } else {
-    preds <- obs_preds
+get_group_names.mvgam <- function(model, ...) {
+  if (!is_ordinal_family(model$family)) {
+    return("main_marginaleffect")
   }
-
-  if (x$family == 'nmix') {
-    if (flatten) {
-      preds <- c(preds, 'cap')
-    } else {
-      preds$conditional <- c(preds$conditional, 'cap')
-    }
+  # The formula names the response column. A model with several
+  # responses has several sets of categories. marginaleffects takes
+  # one set per model.
+  columns <- response_columns(model)
+  if (length(columns) != 1L) {
+    return("main_marginaleffect")
   }
-
-  # Any other required variables, needed for grouped models
-  if (!inherits(attr(x$model_data, 'trend_model'), 'mvgam_trend')) {
-    trend_model <- list(
-      trend_model = attr(x$model_data, 'trend_model'),
-      unit = 'time',
-      gr = 'NA',
-      subgr = 'series'
-    )
-  } else {
-    trend_model <- attr(x$model_data, 'trend_model')
+  y <- model$data[[columns[[1L]]]]
+  if (is.factor(y)) {
+    return(levels(y))
   }
-  other_vars <- c(trend_model$unit, trend_model$gr, trend_model$subgr)
-  if (!is.null(attr(x$model_data, 'prepped_trend_model'))) {
-    prepped_model <- attr(x$model_data, 'prepped_trend_model')
-    other_vars <- c(
-      other_vars,
-      c(prepped_model$unit, prepped_model$gr, prepped_model$subgr)
-    )
-  }
-
-  if (flatten) {
-    other_vars <- setdiff(unique(other_vars), c('NA', preds))
-    preds <- c(preds, other_vars)
-  } else {
-    other_vars <- setdiff(unique(other_vars), c('NA', preds$conditional))
-    preds$conditional <- c(preds$conditional, other_vars)
-  }
-
-  return(preds)
+  as.character(sort(unique(y)))
 }
+
+
+# Re-exports of the user-facing marginaleffects entry points so
+# `library(mvgam); predictions(fit)` works without separately
+# attaching marginaleffects.
+
+#' @importFrom marginaleffects predictions
+#' @export
+marginaleffects::predictions
+
+#' @importFrom marginaleffects avg_predictions
+#' @export
+marginaleffects::avg_predictions
+
+#' @importFrom marginaleffects plot_predictions
+#' @export
+marginaleffects::plot_predictions
+
+#' @importFrom marginaleffects slopes
+#' @export
+marginaleffects::slopes
+
+#' @importFrom marginaleffects avg_slopes
+#' @export
+marginaleffects::avg_slopes
+
+#' @importFrom marginaleffects plot_slopes
+#' @export
+marginaleffects::plot_slopes
+
+#' @importFrom marginaleffects comparisons
+#' @export
+marginaleffects::comparisons
+
+#' @importFrom marginaleffects avg_comparisons
+#' @export
+marginaleffects::avg_comparisons
+
+#' @importFrom marginaleffects plot_comparisons
+#' @export
+marginaleffects::plot_comparisons
+
+#' @importFrom marginaleffects datagrid
+#' @export
+marginaleffects::datagrid
+
+#' @importFrom marginaleffects hypotheses
+#' @export
+marginaleffects::hypotheses
+
+
+# Re-export the generic from brms so `library(mvgam)` is enough for
+# users to call `conditional_effects(mvgam_fit)` directly.
+#' @importFrom brms conditional_effects
+#' @export
+brms::conditional_effects

@@ -1,0 +1,1066 @@
+# Unit tests for `forecast.mvgam()` in `R/forecast.mvgam.R`. The
+# function orchestrates a per-draw kernel loop, an obs-side
+# linpred combination, and an optional family sampling pass. The
+# heavy primitives (extract_component_linpred, propagate_trend,
+# posterior_predict / posterior_epred, get_observation_structure)
+# are exercised by their own test files, so these tests stub
+# them via `local_mocked_bindings()` and assert on:
+#   * mvgam_forecast class shape (12 fields, list-of-matrices
+#     for hindcasts / forecasts).
+#   * uncertainty-toggle semantics (coef_uncertainty,
+#     trend_uncertainty, obs_uncertainty).
+#   * newdata-handling edge cases (NULL, no-novel-times,
+#     unseen-series error).
+#   * type dispatch (response / link / expected / trend) and the
+#     family-pars slot for type = "link".
+
+
+# A minimal `mvgam`-class object that satisfies just enough of
+# the fit interface for `forecast.mvgam()` to traverse. The
+# tests below mock the primitives that would otherwise read
+# real Stan output / brms machinery.
+make_mock_mvgam <- function(series_levels = "s1", n_time = 10L,
+                              trend_type = "AR",
+                              ar_lags = 1L, ma_lags = integer(0),
+                              max_lag = 1L, n_lv = NULL) {
+  d <- data.frame(
+    time = rep(seq_len(n_time), length(series_levels)),
+    series = factor(rep(series_levels, each = n_time),
+                    levels = series_levels),
+    y = rep(0L, n_time * length(series_levels))
+  )
+  spec <- list(trend = trend_type, p = 1, ma = FALSE,
+               cor = FALSE, drift = FALSE)
+  class(spec) <- "mvgam_trend"
+
+  fit <- list(
+    fit = structure(list(), class = "fake_stanfit"),
+    data = d,
+    formula = stats::as.formula("y ~ 1"),
+    call = match.call(),
+    trend_call = stats::as.formula("~ AR(p = 1)"),
+    family = poisson(),
+    trend_model = list(),
+    mv_spec = list(
+      trend_specs = spec
+    ),
+    trend_metadata = c(mock_axis_record(d), list(
+      trend_type = trend_type,
+      ar_lags = ar_lags,
+      ma_lags = ma_lags,
+      max_lag = max_lag,
+      has_cor = FALSE
+    )),
+    standata = list(
+      N_series_trend = length(series_levels),
+      N_lv_trend = n_lv %||% length(series_levels),
+      N_time_trend = n_time
+    ),
+    backend = "rstan"
+  )
+  class(fit) <- "mvgam"
+  fit
+}
+
+
+# A frame reaching one occasion past the mock fit's grid, for the
+# calls whose subject is something other than the horizon. Built
+# from the fit's own data so the series levels and the columns
+# match whatever `make_mock_mvgam()` was given.
+mock_future_data <- function(fit, h = 1L) {
+  d <- fit$data
+  levs <- levels(d$series)
+  nxt <- max(d$time) + seq_len(h)
+  data.frame(
+    time = rep(nxt, times = length(levs)),
+    series = factor(rep(levs, each = h), levels = levs),
+    y = NA_integer_
+  )
+}
+
+
+# Stub `posterior::as_draws_matrix` so `forecast.mvgam` sees a
+# named numeric matrix without touching the fake stanfit.
+make_draws_mat <- function(ndraws = 5L,
+                            cols = c("Intercept", "sigma_trend[1]",
+                                       "ar1_trend[1]")) {
+  m <- matrix(stats::rnorm(ndraws * length(cols)),
+              nrow = ndraws, dimnames = list(NULL, cols))
+  posterior::as_draws_matrix(m)
+}
+
+
+# Build a fake obs_struct that mirrors the real fields. Raw
+# times live on `names(time)` per `ensure_mvgam_variables`.
+# The grid a `slice_per_series()` caller supplies, carrying the
+# occasions as numbers rather than as labels: that is what the
+# function reads, because a label round trip moved an occasion by
+# 1.4e-14 and lost a whole horizon of a continuous grid.
+make_fc_grid_for_slice <- function(times, fc_times) {
+  list(
+    times = fc_times,
+    data = data.frame(time = times),
+    time_var = "time"
+  )
+}
+
+make_obs_struct_for_grid <- function(times, series_int,
+                                       series_levels) {
+  unique_times <- sort(unique(times))
+  time_pos <- match(times, unique_times)
+  names(time_pos) <- as.character(times)
+  list(
+    time = time_pos,
+    series = factor(series_levels[series_int],
+                    levels = series_levels),
+    series_int = as.integer(series_int),
+    series_levels = series_levels,
+    n_obs = length(times),
+    n_times = length(unique_times),
+    n_series = length(series_levels),
+    unique_times = seq_along(unique_times)
+  )
+}
+
+
+# ----- Class shape + type dispatch --------------------------------
+
+test_that("Returns mvgam_forecast with 12 contractual fields", {
+  fit <- make_mock_mvgam()
+  draws <- make_draws_mat(ndraws = 3L)
+  newdata <- data.frame(time = 11:12,
+                         series = factor("s1", levels = "s1"),
+                         y = NA_integer_)
+
+  testthat::local_mocked_bindings(
+    `as_draws_matrix` = function(...) draws,
+    ndraws = function(...) nrow(draws),
+    .package = "posterior"
+  )
+  testthat::local_mocked_bindings(
+    extract_component_linpred = function(mvgam_fit, newdata,
+                                            component, ...) {
+      matrix(0.1, nrow = 3L, ncol = nrow(newdata))
+    },
+    get_observation_structure = function(object, newdata, ...) {
+      make_obs_struct_for_grid(
+        as.integer(newdata$time),
+        rep(1L, nrow(newdata)),
+        levels(newdata$series)
+      )
+    },
+    propagate_trend = function(...) {
+      matrix(c(0.5, 0.6), nrow = 2L, ncol = 1L)
+    },
+    extract_last_states = function(...) list(),
+    last_state_of_draw = function(...) {
+      list(
+        params = list(sigma = 0.1, ar = matrix(0.5, 1L, 1L)),
+        last_state = list(
+          trends = matrix(0, 1L, 1L),
+          errors = NULL
+        )
+      )
+    },
+    posterior_predict = function(...) {
+      matrix(1L, nrow = 3L, ncol = 10L)
+    },
+    posterior_epred = function(...) {
+      matrix(1, nrow = 3L, ncol = 10L)
+    }
+  )
+
+  # `type = "expected"` avoids the family sampling path, which
+  # would require a real stanfit object for dpar extraction; the
+  # class-shape contract is the same for every type.
+  fc <- forecast(fit, newdata = newdata, type = "expected")
+  required <- c("family", "family_pars", "type", "series_names",
+                "train_observations", "train_times",
+                "test_observations", "test_times",
+                "hindcasts", "forecasts", "site_units", "component")
+  expect_equal(sort(names(fc)), sort(required))
+  # Held-out data stored by `mvgam(newdata = )` drive the horizon
+  # when `forecast()` is given none.
+  fit$test_data <- newdata
+  expect_equal(forecast(fit, type = "expected"), fc)
+})
+
+
+test_that("forecast needs newdata or held-out data stored at fit time", {
+  fit <- make_mock_mvgam()
+  draws <- make_draws_mat(ndraws = 3L)
+  testthat::local_mocked_bindings(
+    `as_draws_matrix` = function(...) draws,
+    ndraws = function(...) nrow(draws),
+    .package = "posterior"
+  )
+  # Standard families: hindcast pulls per-draw trend[t, s] from the
+  # stanfit via extract_trend_latent_states, composes with the
+  # per-draw obs-side linpred, then samples the response via
+  # draw_observations.
+  testthat::local_mocked_bindings(
+    extract_trend_latent_states = function(mvgam_fit, newdata,
+                                             full_draws, ...) {
+      matrix(0, nrow = 3L, ncol = nrow(newdata))
+    },
+    extract_component_linpred = function(mvgam_fit, newdata,
+                                           component, ...) {
+      matrix(0, nrow = 3L, ncol = nrow(newdata))
+    },
+    draw_observations = function(object, linpred, newdata, draw_ids,
+                                 resp = NULL) {
+      matrix(2L, nrow = nrow(linpred), ncol = nrow(newdata))
+    }
+  )
+  # A fit given no held-out data has no occasions to forecast at.
+  # `hindcast()` predicts at the training occasions.
+  expect_error(
+    forecast(fit, newdata = NULL, type = "response"),
+    "'newdata' is required to forecast"
+  )
+})
+
+
+test_that("type = 'link' populates family_pars", {
+  fit <- make_mock_mvgam()
+  draws <- make_draws_mat(
+    ndraws = 4L,
+    cols = c("Intercept", "sigma_trend[1]",
+              "ar1_trend[1]", "shape")
+  )
+  # Negative-binomial family so `shape` is a real dpar.
+  fit$family <- brms::negbinomial()
+  newdata <- data.frame(time = 11:12,
+                         series = factor("s1", levels = "s1"),
+                         y = NA_integer_)
+  testthat::local_mocked_bindings(
+    `as_draws_matrix` = function(...) draws,
+    ndraws = function(...) nrow(draws),
+    .package = "posterior"
+  )
+  testthat::local_mocked_bindings(
+    extract_component_linpred = function(mvgam_fit, newdata,
+                                            component, ...) {
+      matrix(0.1, nrow = 4L, ncol = nrow(newdata))
+    },
+    get_observation_structure = function(object, newdata, ...) {
+      make_obs_struct_for_grid(
+        as.integer(newdata$time),
+        rep(1L, nrow(newdata)),
+        levels(newdata$series)
+      )
+    },
+    propagate_trend = function(...) {
+      matrix(c(0.5, 0.6), nrow = 2L, ncol = 1L)
+    },
+    extract_last_states = function(...) list(),
+    last_state_of_draw = function(...) {
+      list(
+        params = list(sigma = 0.1, ar = matrix(0.5, 1L, 1L)),
+        last_state = list(
+          trends = matrix(0, 1L, 1L), errors = NULL
+        )
+      )
+    },
+    posterior_predict = function(...) matrix(1L, 4L, 10L),
+    posterior_epred = function(...) matrix(1, 4L, 10L)
+  )
+  fc <- forecast(fit, newdata = newdata, type = "link",
+                  ndraws = 4L)
+  expect_true("shape" %in% names(fc$family_pars))
+  expect_identical(dim(fc$family_pars$shape), c(4L, 1L))
+})
+
+
+# ----- Validation errors ------------------------------------------
+
+test_that("ndraws beyond available draws errors informatively", {
+  fit <- make_mock_mvgam()
+  draws <- make_draws_mat(ndraws = 3L)
+  testthat::local_mocked_bindings(
+    `as_draws_matrix` = function(...) draws,
+    ndraws = function(...) nrow(draws),
+    .package = "posterior"
+  )
+  # `ndraws` is still checked against the posterior, on a call that
+  # supplies the occasions to forecast at.
+  expect_error(
+    forecast(fit, newdata = mock_future_data(fit), type = "response",
+              ndraws = 50L),
+    "more draws than the posterior has"
+  )
+})
+
+
+test_that("All multivariate / PW trend types flow through dispatch", {
+  # Every supported trend type should reach build_hindcast_arms.
+  # Stubs cover the Stan-direct hindcast pipeline (extract trend +
+  # obs linpred + family RNG). Only an invented "BOGUS" type should
+  # still fail before dispatch.
+  draws <- make_draws_mat(ndraws = 2L)
+  testthat::local_mocked_bindings(
+    `as_draws_matrix` = function(...) draws,
+    ndraws = function(...) nrow(draws),
+    .package = "posterior"
+  )
+  testthat::local_mocked_bindings(
+    extract_trend_latent_states = function(mvgam_fit, newdata,
+                                             full_draws, ...) {
+      matrix(0, nrow = 2L, ncol = nrow(newdata))
+    },
+    extract_component_linpred = function(mvgam_fit, newdata,
+                                           component, ...) {
+      matrix(0, nrow = 2L, ncol = nrow(newdata))
+    },
+    draw_observations = function(object, linpred, newdata, draw_ids,
+                                 resp = NULL) {
+      matrix(1L, nrow = nrow(linpred), ncol = nrow(newdata))
+    }
+  )
+  # Asked of `hindcast()`, which is the surface this block's stubs
+  # cover and the one its claim names. It used to ask `forecast()`
+  # with no `newdata`, which returned before reaching any trend
+  # dispatch at all, so every type passed without being tried.
+  for (tt in c("VAR", "CAR", "PW")) {
+    fit_tt <- make_mock_mvgam(trend_type = tt)
+    fit_tt$mv_spec$trend_specs$trend <- tt
+    hc <- hindcast(fit_tt, ndraws = 2L)
+    expect_identical(dim(hc$hindcasts$s1), c(2L, 10L))
+  }
+})
+
+
+# ----- forecast_context_car ---------------------------------------
+
+test_that("forecast_context_car builds the right gap vector", {
+  # The fitted grid ends at 10 and has a median gap of 2. Gaps start
+  # at the grid end, where every series has a state, and are in units
+  # of the median gap.
+  fit <- make_mock_mvgam(series_levels = c("a", "b"))
+  testthat::local_mocked_bindings(
+    mvgam_axes = function(object) list(time = list(values = c(2, 4, 6, 10)))
+  )
+  fc_grid <- list(times = list(a = c(11, 14, 16),
+                                  b = c(11, 14, 16)))
+  out <- forecast_context_car(fit, NULL, fc_grid,
+                              series_levels = c("a", "b"))$time
+  expect_equal(out, c(1, 3, 2) / 2)
+  # A time the model was fitted on is a hindcast
+  expect_error(
+    forecast_context_car(
+      fit, NULL, list(times = list(a = c(10, 11), b = c(10, 11))),
+      series_levels = c("a", "b")
+    ),
+    "begin after the last fitted time"
+  )
+})
+
+
+test_that("forecast_context_car steps over the union of times", {
+  fit <- make_mock_mvgam(series_levels = c("a", "b"))
+  testthat::local_mocked_bindings(
+    mvgam_axes = function(object) list(time = list(values = c(2, 4, 6, 10)))
+  )
+  # Each series at its own forecast times: one step per time of the
+  # union 11, 12, 13.
+  fc_grid <- list(times = list(a = c(11, 12),
+                                  b = c(11, 13)))
+  out <- forecast_context_car(fit, NULL, fc_grid,
+                              series_levels = c("a", "b"))$time
+  expect_equal(out, c(1, 1, 1) / 2)
+})
+
+
+test_that("forecast_context_car steps over the series with forecast rows", {
+  fit <- make_mock_mvgam(series_levels = c("a", "b"))
+  testthat::local_mocked_bindings(
+    mvgam_axes = function(object) list(time = list(values = c(2, 4, 6, 10)))
+  )
+  fc_grid <- list(times = list(a = c(11, 14, 16),
+                                  b = integer(0L)))
+  out <- forecast_context_car(fit, NULL, fc_grid,
+                              series_levels = c("a", "b"))$time
+  expect_equal(out, c(1, 3, 2) / 2)
+})
+
+
+test_that("ZMVN forecasts refuse series at their own times", {
+  # A series with no forecast rows shares any set of times
+  shared <- list(times = list(a = c(11, 12), b = c(12, 11), c = numeric(0)))
+  expect_identical(
+    forecast_context_zmvn(NULL, NULL, shared, c("a", "b", "c")),
+    list()
+  )
+  own <- list(times = list(a = c(11, 12), b = c(12, 13)))
+  expect_error(
+    forecast_context_zmvn(NULL, NULL, own, c("a", "b")),
+    "Series 'a' and 'b' have different times"
+  )
+})
+
+
+test_that("Trendless fit rejects type = 'trend' but accepts others", {
+  # Trendless forecasting projects the obs-side linear predictor
+  # onto newdata; there is no latent trend trajectory to extract,
+  # so only `type = "trend"` is undefined. The other types
+  # (`"link"`, `"expected"`, `"response"`) route through the
+  # `build_trendless_forecast_arms()` helper. End-to-end recovery
+  # is covered by the live-fit fixtures.
+  fit <- make_mock_mvgam()
+  fit$mv_spec$trend_specs <- NULL
+  draws <- make_draws_mat(ndraws = 2L)
+  testthat::local_mocked_bindings(
+    `as_draws_matrix` = function(...) draws,
+    ndraws = function(...) nrow(draws),
+    .package = "posterior"
+  )
+  newdata <- data.frame(
+    time = 11:12,
+    series = factor("s1", levels = "s1"),
+    y = NA_real_
+  )
+  expect_error(
+    forecast(fit, newdata = newdata, type = "trend"),
+    "not defined for trendless fits"
+  )
+  # Data naming no series leave the fit no axis record to step along
+  fit$trend_metadata <- NULL
+  fit$data$series <- NULL
+  expect_error(hindcast(fit), "Absent from the fitted data: 'series'")
+})
+
+
+test_that("Newdata with unseen series levels errors crisply", {
+  fit <- make_mock_mvgam()
+  draws <- make_draws_mat(ndraws = 2L)
+  newdata <- data.frame(time = 11:12,
+                         series = factor("ghost", levels = "ghost"),
+                         y = NA_integer_)
+  testthat::local_mocked_bindings(
+    `as_draws_matrix` = function(...) draws,
+    ndraws = function(...) nrow(draws),
+    .package = "posterior"
+  )
+  testthat::local_mocked_bindings(
+    posterior_predict = function(...) matrix(1L, 2L, 10L)
+  )
+  expect_error(
+    forecast(fit, newdata = newdata, type = "response"),
+    "has levels absent from the training data"
+  )
+})
+
+
+test_that("Newdata that names no time or no series errors", {
+  # Two conditions, refused separately. The time is read here, so a
+  # frame without one cannot be placed at all. Which columns name
+  # the series is the record's question, and a frame carrying
+  # neither a series column nor a grouping answers it with nothing:
+  # asking for a named column instead turned away hierarchical fits
+  # handed the very frames they were fitted on.
+  fit <- make_mock_mvgam()
+  draws <- make_draws_mat(ndraws = 2L)
+  testthat::local_mocked_bindings(
+    `as_draws_matrix` = function(...) draws,
+    ndraws = function(...) nrow(draws),
+    .package = "posterior"
+  )
+  testthat::local_mocked_bindings(
+    posterior_predict = function(...) matrix(1L, 2L, 10L)
+  )
+  expect_error(
+    forecast(
+      fit,
+      newdata = data.frame(notime = 11:12, y = NA_integer_),
+      type = "response"
+    ),
+    "Column 'time' is absent"
+  )
+  expect_error(
+    forecast(
+      fit,
+      newdata = data.frame(time = 11:12, y = NA_integer_),
+      type = "response"
+    ),
+    "lack the series this model was fitted on"
+  )
+})
+
+
+# ----- trend_linpred_grid -----------------------------------------
+
+test_that("trend_linpred_grid places one draw and keeps the last times", {
+  # 3 times x 2 series, in (time, series) row order
+  obs_struct <- list(
+    unique_times = c(41, 42, 43),
+    time = c(41, 41, 42, 42, 43, 43),
+    series_int = c(1L, 2L, 1L, 2L, 1L, 2L),
+    n_series = 2L
+  )
+  lp <- matrix(seq_len(12), nrow = 2L, byrow = TRUE)
+  expect_equal(
+    trend_linpred_grid(lp, obs_struct, draw_row = 2L, n_rows = 2L,
+                       n_series = 2L),
+    matrix(9:12, nrow = 2L, byrow = TRUE)
+  )
+  expect_error(
+    trend_linpred_grid(lp, obs_struct, draw_row = 1L, n_rows = 4L,
+                       n_series = 2L),
+    "predictor grid"
+  )
+})
+
+
+# ----- the zero-mean propagation convention ------------------------
+
+test_that("centred propagation reproduces the kernel's mean form", {
+  # `trend_arma_recursC()` can carry a time-varying mean itself,
+  # via `trend[t] = lp[t] + A (trend[t - 1] - lp[t - 1]) + e[t]`.
+  # mvgam instead advances the zero-mean latent state and adds
+  # `mu_trend` at series scale, which is the only form that also
+  # covers a factor model. The two agree exactly, and that
+  # equivalence is what lets one convention serve every trend.
+  set.seed(404)
+  h <- 8L
+  n_series <- 2L
+  max_lag <- 1L
+  total <- h + max_lag
+  A <- array(diag(c(0.6, 0.35)), dim = c(2L, 2L, 1L))
+  B <- array(0, dim = c(2L, 2L, 0L))
+  innov <- matrix(rnorm(total * n_series, sd = 0.3),
+                    nrow = total, ncol = n_series)
+  lp <- matrix(rnorm(total * n_series, sd = 1.2),
+                 nrow = total, ncol = n_series)
+  state <- matrix(c(1.1, -0.4), nrow = 1L)
+
+  with_mean <- trend_arma_recursC(
+    ar_lags = 1L, ma_lags = integer(0), drift = c(0, 0),
+    A = A, B = B, innovations = innov, linpreds = lp,
+    last_trends = state, h = h
+  )
+  zero_mean <- trend_arma_recursC(
+    ar_lags = 1L, ma_lags = integer(0), drift = c(0, 0),
+    A = A, B = B, innovations = innov,
+    linpreds = matrix(0, nrow = total, ncol = n_series),
+    last_trends = state - lp[seq_len(max_lag), , drop = FALSE],
+    h = h
+  )
+  reconstructed <- zero_mean +
+    lp[seq.int(max_lag + 1L, total), , drop = FALSE]
+  expect_equal(reconstructed, with_mean, tolerance = 1e-12)
+})
+
+
+# ----- the mean enters once, at series scale -----------------------
+
+test_that("the forecast centres the state and re-adds the mean", {
+  # Pins both halves of the convention separately by giving the
+  # training tail and the forecast window different trend linear
+  # predictors. With a propagator that echoes the state it was
+  # handed, the answer is (state - lp_tail) + lp_forecast.
+  # Dropping the centring gives 3.5, dropping the re-add gives
+  # 1.5, and dropping both gives 2, so no single omission
+  # survives.
+  fit <- make_mock_mvgam()
+  draws <- make_draws_mat(ndraws = 3L)
+  newdata <- data.frame(time = 11:12,
+                          series = factor("s1", levels = "s1"),
+                          y = NA_integer_)
+
+  testthat::local_mocked_bindings(
+    `as_draws_matrix` = function(...) draws,
+    ndraws = function(...) nrow(draws),
+    .package = "posterior"
+  )
+  testthat::local_mocked_bindings(
+    extract_component_linpred = function(mvgam_fit, newdata,
+                                            component, ...) {
+      if (!identical(component, "trend")) {
+        return(matrix(0, nrow = 3L, ncol = nrow(newdata)))
+      }
+      # The tail carries one row per series, the forecast grid two.
+      value <- if (nrow(newdata) == 1L) 0.5 else 1.5
+      matrix(value, nrow = 3L, ncol = nrow(newdata))
+    },
+    get_observation_structure = function(object, newdata, ...) {
+      make_obs_struct_for_grid(
+        as.integer(newdata$time),
+        rep(1L, nrow(newdata)),
+        levels(newdata$series)
+      )
+    },
+    propagate_trend = function(trend_model, params, h, n_series,
+                                 last_state = NULL, ...) {
+      matrix(rep(as.numeric(last_state$trends), h),
+               nrow = h, ncol = n_series, byrow = TRUE)
+    },
+    extract_last_states = function(...) list(),
+    last_state_of_draw = function(...) {
+      list(
+        params = list(sigma = 0.1, ar = matrix(0.5, 1L, 1L)),
+        last_state = list(
+          trends = matrix(2, 1L, 1L),
+          errors = NULL
+        )
+      )
+    }
+  )
+
+  fc <- forecast(fit, newdata = newdata, type = "trend")
+  expect_equal(unname(as.numeric(fc$forecasts[["s1"]])),
+                 rep(2 - 0.5 + 1.5, 6L))
+})
+
+
+# ----- one basis for state and loadings ---------------------------
+
+test_that("a factor forecast projects with the sampled loadings", {
+  # A QR-identified fit stores both `Z` with `lv_trend` and
+  # `Z_tilde` with `lv_trend_tilde`, and only a matching pair
+  # rebuilds the trend. The propagated state is the raw
+  # `lv_trend`, so the projection has to use the raw `Z`. Here
+  # the two loadings matrices differ, so pairing the state with
+  # `Z_tilde` would give 2 rather than 1 in every cell.
+  fit <- make_mock_mvgam(series_levels = c("s1", "s2"),
+                           n_lv = 1L, trend_type = "ZMVN",
+                           ar_lags = integer(0), max_lag = 0L)
+  fit$mv_spec$trend_specs$trend <- "ZMVN"
+  draws <- posterior::as_draws_matrix(matrix(
+    c(1, 1, 2, 2), nrow = 1L,
+    dimnames = list(NULL, c("Z[1,1]", "Z[2,1]",
+                              "Z_tilde[1,1]", "Z_tilde[2,1]"))
+  ))
+  newdata <- data.frame(
+    time = c(11L, 11L, 12L, 12L),
+    series = factor(c("s1", "s2", "s1", "s2"),
+                      levels = c("s1", "s2")),
+    y = NA_integer_
+  )
+
+  testthat::local_mocked_bindings(
+    `as_draws_matrix` = function(...) draws,
+    ndraws = function(...) nrow(draws),
+    .package = "posterior"
+  )
+  testthat::local_mocked_bindings(
+    extract_component_linpred = function(mvgam_fit, newdata,
+                                            component, ...) {
+      matrix(0, nrow = 1L, ncol = nrow(newdata))
+    },
+    get_observation_structure = function(object, newdata, ...) {
+      make_obs_struct_for_grid(
+        as.integer(newdata$time),
+        as.integer(newdata$series),
+        levels(newdata$series)
+      )
+    },
+    propagate_trend = function(trend_model, params, h, n_series,
+                                 ...) {
+      matrix(1, nrow = h, ncol = n_series)
+    },
+    extract_last_states = function(...) list(),
+    last_state_of_draw = function(...) {
+      list(
+        params = list(Sigma = diag(1)),
+        last_state = list(
+          trends = matrix(0, nrow = 0L, ncol = 1L),
+          errors = NULL
+        ),
+        n_lv_active = 1L
+      )
+    }
+  )
+
+  fc <- forecast(fit, newdata = newdata, type = "trend")
+  expect_equal(unname(as.numeric(fc$forecasts[["s1"]])), c(1, 1))
+  expect_equal(unname(as.numeric(fc$forecasts[["s2"]])), c(1, 1))
+})
+
+
+# ----- slice_per_series -------------------------------------------
+
+test_that("slice_per_series picks the right cells per raw time", {
+  # 2 series, 3 forecast times each, interleaved in obs_struct
+  # row order (t, s) = (41,a), (41,b), (42,a), (42,b), (43,a),
+  # (43,b). Mat values encode (time*10 + series_int).
+  obs_struct <- make_obs_struct_for_grid(
+    times = c(41, 41, 42, 42, 43, 43),
+    series_int = c(1, 2, 1, 2, 1, 2),
+    series_levels = c("a", "b")
+  )
+  mat <- matrix(
+    c(411, 412, 421, 422, 431, 432),
+    nrow = 1L
+  )
+  fc_grid <- make_fc_grid_for_slice(
+    times = c(41, 41, 42, 42, 43, 43),
+    fc_times = list(a = c(41, 42, 43), b = c(41, 42, 43))
+  )
+  out <- slice_per_series(mat, fc_grid, obs_struct,
+                            ndraws_use = 1L,
+                            series_levels = c("a", "b"))
+  expect_equal(as.numeric(out[["a"]]), c(411, 421, 431))
+  expect_equal(as.numeric(out[["b"]]), c(412, 422, 432))
+  # Rows sharing an occasion, as the sites of a multi-season fit do,
+  # keep their own columns with `per_row` and are averaged without it
+  visits <- make_obs_struct_for_grid(
+    times = c(41, 41, 42, 42), series_int = c(1, 1, 1, 1),
+    series_levels = "a"
+  )
+  slice_visits <- function(per_row) {
+    slice_per_series(
+      matrix(c(1, 2, 3, 5), nrow = 1L),
+      make_fc_grid_for_slice(c(41, 41, 42, 42), list(a = c(41, 42))),
+      visits, ndraws_use = 1L, series_levels = "a", per_row = per_row
+    )[["a"]]
+  }
+  expect_equal(as.numeric(slice_visits(TRUE)), c(1, 2, 3, 5))
+  expect_equal(as.numeric(slice_visits(FALSE)), c(1.5, 4))
+})
+
+
+test_that("slice_per_series handles per-series horizon differences", {
+  # Series 'a' has 3 forecast times, 'b' has 2 and 'c' none
+  obs_struct <- make_obs_struct_for_grid(
+    times = c(41, 41, 42, 42, 43),
+    series_int = c(1, 2, 1, 2, 1),
+    series_levels = c("a", "b", "c")
+  )
+  mat <- matrix(c(411, 412, 421, 422, 431), nrow = 1L)
+  fc_grid <- make_fc_grid_for_slice(
+    times = c(41, 41, 42, 42, 43),
+    fc_times = list(a = c(41, 42, 43), b = c(41, 42), c = numeric())
+  )
+  out <- slice_per_series(mat, fc_grid, obs_struct,
+                            ndraws_use = 1L,
+                            series_levels = c("a", "b", "c"))
+  expect_equal(as.numeric(out[["a"]]), c(411, 421, 431))
+  expect_equal(as.numeric(out[["b"]]), c(412, 422))
+  expect_identical(dim(out[["c"]]), c(1L, 0L))
+})
+
+
+test_that("the forecast grid does not depend on newdata row order", {
+  # `fc_times` is sorted; the truths and the rows the linear
+  # predictor is built from were taken in arrival order. Passing
+  # the same future rows shuffled therefore permuted the
+  # observations and the forecast columns independently, and
+  # `score()` paired each truth with the wrong horizon without
+  # complaining.
+  training <- data.frame(
+    time = rep(1:10, 2),
+    series = factor(rep(c("a", "b"), each = 10)),
+    y = rnorm(20)
+  )
+  future <- data.frame(
+    time = rep(11:13, 2),
+    series = factor(rep(c("a", "b"), each = 3), levels = c("a", "b")),
+    y = c(101, 102, 103, 201, 202, 203)
+  )
+  train_info <- list(
+    times = list(a = 1:10, b = 1:10),
+    observations = list(a = training$y[1:10], b = training$y[11:20]),
+    data = training, series_var = "series", time_var = "time"
+  )
+  model <- structure(
+    list(formula = brms::bf(y ~ 1),
+         trend_metadata = mock_axis_record(training)),
+    class = "mvgam"
+  )
+  ordered_grid <- resolve_forecast_grid(
+    object = model, newdata = future, training = train_info,
+    series_levels = c("a", "b")
+  )
+  shuffled_grid <- resolve_forecast_grid(
+    object = model, newdata = future[c(5, 2, 6, 1, 4, 3), ],
+    training = train_info, series_levels = c("a", "b")
+  )
+
+  # Truths follow the sorted times, not the order they arrived in.
+  expect_equal(shuffled_grid$observations$a, c(101, 102, 103))
+  expect_equal(shuffled_grid$observations$b, c(201, 202, 203))
+
+  # And so do the rows the linear predictor is built from.
+  expect_equal(shuffled_grid$data$time, ordered_grid$data$time)
+  expect_equal(
+    as.character(shuffled_grid$data$series),
+    as.character(ordered_grid$data$series)
+  )
+})
+
+
+test_that("an argument neither method reads is refused, not swallowed", {
+  # Every argument after `...` is matched by name, so a misspelling
+  # falls into `...` and the call proceeds on the default it meant to
+  # override. Nothing warns, and the returned object has the right
+  # class and shape, which is what made the same shape of defect hard
+  # to see on `posterior_predict()`.
+  fit <- make_mock_mvgam()
+  # The offending name is reported, so the caller can see which one.
+  expect_error(hindcast(fit, incl_autcor = TRUE), "incl_autcor")
+  expect_error(forecast(fit, newdata = fit$data, ndraw = 5L),
+               "must be empty")
+})
+
+
+test_that("the step check names the grid, not an observation", {
+  # `assert_forecast_times_steppable()` reads the training *grid*,
+  # and its own comment says why: the latent state runs on one grid
+  # shared by every series, and reading each series' observed times
+  # instead would refuse a legitimate forecast on a frame padded with
+  # unobserved rows, which is the shape mvgam asks users to supply.
+  #
+  # The horizon rule answers a different question from the axis
+  # record, which counts an occasion observed only where a response
+  # was seen. On a padded frame the two part company over the
+  # occasions between the last response and the end of the grid, so
+  # the refusal must not call the grid's last position an
+  # observation: it named a time the series was never seen at and
+  # then offered a horizon starting past it.
+  set.seed(12L)
+  d <- data.frame(time = 1:40, series = factor("s1"),
+                  y = c(rnorm(30), rep(NA, 10)))
+  # The padding rows leave the likelihood, and brms says so.
+  expect_warning(
+    prefit <- mvgam(y ~ 1, trend_formula = ~ AR(p = 1), data = d,
+                    family = gaussian(), run_model = FALSE, silent = 2,
+                    validate = FALSE),
+    "Rows containing NAs were excluded"
+  )
+  err <- conditionMessage(expect_error(
+    mvgam:::assert_forecast_times_steppable(list(s1 = 31), prefit)
+  ))
+  expect_match(err, "training grid runs to time 40", fixed = TRUE)
+  # The word that was wrong. The series was last seen at 30 here, so
+  # nothing may claim it was observed at 40.
+  expect_false(grepl("observed to time", err, fixed = TRUE))
+  # And the reader is pointed at the surface that does read an
+  # occasion sitting inside the grid.
+  expect_match(err, "hindcast()", fixed = TRUE)
+
+  # The control: a frame that does continue the grid is accepted, so
+  # this is not a check that refuses everything.
+  expect_true(mvgam:::assert_forecast_times_steppable(list(s1 = 41),
+                                                      prefit))
+  # A gap in the horizon is named as the time skipped
+  expect_error(
+    mvgam:::assert_forecast_times_steppable(list(s1 = c(41, 43)), prefit),
+    "Series 's1' skips time 42."
+  )
+})
+
+
+test_that("a wide frame padded at the end is stepped from its grid", {
+  # The grid was gathered from each response's training rows. Where
+  # the responses are the series, those hold its observed rows alone,
+  # and the grid seemed to end at the last observation. Times inside
+  # the grid then passed as a continuation, and the trend stepped on
+  # from the grid's true end under them.
+  set.seed(13L)
+  d <- data.frame(time = 1:12,
+                  y1 = c(rnorm(10), NA, NA), y2 = c(rnorm(10), NA, NA))
+  expect_warning(
+    prefit <- mvgam(
+      brms::bf(brms::mvbind(y1, y2) ~ 1) + brms::set_rescor(FALSE),
+      trend_formula = ~ AR(p = 1), data = d, family = gaussian(),
+      run_model = FALSE, silent = 2, validate = FALSE
+    ),
+    "Rows containing NAs were excluded"
+  )
+  series_levels <- mvgam:::fitted_series_levels(prefit)
+  training <- mvgam:::build_training_arms(prefit, series_levels)
+  expect_identical(max(unlist(training$times)), 10L)
+  fc <- mvgam:::resolve_forecast_grid(
+    prefit, data.frame(time = 11:12), training, series_levels
+  )
+  expect_error(
+    mvgam:::assert_forecast_times_steppable(fc$times, prefit),
+    "training grid runs to time 12"
+  )
+  fc_past <- mvgam:::resolve_forecast_grid(
+    prefit, data.frame(time = 13:14), training, series_levels
+  )
+  expect_true(mvgam:::assert_forecast_times_steppable(fc_past$times,
+                                                      prefit))
+  # The tail that centres the stored state is the end of the same
+  # grid. Taken from the training rows it ended at the last
+  # observation.
+  tail_rows <- mvgam:::build_training_tail_data(prefit, training, 2L)
+  expect_equal(tail_rows$time, c(11, 12))
+})
+
+
+# ----- state components of a trend --------------------------------
+
+test_that("a component request is checked against the trend and type", {
+  llt <- make_mock_mvgam(trend_type = "LLT")
+  expect_identical(resolve_trend_component(llt, "slope", "trend"), "slope")
+  expect_null(resolve_trend_component(llt, NULL, "link"))
+  expect_error(resolve_trend_component(llt, "slope", "link"),
+               "requires type = 'trend'")
+  expect_identical(
+    resolve_trend_component(llt, c("level", "predictor"), "trend"),
+    c("level", "predictor")
+  )
+  expect_error(resolve_trend_component(llt, c("level", "season"), "trend"),
+               "'season'.*'level', 'slope', 'predictor'")
+  # The trends that declare components come from the registry
+  err <- expect_error(
+    resolve_trend_component(make_mock_mvgam(), "slope", "trend"),
+    "not supported for a 'AR()' trend", fixed = TRUE
+  )
+  expect_match(conditionMessage(err), "'LLT()'", fixed = TRUE)
+})
+
+
+test_that("the components of a seasonal LLT partition its trend", {
+  # `lv_trend` holds the level plus the season. The predictor is the
+  # summed trend less `lv_trend`. The slope adds nothing to either.
+  llt <- trend_components_llt(list(season = 12, harmonics = 2L))
+  lv <- matrix(c(1, 2, 4, 8, 16, 32), 2L)
+  season <- matrix(0.5, 2L, 3L)
+  total <- lv + 0.25
+  parts <- list(level = lv, season = season, slope = matrix(9, 2L, 3L))
+  value <- function(component) {
+    trend_component_values(total, parts, component, llt)
+  }
+  expect_identical(component_parts(llt, "level"), c("level", "season"))
+  expect_identical(component_parts(llt, "predictor"), c("level", "season"))
+  expect_identical(value("level"), lv - season)
+  expect_identical(value("season"), season)
+  expect_identical(value("predictor"), total - lv)
+  # Several names add their components
+  expect_identical(value(c("level", "predictor")), total - season)
+  expect_identical(value(c("level", "season", "predictor")), total)
+  expect_identical(value(NULL), total)
+  expect_false(needs_total(llt, c("level", "season")))
+  # Without a season the level is `lv_trend` itself
+  plain <- trend_components_llt(NULL)
+  expect_identical(trend_component_values(total, list(level = lv),
+                                          "level", plain), lv)
+})
+
+
+test_that("project_lv_grid multiplies each draw's grid by its loadings", {
+  set.seed(4L)
+  grid <- matrix(stats::rnorm(12L), 2L)
+  Z <- array(stats::rnorm(16L), c(2L, 4L, 2L))
+  out <- project_lv_grid(grid, Z, n_times = 3L, n_lv = 2L,
+                         n_obs_series = 4L)
+  for (d in 1:2) {
+    expect_equal(matrix(out[d, ], 3L),
+                 matrix(grid[d, ], 3L) %*% t(Z[d, , ]))
+  }
+  # One factor keeps its loading matrix
+  one <- project_lv_grid(grid[, 1:3], Z[, , 1L, drop = FALSE], 3L, 1L, 4L)
+  expect_equal(matrix(one[2L, ], 3L), outer(grid[2L, 1:3], Z[2L, , 1L]))
+})
+
+
+test_that("a component forecast carries its own path and the trend's mean", {
+  # The fitted trend is 3 and its stochastic level 1.8. The trend
+  # formula's predictor, 1.5 over the horizon, adds to the propagated
+  # level of 2. The slope adds nothing to the trend and takes none.
+  fit <- make_mock_mvgam(trend_type = "LLT")
+  n_time <- 10L
+  draws <- posterior::as_draws_matrix(matrix(
+    rep(c(rep(3, n_time), rep(1.8, n_time), rep(0.25, n_time)),
+        each = 3L),
+    nrow = 3L,
+    dimnames = list(NULL, c(sprintf("trend[%d,1]", seq_len(n_time)),
+                            sprintf("lv_trend[%d,1]", seq_len(n_time)),
+                            sprintf("slope_trend[%d,1]", seq_len(n_time))))
+  ))
+  newdata <- mock_future_data(fit, h = 2L)
+
+  testthat::local_mocked_bindings(
+    `as_draws_matrix` = function(...) draws,
+    ndraws = function(...) nrow(draws),
+    .package = "posterior"
+  )
+  testthat::local_mocked_bindings(
+    extract_component_linpred = function(mvgam_fit, newdata,
+                                         component, ...) {
+      value <- if (identical(component, "trend")) 1.5 else 0
+      matrix(value, nrow = 3L, ncol = nrow(newdata))
+    },
+    get_observation_structure = function(object, newdata, ...) {
+      make_obs_struct_for_grid(
+        as.integer(newdata$time),
+        rep(1L, nrow(newdata)),
+        levels(newdata$series)
+      )
+    },
+    propagate_trend = function(trend_model, params, h, n_series, ...) {
+      structure(matrix(2, nrow = h, ncol = n_series),
+                components = list(level = matrix(2, h, n_series),
+                                  slope = matrix(0.25, h, n_series)))
+    },
+    extract_last_states = function(...) list(),
+    last_state_of_draw = function(...) {
+      list(params = list(sigma = 0.1),
+           last_state = list(trends = matrix(0, 1L, 1L), errors = NULL))
+    }
+  )
+
+  fc <- function(component) {
+    forecast(fit, newdata = newdata, type = "trend", component = component)
+  }
+  level <- fc("level")
+  expect_equal(unname(as.numeric(level$forecasts$s1)), rep(2, 6L))
+  expect_equal(unname(as.numeric(level$hindcasts$s1)), rep(1.8, 30L))
+  predictor <- fc("predictor")
+  expect_equal(unname(as.numeric(predictor$forecasts$s1)), rep(1.5, 6L))
+  expect_equal(unname(as.numeric(predictor$hindcasts$s1)), rep(1.2, 30L))
+  both <- fc(c("level", "predictor"))
+  expect_equal(unname(as.numeric(both$forecasts$s1)), rep(3.5, 6L))
+  expect_identical(plot(both)$labels$y, "Latent level + predictor")
+  slope <- forecast(fit, newdata = newdata, type = "trend",
+                    component = "slope")
+  expect_equal(unname(as.numeric(slope$forecasts$s1)), rep(0.25, 6L))
+  expect_equal(unname(as.numeric(slope$hindcasts$s1)), rep(0.25, 30L))
+
+  # The record names the component on every surface
+  expect_identical(slope$component, "slope")
+  expect_identical(unique(summary(slope)$component), "slope")
+  expect_true(any(grepl("component 'slope'", capture.output(print(slope)),
+                        fixed = TRUE)))
+  expect_identical(plot(slope)$labels$y, "Latent slope")
+})
+
+
+test_that("overlapping terms offset within their kind", {
+  n <- 400L
+  set.seed(1)
+  noise <- matrix(rnorm(n), n, 1L)
+  cell <- list(
+    mean = noise,
+    within = matrix(1, n, 1L),
+    noise = NULL,
+    effects = list(a = 50 * noise, b = -49 * noise),
+    kinds = c(a = "coefficients", b = "coefficients"),
+    replicates = 2L
+  )
+  # The terms sum to the parameter uncertainty, in their own ratio
+  split <- variance_split(cell)
+  expected <- var(noise[, 1L]) - 0.5
+  expect_equal(sum(split[, c("a", "b")]), expected)
+  expect_equal(unname(split[, "a"] / split[, "b"]), -50 / 49)
+})
+
+test_that("the overview ranks kinds", {
+  sources <- data.frame(
+    series = "s", time = 1, horizon = 1L,
+    source = c("a", "b", "process error"),
+    kind = c("coefficients", "coefficients", "process error"),
+    variance = c(9, 9, 1), contribution = c(5, -4.5, 1),
+    share = c(5, -4.5, 1) / 1.5
+  )
+  x <- list(sources = sources,
+            horizons = data.frame(series = "s", horizon = 1L, variance = 1.5),
+            boot = list(s = t(replicate(4L, sources$share))),
+            series = "s")
+  overview <- forecast_overview(x)
+  # Term `a` leads alone. Its kind offsets to a third.
+  expect_identical(overview$dominant, "process error")
+})

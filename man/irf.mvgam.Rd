@@ -7,81 +7,134 @@
 \usage{
 irf(object, ...)
 
-\method{irf}{mvgam}(object, h = 10, cumulative = FALSE, orthogonal = FALSE, ...)
+\method{irf}{mvgam}(
+  object,
+  h = 10,
+  cumulative = FALSE,
+  orthogonal = FALSE,
+  ndraws = NULL,
+  draw_ids = NULL,
+  summary = TRUE,
+  probs = c(0.025, 0.975),
+  future = FALSE,
+  ...
+)
 }
 \arguments{
-\item{object}{\code{list} object of class \code{mvgam} resulting from a call to \code{\link[=mvgam]{mvgam()}}
-that used a Vector Autoregressive latent process model (either as \code{VAR(cor = FALSE)} or
-\code{VAR(cor = TRUE)}; see \code{\link[=VAR]{VAR()}} for details)}
+\item{object}{An object of class \code{mvgam} fitted with a \code{VAR()}
+latent process model}
 
-\item{...}{ignored}
+\item{...}{Unused. Anything passed here is refused.}
 
-\item{h}{Positive \code{integer} specifying the forecast horizon over which to calculate
-the IRF}
+\item{h}{Positive integer. The number of horizons to compute. Horizon
+1 is the time step of the shock.}
 
-\item{cumulative}{\code{Logical} flag indicating whether the IRF should be cumulative}
+\item{cumulative}{Logical. \code{TRUE} accumulates each response over the
+horizons.}
 
-\item{orthogonal}{\code{Logical} flag indicating whether orthogonalized IRFs should be
-calculated. Note that the order of the variables matters when calculating these}
+\item{orthogonal}{Logical. \code{TRUE} computes orthogonalised responses
+from the lower Cholesky factor of the innovation covariance. These
+depend on the order of the levels of the series factor. The
+default generalised responses do not (Pesaran and Shin 1998).}
+
+\item{ndraws}{Positive integer specifying number of posterior draws to
+use. NULL (default) uses all available draws.}
+
+\item{draw_ids}{Optional integer vector selecting a subset of posterior
+draw indices to use. NULL (default) uses all draws (subject to
+\code{ndraws}).}
+
+\item{summary}{Logical; return the posterior median and interval of
+each response (the default), or the per-draw responses themselves.
+The draws are one \code{K} by \code{K} matrix per horizon per draw, which on
+a wide panel runs to hundreds of megabytes.}
+
+\item{probs}{The lower and upper percentiles of the interval reported
+with the median when \code{summary = TRUE}.}
+
+\item{future}{\code{Logical}. When \code{TRUE}, the per-draw computation
+runs under the \code{\link[future:plan]{future::plan()}} the caller
+has set. The default \code{sequential} plan runs as base \code{lapply()}
+does. \code{plan(multisession, workers = N)} splits the draws across
+\code{N} R processes. Without the \pkg{future} package the draws
+run in turn, with a message.}
 }
 \value{
-An object of \code{\link{mvgam_irf-class}} containing the posterior IRFs. This
-object can be used with the supplied S3 functions \code{\link[=plot.mvgam_irf]{plot.mvgam_irf()}}
-and \code{\link[=summary.mvgam_irf]{summary.mvgam_irf()}}
+An object of \code{\link{mvgam_irf-class}}. \code{\link[=plot.mvgam_irf]{plot.mvgam_irf()}}
+and \code{\link[=summary.mvgam_irf]{summary.mvgam_irf()}} take it.
 }
 \description{
 Compute Generalized or Orthogonalized Impulse Response Functions (IRFs) from
-\code{mvgam} models with Vector Autoregressive dynamics
+\code{mvgam} models with Vector Autoregressive dynamics. An impulse
+response traces how the latent trend of every series moves over \code{h}
+time steps after a one-standard-deviation innovation to one series.
+The default generalised responses suit most analyses. Orthogonalised
+responses need a causal ordering of the series.
 }
 \details{
-See \code{\link{mvgam_irf-class}} for a full description of the quantities that are
-computed and returned by this function, along with key references.
+See \code{\link{mvgam_irf-class}} for the quantities computed and
+returned, with references.
 }
 \examples{
 \dontrun{
-# Fit a model to the portal time series that uses a latent VAR(1)
-mod <- mvgam(
-  formula = captures ~ -1,
-  trend_formula = ~ trend,
-  trend_model = VAR(cor = TRUE),
-  family = poisson(),
-  data = portal_data,
-  chains = 2,
-  silent = 2
-)
-
-# Plot the autoregressive coefficient distributions;
-# use 'dir = "v"' to arrange the order of facets
-# correctly
-mcmc_plot(
-  mod,
-  variable = 'A',
-  regex = TRUE,
-  type = 'hist',
-  facet_args = list(dir = 'v')
-)
-
-# Calulate Generalized IRFs for each series
-irfs <- irf(
-  mod,
-  h = 12,
-  cumulative = FALSE
-)
-
-# Plot them
-plot(irfs, series = 1)
-plot(irfs, series = 2)
-plot(irfs, series = 3)
-plot(irfs, series = 4)
-
-# Calculate posterior median, upper and lower 95th quantiles
-# of the impulse responses
-summary(irfs)
+# Ten years of monthly counts of a prey species and its predator.
+# Predators suppress the prey a month later. Prey raise the
+# predators a month later.
+set.seed(2025)
+n_months <- 120
+A <- rbind(prey     = c(0.6, -0.5),
+           predator = c(0.4,  0.5))
+z <- matrix(0, n_months, 2)
+for (t in 2:n_months) {
+  z[t, ] <- A \%*\% z[t - 1, ] + rnorm(2, sd = 0.35)
 }
+predator_prey <- data.frame(
+  time = rep(seq_len(n_months), 2),
+  series = factor(rep(c("prey", "predator"), each = n_months),
+                  levels = c("prey", "predator")),
+  y = rpois(2 * n_months, exp(c(2.5 + z[, 1], 1.5 + z[, 2])))
+)
+var_mod <- mvgam(y ~ series, trend_formula = ~ VAR(),
+                 data = predator_prey, family = poisson(),
+                 chains = 2, silent = 2)
+}
+\dontrun{
+# Generalised responses of every series to a shock in each
+irf_obj <- irf(var_mod, h = 8L)
+plot(irf_obj, series = 1)
+
+# Next: fevd() splits each series' forecast variance among the
+# shocks. stability() summarises how the system returns to
+# equilibrium
+}
+
+}
+\references{
+Lutkepohl H (2005). New Introduction to Multiple Time Series
+Analysis. Springer, Berlin. \doi{10.1007/978-3-540-27752-1}
+
+Pesaran HH and Shin Y (1998). Generalized impulse response analysis
+in linear multivariate models. Economics Letters 58, 17-29.
+\doi{10.1016/S0165-1765(97)00214-0}
 }
 \seealso{
-\code{\link{mvgam_irf-class}}, \code{\link[=VAR]{VAR()}}, \code{\link[=plot.mvgam_irf]{plot.mvgam_irf()}}, \code{\link[=stability]{stability()}}, \code{\link[=fevd]{fevd()}}
+\code{\link[=fevd]{fevd()}} and \code{\link[=stability]{stability()}} summarise the same VAR dynamics.
+The \href{https://nicholasjclark.github.io/mvgam/articles/var.html}{VAR article} runs \code{irf()} on a
+plankton community. The
+\href{https://nicholasjclark.github.io/mvgam/articles/hierarchical_var.html}{hierarchical VAR article}
+runs it on each group of a hierarchical VAR.
+
+Other latent dynamics: 
+\code{\link{active_factors}()},
+\code{\link{compare_loadings}()},
+\code{\link{fevd.mvgam}()},
+\code{\link{ordinate}()},
+\code{\link{posterior_transition_matrix}()},
+\code{\link{residual_cor}()},
+\code{\link{shared_variation}()},
+\code{\link{stability.mvgam}()}
 }
 \author{
 Nicholas J Clark
 }
+\concept{latent dynamics}

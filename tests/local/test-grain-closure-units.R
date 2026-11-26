@@ -1,0 +1,1845 @@
+# The closure-unit grain, and what happens at its edges.
+#
+# An occupancy model has two grains at once. A closure unit is a
+# (series, time) cell holding one latent state, and a visit is a row
+# within it holding one detection attempt. Which grain a method
+# answers on is its whole contract: a likelihood term belongs to a
+# unit, a detection probability to a visit, and a method that
+# confuses them returns a plausible matrix of the wrong width.
+#
+# The counts are chosen so no two of them coincide. 25 sites visited
+# over 3 occasions with 4 visits gives 75 units, 25 series and 300
+# rows, so a method answering on the wrong grain returns a number
+# that belongs to no other grain. On a frame setting `time = 1L` the
+# closure unit and the series are the same count, and every claim
+# about the unit grain compares one number with itself.
+#
+#   truth: 25 sites x 3 occasions x 4 visits, occupancy driven by
+#          elevation and detection by time of day
+#   model: bf(y ~ elev, p ~ tod_c), family = occ()
+#
+# Occasions are numbered from 3, so a rank is never a time.
+#
+# Four fits follow the occupancy one, each answering a question the
+# first cannot. An `nmix()` fit gives the ceiling claim a range to be
+# wrong across, since a population size can sit below an observed
+# count where a boolean occupancy cannot. An occ fit with every sixth
+# visit unmade says what happens when the repeat-visit arrays and the
+# likelihood disagree about how many rows there are. A `jsdgam()` fit
+# puts the closure unit under a factor model, where the trend design
+# moves to the latent-factor axis while an observation still has to
+# read a species cell. A multi-season fit groups by three axes rather
+# than two.
+#
+# Each fit here has to make some claim the others cannot. A second
+# family run through the same battery re-witnesses rather than adds,
+# and a second fit whose only job is to be compared against the first
+# buys one soft claim at the price of a whole model.
+#
+# Run with:
+#   testthat::test_file("tests/local/test-grain-closure-units.R")
+
+suppressMessages({
+  devtools::load_all(".", quiet = TRUE)
+  library(posterior)
+  library(testthat)
+})
+
+# Several blocks below state what the package does not yet do, and
+# testthat stops a file after ten failures by default, which would
+# leave the blocks after them unrun and looking clean. The limit is
+# read when the reporter is built, before this file is sourced, so it
+# has to come from the environment:
+#   TESTTHAT_MAX_FAILS=1000 Rscript -e "..."
+
+
+set.seed(808L)
+
+n_site <- 25L
+n_season <- 3L
+n_visit <- 4L
+n_unit <- n_site * n_season
+site_levels <- paste0("site_", sprintf("%02d", seq_len(n_site)))
+time_vals <- seq_len(n_season) + 2L
+
+grid <- expand.grid(
+  visit = seq_len(n_visit), season = seq_len(n_season),
+  site = site_levels, stringsAsFactors = FALSE
+)
+elev <- rnorm(n_site)
+dat <- data.frame(
+  series = factor(grid$site, levels = site_levels),
+  time = as.integer(grid$season) + 2L,
+  visit = grid$visit,
+  elev = rep(elev, each = n_season * n_visit),
+  tod_c = runif(nrow(grid), -6, 6)
+)
+
+# The latent state is drawn once per unit and every visit in that
+# unit sees it, which is what makes the unit the grain the likelihood
+# runs on.
+psi_true <- plogis(-0.3 + 1.1 * dat$elev[!duplicated(paste(grid$site,
+                                                           grid$season))])
+z_true <- rbinom(n_unit, 1L, psi_true)
+p_true <- plogis(0.4 + 0.2 * dat$tod_c)
+dat$y <- as.integer(rep(z_true, each = n_visit) *
+                      rbinom(nrow(dat), 1L, p_true))
+
+# The three counts this file separates. Every grain claim below names
+# one of them, and no two are equal.
+stopifnot(length(unique(c(nrow(dat), n_unit, n_site))) == 3L)
+
+# Unit identity taken from the user's own columns, never from
+# anything the package derives.
+unit_key <- paste(dat$series, dat$time)
+unit_keys <- unique(unit_key)
+detected <- as.logical(
+  tapply(dat$y, unit_key, function(v) any(v > 0))[unit_keys]
+)
+stopifnot(any(detected), any(!detected))
+
+sim_truth <- list(
+  n_site = n_site, n_season = n_season, n_visit = n_visit,
+  n_unit = n_unit, site_levels = site_levels, time_vals = time_vals,
+  elev = elev, z_true = z_true
+)
+
+obs_formula <- bf(y ~ elev, p ~ tod_c)
+
+
+# -- Fit --------------------------------------------------------------
+
+fit <- cached_fit(
+  "val_mvgam_occ_units.rds",
+  function() {
+    with_warnings(mvgam(
+      formula = obs_formula, family = occ(), data = dat,
+      chains = 2L, iter = 1000L, warmup = 500L,
+      silent = 2, backend = "cmdstanr"
+    ))$value
+  },
+  key = sim_truth
+)
+
+
+test_that("the program counts units, not rows and not series", {
+  sd <- fit$standata
+  expect_identical(as.integer(sd$N), nrow(dat))
+  expect_identical(as.integer(sd$N_unit), n_unit)
+  # One repeat count per unit, and every unit is visited the same
+  # number of times on this frame.
+  expect_length(as.integer(sd$n_rep), n_unit)
+  expect_true(all(as.integer(sd$n_rep) == n_visit))
+  expect_identical(sum(as.integer(sd$n_rep)), nrow(dat))
+
+  # `visit_idx` reorders the rows into the layout the likelihood
+  # walks, so it names every row exactly once. A mapping that named
+  # one twice and skipped another keeps its length, keeps every index
+  # in range, and quietly counts one observation twice.
+  expect_length(as.integer(sd$visit_idx), nrow(dat))
+  expect_setequal(as.integer(sd$visit_idx), seq_len(nrow(dat)))
+})
+
+
+test_that("the generated program divides its grainsize as an integer", {
+  # `grainsize` is an `int`, so rounding is what is wanted, but a `/`
+  # between two integers makes stanc say so at every compile of a
+  # closure-unit model. `%/%` states the intent and silences it.
+  #
+  # Asked of a prefit rather than of the cached fit, because the
+  # question is what mvgam writes now: a fit carries the program it
+  # was compiled from, so reading the code off one answers for the
+  # day it was sampled. The two spellings divide identically for a
+  # non-negative count, so the cached posterior is unaffected.
+  prefit <- mvgam(
+    formula = obs_formula, family = occ(), data = dat,
+    run_model = FALSE, silent = 2
+  )
+  code <- paste(as.character(stancode(prefit)), collapse = "\n")
+  expect_true(grepl("grainsize", code, fixed = TRUE))
+  expect_false(grepl("N_unit / 8", code, fixed = TRUE))
+  expect_true(grepl("N_unit %/% 8", code, fixed = TRUE))
+})
+
+
+test_that("each surface answers on the grain it belongs to", {
+  # The claim the whole file rests on. A likelihood term and a latent
+  # state belong to a unit; a detection probability and a fitted
+  # value belong to a visit. Because units, series and rows are three
+  # different counts here, a method answering on the wrong one is
+  # visible in the width alone -- which it was not on the fixture
+  # this file replaces, where units and series coincided.
+  per_unit <- list(
+    residuals = residuals(fit),
+    residual_draws = residuals(fit, summary = FALSE, ndraws = 20L),
+    log_lik = log_lik(fit, ndraws = 20L),
+    latent_state = predict(fit, type = "latent_state", ndraws = 20L),
+    occupancy = posterior_occupancy(fit, conditional = TRUE,
+                                    draw = FALSE)
+  )
+  expect_identical(nrow(per_unit$residuals), n_unit)
+  expect_identical(ncol(per_unit$residual_draws), n_unit)
+  expect_identical(ncol(per_unit$log_lik), n_unit)
+  expect_identical(nrow(per_unit$latent_state), n_unit)
+  expect_identical(ncol(per_unit$occupancy), n_unit)
+
+  per_visit <- list(
+    epred = posterior_epred(fit, ndraws = 20L),
+    predict = posterior_predict(fit, ndraws = 20L),
+    fitted = fitted(fit, ndraws = 20L),
+    detection = predict(fit, type = "detection", ndraws = 20L)
+  )
+  expect_identical(ncol(per_visit$epred), nrow(dat))
+  expect_identical(ncol(per_visit$predict), nrow(dat))
+  expect_identical(nrow(per_visit$fitted), nrow(dat))
+  expect_identical(nrow(per_visit$detection), nrow(dat))
+
+  # And neither grain is the series count, which is what the
+  # replaced fixture could not say.
+  expect_false(n_unit == n_site)
+  expect_false(nrow(dat) == n_unit)
+})
+
+
+test_that("a visit's expectation follows its row and carries no unit label", {
+  # Every visit of a unit takes that unit's state. The columns are
+  # positions in the frame, as for every other family. Broadcasting
+  # the state carried each unit's first-row label onto all of its
+  # visits. A shuffled frame gives each visit the value it had in
+  # place.
+  set.seed(3L)
+  perm <- sample.int(nrow(dat))
+  ep <- posterior_epred(fit, newdata = dat, draw_ids = 1:5)
+  ep_shuffled <- posterior_epred(fit, newdata = dat[perm, ], draw_ids = 1:5)
+  expect_null(dimnames(ep))
+  expect_equal(ep[, perm], ep_shuffled)
+  expect_null(dimnames(posterior_linpred(fit, newdata = dat, draw_ids = 1:5)))
+})
+
+
+test_that("seeing the species settles the state at that unit", {
+  # The one claim occupancy makes that arithmetic cannot soften: a
+  # unit where the species was detected is occupied, so its
+  # conditional probability is exactly one and not merely close to
+  # it. A model conditioning on the wrong unit's history puts a
+  # number below one somewhere in this set, and every value stays in
+  # [0, 1] while it does.
+  cond <- colMeans(posterior_occupancy(fit, conditional = TRUE,
+                                       draw = FALSE))
+  uncond <- colMeans(posterior_occupancy(fit, conditional = FALSE,
+                                         draw = FALSE))
+  expect_length(cond, n_unit)
+  expect_true(all(cond >= 0 & cond <= 1))
+  expect_true(all(uncond > 0 & uncond < 1))
+
+  expect_equal(as.numeric(cond[detected]),
+               rep(1, sum(detected)), tolerance = 1e-10)
+
+  # Non-detection is evidence of absence, so conditioning has to
+  # move an undetected unit down rather than leaving it alone. The
+  # two directions together are what say the detection history
+  # reached the state at all: a conditional surface that ignored it
+  # returns the unconditional one and fails both.
+  expect_true(all(cond[detected] > uncond[detected]))
+  expect_true(all(cond[!detected] < uncond[!detected]))
+
+  # `predict(type = "latent_state")` reports the same quantity and
+  # has to agree with it.
+  ls <- predict(fit, type = "latent_state", ndraws = 500L)
+  expect_identical(colnames(ls),
+                   c("Estimate", "Est.Error", "Q2.5", "Q97.5"))
+  expect_true(all(ls[, "Estimate"] >= 0 & ls[, "Estimate"] <= 1))
+  expect_equal(as.numeric(ls[detected, "Estimate"]),
+               rep(1, sum(detected)), tolerance = 1e-10)
+})
+
+
+test_that("the saturation table agrees with the detections", {
+  # A unit is at its ceiling when its latent state equals the cap,
+  # which for occupancy is one. A detected unit is occupied in every
+  # draw. An undetected one is occupied with its conditional
+  # occupancy probability. The share of draws at the cap estimates
+  # that probability.
+  sat <- withr::with_seed(1L, latent_N_saturation(fit))
+  expect_identical(nrow(sat), n_unit)
+  expect_true(all(c("unit", "label", "K_max", "p_saturated",
+                    "saturated") %in% names(sat)))
+  # Occupancy is presence or absence, so the ceiling is one.
+  expect_true(all(sat$K_max == 1L))
+  expect_identical(sat$p_saturated == 1, unname(detected))
+  cond <- colMeans(posterior_occupancy(fit, conditional = TRUE,
+                                       draw = FALSE))
+  expect_lt(max(abs(sat$p_saturated - cond)), 0.05)
+  # The flag is the share against the documented default of 0.05
+  expect_identical(sat$saturated, sat$p_saturated > 0.05)
+})
+
+
+test_that("the saturation table names its units", {
+  # The labels come back as `1_1`, `1_2`, `1_3`: the series index
+  # and the occasion index. This fit's units are `site_01` at times
+  # 3, 4 and 5, so a reader has no way from the table back to a site
+  # or a date, and the mapping is positional and undocumented.
+  #
+  # A reader acts on this table. A saturated unit is one whose survey
+  # effort was insufficient. The label names the site to revisit.
+  sat <- latent_N_saturation(fit)
+  labs <- as.character(sat$label)
+  expect_true(any(grepl(site_levels[1L], labs, fixed = TRUE)))
+  expect_false(any(grepl("^[0-9]+_[0-9]+$", labs)))
+})
+
+
+test_that("residuals are bounded by what their definition allows", {
+  # A quantile residual is a normal deviate through an empirical
+  # PIT, which clamps at about 8.13; an ordinary residual is an
+  # observed count minus a replicated one, so on a unit of four
+  # visits it cannot exceed four. Values outside either bound mean
+  # the residual was computed on the wrong scale or the wrong grain.
+  qr <- residuals(fit, summary = FALSE, ndraws = 100L)
+  expect_identical(dim(qr), c(100L, n_unit))
+  expect_true(all(is.finite(qr)))
+  expect_true(all(abs(qr) <= 8.5))
+
+  orl <- residuals(fit, type = "ordinary", summary = FALSE,
+                   ndraws = 100L)
+  expect_identical(dim(orl), c(100L, n_unit))
+  expect_true(all(is.finite(orl)))
+  expect_true(all(abs(orl) <= n_visit))
+
+  rs <- residuals(fit)
+  expect_identical(colnames(rs),
+                   c("Estimate", "Est.Error", "Q2.5", "Q97.5"))
+  expect_true(all(rs[, "Q2.5"] <= rs[, "Estimate"]))
+  expect_true(all(rs[, "Estimate"] <= rs[, "Q97.5"]))
+})
+
+
+test_that("augment recycles a unit's residual across its visits", {
+  # The residual belongs to the unit and the fitted value to the
+  # visit, so a per-visit frame carries one repeated across four rows
+  # and the other varying within them. A frame that recycled both, or
+  # neither, has the right number of rows either way.
+  got <- with_warnings(augment(fit))
+  aug <- got$value
+  expect_identical(nrow(aug), nrow(dat))
+  expect_true(all(c(".fitted", ".resid", ".resid.se", ".unit") %in%
+                    names(aug)))
+  expect_identical(length(unique(aug$.unit)), n_unit)
+
+  # Every unit, not merely the first one.
+  by_unit <- split(seq_len(nrow(aug)), aug$.unit)
+  expect_true(all(lengths(by_unit) == n_visit))
+  for (idx in by_unit) {
+    expect_identical(length(unique(aug$.resid[idx])), 1L)
+    expect_identical(length(unique(aug$.resid.se[idx])), 1L)
+  }
+  # And the fitted value moves with the detection covariate, so it
+  # was not recycled too.
+  varies <- vapply(by_unit, function(idx) {
+    length(unique(aug$.fitted[idx])) > 1L
+  }, logical(1))
+  expect_true(all(varies))
+
+  # The notice this fit owes is about the coarse PIT support, once.
+  pit <- grep("coarse PIT support", got$warnings, value = TRUE)
+  expect_lte(length(pit), 1L)
+  expect_identical(setdiff(got$warnings, pit), character(0))
+})
+
+
+test_that("a covariate that moves inside a unit cannot group a check", {
+  # A posterior predictive check on this family compares observed
+  # against replicated counts per unit, so a grouping has to be
+  # constant within one. `tod_c` changes at every visit and `elev`
+  # is a property of the site, which is the distinction the refusal
+  # is drawing.
+  expect_error(
+    pp_check(fit, type = "bars_grouped", group = "tod_c",
+             ndraws = 20L),
+    "'tod_c' varies within a closure unit"
+  )
+
+  got <- with_warnings(
+    pp_check(fit, type = "bars_grouped", group = "elev", ndraws = 20L)
+  )
+  expect_drawn(got$value)
+})
+
+
+test_that("the checks that read a unit's count all render", {
+  # 100 draws rather than 30: a residual histogram built from few
+  # draws shows apparent outliers that are an artefact of the PIT
+  # support, and the package says so. The count is chosen to satisfy
+  # that advice rather than to dodge it, and the advice itself is
+  # pinned in the block below.
+  got <- with_warnings({
+    lapply(c("bars", "rootogram", "ecdf_overlay", "hist", "freqpoly",
+             "dens_overlay", "stat_2d", "resid_hist", "resid_qq"),
+           function(ty) pp_check(fit, type = ty, ndraws = 100L))
+  })
+  for (p in got$value) expect_drawn(p)
+  expect_drawn(
+    pp_check(fit, type = "stat", stat = function(x) mean(x == 0))
+  )
+  # A statistic named as a string resolves where it was defined. A test
+  # body is a local environment, as an example page is.
+  prop_zero <- function(x) mean(x == 0)
+  expect_drawn(pp_check(fit, type = "stat", stat = "prop_zero"))
+  # The coarse-PIT notice is owed once per session, and nothing else
+  # is owed at all.
+  other <- grep("coarse PIT support", got$warnings, value = TRUE,
+                invert = TRUE)
+  expect_identical(other, character(0))
+})
+
+
+test_that("too few draws for a residual histogram is called out", {
+  # The advice that made the block above ask for a hundred draws. A
+  # quantile residual on a coarse discrete support needs enough draws
+  # for the PIT to fill in, and below that the histogram shows
+  # outliers that are an artefact of the method rather than of the
+  # fit. Silence here would let a reader take those for a finding.
+  # Once-per-session warnings are quiet under testthat.
+  withr::local_envvar(TESTTHAT = "")
+  got <- with_warnings(pp_check(fit, type = "resid_hist", ndraws = 8L))
+  expect_drawn(got$value)
+  expect_true(any(grepl("fewer than 50 draws", got$warnings)))
+
+  # And the advice stops once the count is adequate.
+  ample <- with_warnings(pp_check(fit, type = "resid_hist",
+                                  ndraws = 100L))
+  expect_false(any(grepl("fewer than 50 draws", ample$warnings)))
+})
+
+
+test_that("the checks that need a per-row grain are refused", {
+  # Each of these compares one observation against one replicate, and
+  # a closure-unit fit has no such pairing: the likelihood is a unit's
+  # whole detection history. Refusing by name beats plotting the
+  # first visit of each unit and calling it the fit.
+  for (ty in c("scatter_avg", "error_binned", "resid_acf",
+               "resid_vs_fitted")) {
+    expect_error(pp_check(fit, type = ty),
+                 "is not supported for closure-unit")
+  }
+})
+
+
+test_that("the two extractions are drawn from the same iterations", {
+  # A closure-unit family reads a detection probability and a latent
+  # state from the posterior separately. Unless a count is resolved
+  # to concrete draw indices first, each subsamples on its own and
+  # pairs a probability with a state from an unrelated iteration.
+  for (nd in c(5L, 25L)) {
+    ll <- log_lik(fit, ndraws = nd)
+    expect_identical(nrow(ll), nd)
+    expect_true(all(is.finite(ll)))
+  }
+  ids <- c(2L, 9L, 41L, 300L)
+  a <- log_lik(fit, draw_ids = ids)
+  expect_identical(nrow(a), length(ids))
+  # Naming the same draws twice gives the same answer, which it
+  # cannot if the two reads sample apart.
+  expect_identical(a, log_lik(fit, draw_ids = ids))
+
+  expect_identical(nrow(posterior_epred(fit, ndraws = 5L)), 5L)
+  expect_identical(nrow(posterior_predict(fit, ndraws = 5L)), 5L)
+  expect_identical(nrow(residuals(fit, summary = FALSE, ndraws = 5L)),
+                   5L)
+})
+
+
+test_that("a detection draw is a detection, and an epred a probability", {
+  # The observation is binary, so a draw on the response scale is in
+  # {0, 1} while the expectation is strictly between them. A surface
+  # returning one where the other was asked for is finite, correctly
+  # shaped and wrong.
+  pp <- posterior_predict(fit, ndraws = 50L)
+  expect_true(all(as.numeric(pp) %in% c(0, 1)))
+  ep <- posterior_epred(fit, ndraws = 50L)
+  expect_true(all(ep > 0 & ep < 1))
+  # The expectation of a visit is occupancy times detection, so it
+  # cannot exceed either.
+  det <- predict(fit, type = "detection", ndraws = 500L)
+  expect_true(all(det[, "Estimate"] > 0 & det[, "Estimate"] < 1))
+  expect_true(all(colMeans(ep) <= det[, "Estimate"] + 1e-6))
+})
+
+
+test_that("a frame carrying no responses can still be predicted at", {
+  # A prediction frame reaching past the training grid has no response
+  # by construction. Two fit-time requirements were being asked of it
+  # anyway -- that some visit was observed, and that the design could
+  # separate state from detection -- and between them they refused
+  # every such frame, one with a message about estimating detection
+  # and one about needing two closure units.
+  future <- dat[dat$time == max(dat$time), , drop = FALSE]
+  future$time <- max(dat$time) + 1L
+  future$y <- NA_integer_
+  expect_gt(length(unique(paste(future$series, future$time))), 1L)
+
+  ep <- posterior_epred(fit, newdata = future, draw_ids = 1:20)
+  expect_identical(ncol(ep), nrow(future))
+  expect_true(all(ep > 0 & ep < 1))
+  # A unit holds one state. A frame giving one unit two elevations, as
+  # a grid at one site would, is refused.
+  mixed <- future
+  mixed$elev[1L] <- mixed$elev[1L] + 1
+  expect_error(posterior_epred(fit, newdata = mixed, draw_ids = 1:5),
+               "'elev' varies within a closure unit")
+
+  # A visit's expectation is its unit's occupancy times that visit's
+  # own detection, so dividing one out leaves the other: a value
+  # constant across the unit's visits, because occupancy is a
+  # property of the unit. Returning the occupancy alone is in (0, 1)
+  # and correctly shaped, and leaves a ratio that moves with `tod_c`
+  # within the unit.
+  det <- predict(fit, newdata = future, type = "detection",
+                 summary = FALSE, draw_ids = 1:20)
+  ratio <- ep / det
+  expect_true(all(ratio > 0 & ratio <= 1 + 1e-8))
+  unit_of_row <- paste(future$series, future$time)
+  spread <- vapply(split(seq_len(ncol(ratio)), unit_of_row), function(j) {
+    max(apply(ratio[, j, drop = FALSE], 1L, function(r) diff(range(r))))
+  }, numeric(1L))
+  expect_true(all(spread < 1e-8))
+  # The premise: detection does move within a unit, so the check
+  # above could have failed.
+  det_spread <- vapply(split(seq_len(ncol(det)), unit_of_row), function(j) {
+    max(apply(det[, j, drop = FALSE], 1L, function(r) diff(range(r))))
+  }, numeric(1L))
+  expect_gt(max(det_spread), 1e-3)
+})
+
+
+test_that("the criticism surface runs on a closure-unit fit", {
+  caught <- with_warnings(loo(fit))
+  ic <- caught$value
+  loo_warnings <- caught$warnings
+  expect_true(is.finite(ic$estimates["elpd_loo", "Estimate"]))
+  # One likelihood term per closure unit, so the diagnostic is
+  # counted on units rather than on visits.
+  expect_identical(length(ic$diagnostics$pareto_k), n_unit)
+  expect_identical(
+    any(ic$diagnostics$pareto_k > 0.7),
+    any(grepl("Pareto k", loo_warnings))
+  )
+  expect_true(all(grepl("Pareto k", loo_warnings)))
+})
+
+
+test_that("summary and the tidiers name the occupancy structure", {
+  txt <- capture.output(summary(fit))
+  # Both submodels are reported, so a reader can tell occupancy from
+  # detection rather than seeing one block of coefficients.
+  expect_true(any(grepl("^elev\\s", txt)))
+  expect_true(any(grepl("^p_tod_c\\s", txt)))
+
+  vars <- variables(fit)
+  expect_true("b_elev" %in% vars)
+  expect_true("b_p_tod_c" %in% vars)
+
+  expect_tidy_glance(fit, observed = sum(!is.na(dat$y)))
+})
+
+
+# ----------------------------------------------------------------------
+# An abundance ceiling, and the grid the kernel numbers
+# ----------------------------------------------------------------------
+#
+# `occ()` pins its latent state at one, so the ceiling claim above is
+# about a boolean. `nmix()` estimates a population size, where the
+# same claim has a range to be wrong across: N is the population a
+# binomial count was drawn from, so it can never sit below the
+# largest count seen at that unit. A permuted unit grid puts a small
+# site's ceiling on a large one and breaks it.
+
+nmix_sim <- local({
+  cached <- NULL
+  function() {
+    if (!is.null(cached)) return(cached)
+    set.seed(4242L)
+    n_site <- 12L
+    n_season <- 2L
+    n_visit <- 3L
+    sites <- paste0("s", sprintf("%02d", seq_len(n_site)))
+    # Time-major, so the frame's own unit order interleaves sites
+    # across occasions and differs from sorting by (series, time).
+    # Built site-major the two coincide, and the ordering claim below
+    # cannot fail -- which is what its own guard checks.
+    grid <- expand.grid(
+      visit = seq_len(n_visit), site = sites,
+      season = seq_len(n_season), stringsAsFactors = FALSE
+    )
+    # Abundance varies strongly across sites so the ceiling claim has
+    # room to fail: a grid off by one puts a site of ~2 animals
+    # against a count from a site of ~30.
+    elev <- seq(-1.5, 1.5, length.out = n_site)
+    lambda <- exp(1.4 + 1.3 * elev)
+    # Units run site-fastest within a season, matching the frame's
+    # own row order, so `rep(N_true, each = n_visit)` below lands
+    # each unit's population on its own visits.
+    N_true <- rpois(n_site * n_season, rep(lambda, times = n_season))
+    d <- data.frame(
+      series = factor(grid$site, levels = sites),
+      time = as.integer(grid$season) + 4L,
+      elev = elev[match(grid$site, sites)],
+      y = as.integer(rbinom(nrow(grid), rep(N_true, each = n_visit),
+                            0.65))
+    )
+    # `nmix()` marginalises the latent population up to a ceiling, so
+    # the frame carries one. It sits well above the largest N drawn
+    # here, since a cap that binds would truncate the very quantity
+    # the ceiling claim below is about.
+    d$cap <- as.integer(max(N_true) * 3L)
+    cached <<- list(data = d, n_unit = n_site * n_season,
+                    n_site = n_site, N_true = N_true)
+    cached
+  }
+})
+
+nmix_fit <- cached_fit("val_mvgam_closure_nmix_units.rds", function() {
+  with_warnings(mvgam(
+    formula = y ~ elev, family = nmix(), data = nmix_sim()$data,
+    chains = 2L, iter = 1000L, warmup = 500L,
+    silent = 2, backend = "cmdstanr"
+  ))$value
+})
+
+
+test_that("the two sample-size accessors agree", {
+  # A closure-unit likelihood is evaluated per unit and the frame
+  # holds one row per visit, so both counts are meaningful. What a
+  # reader could not do is tell which they were given: `summary()`
+  # printed the unit count under a header naming observations while
+  # `nobs()` returns the row count. The block named an `occ_fit`
+  # that no line of this file defines, so it errored before it
+  # compared anything; the occupancy fit here is `fit`, and it runs
+  # below the nmix fit because that is where both exist.
+  for (f in list(fit, nmix_fit)) {
+    d <- f$data
+    n_unit <- as.integer(f$standata$N_unit)
+    expect_gt(nrow(d), n_unit)
+    printed <- capture.output(summary(f))
+    line <- grep("Number of observations", printed, value = TRUE)
+    expect_length(line, 1L)
+    shown <- as.integer(sub(".*Number of observations: *([0-9]+).*",
+                            "\\1", line))
+    # The header names observations, so the number under it is the
+    # row count, and the two accessors now answer alike.
+    expect_identical(shown, as.integer(nrow(d)))
+    expect_identical(as.integer(nobs(f)), shown)
+  }
+})
+
+
+test_that("no unit is given fewer animals than were counted there", {
+  # N is the population a binomial count is drawn from, so the
+  # posterior for a unit cannot sit below the largest count observed
+  # at that unit. This is the one claim an abundance model makes that
+  # holds whatever the seed or the sampler settings.
+  d <- nmix_sim()$data
+  state <- as.data.frame(hindcast(nmix_fit, type = "latent_state"))
+  observed <- stats::aggregate(y ~ series + time, data = d, FUN = max)
+  merged <- merge(state, observed, by = c("series", "time"))
+  expect_identical(nrow(merged), nrow(state))
+  expect_identical(nrow(merged), nmix_sim()$n_unit)
+  expect_true(all(merged$median >= merged$y))
+  expect_true(all(merged$upper_95 >= merged$y))
+  # The counts have to differ across units, or a single ceiling would
+  # satisfy the comparison everywhere.
+  expect_gt(stats::sd(merged$y), 1)
+})
+
+
+test_that("the unit grid keeps the kernel's own ordering", {
+  # `build_closure_unit_arrays()` numbers units by first appearance
+  # in the time-major frame and the draw matrix columns follow that,
+  # so the grid must not be re-sorted on the way out.
+  #
+  # The defect this guards is a permutation, which `expect_setequal()`
+  # cannot see: both orders hold the same labels. So the check is on
+  # the sequence, and it is paired with a claim that the frame's own
+  # order is not the sorted one -- otherwise the two coincide and the
+  # first check says nothing.
+  d <- nmix_sim()$data
+  state <- as.data.frame(hindcast(nmix_fit, type = "latent_state"))
+  units <- unique(d[, c("series", "time")])
+  expect_identical(nrow(state), nrow(units))
+  expect_identical(paste(state$series, state$time),
+                   paste(units$series, units$time))
+  expect_false(identical(
+    paste(units$series, units$time),
+    paste(units$series, units$time)[order(units$series, units$time)]
+  ))
+})
+
+
+test_that("the abundance ceiling is reported against real labels", {
+  # The same table the occupancy block covers. Here the ceiling
+  # is an estimated count rather than one, so the label is what tells
+  # a reader which site to revisit.
+  sat <- latent_N_saturation(nmix_fit)
+  expect_identical(nrow(sat), nmix_sim()$n_unit)
+  expect_true(all(sat$K_max >= 1L))
+  labs <- as.character(sat$label)
+  expect_true(any(grepl(levels(nmix_sim()$data$series)[1L], labs,
+                        fixed = TRUE)))
+  expect_false(any(grepl("^[0-9]+_[0-9]+$", labs)))
+})
+
+
+test_that("a cap column survives a unit whose responses are absent", {
+  # The cap bounds a unit's latent state, so it is a property of the
+  # unit and every one of its rows carries it. Read over the observed
+  # rows alone it was empty for a unit nothing was recorded in, and
+  # the ceiling became `NA`; the comparison against the unit's
+  # largest count then met a missing condition and stopped on R's own
+  # "missing value where TRUE/FALSE needed", naming nothing a caller
+  # supplied. Only `nmix()` takes a cap column, which is why the
+  # occupancy fit above cannot stand in for this.
+  sim <- nmix_sim()
+  future <- sim$data[sim$data$time == max(sim$data$time), , drop = FALSE]
+  future$time <- max(sim$data$time) + 1L
+  future$y <- NA_integer_
+  expect_true("cap" %in% names(future))
+
+  ep <- posterior_epred(nmix_fit, newdata = future, draw_ids = 1:20)
+  expect_identical(ncol(ep), nrow(future))
+  expect_true(all(is.finite(ep) & ep > 0))
+  # An expected count is abundance times detection, so it stays under
+  # the ceiling the frame declared.
+  expect_true(all(ep < future$cap[1L]))
+})
+
+
+# ----------------------------------------------------------------------
+# Occasions that were never visited
+# ----------------------------------------------------------------------
+#
+# A missing response is a visit that did not happen, which is the
+# normal case in repeat-visit data. The Stan code aggregates visits
+# per unit through `visit_idx` and `n_rep`, and both are built from
+# the raw frame while brms sizes the likelihood to the observed rows.
+# The pair of fits below, one complete and one gappy, is what says
+# those indices stay inside the response.
+
+gappy_fits <- local({
+  cached <- NULL
+  function() {
+    if (!is.null(cached)) return(cached)
+    gappy <- dat
+    # Every sixth visit goes unmade, spread across sites rather than
+    # clustered, so no unit loses all of its visits.
+    gappy$y[seq(2L, nrow(gappy), by = 6L)] <- NA_integer_
+    fit <- cached_fit("val_mvgam_occ_visits_gappy.rds", function() {
+      # brms reports the rows it dropped, once per internal pass.
+      withCallingHandlers(
+        mvgam(y ~ 1, data = gappy, family = occ(), chains = 2L,
+              iter = 800L, warmup = 400L, silent = 2, seed = 11L,
+              backend = "cmdstanr"),
+        warning = function(w) {
+          if (grepl("Rows containing NAs", conditionMessage(w))) {
+            invokeRestart("muffleWarning")
+          }
+        }
+      )
+    })
+    cached <<- list(gappy = fit, data_gappy = gappy)
+    cached
+  }
+})
+
+
+test_that("the unit arrays cover the visits that happened", {
+  obj <- gappy_fits()
+  sd <- obj$gappy$standata
+  n_obs <- sum(!is.na(obj$data_gappy$y))
+  expect_identical(as.integer(sd$N), n_obs)
+  # Every repeat count adds up to the observed rows, and no index
+  # reaches past the response the likelihood was given.
+  expect_identical(sum(as.integer(sd$n_rep)), n_obs)
+  expect_lte(max(as.integer(sd$visit_idx)), n_obs)
+  expect_setequal(as.integer(sd$visit_idx), seq_len(n_obs))
+  # The unit count is unchanged: a unit that lost a visit is still a
+  # unit, which is the whole point of the padded grid.
+  expect_identical(as.integer(sd$N_unit), n_unit)
+  # And the gaps are real, or this file is testing the complete fit
+  # twice.
+  expect_gt(sum(is.na(obj$data_gappy$y)), 0L)
+  expect_lt(n_obs, nrow(dat))
+})
+
+
+test_that("an unmade visit does not cost a unit its density", {
+  # 300 rows, 250 observed, 75 units, and the gaps are spread so no
+  # unit loses all of its visits. The Stan data agrees: N is the
+  # observed count, n_rep sums to it and visit_idx stays inside it.
+  # So every unit still has visits to contribute a density, and the
+  # likelihood has to carry one term per unit.
+  obj <- gappy_fits()
+  ll <- log_lik(obj$gappy, ndraws = 10L)
+  expect_identical(ncol(ll), n_unit)
+  empty <- sum(apply(ll, 2L, function(v) all(is.na(v))))
+  expect_identical(empty, 0L)
+})
+
+
+test_that("the prediction methods survive an unmade visit", {
+  # `posterior_predict()` and `residuals()` answer on this fit, so the
+  # draws and the unit grain are both reachable. These two stop on
+  # "non-conformable arrays", which names neither a row nor a column
+  # the caller supplied.
+  obj <- gappy_fits()
+  n_row <- nrow(obj$data_gappy)
+  ep <- posterior_epred(obj$gappy, ndraws = 10L)
+  expect_identical(ncol(ep), n_row)
+  ft <- fitted(obj$gappy, ndraws = 10L)
+  expect_identical(nrow(ft), n_row)
+})
+
+
+test_that("the checks read a unit that lost a visit", {
+  # `pp_check()` narrows the plot to the observations it can show. A
+  # closure-unit family answers per unit, and a unit keeps its place
+  # when one of its visits was never made, so the narrowing has to
+  # happen at the unit grain. Dropping visits first handed the
+  # aggregator a replicate matrix 250 wide and a frame 300 long, and
+  # every type refused with a count the caller cannot act on.
+  obj <- gappy_fits()
+  grDevices::pdf(NULL)
+  on.exit(grDevices::dev.off(), add = TRUE)
+  # One type per shape. A density over the units, an interval per
+  # unit, a scalar statistic, a PSIS-weighted check and a residual
+  # panel each narrow a different quantity. Every draw is used: PSIS
+  # fits its tail to 20 draws poorly and warns for each unit.
+  #
+  # bayesplot 1.15.0 draws intervals with a `size` aesthetic that
+  # ggplot2 4.0 deprecates. The deprecation comes from bayesplot, and
+  # only lifecycle notices are quieted here.
+  withr::local_options(lifecycle_verbosity = "quiet")
+  for (ty in c("dens_overlay", "intervals", "stat",
+               "loo_pit_overlay", "resid_hist")) {
+    expect_drawn(pp_check(obj$gappy, type = ty))
+  }
+  # `group` travels the same narrowing by a different route. It is
+  # mapped to one value per unit, and the mapped values are narrowed.
+  expect_drawn(
+    pp_check(obj$gappy, type = "stat_grouped", group = "series")
+  )
+})
+
+
+test_that("a fold holds out whole closure units", {
+  # A closure unit is the block the likelihood is written over: its
+  # visits share the latent state, so holding out one visit while
+  # keeping its siblings leaves the state in the training data and
+  # the score is optimistic. Nothing in `kfold()`'s output says which
+  # grain it split on, and the ELPD it returns is finite either way,
+  # so the fold keys are checked against the unit arrays directly.
+  #
+  # This read `closure_unit_grouping()`, which returns the raw
+  # attribute and is set only for `multi_season = TRUE`. On a plain
+  # `occ()` fit it answered NULL, every visit became its own fold,
+  # and all 75 units were split.
+  obj <- gappy_fits()
+  d <- obj$gappy$data
+  arrays <- mvgam:::closure_unit_arrays_for(obj$gappy, d)
+  keys <- mvgam:::resolve_kfold_group(obj$gappy, NULL, d)
+
+  # One fold key per unit, not one per visit.
+  expect_identical(length(unique(keys$key)), as.integer(arrays$N_unit))
+
+  # And each unit's visits carry the same key, so no split can put
+  # them in different folds.
+  per_unit <- vapply(seq_len(arrays$N_unit), function(u) {
+    idx <- arrays$visit_row[u, seq_len(arrays$n_rep[u])]
+    length(unique(keys$key[idx]))
+  }, integer(1L))
+  expect_identical(unique(per_unit), 1L)
+})
+
+
+test_that("a fold survives an unmade visit", {
+  # `kfold()` reads the likelihood, so it inherits whatever the units
+  # above lost: it reports the count that survives rather than the
+  # count the fit holds.
+  obj <- gappy_fits()
+  kf <- kfold(obj$gappy, K = 2L)
+  expect_true(is.finite(kf$estimates["elpd_kfold", "Estimate"]))
+})
+
+
+test_that("a visit that never happened is still predicted", {
+  # The likelihood never saw these rows, and the frame still names
+  # them, so a prediction has to cover the whole frame rather than
+  # the observed part of it. A method sized to the likelihood comes
+  # back one column short per missing visit and every value in it is
+  # finite, so only the width says anything.
+  obj <- gappy_fits()
+  pp <- posterior_predict(obj$gappy, ndraws = 20L)
+  expect_identical(ncol(pp), nrow(obj$data_gappy))
+  gaps_at <- which(is.na(obj$data_gappy$y))
+  expect_gt(length(gaps_at), 0L)
+  expect_true(all(is.finite(pp[, gaps_at])))
+  expect_true(all(as.numeric(pp) %in% c(0, 1)))
+})
+
+# ----------------------------------------------------------------------
+# Closure units under a factor model
+# ----------------------------------------------------------------------
+#
+# The fits above give each series its own latent state. A `jsdgam()`
+# gives K species N_lv shared factors instead, and puts the closure
+# unit underneath: the trend design moves to the factor axis while an
+# observation still has to read a species cell. Two families reach
+# that composition, and they differ only in what the latent state is
+# -- binary occupancy for `occ()`, a population size for `nmix()` --
+# so the questions are asked once, in `closure_jsdm_battery()`, and
+# what each family recovers is written out beneath it.
+#
+# `s(env, by = lv_axis())` puts one smooth on the factor grain, which
+# is the second thing these fits carry that nothing above does: the
+# trend design has `n_sites * N_lv` rows where the observation side
+# has `n_sites * K * n_visits`.
+#
+# Sites are numbered from 3 in both, so a site identifier never
+# equals its own rank.
+
+jsdm_K <- 4L
+jsdm_N_lv <- 2L
+jsdm_visits <- 3L
+jsdm_p_true <- 0.6
+jsdm_species <- paste0("sp", seq_len(jsdm_K))
+
+# Two orthogonal smooth shapes in env, standardised, so the factor
+# model has something to tell apart on the factor axis.
+jsdm_lv_true <- function(env) {
+  lv <- cbind(sin(env), env^2 - mean(env^2))
+  scale(lv, center = TRUE, scale = apply(lv, 2L, sd))
+}
+
+
+# The cached fit is keyed to this exact sequence of random calls, so
+# reordering or adding one invalidates it silently. Change the seed
+# and delete the cache together, or not at all.
+sim_jsdgam_occ <- function() {
+  set.seed(607L)
+  n_sites <- 50L
+  env <- sort(runif(n_sites, -2, 2))
+  lv_true <- jsdm_lv_true(env)
+  Z_true <- matrix(rnorm(jsdm_K * jsdm_N_lv, sd = 1.0),
+                   nrow = jsdm_K, ncol = jsdm_N_lv)
+  Z_true <- scale(Z_true, center = TRUE, scale = FALSE)
+  attr(Z_true, "scaled:center") <- NULL
+  b_int <- rnorm(jsdm_K, mean = 0, sd = 0.5)
+
+  logit_psi <- matrix(NA_real_, nrow = jsdm_K, ncol = n_sites)
+  for (s in seq_len(jsdm_K)) {
+    for (i in seq_len(n_sites)) {
+      logit_psi[s, i] <- b_int[s] + sum(Z_true[s, ] * lv_true[i, ])
+    }
+  }
+  z_latent <- matrix(rbinom(jsdm_K * n_sites, 1L,
+                            1 / (1 + exp(-logit_psi))),
+                     nrow = jsdm_K, ncol = n_sites)
+  site_ids <- seq_len(n_sites) + 2L
+
+  rows <- list()
+  for (s in seq_len(jsdm_K)) {
+    for (i in seq_len(n_sites)) {
+      for (v in seq_len(jsdm_visits)) {
+        rows[[length(rows) + 1L]] <- data.frame(
+          species = jsdm_species[s], site = site_ids[i],
+          env = env[i], visit = v,
+          y = if (z_latent[s, i] == 1L) {
+            rbinom(1L, 1L, jsdm_p_true)
+          } else {
+            0L
+          }
+        )
+      }
+    }
+  }
+  d <- do.call(rbind, rows)
+  d$species <- factor(d$species, levels = jsdm_species)
+  sigma_true_cov <- tcrossprod(Z_true)
+  list(
+    data = d, n_sites = n_sites, K = jsdm_K, N_lv = jsdm_N_lv,
+    n_visits = jsdm_visits, species_levels = jsdm_species,
+    Z_true = Z_true, z_latent = z_latent, env = env,
+    state_true = t(z_latent),
+    sigma_true_cor = cov2cor(sigma_true_cov + diag(1e-8, jsdm_K))
+  )
+}
+
+
+fit_jsdm_closure <- function(nm, sim, family) {
+  cached_fit(paste0("val_mvgam_jsdgam_mv_", nm, ".rds"), function() {
+    jsdgam(
+      formula = y ~ species,
+      factor_formula = ~ s(env, by = lv_axis(), k = 5) - 1,
+      data = sim$data, unit = site, species = species,
+      family = family, n_lv = sim$N_lv,
+      chains = 2L, iter = 1000L, warmup = 500L,
+      silent = 2, backend = "cmdstanr"
+    )
+  })
+}
+
+
+closure_jsdm_battery <- function(nm, sim, fit, threshold_cor,
+                                 state_ok) {
+  K <- sim$K
+  N_lv <- sim$N_lv
+  lev <- sim$species_levels
+  n_sites <- sim$n_sites
+  n_visits <- sim$n_visits
+  # `unit = site` makes mvgam synthesise its own `time` and `series`
+  # columns, so the frame every prediction call is given is the one
+  # the fit kept rather than the one the simulation built. The
+  # simulation frame has no `time`, and passing it raises there
+  # instead of reaching the claim.
+  d <- as.data.frame(fit$data)
+  raw <- sim$data
+  n_unit_jsdm <- K * n_sites
+  says <- function(claim) paste0(nm, ": ", claim)
+  dm <- as_draws_matrix(fit$fit)
+  post_cor <- residual_cor(fit)$cor
+  true_off <- sim$sigma_true_cor[upper.tri(sim$sigma_true_cor)]
+  post_off <- post_cor[upper.tri(post_cor)]
+
+  test_that(says("the loadings recover the simulated covariance"), {
+    expect_gt(stats::cor(true_off, post_off), threshold_cor)
+    expect_lt(mean(abs(true_off - post_off)), 0.6)
+  })
+
+  test_that(says("the closure units are the species-site cells"), {
+    # A closure unit is a (species, site) cell with three visits. It
+    # is neither a species nor a row, and all three counts differ
+    # here, so a marginalisation taken over the wrong grouping shows
+    # in the count alone.
+    expect_identical(as.integer(fit$standata$N_unit), n_unit_jsdm)
+    expect_identical(nrow(unique(raw[, c("species", "site")])),
+                     n_unit_jsdm)
+    expect_identical(as.integer(fit$standata$N), nrow(raw))
+    expect_false(n_unit_jsdm == K)
+    expect_false(n_unit_jsdm == nrow(d))
+  })
+
+  test_that(says("the trend design is split by factor, on one basis"), {
+    # `by = lv_axis()` puts the design on the factor axis. It has to
+    # come out block-complementary across the factors and evaluated
+    # at one shared basis. Read off the data Stan is handed rather
+    # than the program text, since a design built on the species axis
+    # and relabelled has correct dimensions and wrong content.
+    sd <- fit$standata
+    expect_identical(as.integer(sd$N_trend), n_sites * N_lv)
+    expect_identical(dim(sd$times_trend), c(n_sites, N_lv))
+    r1 <- as.integer(sd$times_trend[, 1L])
+    r2 <- as.integer(sd$times_trend[, 2L])
+    expect_length(intersect(r1, r2), 0L)
+    expect_identical(sort(c(r1, r2)), seq_len(n_sites * N_lv))
+
+    X <- sd$Xs_trend
+    expect_identical(nrow(X), n_sites * N_lv)
+    expect_identical(ncol(X), N_lv)
+    expect_true(all(X[r1, 2L] == 0))
+    expect_true(all(X[r2, 1L] == 0))
+    # One smooth split two ways: the same covariate value reaches
+    # both factors, in their own columns.
+    expect_equal(unname(X[r1, 1L]), unname(X[r2, 2L]))
+
+    zs <- grep("^Zs_[0-9]+_[0-9]+_trend$", names(sd), value = TRUE)
+    expect_length(zs, N_lv)
+    Z1 <- sd$Zs_1_1_trend
+    Z2 <- sd$Zs_2_1_trend
+    expect_identical(dim(Z1), dim(Z2))
+    expect_true(all(Z1[r2, ] == 0))
+    expect_true(all(Z2[r1, ] == 0))
+    expect_equal(unname(Z1[r1, ]), unname(Z2[r2, ]))
+    expect_equal(as.integer(sd$knots_1_trend),
+                 as.integer(sd$knots_2_trend))
+  })
+
+  test_that(says("an observation reads a species cell, not a factor"), {
+    # `times_trend` moved to the factor axis, but `trend[t, s]` stays
+    # species-grained because the program folds through `Z`. Running
+    # `obs_trend_series` over factors stays in range, samples, and
+    # silently gives four species two states.
+    s_rec <- as.integer(fit$standata$obs_trend_series)
+    expect_identical(sort(unique(s_rec)), seq_len(K))
+    expect_identical(s_rec, match(as.character(d$species), lev))
+    expect_identical(as.integer(table(s_rec)),
+                     rep(n_sites * n_visits, K))
+  })
+
+  test_that(says("every prediction surface answers at the row grain"), {
+    ep <- posterior_epred(fit, draw_ids = 1:20)
+    pp <- posterior_predict(fit, draw_ids = 1:20)
+    expect_identical(dim(ep), c(20L, nrow(d)))
+    expect_identical(dim(pp), c(20L, nrow(d)))
+    expect_true(all(is.finite(ep)))
+    expect_true(all(is.finite(pp)))
+    # `fitted()` summarises the draws `posterior_epred()` returns at
+    # the fitted state. Its Estimate column is their column mean.
+    ft <- fitted(fit, draw_ids = 1:20)
+    ep_state <- posterior_epred(fit, draw_ids = 1:20,
+                                incl_autocor = TRUE)
+    expect_identical(nrow(ft), nrow(d))
+    expect_equal(unname(ft[, "Estimate"]), unname(colMeans(ep_state)),
+                 tolerance = 1e-8)
+    # The density belongs to the unit, not the row: one term per
+    # closure unit is what the marginalisation produces.
+    ll <- log_lik(fit, draw_ids = 1:20)
+    expect_identical(ncol(ll), n_unit_jsdm)
+    expect_true(all(is.finite(ll)))
+  })
+
+  test_that(says("the latent state recovers the simulated one"), {
+    # The quantity these families exist to estimate, and the one
+    # nothing checked. It is also the sharpest axis test available
+    # here: the units are (species, site) cells, so reading them in
+    # species-major order instead of the fit's own order is a
+    # permutation that leaves every value plausible. Measured, the
+    # correct ordering agrees with the truth far better than that
+    # permutation, and requiring both is what makes this a claim
+    # about which cell is which rather than about the fit's quality.
+    ls <- predict(fit, type = "latent_state", ndraws = 200L)
+    truth <- sim$state_true
+    expect_length(as.numeric(ls[, "Estimate"]), length(truth))
+    right <- stats::cor(as.numeric(ls[, "Estimate"]), as.numeric(truth))
+    permuted <- stats::cor(as.numeric(ls[, "Estimate"]),
+                           as.numeric(t(truth)))
+    expect_gt(right, 0.8)
+    expect_gt(right - permuted, 0.3)
+  })
+
+  test_that(says("the closure-unit prediction types answer per unit"), {
+    # The two quantities these families exist to separate: the latent
+    # state and the detection probability. Confusing their grain is
+    # what makes a state estimate read as a detection rate, so the
+    # width is checked as well as the scale.
+    ls <- predict(fit, type = "latent_state", ndraws = 20L)
+    det <- predict(fit, type = "detection", ndraws = 20L)
+    expect_identical(nrow(ls), n_unit_jsdm)
+    expect_identical(nrow(det), nrow(d))
+    expect_true(all(det[, "Estimate"] >= 0 & det[, "Estimate"] <= 1))
+    expect_true(state_ok(as.numeric(ls[, "Estimate"])))
+  })
+
+  test_that(says("each row reads the latent cell the sampler drew"), {
+    t_rec <- as.integer(fit$standata$obs_trend_time)
+    s_rec <- as.integer(fit$standata$obs_trend_series)
+    expect_length(t_rec, nrow(d))
+    want <- vapply(paste0("trend[", t_rec, ",", s_rec, "]"),
+                   function(k) mean(dm[, k]), numeric(1))
+    got <- colMeans(
+      mvgam:::extract_trend_latent_states(fit, newdata = d,
+                                          full_draws = dm)
+    )
+    expect_equal(unname(got), unname(want))
+    expect_gt(stats::sd(want), 1e-6)
+  })
+
+  test_that(says("a shuffled frame answers the same, in the new order"), {
+    set.seed(19L)
+    perm <- sample(nrow(d))
+    base <- posterior_epred(fit, newdata = d, draw_ids = 1:10,
+                            incl_autocor = TRUE)
+    shuf <- posterior_epred(fit, newdata = d[perm, , drop = FALSE],
+                            draw_ids = 1:10, incl_autocor = TRUE)
+    expect_equal(unname(base[, perm, drop = FALSE]), unname(shuf))
+    expect_gt(stats::sd(colMeans(base)), 1e-8)
+  })
+
+  test_that(says("a frame holding whole units for some species maps"), {
+    # Closure units have to stay whole, so the cut is by species
+    # rather than by row. A frame carrying some of the species in a
+    # different order is what separates an axis read off the record
+    # from one rebuilt out of the levels the frame happens to carry.
+    base <- posterior_epred(fit, newdata = d, draw_ids = 1:10,
+                            incl_autocor = TRUE)
+    for (subset in list(lev[c(2L, 4L)], lev[c(4L, 1L, 3L)])) {
+      rows <- which(as.character(d$species) %in% subset)
+      sub <- d[rows, , drop = FALSE]
+      sub$series <- factor(as.character(sub$series), levels = subset)
+      sub$species <- factor(as.character(sub$species),
+                            levels = subset)
+      expect_true(all(table(paste(sub$species, sub$time)) == n_visits))
+      got <- posterior_epred(fit, newdata = sub, draw_ids = 1:10,
+                             incl_autocor = TRUE)
+      expect_equal(unname(got), unname(base[, rows, drop = FALSE]))
+    }
+  })
+
+  test_that(says("a frame naming an unknown species is refused"), {
+    nd <- d
+    nd$series <- factor(
+      ifelse(seq_len(nrow(nd)) == 1L, "sp_unseen",
+             as.character(nd$series)),
+      levels = c(lev, "sp_unseen")
+    )
+    err <- expect_error(
+      posterior_epred(fit, newdata = nd, draw_ids = 1:5),
+      "'species' in 'newdata' has levels absent from the training data"
+    )
+    expect_match(conditionMessage(err), "sp_unseen", fixed = TRUE)
+    for (s in lev) {
+      expect_match(conditionMessage(err), s, fixed = TRUE)
+    }
+  })
+
+  test_that(says("hindcast arms are the species, in order, distinct"), {
+    arms <- hindcast(fit, ndraws = 20L)$hindcasts
+    expect_identical(names(arms), lev)
+    same <- character(0)
+    for (i in seq_along(arms)) {
+      for (j in seq_along(arms)) {
+        if (j <= i) next
+        if (isTRUE(all.equal(arms[[i]], arms[[j]]))) {
+          same <- c(same, paste(names(arms)[i], names(arms)[j],
+                                sep = "="))
+        }
+      }
+    }
+    expect_identical(same, character(0))
+  })
+
+  test_that(says("residual_cor is labelled by the species axis"), {
+    expect_identical(rownames(post_cor), lev)
+    expect_identical(colnames(post_cor), lev)
+    expect_equal(unname(diag(post_cor)), rep(1, K))
+    expect_equal(unname(post_cor), unname(t(post_cor)))
+    expect_gt(max(abs(post_off)), 0.05)
+  })
+
+  test_that(says("the factor methods report the fit's own loadings"), {
+    af <- active_factors(fit)
+    expect_identical(as.integer(af$n_lv), N_lv)
+    expect_identical(nrow(af$per_factor), N_lv)
+
+    sv <- shared_variation(fit)
+    expect_identical(as.character(sv$series_names), lev)
+    expect_identical(as.integer(sv$n_series), K)
+    expect_identical(dim(sv$delta), c(K, K))
+    expect_equal(unname(sv$delta), unname(t(sv$delta)))
+    expect_true(all(diag(sv$delta) > 0))
+
+    Z_m <- apply(
+      mvgam:::extract_Z_loadings(dm, n_obs_series = K, n_lv = N_lv),
+      c(2L, 3L), mean
+    )
+    expect_identical(dim(Z_m), c(K, N_lv))
+    # `Z` is [species, factor], so a permutation of its rows gives
+    # every species another's loadings while leaving the recovery
+    # correlation above almost unchanged. Every pair, not just the
+    # opening one.
+    same <- character(0)
+    for (i in seq_len(K)) {
+      for (j in seq_len(K)) {
+        if (j <= i) next
+        if (isTRUE(all.equal(Z_m[i, ], Z_m[j, ]))) {
+          same <- c(same, paste(lev[i], lev[j], sep = "="))
+        }
+      }
+    }
+    expect_identical(same, character(0))
+    # The distinctness above holds vacuously on loadings that are all
+    # near zero, so they have to be materially non-zero. `nmix()`
+    # draws its truth at half the occupancy fit's scale and centres
+    # it, so the floor is the smaller of the two.
+    expect_gt(max(abs(Z_m)), 0.05)
+  })
+
+  test_that(says("the env smooth is drawn once per latent factor"), {
+    # `s(env, by = lv_axis())` is the only smooth, and it is indexed
+    # by latent factor rather than by species. Checking that the call
+    # returns leaves the two ways it can be wrong untouched: an empty
+    # grid, which comes back correctly named with no rows, and a grid
+    # built over the observation frame, which carries no `.trend`
+    # column and cannot separate the factors.
+    sm <- smooths(fit)
+    expect_length(sm, 1L)
+    expect_match(sm[1L], ".trend", fixed = TRUE)
+
+    ps <- posterior_smooths(fit, smooth = sm[1L], ndraws = 20L)
+    expect_identical(dim(ps), c(20L, n_sites * N_lv))
+    expect_true(all(is.finite(ps)))
+
+    cs <- conditional_smooths(fit)
+    expect_length(cs, 1L)
+    cd <- cs[[1L]]
+    expect_gt(nrow(cd), 0L)
+    expect_true(all(is.finite(cd$estimate__)))
+    expect_true(all(cd$lower__ <= cd$estimate__))
+    expect_true(all(cd$estimate__ <= cd$upper__))
+    # One curve per latent factor. Requiring only that the two
+    # differ is satisfied by a second curve that is identically
+    # zero, so each is asked to move and to carry uncertainty of
+    # its own. A flat curve with a zero-width interval is not a
+    # shrunken smooth; it is coefficients that never reached the
+    # grid.
+    curves <- split(cd$estimate__, cd$cond__)
+    widths <- split(cd$upper__ - cd$lower__, cd$cond__)
+    expect_length(curves, N_lv)
+    expect_false(isTRUE(all.equal(curves[[1L]], curves[[2L]])))
+    for (k in seq_len(N_lv)) {
+      expect_gt(stats::sd(curves[[k]]), 1e-8)
+      expect_gt(mean(widths[[k]]), 0)
+    }
+
+    # And the renderer has to keep them apart. Drawn as one group
+    # the line runs the width of the covariate once per factor and
+    # returns, which comes out as a sawtooth across the panel with a
+    # ribbon spanning both curves' uncertainty at once.
+    pl <- plot(cs)
+    pl <- if (inherits(pl, "ggplot")) pl else pl[[1L]]
+    pb <- ggplot2::ggplot_build(pl)$data[[1L]]
+    expect_gte(nrow(unique(pb[, c("PANEL", "group")])), N_lv)
+    # Drawn over the covariate the trend side actually saw.
+    trend_env <- fit$trend_model$data$env
+    expect_gte(min(cd$effect1__), min(trend_env) - 1e-8)
+    expect_lte(max(cd$effect1__), max(trend_env) + 1e-8)
+  })
+
+  test_that(says("the criticism methods run on this fit"), {
+    caught <- with_warnings(loo(fit))
+    ic <- caught$value
+    seen <- caught$warnings
+    expect_true(is.finite(ic$estimates["elpd_loo", "Estimate"]))
+    # One likelihood term per closure unit, so the diagnostic is
+    # counted on units rather than on visits.
+    expect_identical(length(ic$diagnostics$pareto_k), n_unit_jsdm)
+    expect_true(all(is.finite(ic$diagnostics$pareto_k)))
+    expect_true(all(grepl("Pareto", seen)))
+  })
+
+  test_that(says("pp_check and the plotting methods render"), {
+    expect_drawn(pp_check(fit, ndraws = 40L))
+    expect_drawn(plot(fit, type = "factors"))
+    # The units of a jsdgam are sites in arbitrary order. A trend
+    # drawn along them would look like a time series
+    expect_error(plot(fit, type = "trend"), "along time is not supported")
+    ce <- conditional_effects(fit)
+    expect_gt(length(ce), 0L)
+    for (eff in names(ce)) {
+      cd <- ce[[eff]]$data
+      expect_true(all(is.finite(cd$estimate)))
+      expect_true(all(cd$conf.low <= cd$estimate))
+      expect_true(all(cd$estimate <= cd$conf.high))
+      expect_gt(max(cd$conf.high - cd$conf.low), 0)
+    }
+  })
+
+  invisible(NULL)
+}
+
+
+occ_jsdm <- sim_jsdgam_occ()
+occ_jsdm_fit <- fit_jsdm_closure("occ", occ_jsdm, occ())
+closure_jsdm_battery(
+  "jsdgam occ", occ_jsdm, occ_jsdm_fit, threshold_cor = 0.5,
+  # Occupancy is a probability.
+  state_ok = function(x) all(x >= 0 & x <= 1)
+)
+
+
+test_that("jsdgam occ: the detection probability recovers the truth", {
+  # A detection probability that had run to 0 or 1 is still a number
+  # in the unit interval, so the claim is against the simulated
+  # value rather than against the bounds.
+  p_post <- as.numeric(as_draws_matrix(occ_jsdm_fit$fit)[, "p"])
+  expect_lt(abs(mean(p_post) - jsdm_p_true), 0.2)
+})
+
+
+test_that("jsdgam occ: a fitted site's occupancy uses its fitted factors", {
+  # By hand: psi from the fitted factors, discounted by every visit
+  # that missed the species at an undetected unit
+  ids <- 1:40
+  fit <- occ_jsdm_fit
+  frame <- closure_unit_frame(fit)
+  arrays <- closure_unit_arrays_for(fit)
+  rows <- closure_unit_row_split(arrays)
+  lp <- posterior_linpred(fit, draw_ids = ids, incl_autocor = TRUE)
+  psi <- plogis(lp[, closure_unit_first_rows(arrays)])
+  p <- as.vector(as_draws_matrix(fit)[ids, "p"])
+  y <- frame[[response_column(fit)]]
+  missed <- vapply(rows, function(r) all(y[r] == 0), logical(1L))
+  visits <- lengths(rows)[missed]
+  miss <- outer((1 - p), visits, `^`)
+  by_hand <- psi[, missed] * miss / (psi[, missed] * miss + 1 - psi[, missed])
+  state <- hindcast(fit, type = "latent_state", draw_ids = ids)$draws
+  expect_equal(unname(state[, missed]), unname(by_hand))
+})
+
+
+test_that("jsdgam occ: a community is named by the user's unit column", {
+  x <- community(occ_jsdm_fit, latent = "zero", draw_ids = 1:3)
+  expect_identical(names(x$communities), "site")
+})
+
+
+test_that("jsdgam occ: the loadings stay at the identified mode", {
+  # A closure-unit family carries no simplex constraint, so the
+  # loadings are not pinned to sum to zero the way the softmax
+  # families are. They still have to sit near the mode the Heaps QR
+  # targets: a column sum that has wandered means they are drifting
+  # along an unidentified direction, which leaves every loading
+  # finite and the covariance they imply unchanged.
+  dm <- as_draws_matrix(occ_jsdm_fit$fit)
+  Z_m <- apply(
+    mvgam:::extract_Z_loadings(dm, n_obs_series = occ_jsdm$K,
+                               n_lv = occ_jsdm$N_lv),
+    c(2L, 3L), mean
+  )
+  expect_lt(max(abs(colSums(Z_m))), 0.5)
+})
+
+
+# ----- A multi-season occupancy fit, and the surfaces it reaches ----
+#
+# `pivot_detection_array(multi_season = "hierarchical")` keeps
+# `time = season` and hands `site` over as a covariate, and
+# `occ(multi_season = TRUE)` is documented to activate the three-axis
+# closure-unit grouping `(series, site, time)` in response. So the
+# unit count here is 6 species x 10 sites x 8 seasons = 480 while the
+# pair `(series, time)` numbers only 48. Every count in the design is
+# distinct -- 6 species, 10 sites, 8 seasons, 3 visits, 480 units,
+# 1440 rows -- so no grain claim below can hold by coincidence.
+
+sim_multi_season <- local({
+  cached <- NULL
+  function() {
+    if (!is.null(cached)) return(cached)
+    set.seed(4181L)
+    K_sp <- 6L; J <- 10L; T_s <- 8L; V <- 3L; N_lv <- 2L
+    lev <- paste0("sp", seq_len(K_sp))
+    rho_true <- 0.7
+    p_true <- 0.55
+    f_true <- function(e) 1.5 * sin(2 * e)
+
+    Z_true <- matrix(rnorm(K_sp * N_lv, 0, 0.9), K_sp, N_lv,
+                     dimnames = list(lev, NULL))
+    lv_true <- matrix(NA_real_, T_s, N_lv)
+    for (l in seq_len(N_lv)) {
+      lv_true[1L, l] <- rnorm(1L)
+      for (t in 2L:T_s) {
+        lv_true[t, l] <- rho_true * lv_true[t - 1L, l] +
+          sqrt(1 - rho_true^2) * rnorm(1L)
+      }
+    }
+    env <- as.numeric(scale(runif(J, -2, 2)))
+    alpha_site <- rnorm(J, 0, 0.4)
+    alpha_sp <- rnorm(K_sp, 0, 0.4)
+
+    logit_psi <- array(NA_real_, c(K_sp, J, T_s))
+    for (s in seq_len(K_sp)) {
+      for (i in seq_len(J)) {
+        for (t in seq_len(T_s)) {
+          logit_psi[s, i, t] <- alpha_sp[s] + f_true(env[i]) +
+            alpha_site[i] + sum(Z_true[s, ] * lv_true[t, ])
+        }
+      }
+    }
+    psi <- plogis(logit_psi)
+    z <- array(rbinom(length(psi), 1L, psi), dim = dim(psi))
+    yarr <- array(0L, c(K_sp, J, T_s, V))
+    for (s in seq_len(K_sp)) {
+      for (i in seq_len(J)) {
+        for (t in seq_len(T_s)) {
+          if (z[s, i, t] == 1L) yarr[s, i, t, ] <- rbinom(V, 1L, p_true)
+        }
+      }
+    }
+    d <- pivot_detection_array(
+      yarr, site_covs = data.frame(env = env),
+      species = lev, multi_season = "hierarchical"
+    )
+    d$site <- factor(d$site)
+    cached <<- list(
+      data = d, K = K_sp, J = J, T_s = T_s, V = V, N_lv = N_lv,
+      species_levels = lev, rho_true = rho_true, p_true = p_true,
+      Z_true = Z_true, lv_true = lv_true, env = env,
+      alpha_site = alpha_site, alpha_sp = alpha_sp, psi = psi, z = z,
+      n_unit = K_sp * J * T_s, n_row = K_sp * J * T_s * V
+    )
+    cached
+  }
+})
+
+fit_multi_season <- local({
+  cached <- NULL
+  function() {
+    if (!is.null(cached)) return(cached)
+    cached <<- cached_fit("val_mvgam_occ_multi_season.rds", function() {
+      sim <- sim_multi_season()
+      jsdgam(
+        formula = y ~ s(env, k = 6) + s(site, bs = "re"),
+        factor_formula = ~ AR(time = time) - 1,
+        data = sim$data, unit = time, species = series,
+        family = occ(multi_season = TRUE), n_lv = sim$N_lv,
+        prior = prior(normal(0, 0.5), class = "sds"),
+        chains = 2L, iter = 1000L, warmup = 500L,
+        silent = 2, backend = "cmdstanr"
+      )
+    })
+    cached
+  }
+})
+
+
+test_that("multi-season: the frame separates all four axes", {
+  sim <- sim_multi_season()
+  d <- sim$data
+  # The premise every claim below rests on. If any two of these
+  # coincided a surface answering on the wrong one would still be
+  # counted correct.
+  expect_identical(nrow(d), sim$n_row)
+  expect_identical(nrow(unique(d[, c("series", "time")])),
+                   sim$K * sim$T_s)
+  expect_identical(nrow(unique(d[, c("series", "site", "time")])),
+                   sim$n_unit)
+  expect_false(sim$K * sim$T_s == sim$n_unit)
+  expect_setequal(as.character(unique(d$series)), sim$species_levels)
+  # `"hierarchical"` keeps `time` as the season rather than fusing
+  # site into it, which is what leaves site free to be a covariate.
+  expect_identical(sort(unique(d$time)), seq_len(sim$T_s))
+})
+
+
+test_that("multi-season: every per-unit surface uses the unit axis", {
+  sim <- sim_multi_season()
+  fit <- fit_multi_season()
+  # `occ(multi_season = TRUE)` is documented to activate the
+  # three-axis grouping, and Stan does: `N_unit` is 480, the count
+  # of (series, site, season) cells, not the 48 that (series,
+  # season) gives. Everything reported per unit has to agree with
+  # it. Measured, `log_lik()` does and three others do not, each
+  # returning 48 and so describing one site in ten while naming no
+  # site at all. The single-season fits above agree across all five,
+  # which is what places this on the multi-season path.
+  expect_identical(as.integer(standata(fit)$N_unit), sim$n_unit)
+  expect_identical(ncol(log_lik(fit, ndraws = 5L)), sim$n_unit)
+  expect_identical(
+    ncol(predict(fit, type = "latent_state", ndraws = 5L,
+                 summary = FALSE)),
+    sim$n_unit
+  )
+  expect_identical(nrow(residuals(fit, ndraws = 5L)), sim$n_unit)
+  expect_identical(nrow(latent_N_saturation(fit)), sim$n_unit)
+
+  # A latent-state forecast holds one column per species and season,
+  # the mean over that season's sites of the per-unit hindcast
+  hc <- hindcast(fit, type = "latent_state", draw_ids = 1:5)
+  future <- fit$data[fit$data$time == sim$T_s, ]
+  future$time <- sim$T_s + 1L
+  future$y <- NA
+  fc <- forecast(fit, newdata = future, type = "latent_state",
+                 draw_ids = 1:5)
+  site_mean <- sapply(seq_len(sim$T_s), function(t) {
+    rowMeans(hc$draws[, hc$unit$series == "sp2" & hc$unit$time == t])
+  })
+  expect_equal(unname(fc$hindcasts$sp2), site_mean)
+
+  # A multi-season link keeps one column per visit row, conditioned on
+  # the fitted trend: its predictor without the trend plus its season's
+  # fitted trend. A first-site slice or a marginal predictor fails it.
+  rows <- which(fit$data$series == "sp2")
+  rows <- rows[order(fit$data$time[rows])]
+  link <- hindcast(fit, type = "link", draw_ids = 1:5)$hindcasts$sp2
+  marginal <- posterior_linpred(fit, newdata = fit$data[rows, ],
+                                draw_ids = 1:5)
+  trend <- hindcast(fit, type = "trend", draw_ids = 1:5)$hindcasts$sp2
+  expect_equal(unname(link),
+               unname(marginal + trend[, fit$data$time[rows]]))
+
+  # The per-visit surfaces answer on rows, which is the other grain
+  # and is correct on this fit. Stating both is what makes the
+  # failures above a confusion between two axes rather than a
+  # method that is simply short.
+  expect_identical(ncol(posterior_epred(fit, ndraws = 5L)), sim$n_row)
+  expect_identical(ncol(posterior_predict(fit, ndraws = 5L)), sim$n_row)
+  expect_identical(nrow(fitted(fit, ndraws = 5L)), sim$n_row)
+  expect_identical(nrow(augment(fit)), sim$n_row)
+})
+
+
+test_that("multi-season: a community is a site in a season", {
+  sim <- sim_multi_season()
+  fit <- fit_multi_season()
+  fitted <- community(fit, latent = "conditional", draw_ids = 1:3)
+  expect_identical(nrow(fitted$communities), sim$J * sim$T_s)
+  # Each row's community holds its own site and season
+  keys <- c("site", "time")
+  expect_identical(as.list(fitted$communities[fitted$community, keys]),
+                   as.list(fitted$frame[keys]))
+  # Communities at one future season share the forecast paths
+  site <- fit$data[1L, c("site", "env")]
+  ahead <- community(fit, newdata = cbind(site[c(1L, 1L), ], time = 9L),
+                     latent = "forecast", draw_ids = 1:5, n_nodes = 20L)
+  expect_identical(ahead$richness[, 1L], ahead$richness[, 2L])
+})
+
+
+test_that("multi-season: a factor's effects follow its levels", {
+  fit <- fit_multi_season()
+  se <- species_effects(fit, variables = "site", draw_ids = 1:3)
+  expect_identical(dimnames(se$draws$species)[[3L]],
+                   paste0("site: ", 2:10, " - 1"))
+})
+
+
+test_that("species_effects refuses a covariate of detection alone", {
+  # `tod_c` enters the detection formula `p ~ tod_c` alone
+  expect_error(species_effects(fit, variables = "tod_c", draw_ids = 1:3),
+               "'tod_c' leaves every species' predictor unchanged")
+})
+
+
+test_that("multi-season: the saturation table names its units", {
+  sim <- sim_multi_season()
+  fit <- fit_multi_season()
+  sat <- latent_N_saturation(fit)
+  # Finding 19 on the three-axis grouping. A label has to reach a
+  # site and a season, and a unit here is a (species, site, season)
+  # triple, so a two-part index cannot identify one even in
+  # principle.
+  expect_true(all(c("unit", "label") %in% names(sat)))
+  expect_identical(length(unique(sat$label)), sim$n_unit)
+  expect_true(any(grepl(paste(sim$species_levels, collapse = "|"),
+                        sat$label)))
+})
+
+
+test_that("multi-season: hindcast returns one arm per species", {
+  sim <- sim_multi_season()
+  fit <- fit_multi_season()
+  hc <- hindcast(fit, ndraws = 10L)
+  # A hindcast fills `hindcasts` and leaves `forecasts` and the
+  # `test_*` slots empty, which is the documented contract: it
+  # predicts at the training times and extends nothing. Reading
+  # `forecasts` here reported no arms at all, and an empty list
+  # satisfies every claim of the form "each arm has the right
+  # width", so the count is stated before anything is read out.
+  expect_length(hc$hindcasts, sim$K)
+  # `names()` of an empty list is NULL, and a set comparison against
+  # NULL raises instead of failing, which would leave this block
+  # reporting an error where it has a result to report. Coercing
+  # first keeps the failure a failure.
+  expect_identical(sort(as.character(names(hc$hindcasts))),
+                   sort(sim$species_levels))
+  for (s in names(hc$hindcasts)) {
+    expect_identical(nrow(hc$hindcasts[[s]]), 10L)
+    expect_true(all(is.finite(hc$hindcasts[[s]])))
+  }
+})
+
+
+test_that("multi-season: the fit reports its own dimensions", {
+  sim <- sim_multi_season()
+  fit <- fit_multi_season()
+  # Six counters that have to agree with each other and with the
+  # frame. None of them is driven anywhere else in this directory,
+  # and each is the kind of number a caller trusts without checking.
+  expect_identical(as.integer(ndraws(fit)),
+                   as.integer(nchains(fit) * niterations(fit)))
+  expect_identical(as.integer(nobs(fit)), sim$n_row)
+  expect_identical(as.integer(nsamples(fit)), as.integer(ndraws(fit)))
+  expect_identical(as.integer(nvariables(fit)),
+                   ncol(as_draws_matrix(fit)))
+
+  # Every user-facing accessor answers on one parameter set, so the
+  # draws a caller is handed and the names they are given for them
+  # agree exactly. Naming Stan's own bookkeeping columns is what
+  # makes this a claim rather than a count: they live on the raw
+  # `$fit` and reach neither surface, so a real parameter that
+  # started being hidden, or a raw block that started being exposed,
+  # changes one of these sets.
+  expect_setequal(colnames(as_draws_matrix(fit)), variables(fit))
+  bookkeeping <- c("lprior", "lp__")
+  expect_true(all(bookkeeping %in%
+                    posterior::variables(as_draws_matrix(fit$fit))))
+  expect_identical(intersect(variables(fit), bookkeeping),
+                   character(0))
+  expect_setequal(names(rhat(fit)), colnames(as_draws_matrix(fit)))
+  expect_setequal(names(neff_ratio(fit)), names(rhat(fit)))
+
+  # An effective sample size is undefined for a parameter that never
+  # moves, and only such a parameter may report `NA`. An `NA` against
+  # a parameter that does move would be a diagnostic failing
+  # silently.
+  nr <- neff_ratio(fit)
+  dm <- as_draws_matrix(fit)
+  moves <- apply(dm[, names(nr), drop = FALSE], 2L, stats::sd) > 0
+  expect_identical(unname(is.na(nr)), unname(!moves))
+  expect_true(all(nr[moves] > 0))
+})
+
+
+test_that("multi-season: the five draws formats hold one posterior", {
+  fit <- fit_multi_season()
+  # Six containers for the same numbers. Converting between them is
+  # where a chain-major and a draw-major layout get confused, and a
+  # container that transposed its contents keeps every dimension.
+  dm <- as_draws_matrix(fit)
+  da <- as_draws_array(fit)
+  dd <- as_draws_df(fit)
+  dl <- as_draws_list(fit)
+  dr <- as_draws_rvars(fit)
+  expect_identical(dim(da),
+                   c(as.integer(niterations(fit)),
+                     as.integer(nchains(fit)), ncol(dm)))
+  expect_length(dl, as.integer(nchains(fit)))
+  expect_true(all(vapply(dl, length, integer(1L)) == ncol(dm)))
+
+  # The values agree, not merely the shapes. A single parameter is
+  # read out of each container and required to be the same vector.
+  v <- "Intercept"
+  ref <- as.numeric(dm[, v])
+  expect_equal(as.numeric(dd[[v]]), ref)
+  expect_equal(as.numeric(posterior::draws_of(dr[[v]])), ref)
+  expect_equal(as.numeric(da[, , v]), ref)
+  # `unlist()` labels its result from the list it flattens, so the
+  # names are dropped before comparing values with values.
+  expect_equal(sort(unname(unlist(lapply(dl, `[[`, v))), method = "radix"),
+               sort(ref, method = "radix"))
+})
+
+
+test_that("multi-season: the fit describes its own specification", {
+  sim <- sim_multi_season()
+  fit <- fit_multi_season()
+  # Other packages call these introspection hooks. A family misreported
+  # by `family()` sends a fit down a code path written for another.
+  # Measured, `family()` answers "custom" here while `summary()`
+  # prints "Family: occ" and `glance()` reports "occ". The accessor
+  # every downstream package reaches for is the one that does not
+  # name the family, and the gaussian VAR fit answers "gaussian" on
+  # the same method, so this belongs to the closure-unit families
+  # rather than to the method in general.
+  fam <- family(fit)
+  expect_identical(fam$family, "occ")
+  expect_identical(as.character(glance(fit)$family), fam$family)
+  expect_true(any(grepl("Family:\\s*occ",
+                        capture.output(summary(fit)))))
+
+  # `insight` reads these to build a data grid, so a wrong response
+  # or a missing predictor is a wrong plot rather than an error.
+  expect_identical(find_response(fit), "y")
+  preds <- unlist(find_predictors(fit), use.names = FALSE)
+  expect_true(all(c("env", "site") %in% preds))
+  expect_identical(nrow(get_data(fit)), sim$n_row)
+  expect_true(all(c("conditional", "trend") %in% names(find_formula(fit))))
+
+  # The sampler settings the call asked for come back as asked.
+  ctrl <- control_params(fit)
+  expect_true(all(c("adapt_delta", "max_treedepth") %in% names(ctrl)))
+  expect_true(ctrl$adapt_delta > 0 && ctrl$adapt_delta < 1)
+
+  # `getCall()` has to name the function that built this, since it
+  # is what `update()` re-evaluates and what a user prints to see
+  # how a fit was made. Measured, element one is the `jsdgam`
+  # closure rather than the symbol `jsdgam`, so deparsing the call
+  # prints the whole function source instead of the call. Asking
+  # whether it is a name fails; coercing it raises, which would
+  # report an error where there is a result.
+  cl <- getCall(fit)
+  expect_true(is.name(cl[[1L]]))
+  # The call's own arguments are well formed, which is what makes
+  # the head position the single thing wrong with it.
+  expect_true(all(c("formula", "data", "family") %in% names(cl)))
+  expect_identical(nrow(model.frame(fit)), sim$n_row)
+})
+
+
+test_that("multi-season: every listed parameter is reachable", {
+  fit <- fit_multi_season()
+  vars <- variables(fit)
+  expect_hypothesis_reaches(fit, c(
+    "b_Intercept", grep("^ar1_trend\\[", vars, value = TRUE)[1L],
+    grep("^(sds|bs)_", vars, value = TRUE)
+  ))
+})
+
+
+test_that("multi-season: the prior the call set is reported back", {
+  fit <- fit_multi_season()
+  # The fit was built with `prior(normal(0, 0.5), class = "sds")`,
+  # so a prior summary that does not carry it is not describing this
+  # model. Neither this nor `default_prior()` is driven anywhere
+  # else in the directory.
+  ps <- prior_summary(fit)
+  expect_true("sds" %in% ps$class)
+  set_sds <- ps$prior[ps$class == "sds" & nzchar(ps$prior)]
+  expect_true(any(grepl("normal(0, 0.5)", set_sds, fixed = TRUE)))
+
+  # A default prior list is available for the same specification and
+  # names the classes this model actually has.
+  dp <- default_prior(fit)
+  expect_true(all(c("sds", "Intercept") %in% dp$class))
+})
+
+
+test_that("latent_state and latent_N are one type under two names", {
+  # marginaleffects ships mvgam's latent-state token as `latent_N`
+  # while mvgam's own user-facing token is `latent_state`.
+  # `conditional_effects()` translates one into the other so the
+  # upstream `sanitize_type()` gate passes without patching the
+  # marginaleffects namespace, and `get_predict()` accepts both.
+  # Two names for one quantity is exactly the shape that goes wrong
+  # quietly, so the claim is that they are the same numbers and not
+  # merely that both return something.
+  gp_state <- marginaleffects::get_predict(
+    fit, newdata = dat, type = "latent_state"
+  )
+  gp_n <- marginaleffects::get_predict(
+    fit, newdata = dat, type = "latent_N"
+  )
+  expect_identical(nrow(gp_state), nrow(gp_n))
+  expect_equal(gp_state$estimate, gp_n$estimate)
+  # And they are the latent state rather than the response: an
+  # occupancy state is a probability, which the detection-scale
+  # answer for these data is not.
+  expect_true(all(gp_state$estimate >= 0 & gp_state$estimate <= 1))
+  # The effect is the expected state given the covariates. A grid's
+  # placeholder counts leave it unchanged.
+  zeroed <- dat
+  zeroed[[response_column(fit)]] <- 0L
+  expect_equal(
+    marginaleffects::get_predict(fit, newdata = zeroed,
+                                 type = "latent_state")$estimate,
+    gp_state$estimate
+  )
+
+  ce <- conditional_effects(fit, type = "latent_state")
+  expect_gt(length(ce), 0L)
+  # A panel that received no data still returns a ggplot, so the
+  # layers are built rather than the class asserted.
+  expect_drawn(plot(ce)[[1L]])
+})
+
+
+test_that("each part's response-scale share is the fit's own: occ and nmix", {
+  expect_epred_parts(fit)
+  expect_epred_parts(nmix_fit)
+})
+
+
+test_that("variance_partition() pools an effect that differs by site", {
+  # `elev` holds one value per site. It moves no site over its own rows.
+  # Only the pooled rows show it, as a share against the detection terms.
+  ids <- 1:10
+  x <- variance_partition(fit, draw_ids = ids)
+  expect_identical(x$sources, c("environment", "detection"))
+  of <- function(m) apply(m, 1L, var)
+  p <- of(extract_component_linpred(fit, fit$data, component = "p",
+                                    draw_ids = ids))
+  occupancy <- of(extract_component_linpred(fit, fit$data, draw_ids = ids))
+  expect_equal(x$community[, "detection"], p / (p + occupancy))
+  expect_identical(unique(as.vector(x$shares[[1L]][, "detection"])), 1)
+})
+
+cat("\nDone.\n")

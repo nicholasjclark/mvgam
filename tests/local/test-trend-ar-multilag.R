@@ -1,0 +1,1245 @@
+# Recovery and post-fit coverage for a sparse multi-lag `AR()`,
+# fitted in this file.
+#
+# `AR(p = c(1, 3, 12))` asks for three specific lags rather than the
+# first twelve. That distinction is the whole point of passing a
+# vector, and it is invisible to any check on shape: a model that
+# quietly read the vector's maximum would emit twelve coefficients,
+# fit at least as well, and differ only in which lags exist.
+#
+# The observation side carries a `gp()` term, which no other local
+# file exercises. A Gaussian process on a covariate reaches Stan as an
+# approximate basis with its own eigenvalues, so it has structure of
+# its own to get wrong.
+#
+#   truth: 2 series, 96 occasions, gaussian, latent AR with real
+#          weight at lags 1, 3 and 12 and none in between
+#   model: y ~ gp(x, k = 10), trend_formula = ~ AR(p = c(1, 3, 12))
+#
+# Series named out of alphabetical order, occasions numbered from 3.
+#
+# Cached at tests/local/fixtures/val_mvgam_ar_multilag.rds.
+#
+# A second, smaller fit covers the contiguous case `AR(p = 2)`,
+# which takes the partial autocorrelation parameterisation. Every
+# draw of that fit is stationary by construction, and the blocks at
+# the end of this file check it.
+# Cached at tests/local/fixtures/val_mvgam_ar_contiguous.rds.
+#
+# Run with:
+#   testthat::test_file("tests/local/test-trend-ar-multilag.R")
+
+suppressMessages({
+  devtools::load_all(".", quiet = TRUE)
+  library(posterior)
+  library(testthat)
+})
+
+# Several blocks below state what the package does not yet do, and
+# testthat stops a file after ten failures by default, which would
+# leave the blocks after them unrun and looking clean. The limit is
+# read when the reporter is built, before this file is sourced, so it
+# has to come from the environment:
+#   TESTTHAT_MAX_FAILS=1000 Rscript -e "..."
+
+# This file fits its own model and caches it beside itself, so it
+# depends on no shared fixture and no build step.
+
+set.seed(2207L)
+
+n_series <- 2L
+n_time <- 96L
+series_levels <- c("gamma", "alpha")
+stopifnot(!identical(series_levels, sort(series_levels)))
+
+time_vals <- seq_len(n_time) + 2L
+
+# The lags the model is told to use, and the ones it must not invent.
+lags <- c(1L, 3L, 12L)
+absent_lags <- setdiff(seq_len(max(lags)), lags)
+stopifnot(length(absent_lags) == 9L)
+
+# Weight at exactly those lags. The lag-12 term is the seasonal one,
+# which is why a vector of lags is worth having at all.
+phi_true <- c(0.35, 0.25, 0.30)
+
+latent <- matrix(0, nrow = n_time, ncol = n_series)
+for (s in seq_len(n_series)) {
+  e <- rnorm(n_time, 0, 0.3)
+  for (t in seq_len(n_time)) {
+    val <- e[t]
+    for (li in seq_along(lags)) {
+      if (t > lags[li]) {
+        val <- val + phi_true[li] * latent[t - lags[li], s]
+      }
+    }
+    latent[t, s] <- val
+  }
+}
+
+# A smooth, non-linear function of `x` for the gp term to find.
+x <- as.numeric(scale(seq_len(n_time)))
+gp_true <- 1.2 * sin(x * 2) - 0.5 * x
+
+# A covariate on the *trend* side. This is a different code path from
+# an observation-side term: it is built on the trend grid, carried by
+# a separate brmsfit, and read again whenever a forecast has to
+# evaluate the trend beyond the training grid. No other local file
+# pairs one with a dynamic trend.
+temp <- as.numeric(scale(cos(seq_len(n_time) / 7)))
+temp_effect <- 0.8 * sin(temp * 1.6)
+
+dat <- data.frame(
+  time = rep(time_vals, times = n_series),
+  series = factor(rep(series_levels, each = n_time),
+                  levels = series_levels),
+  x = rep(x, times = n_series),
+  temp = rep(temp, times = n_series)
+)
+dat$y <- as.numeric(latent) + rep(gp_true, times = n_series) +
+  rep(temp_effect, times = n_series) +
+  rnorm(nrow(dat), 0, 0.25)
+
+obs_formula <- y ~ gp(x, k = 10)
+trend_spec <- ~ s(temp, k = 6) + AR(p = c(1, 3, 12))
+
+sim_truth <- list(
+  n_series = n_series, n_time = n_time,
+  series_levels = series_levels, time_vals = time_vals,
+  lags = lags, phi_true = phi_true, latent = latent,
+  gp_true = gp_true, x = x, temp = temp,
+  temp_effect = temp_effect
+)
+
+# A future frame carrying both the observation covariate and the
+# trend covariate. `temp_future` is what the trend smooth is
+# evaluated at beyond the training grid.
+make_future <- function(h, temp_future = 0) {
+  ft <- max(time_vals) + seq_len(h)
+  data.frame(
+    time = rep(ft, times = n_series),
+    series = factor(rep(series_levels, each = h),
+                    levels = series_levels),
+    x = rep(rep(0, h), times = n_series),
+    temp = rep(rep(temp_future, length.out = h), times = n_series),
+    y = NA_real_
+  )
+}
+
+
+# -- Prefit: which lags exist, and the gp basis ----------------------
+
+prefit <- mvgam(
+  formula = obs_formula, trend_formula = trend_spec,
+  data = dat, family = gaussian(), run_model = FALSE, silent = 2
+)
+
+ar_params <- function(object) {
+  sc <- as.character(stancode(object))
+  toks <- strsplit(sc, "[^A-Za-z0-9_]")[[1]]
+  sort(unique(grep("^ar[0-9]+_trend$", toks, value = TRUE)))
+}
+
+
+test_that("a lag vector emits those lags and no others", {
+  # The claim that makes `p = c(1, 3, 12)` different from `p = 12`.
+  # A model that took the maximum would carry nine more coefficients,
+  # every one of them free, and no shape check would see it.
+  found <- ar_params(prefit)
+  expect_identical(found, sort(paste0("ar", lags, "_trend")))
+  expect_length(found, length(lags))
+  for (l in absent_lags) {
+    expect_false(paste0("ar", l, "_trend") %in% found)
+  }
+})
+
+
+test_that("a dense p emits every lag up to it, which is the contrast", {
+  # The same model written the other way. Without this the check
+  # above could pass on a build that emits nothing at all.
+  dense <- mvgam(
+    formula = obs_formula, trend_formula = ~ AR(p = 12),
+    data = dat, family = gaussian(), run_model = FALSE, silent = 2
+  )
+  found <- ar_params(dense)
+  expect_length(found, 12L)
+  expect_identical(found, sort(paste0("ar", seq_len(12L), "_trend")))
+  # And it is a strict superset of the sparse set, so the two specs
+  # really are the same family read two ways.
+  expect_true(all(ar_params(prefit) %in% found))
+})
+
+
+test_that("the trend axis and grain are the series", {
+  sd <- prefit$standata
+  ax <- mvgam:::mvgam_axes(prefit)
+  expect_identical(as.character(ax$series$levels), series_levels)
+  expect_identical(as.integer(ax$time$values), time_vals)
+  expect_identical(ax$grain, "series")
+  expect_identical(as.integer(sd$N_time_trend), n_time)
+  expect_identical(as.integer(sd$N_series_trend), n_series)
+  expect_identical(as.integer(sd$obs_trend_series),
+                   match(as.character(dat$series), series_levels))
+  # The grid has to be long enough for the longest lag to be
+  # identified at all.
+  expect_gt(n_time, max(lags) * 2L)
+})
+
+
+test_that("the gp term reaches Stan as a one-dimensional basis", {
+  # A `gp()` is approximated by a basis with its own eigenvalues, so
+  # it carries structure beyond a column of the design matrix. The
+  # dimension is the one that matters here: `gp(x)` is over a single
+  # covariate, and a two-dimensional basis would be a different
+  # model with the same term in the formula.
+  sd <- prefit$standata
+  expect_identical(as.integer(sd$Dgp_1), 1L)
+  # One gp block, so no second process is hiding behind the first.
+  expect_length(grep("^Dgp_[0-9]+$", names(sd), value = TRUE), 1L)
+
+  # The basis is evaluated once per distinct covariate value, and
+  # each row is pointed at its own value by `Jgp_1`. That index is
+  # the whole of the term's row-level correctness, and a permutation
+  # of it gives every observation another's position on the curve
+  # while keeping every dimension.
+  n_unique <- length(unique(dat$x))
+  expect_identical(as.integer(sd$Nsubgp_1), n_unique)
+  expect_length(as.integer(sd$Jgp_1), nrow(dat))
+  expect_identical(sort(unique(as.integer(sd$Jgp_1))),
+                   seq_len(n_unique))
+  # The round trip. brms rescales a gp covariate onto its own
+  # bounded support before building the basis, so the stored values
+  # are an increasing affine image of `x` rather than `x` itself.
+  # What has to hold regardless of that scaling is the map: rows
+  # sharing a covariate value share an index, rows differing in it
+  # differ, and the mapped values rise with the covariate. A
+  # permuted index breaks the last of these while keeping the first
+  # two and every dimension.
+  mapped <- as.numeric(sd$Xgp_prior_1[, 1L])[as.integer(sd$Jgp_1)]
+  expect_length(mapped, nrow(dat))
+  expect_equal(stats::cor(mapped, as.numeric(dat$x)), 1)
+  expect_identical(as.integer(sd$Jgp_1),
+                   match(as.numeric(dat$x),
+                         sort(unique(as.numeric(dat$x)))))
+
+  # `k` basis functions, and the basis matrix is one row per distinct
+  # value and one column per function.
+  expect_identical(as.integer(sd$NBgp_1), 10L)
+  expect_identical(dim(sd$Xgp_1),
+                   c(n_unique, as.integer(sd$NBgp_1)))
+  # One eigenvalue per basis function, all positive.
+  expect_length(as.numeric(sd$slambda_1), as.integer(sd$NBgp_1))
+  expect_true(all(as.numeric(sd$slambda_1) > 0))
+})
+
+
+test_that("a trend covariate is built on the trend grid", {
+  # The trend side has its own design, at its own grain: one row per
+  # (occasion, series), not one per observation and not one per
+  # occasion. `temp` varies by occasion only, so every series has to
+  # receive the same value at a given occasion, and different
+  # occasions have to receive different ones.
+  sd <- prefit$standata
+  expect_identical(as.integer(sd$N_trend), n_time * n_series)
+  expect_identical(nrow(sd$Xs_trend), n_time * n_series)
+  expect_identical(nrow(sd$Zs_1_1_trend), n_time * n_series)
+
+  # Read through `times_trend`, which is the map from a cell to its
+  # design row. This is the check a transposed or renumbered map
+  # fails: the covariate would be read at the wrong occasion while
+  # every dimension stayed correct.
+  tt <- sd$times_trend
+  expect_identical(dim(tt), c(n_time, n_series))
+  design_col <- as.numeric(sd$Xs_trend[, 1L])
+  for (t in c(1L, 2L, 37L, n_time)) {
+    rows <- as.integer(tt[t, ])
+    expect_length(rows, n_series)
+    # One value per occasion, shared across the series.
+    expect_length(unique(round(design_col[rows], 10L)), 1L)
+  }
+  # Distinct occasions do not collapse onto one design value.
+  per_time <- vapply(seq_len(n_time), function(t) {
+    design_col[as.integer(tt[t, 1L])]
+  }, numeric(1))
+  expect_gt(length(unique(round(per_time, 10L))), n_time / 2)
+  # And the design column tracks the covariate the user supplied,
+  # occasion for occasion, up to the basis rescaling a smooth
+  # applies.
+  expect_equal(abs(stats::cor(per_time, temp)), 1)
+
+  # The trend model carries its own frame at that grain, holding the
+  # covariate and nothing from the observation side.
+  td <- prefit$trend_model$data
+  expect_identical(nrow(td), n_time * n_series)
+  expect_true("temp" %in% names(td))
+  expect_false("x" %in% names(td))
+
+  # The smooth is named on the trend side, and the observation-side
+  # gp is not confused with it.
+  sm <- smooths(prefit)
+  expect_true(any(grepl("temp", sm, fixed = TRUE)))
+})
+
+
+# -- Fit --------------------------------------------------------------
+
+fit <- cached_fit(
+  "val_mvgam_ar_multilag.rds",
+  function() {
+    mvgam(
+      formula = obs_formula, trend_formula = trend_spec,
+      data = dat, family = gaussian(),
+      chains = 2L, iter = 1000L, warmup = 500L,
+      silent = 2, backend = "cmdstanr"
+    )
+  },
+  key = sim_truth
+)
+
+dm <- posterior::as_draws_matrix(fit$fit)
+
+
+
+test_that("print names every lag the model carries", {
+  # A bare `AR` is what `print()` reported for this fit, so all
+  # three lags this file exists to exercise were invisible in the
+  # first summary a user sees. A sparse set has no order that names
+  # it, and the braces keep the list from spelling an ARIMA order.
+  txt <- capture.output(print(fit))
+  i <- grep("^Trend model", txt)
+  expect_length(i, 1L)
+  expect_identical(trimws(txt[i + 1L]), "AR({1, 3, 12})")
+  expect_false(any(grepl("<environment:", txt, fixed = TRUE)))
+})
+
+
+test_that("the posterior carries exactly the three lag coefficients", {
+  for (l in lags) {
+    cols <- grep(paste0("^ar", l, "_trend\\["), colnames(dm),
+                 value = TRUE)
+    expect_length(cols, n_series)
+  }
+  for (l in absent_lags) {
+    expect_length(
+      grep(paste0("^ar", l, "_trend\\["), colnames(dm), value = TRUE),
+      0L
+    )
+  }
+})
+
+
+test_that("the lag coefficients recover the simulated weights", {
+  # Each lag carries real weight in the simulation, so none should
+  # come back at zero, and the ordering of the three is roughly the
+  # ordering that was put in.
+  est <- vapply(lags, function(l) {
+    mean(vapply(seq_len(n_series), function(s) {
+      mean(dm[, paste0("ar", l, "_trend[", s, "]")])
+    }, numeric(1)))
+  }, numeric(1))
+  names(est) <- paste0("lag", lags)
+  # Positive dependence at every lag the simulation used.
+  expect_true(all(est > 0))
+  expect_lt(max(abs(est - phi_true)), 0.3)
+  # The seasonal lag is real, which is the reason for the vector.
+  expect_gt(est[["lag12"]], 0.1)
+})
+
+
+test_that("every prediction surface answers for every row", {
+  n_obs <- nrow(dat)
+  ep <- posterior_epred(fit, ndraws = 20L)
+  pp <- posterior_predict(fit, ndraws = 20L)
+  lp <- posterior_linpred(fit, ndraws = 20L)
+  expect_identical(dim(ep), c(20L, n_obs))
+  expect_identical(dim(pp), c(20L, n_obs))
+  expect_identical(dim(lp), c(20L, n_obs))
+  expect_true(all(is.finite(ep)))
+  expect_identical(nrow(fitted(fit, ndraws = 20L)), n_obs)
+  expect_identical(nrow(residuals(fit, ndraws = 20L)), n_obs)
+
+  os <- mvgam:::get_observation_structure(fit, newdata = dat)
+  expect_identical(as.character(os$series), as.character(dat$series))
+  expect_identical(os$series_levels, series_levels)
+  expect_identical(as.integer(os$time), match(dat$time, time_vals))
+})
+
+
+test_that("each row reads the latent cell the sampler drew for it", {
+  t_rec <- as.integer(fit$standata$obs_trend_time)
+  s_rec <- as.integer(fit$standata$obs_trend_series)
+  expect_length(t_rec, nrow(dat))
+  want <- vapply(paste0("trend[", t_rec, ",", s_rec, "]"),
+                 function(k) mean(dm[, k]), numeric(1))
+  got <- colMeans(
+    mvgam:::extract_trend_latent_states(fit, newdata = dat,
+                                        full_draws = dm)
+  )
+  expect_equal(unname(got), unname(want))
+})
+
+
+test_that("fitted summarises the same draws epred returns", {
+  ep <- posterior_epred(fit, ndraws = NULL, incl_autocor = TRUE)
+  ft <- fitted(fit)
+  expect_identical(nrow(ft), nrow(dat))
+  expect_identical(colnames(ft),
+                   c("Estimate", "Est.Error", "Q2.5", "Q97.5"))
+  expect_equal(as.numeric(ft[, "Estimate"]), unname(colMeans(ep)))
+  expect_true(all(ft[, "Q2.5"] <= ft[, "Estimate"]))
+  expect_true(all(ft[, "Estimate"] <= ft[, "Q97.5"]))
+})
+
+
+test_that("the one-step forecast weights all three lags", {
+  # An AR with lags 1, 3 and 12 carries the state forward as a
+  # weighted sum at those three offsets. The recursion runs on
+  # `lv_trend`, and the returned trend adds the trend-design term
+  # `mu_trend` evaluated at the covariate the future frame supplies.
+  #
+  # That term is unknown here: `temp_future` is 0 and no draw names
+  # the smooth at that value. It is, however, the same number for
+  # both series, because `temp` varies by occasion and not by series.
+  # So the AR part is pinned by subtracting it out: whatever the
+  # forecast owes to the covariate cancels, and what is left has to
+  # agree across the two series.
+  #
+  # A recursion that used only the first lag, or read a lag at the
+  # wrong offset, leaves a residual built from the omitted terms,
+  # which carry each series' own coefficients and own states. Those
+  # do not agree, so the check bites.
+  h <- 1L
+  fc <- forecast(fit, newdata = make_future(h), ndraws = NULL,
+                 type = "trend")
+  resid <- vapply(seq_len(n_series), function(s) {
+    contrib <- 0
+    for (l in lags) {
+      phi <- as.numeric(dm[, paste0("ar", l, "_trend[", s, "]")])
+      st <- as.numeric(
+        dm[, paste0("lv_trend[", n_time - l + 1L, ",", s, "]")]
+      )
+      contrib <- contrib + mean(phi * st)
+    }
+    mean(fc$forecasts[[series_levels[s]]][, 1L]) - contrib
+  }, numeric(1))
+  expect_lt(abs(diff(resid)), 0.15)
+
+  # And the cancelled term is the trend design, so the residual has
+  # to sit inside the range that design took over training. A
+  # forecast that dropped `mu_trend` altogether would leave a
+  # residual near zero for both series and pass the agreement check
+  # above on its own.
+  mu_cols <- grep("^mu_trend\\[", colnames(dm), value = TRUE)
+  mu_rng <- range(colMeans(dm[, mu_cols, drop = FALSE]))
+  expect_gt(mean(resid), mu_rng[1L] - 0.1)
+  expect_lt(mean(resid), mu_rng[2L] + 0.1)
+})
+
+
+test_that("a forecast responds to the trend covariate it is given", {
+  # The claim that makes a trend covariate worth having, and the one
+  # place its newdata handling is load-free of the fitted states: past
+  # the training grid there is no latent state to read, so the trend
+  # smooth has to be evaluated at the covariate the caller supplied.
+  # A forecast that ignored `temp` in newdata, or read it from the
+  # training frame instead, returns a finite trajectory of the right
+  # width and the same numbers whatever is asked for.
+  h <- 4L
+  lo <- forecast(fit, newdata = make_future(h, temp_future = -1.5),
+                 ndraws = 300L, type = "trend")
+  hi <- forecast(fit, newdata = make_future(h, temp_future = 1.5),
+                 ndraws = 300L, type = "trend")
+  for (s in series_levels) {
+    expect_identical(dim(lo$forecasts[[s]]), c(300L, h))
+    expect_identical(dim(hi$forecasts[[s]]), c(300L, h))
+    expect_true(all(is.finite(lo$forecasts[[s]])))
+    expect_true(all(is.finite(hi$forecasts[[s]])))
+  }
+  # The two differ, which is the whole point.
+  diffs <- vapply(series_levels, function(s) {
+    abs(mean(lo$forecasts[[s]]) - mean(hi$forecasts[[s]]))
+  }, numeric(1))
+  expect_gt(max(diffs), 0)
+
+  # A frame with no `temp` column cannot be forecast from, and the
+  # refusal names the column rather than failing on a dimension.
+  bare <- make_future(h)
+  bare$temp <- NULL
+  err <- expect_error(
+    forecast(fit, newdata = bare, ndraws = 20L, type = "trend")
+  )
+  expect_match(conditionMessage(err), "temp", fixed = TRUE)
+})
+
+
+test_that("the trend smooth is recovered on the trend side", {
+  # `s(temp)` sits on the trend, so its shape is read through the
+  # trend component rather than through the observation linpred.
+  # Reading it at the wrong grain returns one value per observation
+  # instead of one per trend cell.
+  lp <- extract_component_linpred(
+    mvgam_fit = fit, newdata = dat, component = "trend", draw_ids = 1:20
+  )
+  expect_identical(dim(lp), c(20L, nrow(dat)))
+  expect_true(all(is.finite(lp)))
+  # The deterministic trend submodel is the temp smooth, so it tracks
+  # the simulated effect and is not flat.
+  det <- colMeans(lp)
+  expect_gt(stats::sd(det), 0)
+  first <- which(as.character(dat$series) == series_levels[1L])
+  first <- first[order(dat$time[first])]
+  expect_gt(abs(stats::cor(det[first], temp_effect)), 0.5)
+})
+
+
+test_that("the forecast object is keyed, ordered and in user units", {
+  h <- 6L
+  future_times <- max(time_vals) + seq_len(h)
+  fc <- forecast(fit, newdata = make_future(h), ndraws = 20L,
+                 type = "link")
+  expect_identical(names(fc$forecasts), series_levels)
+  expect_identical(as.character(fc$series_names), series_levels)
+  for (s in series_levels) {
+    expect_identical(as.integer(fc$test_times[[s]]), future_times)
+    expect_identical(as.integer(fc$train_times[[s]]), time_vals)
+    expect_identical(ncol(fc$forecasts[[s]]),
+                     length(fc$test_times[[s]]))
+    rows <- which(as.character(dat$series) == s)
+    rows <- rows[order(dat$time[rows])]
+    expect_equal(as.numeric(fc$train_observations[[s]]),
+                 as.numeric(dat$y[rows]))
+  }
+})
+
+
+test_that("the hindcast reads the same cells as the conditional epred", {
+  hc <- hindcast(fit, type = "expected")
+  blocks <- hc$hindcasts
+  expect_identical(names(blocks), series_levels)
+  cells <- unlist(lapply(names(blocks), function(s) {
+    rows <- which(as.character(dat$series) == s)
+    rows[order(dat$time[rows])]
+  }))
+  ep <- posterior_epred(fit, incl_autocor = TRUE)
+  expect_equal(unname(ep[, cells, drop = FALSE]),
+               unname(do.call(cbind, blocks)))
+})
+
+
+test_that("the gp effect is recovered and drawn over its covariate", {
+  # The gp is the only observation-side term, so the marginal effect
+  # of `x` is the shape it found. It has to track the simulated
+  # function rather than merely existing.
+  grid <- data.frame(
+    x = seq(min(dat$x), max(dat$x), length.out = 40L),
+    series = factor(series_levels[1L], levels = series_levels),
+    time = time_vals[1L],
+    temp = temp[1L],
+    y = NA_real_
+  )
+  ep <- colMeans(posterior_epred(fit, newdata = grid, ndraws = 200L))
+  truth <- 1.2 * sin(grid$x * 2) - 0.5 * grid$x
+  expect_gt(stats::cor(ep, truth), 0.7)
+  # The effect is not flat, which a gp that collapsed to a constant
+  # would be while still returning finite values everywhere.
+  expect_gt(stats::sd(ep), 0.1)
+
+  # Both sides carry a smooth term, so both have to appear, keyed by
+  # the covariate each was written over and in the order the two
+  # formulas name them. A method that swept only the observation
+  # formula returns one panel; one that keyed them positionally
+  # returns two panels a reader cannot attribute.
+  ce <- conditional_effects(fit)
+  expect_identical(names(ce), c("x", "temp"))
+
+  # And each panel has to carry its own function rather than the
+  # other's. Two panels of the right names holding the same curve is
+  # the failure a shape check cannot see.
+  truths <- list(
+    x = function(v) 1.2 * sin(v * 2) - 0.5 * v,
+    temp = function(v) 0.8 * sin(v * 1.6)
+  )
+  for (nm in names(ce)) {
+    d <- ce[[nm]]$data
+    expect_true(all(is.finite(d$estimate)))
+    expect_true(all(d$conf.low <= d$estimate))
+    expect_true(all(d$estimate <= d$conf.high))
+    expect_gt(stats::sd(d$estimate), 0.05)
+    expect_gt(stats::cor(d$estimate, truths[[nm]](d[[nm]])), 0.7)
+    # The panel is drawn over its own covariate, not over a rank or
+    # over the other term's range.
+    expect_equal(range(d[[nm]]), range(dat[[nm]]), tolerance = 1e-6)
+  }
+})
+
+
+# -- The newdata battery ----------------------------------------------
+
+ref_epred <- posterior_epred(fit, newdata = dat, draw_ids = 1:10,
+                             incl_autocor = TRUE)
+
+test_that("the reference the battery compares against actually varies", {
+  # Every check below compares a rearranged or cut frame against the
+  # same columns of `ref_epred`. That is a comparison of the
+  # prediction with itself, so a predictor returning one constant for
+  # every row satisfies the whole battery: the shuffle, the subsets,
+  # the relabelling, the single rows and the duplicates all agree
+  # trivially. This is the guard that makes the rest of them mean
+  # something.
+  colm <- colMeans(ref_epred)
+  expect_gt(stats::sd(colm), 0)
+
+  # It varies between series, so a cut by series is a real cut.
+  by_series <- tapply(colm, as.character(dat$series), mean)
+  expect_length(by_series, n_series)
+  expect_gt(stats::sd(as.numeric(by_series)), 0)
+
+  # And within a series over time, so a cut by occasion is one too.
+  for (s in series_levels) {
+    rows <- which(as.character(dat$series) == s)
+    expect_gt(stats::sd(colm[rows]), 0)
+  }
+
+  # No two rows of the reference are the same everywhere, which is
+  # what a collapsed axis would produce while keeping every shape.
+  expect_gt(length(unique(round(colm, 8))), 1L)
+})
+
+
+test_that("rearranged and cut newdata frames read the same cells", {
+  set.seed(88L)
+  perm <- sample(nrow(dat))
+  expect_equal(
+    unname(posterior_epred(fit, newdata = dat[perm, , drop = FALSE],
+                           draw_ids = 1:10, incl_autocor = TRUE)),
+    unname(ref_epred[, perm, drop = FALSE])
+  )
+
+  for (s in series_levels) {
+    rows <- which(as.character(dat$series) == s)
+    sub <- dat[rows, , drop = FALSE]
+    sub$series <- droplevels(sub$series)
+    expect_identical(levels(sub$series), s)
+    expect_equal(
+      unname(posterior_epred(fit, newdata = sub, draw_ids = 1:10,
+                             incl_autocor = TRUE)),
+      unname(ref_epred[, rows, drop = FALSE])
+    )
+  }
+
+  for (tv in time_vals[c(1L, 40L, n_time)]) {
+    rows <- which(dat$time == tv)
+    expect_equal(
+      unname(posterior_epred(fit, newdata = dat[rows, , drop = FALSE],
+                             draw_ids = 1:10, incl_autocor = TRUE)),
+      unname(ref_epred[, rows, drop = FALSE])
+    )
+  }
+
+  rev_nd <- dat
+  rev_nd$series <- factor(as.character(rev_nd$series),
+                          levels = rev(series_levels))
+  expect_equal(
+    unname(posterior_epred(fit, newdata = rev_nd, draw_ids = 1:10,
+                           incl_autocor = TRUE)),
+    unname(ref_epred)
+  )
+})
+
+
+test_that("an unknown series is refused, and named", {
+  nd <- dat
+  nd$series <- factor(
+    ifelse(seq_len(nrow(nd)) == 1L, "omega", as.character(nd$series)),
+    levels = c(series_levels, "omega")
+  )
+  err <- expect_error(
+    posterior_epred(fit, newdata = nd, draw_ids = 1:5),
+    "Series in 'newdata' has levels absent from the training data"
+  )
+  expect_match(conditionMessage(err), "omega", fixed = TRUE)
+  for (s in series_levels) {
+    expect_match(conditionMessage(err), s, fixed = TRUE)
+  }
+})
+
+
+test_that("a newdata missing the gp covariate is refused by name", {
+  nd <- dat
+  nd$x <- NULL
+  err <- expect_error(
+    posterior_epred(fit, newdata = nd, draw_ids = 1:5)
+  )
+  expect_match(conditionMessage(err), "x", fixed = TRUE)
+})
+
+
+test_that("tidiers and criticism run on a multi-lag AR", {
+
+  ll <- log_lik(fit, ndraws = 20L)
+  expect_identical(dim(ll), c(20L, nrow(dat)))
+  expect_true(all(is.finite(ll)))
+  # `loo()` warns when a Pareto-k exceeds its threshold, which is a
+  # statement about this fit rather than noise. Suppressing it throws
+  # away the one diagnostic that says whether the approximation can
+  # be trusted, so it is captured and turned into claims: the
+  # estimate is finite, no k reaches the point where the
+  # approximation breaks, and the warning that arrived, if any, is
+  # the k notice those numbers already account for rather than
+  # something else that slipped through.
+  caught <- with_warnings(loo(fit))
+  ic <- caught$value
+  loo_warnings <- caught$warnings
+  expect_true(is.finite(ic$estimates["elpd_loo", "Estimate"]))
+  pareto_k <- ic$diagnostics$pareto_k
+  expect_true(all(is.finite(pareto_k)))
+  # A high Pareto-k is what a latent state-space fit is expected to
+  # produce: dropping an observation moves the very state it is being
+  # scored against, which is the reason `lfo_cv()` exists. So the
+  # claim is not that the diagnostic is good, it is that the user is
+  # told the truth about it. The notice has to arrive exactly when
+  # there is something to report, which fails both on a `loo()` gone
+  # silent over bad draws and on one that cries out over good ones.
+  expect_identical(
+    any(pareto_k > 0.7),
+    any(grepl("Pareto k", loo_warnings))
+  )
+  # Whatever was raised is that notice and nothing else, so an
+  # unrelated warning cannot hide among the expected ones.
+  expect_true(all(grepl("Pareto k", loo_warnings)))
+
+  aug <- augment(fit)
+  expect_identical(nrow(aug), nrow(dat))
+  expect_equal(as.numeric(aug$time), as.numeric(dat$time))
+  expect_equal(as.numeric(aug$.observed), as.numeric(dat$y))
+  expect_identical(as.character(aug$series), as.character(dat$series))
+
+  # Every lag the model has is reported, and no others. Asked of
+  # `variables()` and of `tidy()`, which have to agree: a table that
+  # named a lag the program does not carry, or dropped one it does,
+  # describes another model.
+  vars <- variables(fit)
+  td <- tidy(fit, effects = "all")
+  for (l in lags) {
+    expect_true(any(grepl(paste0("^ar", l, "_trend\\["), vars)))
+    expect_true(any(grepl(paste0("^ar", l, "_trend\\["), td$term)))
+  }
+  for (l in absent_lags) {
+    expect_false(any(grepl(paste0("^ar", l, "_trend\\["), vars)))
+    expect_false(any(grepl(paste0("^ar", l, "_trend\\["), td$term)))
+  }
+
+  # The trend-side smooth's own basis coefficient is reported by
+  # `variables()` and by `posterior_summary()` and is absent from the
+  # tidy table. It is the parameter the smooth is, so a table without
+  # it describes a model with no `s(temp)` in it.
+  ps <- rownames(posterior_summary(fit))
+  expect_identical(sum(grepl("^bs_", ps)), sum(grepl("^bs_", vars)))
+  # The tidy table names a fixed effect as `fixef()` does, without
+  # its `bs_` prefix
+  expect_true(all(mvgam:::fixef_name(grep("^bs_", vars, value = TRUE)) %in%
+                    td$term))
+
+  # One intercept, under one name. The table carries `Intercept` and
+  # `b_Intercept` as separate terms for the same coefficient.
+  expect_lte(sum(td$term %in% c("Intercept", "b_Intercept")), 1L)
+})
+
+
+test_that("hypothesis reaches the smooth's own coefficient", {
+  targets <- grep("^(ar1_trend\\[|(sdgp|lscale|sds|bs)_)",
+                  variables(fit), value = TRUE)
+  expect_gt(length(targets), 4L)
+  expect_hypothesis_reaches(fit, targets)
+})
+
+
+test_that("the trend-side smooth is drawn as a curve that moves", {
+  # `conditional_smooths()` is the drawn view of the same term
+  # `posterior_smooths()` evaluates. A smooth the data did not
+  # support shrinks toward zero and keeps its posterior width; one
+  # whose coefficients never reach the grid has no width at all.
+  # Measured here the curve has sd 0.75 and spans -1.06 to
+  # 0.91, so a curve pinned flat fails.
+  cs <- conditional_smooths(fit)
+  expect_length(cs, 1L)
+  expect_match(names(cs)[1L], "temp", fixed = TRUE)
+  d <- cs[[1L]]
+  expect_gt(nrow(d), 0L)
+
+  # brms names the estimate and its interval with trailing
+  # underscores in both of its drawn views, and the sibling method
+  # here answers with the same three, so code written against one
+  # frame reads the other.
+  expect_true(all(c("estimate__", "lower__", "upper__") %in% names(d)))
+  expect_gt(stats::sd(d$estimate__), 1e-6)
+  expect_true(all(d$lower__ <= d$estimate__))
+  expect_true(all(d$estimate__ <= d$upper__))
+  expect_gt(min(d$upper__ - d$lower__), 0)
+  # Drawn over the covariate's own range rather than over its rank.
+  expect_true(all(d$temp >= min(dat$temp) - 1e-8))
+  expect_true(all(d$temp <= max(dat$temp) + 1e-8))
+})
+
+
+test_that("pp_check and the plotting methods draw something", {
+  expect_drawn(pp_check(fit, ndraws = 20L))
+  for (ty in c("residuals", "trend", "series")) {
+    expect_drawn(plot(fit, type = ty))
+  }
+  expect_drawn(mcmc_plot(fit))
+})
+
+test_that("irf, fevd and stability refuse a trend that has no A", {
+  # All three read a transition matrix, and an AR has none: its
+  # persistence is a vector of lag coefficients, so there are no
+  # off-diagonal entries to carry a shock from one series into
+  # another. Answering anyway would mean inventing the cross terms,
+  # and the tables give a reader no way to tell an invented one from
+  # an estimated one.
+  expect_error(irf(fit), "requires a VAR latent trend")
+  expect_error(fevd(fit), "requires a VAR latent trend")
+  expect_error(stability(fit), "requires a VAR latent trend")
+})
+
+
+# ----- conditional_effects, and the `series` argument ----------------
+#
+# Two series is what makes the `series` argument testable: on one
+# series every filtering claim below passes whether or not the filter
+# does anything.
+
+test_that("conditional_effects finds the model's own smooth term", {
+  # Each element is a built panel, and the frame behind it is what
+  # carries the effect. A panel that was never evaluated is a
+  # constant with a zero-width band and satisfies any class check.
+  ce <- conditional_effects(fit)
+  expect_true("x" %in% names(ce))
+  d <- ce[["x"]]$data
+  expect_true(all(c("estimate", "conf.low", "conf.high") %in%
+                    colnames(d)))
+  expect_gt(stats::sd(d$estimate), 1e-8)
+  expect_true(all(d$conf.low <= d$estimate))
+  expect_true(all(d$estimate <= d$conf.high))
+  expect_gt(mean(d$conf.high - d$conf.low), 0)
+
+  # The ggplot keeps marginaleffects' own names, which its layers map
+  # to aesthetics. The documented extraction route is where mvgam
+  # names these columns, and it answers the way brms does, matching
+  # the `conditional_smooths()` frame above.
+  ce_df <- as.data.frame(ce)
+  expect_true(all(c("estimate__", "lower__", "upper__") %in%
+                    names(ce_df)))
+  expect_false(any(c("conf.low", "conf.high") %in% names(ce_df)))
+})
+
+
+test_that("conditional_effects type = link is the link scale", {
+  ce_resp <- conditional_effects(fit)
+  ce_link <- conditional_effects(fit, type = "link")
+  expect_setequal(names(ce_link), names(ce_resp))
+  # This fit is gaussian, so its link is the identity and the two
+  # scales are the same numbers. Agreeing is the contract rather than
+  # a coincidence, and it has to hold on both panels: a `type` that
+  # applied some inverse link anyway would move them. The
+  # complementary claim, where the two must not agree, is made on the
+  # log-linked fits in test-draws-alignment.R and on the bernoulli arm
+  # of test-grain-mvbf-wide.R.
+  for (nm in names(ce_resp)) {
+    expect_equal(ce_link[[nm]]$data$estimate,
+                 ce_resp[[nm]]$data$estimate, tolerance = 1e-10)
+    expect_equal(ce_link[[nm]]$data$conf.low,
+                 ce_resp[[nm]]$data$conf.low, tolerance = 1e-10)
+  }
+  # And the panels are not constant, so the agreement above is
+  # between two things that vary rather than between two flat lines.
+  expect_gt(stats::sd(ce_resp[["x"]]$data$estimate), 0.05)
+})
+
+
+test_that("conditional_effects honours a user-supplied effects list", {
+  ce <- conditional_effects(fit, effects = "x")
+  expect_length(ce, 1L)
+  expect_identical(names(ce), "x")
+})
+
+
+test_that("plot returns the panels as brms does and draws them", {
+  ce <- conditional_effects(fit)
+  out <- plot(ce, plot = FALSE)
+  # One ggplot per effect, named as the effects are
+  expect_identical(names(out), names(ce))
+  expect_true(all(vapply(out, inherits, logical(1L), "ggplot")))
+  p <- plot(ce)[[1L]]
+  layers <- ggplot2::ggplot_build(p)$data
+  expect_gt(sum(vapply(layers, nrow, integer(1L))), 0L)
+})
+
+
+test_that("the series argument selects among this fit's own levels", {
+  # The levels are the fit's own, in its own order, which is the
+  # alphabetical reverse of what a rebuilt axis would give.
+  lev <- levels(fit$data$series)
+  expect_identical(lev, series_levels)
+  all_ce <- conditional_effects(fit, series = "all")
+  d_all <- all_ce[[1L]]$data
+  expect_true("series" %in% colnames(d_all))
+  expect_setequal(as.character(unique(d_all$series)), lev)
+
+  # Naming one series filters to it. On a single-series fit this is
+  # satisfied by a filter that does nothing, which is why it is
+  # asserted here instead.
+  one <- conditional_effects(fit, series = lev[1L])
+  d_one <- one[[1L]]$data
+  expect_lt(nrow(d_one), nrow(d_all))
+  expect_setequal(as.character(unique(d_one$series)), lev[1L])
+
+  # An index resolves to the level at that position, so it and the
+  # name give the same answer. Position, not alphabetical rank: this
+  # fit's first level is `gamma`, which sorts second.
+  by_int <- conditional_effects(fit, series = 1L)
+  expect_equal(by_int[[1L]]$data$estimate, d_one$estimate)
+})
+
+
+test_that("the series argument refuses what it cannot resolve", {
+  n_lev <- nlevels(fit$data$series)
+  expect_identical(n_lev, n_series)
+  expect_error(conditional_effects(fit, series = "not_a_series"),
+               "Unknown series name")
+  expect_error(conditional_effects(fit, series = n_lev + 1L), "out of range")
+  expect_error(conditional_effects(fit, series = c("a", "b")),
+               "NULL, 'all', a series name")
+})
+
+
+# -- Stationarity of a contiguous lag set ----------------------------
+
+# A contiguous `AR(p >= 2)` samples partial autocorrelations and
+# derives the coefficients through the Levinson-Durbin recursion. A
+# sparse lag set keeps the bounded coefficients, where a draw can be
+# explosive. This fit covers the contiguous case and checks the
+# property the recursion exists for.
+
+fit_ar2 <- cached_fit("val_mvgam_ar_contiguous.rds", function() {
+  set.seed(99L)
+  phi2 <- c(0.65, -0.4)
+  lat2 <- matrix(0, n_time, n_series)
+  for (s in seq_len(n_series)) {
+    e2 <- rnorm(n_time, 0, 0.5)
+    for (t in 3:n_time) {
+      lat2[t, s] <- phi2[1L] * lat2[t - 1L, s] +
+        phi2[2L] * lat2[t - 2L, s] + e2[t]
+    }
+  }
+  dat2 <- data.frame(
+    y = as.numeric(lat2) + rnorm(n_time * n_series, 0, 0.2),
+    time = rep(time_vals, times = n_series),
+    series = factor(rep(series_levels, each = n_time),
+                    levels = series_levels)
+  )
+  mvgam(
+    y ~ 1, trend_formula = ~ AR(p = 2), data = dat2,
+    family = gaussian(), chains = 2L, iter = 1000L, warmup = 500L,
+    silent = 2, backend = "cmdstanr"
+  )
+})
+
+dm2 <- posterior::as_draws_matrix(fit_ar2$fit)
+
+
+
+test_that("a contiguous AR(p = 2) carries both parameterisations", {
+  # The partial autocorrelation is sampled and the coefficient is
+  # derived. Both reach the posterior, which lets every post-fit
+  # consumer keep taking `ar{lag}_trend` as the coefficient.
+  vars <- colnames(dm2)
+  expect_true(all(paste0("ar", 1:2, "_pacf_trend[1]") %in% vars))
+  expect_true(all(paste0("ar", 1:2, "_trend[1]") %in% vars))
+})
+
+
+test_that("every draw of a contiguous AR(p = 2) is stationary", {
+  # The claim the recursion exists for. Bounded coefficients leave
+  # about a quarter of the declared region explosive, and a draw
+  # taken there gives a latent state that grows without limit.
+  for (s in seq_len(n_series)) {
+    a1 <- as.numeric(dm2[, paste0("ar1_trend[", s, "]")])
+    a2 <- as.numeric(dm2[, paste0("ar2_trend[", s, "]")])
+    # The AR(2) stationarity region is the triangle these three
+    # inequalities give.
+    expect_true(all(abs(a2) < 1))
+    expect_true(all(a1 + a2 < 1))
+    expect_true(all(a2 - a1 < 1))
+  }
+})
+
+
+test_that("the partial autocorrelations hold their declared bounds", {
+  for (s in seq_len(n_series)) {
+    for (l in 1:2) {
+      pk <- as.numeric(dm2[, paste0("ar", l, "_pacf_trend[", s, "]")])
+      expect_true(all(abs(pk) < 1))
+    }
+  }
+})
+
+
+test_that("a contiguous AR(p = 2) starts at its stationary distribution", {
+  # The first two states are built from the partial autocorrelations
+  # by the Levinson-Durbin recursion. Ground truth here is the closed
+  # form for p = 2, written from the definition: the marginal variance
+  # is sigma^2 / ((1 - pacf1^2) (1 - pacf2^2)), and the second state
+  # adds the order-one predictor pacf1 * lv[1] to an innovation of
+  # variance sigma^2 / (1 - pacf2^2). Stored draws keep about nine
+  # significant digits.
+  for (s in seq_len(n_series)) {
+    lv1 <- as.numeric(dm2[, paste0("lv_trend[1,", s, "]")])
+    lv2 <- as.numeric(dm2[, paste0("lv_trend[2,", s, "]")])
+    z1 <- as.numeric(dm2[, paste0("innovations_trend[1,", s, "]")])
+    z2 <- as.numeric(dm2[, paste0("innovations_trend[2,", s, "]")])
+    sg <- as.numeric(dm2[, paste0("sigma_trend[", s, "]")])
+    p1 <- as.numeric(dm2[, paste0("ar1_pacf_trend[", s, "]")])
+    p2 <- as.numeric(dm2[, paste0("ar2_pacf_trend[", s, "]")])
+    gamma0 <- sg^2 / ((1 - p1^2) * (1 - p2^2))
+    expected1 <- sqrt(gamma0) * z1
+    expected2 <- p1 * expected1 + sqrt(sg^2 / (1 - p2^2)) * z2
+    expect_equal(lv1, expected1, tolerance = 1e-6)
+    expect_equal(lv2, expected2, tolerance = 1e-6)
+  }
+})
+
+
+test_that("a sparse lag set keeps the bounded coefficients", {
+  # The scoping claim. A sparse lag set fixes its intermediate
+  # coefficients at zero, a constraint the recursion cannot state,
+  # and it keeps the plain declaration.
+  vars <- colnames(dm)
+  expect_false(any(grepl("pacf", vars, fixed = TRUE)))
+  expect_true(all(paste0("ar", lags, "_trend[1]") %in% vars))
+})
+
+
+# -- One coefficient shared across series ----------------------------
+
+# `coef_sharing = "shared"` samples one coefficient per lag and
+# broadcasts it to every series through `rep_vector`. Two series each
+# drawing an independent coefficient from one narrow posterior give
+# matching estimates, matching dimensions and a matching summary.
+# Identity within each individual draw separates the two models, and
+# a posterior supplies that.
+#
+# The fit then drives the post-fit battery. A broadcast coefficient
+# has to reach the prediction routes, the forecast recursion, the
+# hindcast blocks and the tidiers under one name.
+#
+#   truth: 2 series, 96 occasions, gaussian, one AR(1) coefficient
+#          governing both series
+#   model: y ~ 1, trend_formula = ~ AR(p = 1, coef_sharing = "shared")
+#
+# Cached at tests/local/fixtures/val_mvgam_ar_shared.rds.
+
+set.seed(4242L)
+phi_shared <- 0.7
+lat_sh <- matrix(0, n_time, n_series)
+for (s in seq_len(n_series)) {
+  e_sh <- rnorm(n_time, 0, 0.5)
+  for (t in 2:n_time) {
+    lat_sh[t, s] <- phi_shared * lat_sh[t - 1L, s] + e_sh[t]
+  }
+}
+dat_sh <- data.frame(
+  y = as.numeric(lat_sh) + rnorm(n_time * n_series, 0, 0.2),
+  time = rep(time_vals, times = n_series),
+  series = factor(rep(series_levels, each = n_time),
+                  levels = series_levels)
+)
+
+make_future_sh <- function(h) {
+  ft <- max(time_vals) + seq_len(h)
+  data.frame(
+    time = rep(ft, times = n_series),
+    series = factor(rep(series_levels, each = h),
+                    levels = series_levels),
+    y = NA_real_
+  )
+}
+
+fit_sh <- cached_fit("val_mvgam_ar_shared.rds", function() {
+  mvgam(
+    y ~ 1, trend_formula = ~ AR(p = 1, coef_sharing = "shared"),
+    data = dat_sh, family = gaussian(), chains = 2L, iter = 1000L,
+    warmup = 500L, silent = 2, backend = "cmdstanr"
+  )
+})
+
+dm_sh <- posterior::as_draws_matrix(fit_sh$fit)
+
+
+
+test_that("the program samples one coefficient and broadcasts it", {
+  # The generated Stan states the whole mechanism: a length-one
+  # vector in `parameters`, a `rep_vector` filling the per-series
+  # vector, and the prior on the sampled scalar.
+  sc <- as.character(stancode(fit_sh))
+  flat <- gsub("\\s+", "", sc)
+  expect_true(grepl("vector<lower=-1,upper=1>[1]shared_ar1_trend;", flat,
+                    fixed = TRUE))
+  expect_true(grepl(
+    "ar1_trend=rep_vector(shared_ar1_trend[1],N_lv_trend);",
+    flat, fixed = TRUE))
+  # The per-series vector is derived, which leaves the scalar as the
+  # one AR coefficient with a prior.
+  expect_true(grepl("shared_ar1_trend|0,0.5", flat))
+  expect_false(grepl("pacf", flat, fixed = TRUE))
+})
+
+
+test_that("every draw gives both series the same coefficient", {
+  # The claim no program check can make. Two series sampling
+  # independent coefficients from one narrow posterior agree on
+  # average and differ draw by draw; a broadcast agrees within each
+  # individual draw exactly.
+  a1 <- as.numeric(dm_sh[, "ar1_trend[1]"])
+  a2 <- as.numeric(dm_sh[, "ar1_trend[2]"])
+  expect_identical(a1, a2)
+  expect_identical(a1, as.numeric(dm_sh[, "shared_ar1_trend[1]"]))
+  # Both vary, which makes the identity above a real constraint.
+  expect_gt(stats::sd(a1), 1e-6)
+  expect_true(all(abs(a1) < 1))
+  expect_length(
+    grep("^shared_ar1_trend\\[", colnames(dm_sh), value = TRUE), 1L)
+  expect_length(grep("^ar1_trend\\[", colnames(dm_sh), value = TRUE),
+                n_series)
+})
+
+
+test_that("the trend axis matches the series the fit was given", {
+  sd_sh <- fit_sh$standata
+  ax <- mvgam:::mvgam_axes(fit_sh)
+  expect_identical(as.character(ax$series$levels), series_levels)
+  expect_identical(as.integer(ax$time$values), time_vals)
+  expect_identical(as.integer(sd_sh$N_time_trend), n_time)
+  expect_identical(as.integer(sd_sh$N_series_trend), n_series)
+  expect_identical(as.integer(sd_sh$obs_trend_series),
+                   match(as.character(dat_sh$series), series_levels))
+})
+
+
+test_that("every prediction route covers every row", {
+  n_obs <- nrow(dat_sh)
+  ep <- posterior_epred(fit_sh, ndraws = 20L)
+  pp <- posterior_predict(fit_sh, ndraws = 20L)
+  lp <- posterior_linpred(fit_sh, ndraws = 20L)
+  expect_identical(dim(ep), c(20L, n_obs))
+  expect_identical(dim(pp), c(20L, n_obs))
+  expect_identical(dim(lp), c(20L, n_obs))
+  expect_true(all(is.finite(ep)))
+  expect_identical(nrow(fitted(fit_sh, ndraws = 20L)), n_obs)
+  expect_identical(nrow(residuals(fit_sh, ndraws = 20L)), n_obs)
+  ll <- log_lik(fit_sh, ndraws = 20L)
+  expect_identical(dim(ll), c(20L, n_obs))
+  expect_true(all(is.finite(ll)))
+})
+
+
+test_that("the one-step forecast uses the shared coefficient", {
+  # One coefficient governs both series, making the one-step trend
+  # forecast that shared value times the last latent state. A
+  # recursion taking a per-series coefficient from elsewhere, or
+  # taking the scalar at the wrong index, lands somewhere else while
+  # staying finite and correctly shaped.
+  fc <- forecast(fit_sh, newdata = make_future_sh(1L), ndraws = NULL,
+                 type = "trend")
+  phi <- as.numeric(dm_sh[, "shared_ar1_trend[1]"])
+  for (s in seq_len(n_series)) {
+    st <- as.numeric(
+      dm_sh[, paste0("lv_trend[", n_time, ",", s, "]")]
+    )
+    expect_equal(mean(fc$forecasts[[series_levels[s]]][, 1L]),
+                 mean(phi * st), tolerance = 0.1)
+  }
+})
+
+
+test_that("the forecast object is keyed and ordered by the fit", {
+  h <- 5L
+  future_times <- max(time_vals) + seq_len(h)
+  fc <- forecast(fit_sh, newdata = make_future_sh(h), ndraws = 20L,
+                 type = "link")
+  expect_identical(names(fc$forecasts), series_levels)
+  for (s in series_levels) {
+    expect_identical(as.integer(fc$test_times[[s]]), future_times)
+    expect_identical(as.integer(fc$train_times[[s]]), time_vals)
+    expect_identical(ncol(fc$forecasts[[s]]), h)
+  }
+})
+
+
+test_that("hindcast blocks match the conditional epred cells", {
+  hc <- hindcast(fit_sh, type = "expected")
+  blocks <- hc$hindcasts
+  expect_identical(names(blocks), series_levels)
+  cells <- unlist(lapply(names(blocks), function(s) {
+    rows <- which(as.character(dat_sh$series) == s)
+    rows[order(dat_sh$time[rows])]
+  }))
+  ep <- posterior_epred(fit_sh, incl_autocor = TRUE)
+  expect_equal(unname(ep[, cells, drop = FALSE]),
+               unname(do.call(cbind, blocks)))
+})
+
+
+test_that("the tidiers name the shared parameter", {
+
+  vars <- variables(fit_sh)
+  td <- tidy(fit_sh, effects = "all")
+  ps <- rownames(posterior_summary(fit_sh))
+  # The sampled scalar appears under one name everywhere it is
+  # reported, and the derived vector keeps its own name.
+  # The sampled scalar reaches all three reporting tables. `tidy()`
+  # walks the parameter taxonomy, where a name without the `_trend`
+  # suffix lands on the observation side and reaches no bucket.
+  for (tbl in list(vars, td$term, ps)) {
+    expect_true(any(grepl("^shared_ar1_trend", tbl)))
+  }
+  # The per-series copies repeat that scalar. The default view leaves
+  # them out, and naming one retrieves it.
+  expect_false(any(grepl("^ar1_trend\\[", vars)))
+  named <- as.data.frame(fit_sh, variable = "^ar1_trend\\[",
+                         regex = TRUE)
+  # A draws data frame ends with `.chain`, `.iteration` and `.draw`,
+  # which index the rows.
+  cols <- setdiff(colnames(named), c(".chain", ".iteration", ".draw"))
+  expect_gt(length(cols), 0L)
+  expect_true(all(grepl("^ar1_trend\\[", cols)))
+  # Every copy equals the sampled scalar, which is what makes
+  # reporting each of them a repetition.
+  scalar <- as.numeric(dm_sh[, "shared_ar1_trend[1]"])
+  for (nm in cols) {
+    expect_equal(as.numeric(named[[nm]]), scalar)
+  }
+
+  # A prior can still be set on the name `get_prior()` offers.
+  gp <- get_prior(y ~ 1,
+                  trend_formula = ~ AR(p = 1, coef_sharing = "shared"),
+                  data = dat_sh, family = gaussian())
+  ar_rows <- gp$class[grepl("ar[0-9]", gp$class)]
+  expect_identical(sort(unique(ar_rows)), "shared_ar1_trend")
+
+  aug <- augment(fit_sh)
+  expect_identical(nrow(aug), nrow(dat_sh))
+  expect_equal(as.numeric(aug$.observed), as.numeric(dat_sh$y))
+})
+
+
+test_that("pp_check and the plotting methods draw something", {
+  expect_drawn(pp_check(fit_sh, ndraws = 20L))
+  for (ty in c("residuals", "trend", "series")) {
+    expect_drawn(plot(fit_sh, type = ty))
+  }
+  expect_drawn(mcmc_plot(fit_sh))
+})
+
+
+cat("\nDone.\n")

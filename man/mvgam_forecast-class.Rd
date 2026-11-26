@@ -2,66 +2,84 @@
 % Please edit documentation in R/mvgam_forecast-class.R
 \name{mvgam_forecast-class}
 \alias{mvgam_forecast-class}
+\alias{summary.mvgam_forecast}
+\alias{print.mvgam_forecast}
 \title{\code{mvgam_forecast} object description}
+\usage{
+\method{summary}{mvgam_forecast}(object, probs = c(0.025, 0.975), ...)
+
+\method{print}{mvgam_forecast}(x, ...)
+}
+\arguments{
+\item{object}{An \code{mvgam_forecast} object.}
+
+\item{probs}{The lower and upper quantiles reported with the median.
+Defaults to \code{c(0.025, 0.975)}.}
+
+\item{...}{Unused. Anything passed here is refused.}
+
+\item{x}{An \code{mvgam_forecast} object.}
+}
 \description{
 A \code{mvgam_forecast} object returned by function \code{\link{hindcast}}
-or \code{\link{forecast}}. Run \code{methods(class = "mvgam_forecast")} to see
-an overview of available methods.
+or \code{\link[generics]{forecast}}. Run
+\code{methods(class = "mvgam_forecast")} to see an overview of available
+methods.
 }
 \details{
 A \code{mvgam_forecast} object contains the following elements:
 
 \itemize{
-\item \code{call} the original observation model formula
-
-\item \code{trend_call} If a \verb{trend_formula was supplied}, the original trend
-model formula is returned. Otherwise \code{NULL}
-
-\item \code{family} \code{character} description of the observation distribution
+\item \code{family} \code{character} description of the observation
+distribution.
 
 \item \code{family_pars} \code{list} containing draws of family-specific
-parameters (i.e. shape, scale or overdispersion parameters). Only
-returned if \code{type = link}. Otherwise \code{NULL}
+parameters (e.g. shape, scale, overdispersion). Only returned when
+\code{type = "link"}; otherwise \code{NULL}.
 
-\item \code{trend_model} \code{character} description of the latent trend model
+\item \code{type} The type of predictions included
+(\code{"link"}, \code{"response"}, \code{"expected"}, or \code{"trend"}).
 
-\item \code{drift} Logical specifying whether a drift term was used in the
-trend model
+\item \code{series_names} Factor of series names, taken from
+\code{levels(data$series)} in the original model fit.
 
-\item \code{use_lv} Logical flag indicating whether latent dynamic factors were
-used in the model
+\item \code{train_observations}, \code{train_times} Lists of length \code{n_series}
+holding the training responses and the time of each hindcast
+column. A closure-unit family's \code{"expected"} and \code{"response"}
+hindcasts have one column per visit. Their times repeat.
 
-\item \code{fit_engine} \code{Character} describing the fit engine, either as \code{stan}
-or \code{jags}
+\item \code{test_observations}, \code{test_times} If \code{forecast()} produced the
+object, the corresponding test response vectors and time grids.
+\code{NULL} otherwise (e.g. from \code{hindcast()}).
 
-\item \code{type} The type of predictions included (either \code{link}, \code{response}
-or \code{trend})
+\item \code{hindcasts} Named list of posterior hindcast draw matrices, one
+\verb{(ndraws x n_train)} matrix per series.
 
-\item \code{series_names} Names of the time series, taken from
-\code{levels(data$series)} in the original model fit
+\item \code{forecasts} Named list of posterior forecast draw matrices when
+produced by \code{forecast()}, otherwise \code{NULL}.
 
-\item \code{train_observations} A \code{list} of training observation vectors of
-length \code{n_series}
+\item \code{site_units} \code{TRUE} when the fit came from \code{\link[=jsdgam]{jsdgam()}}. Its
+units are sites, which \code{plot()} refuses to draw along a time
+axis.
 
-\item \code{train_times} A \code{list} of the unique training times of length
-\code{n_series}
-
-\item \code{test_observations} If the \code{\link{forecast}} function was used,
-a \code{list} of test observation vectors of length \code{n_series}. Otherwise
-\code{NULL}
-
-\item \code{test_times} If the \code{\link{forecast}} function was used, a
-\code{list} of the unique testing (validation) times of length \code{n_series}.
-Otherwise \code{NULL}
-
-\item \code{hindcasts} A \code{list} of posterior hindcast distributions of length
-\code{n_series}.
-
-\item \code{forecasts} If the \code{\link{forecast}} function was used, a
-\code{list} of posterior forecast distributions of length \code{n_series}.
-Otherwise \code{NULL}
+\item \code{component} The state components of the trend the draws hold,
+such as \code{"slope"}, or \code{NULL} for the summed trend. Set through
+the \code{component} argument of \code{\link[=hindcast.mvgam]{hindcast.mvgam()}} and
+\code{\link[=forecast.mvgam]{forecast.mvgam()}}.
 }
 }
+\section{Methods}{
+
+\code{print()} gives the family, the number of series, the sizes of the
+training and forecast windows and the number of draws. \code{summary()}
+returns a long tibble with one row per series and time: the median
+and the two quantiles of \code{probs}, the observed value for
+\code{type = "response"} and the prediction type. Trend components add a
+\code{component} column, their names joined by \code{" + "}. A multivariate
+fit on a long frame adds a leading \code{resp} column. \code{\link[=plot.mvgam_forecast]{plot.mvgam_forecast()}}
+draws the object.
+}
+
 \seealso{
 \link{mvgam}, \link{hindcast.mvgam}, \link{forecast.mvgam}
 }

@@ -1,246 +1,215 @@
-#'@title Extract hindcasts for a fitted \code{mvgam} object
-#'@name hindcast.mvgam
-#'@importFrom stats predict
-#'@inheritParams predict.mvgam
-#'@param ... Ignored
-#'@details Posterior hindcasts (i.e. retrodictions) are drawn from the fitted \code{mvgam} and
-#'organized into a convenient format for plotting
-#'@return An object of class \code{mvgam_forecast} containing hindcast distributions.
-#'See \code{\link{mvgam_forecast-class}} for details.
-#'
-#'@seealso [plot.mvgam_forecast()], [summary.mvgam_forecast()],
-#'[forecast.mvgam()], [fitted.mvgam()], [predict.mvgam()]
-#'@export
+# hindcast.mvgam: posterior hindcasts at the training times, built by
+# `build_hindcast_arms()` from the fitted latent states.
+
+
+#' @rdname hindcast.mvgam
+#' @export
 hindcast <- function(object, ...) {
   UseMethod("hindcast", object)
 }
 
-#'@rdname hindcast.mvgam
-#'@method hindcast mvgam
+
+#' Posterior hindcasts for an mvgam state-space model
+#'
+#' Posterior draws at the training time points. Each draw takes the
+#' latent state the model inferred at each time. The observation
+#' family maps it to the response scale. A hindcast shows how closely
+#' the fitted states track the data. [forecast.mvgam()] predicts
+#' unseen times.
+#'
+#' @inheritParams forecast.mvgam
+#' @param object A fitted [mvgam][mvgam::mvgam] object, or for
+#'   `summary()` an `mvgam_latent_state` object.
+#' @param ... Unused. Anything passed here is refused.
+#' @param x An `mvgam_latent_state` object.
+#' @param probs For `summary()`, the four interval bounds, lowest
+#'   first. Defaults to `c(0.025, 0.25, 0.75, 0.975)`, the 50% and 95%
+#'   intervals.
+#' @param digits Integer number of digits in the printed range.
+#'   Defaults to 2.
+#' @param series Names or indices of the series to plot, or `NULL` for
+#'   every series.
+#' @param type The scale of the draws, as in [forecast.mvgam()], or
+#'   `"latent_state"` for a closure-unit family. `"latent_state"`
+#'   returns the occupancy probability `psi` of an [occ()] model or the
+#'   abundance `N` of an [nmix()] model at each closure unit, as an
+#'   `mvgam_latent_state` object. Its `print()` gives the range of the
+#'   unit medians. `summary()` and `as.data.frame()` return one row per
+#'   unit, with its key columns (`series`, `time` and the `site` of a
+#'   multi-season fit), the median and the 50% and 95% interval bounds.
+#'   `plot()` draws them per series, as a line with ribbons over time or
+#'   as points with interval bars over units without an order. A
+#'   multi-season fit holds several sites in each season. Its plot draws
+#'   the mean over those sites in each draw: the expected share of sites
+#'   occupied, or the mean abundance per site.
+#' @param process_error Logical. `FALSE` (the default) takes the
+#'   fitted latent state of each draw. `type = "response"` then adds
+#'   the observation noise alone. `TRUE` replaces the fitted states
+#'   with the covariate part plus newly drawn innovations, as
+#'   [posterior_epred.mvgam()] gives with the same argument. The
+#'   hindcast then shows what the model predicts without the observed
+#'   history. A `component` is a fitted state and needs `FALSE`.
+#'
+#' @return An [mvgam_forecast-class][mvgam] object. Its hindcasts are a
+#'   named list of `[ndraws, n_times]` matrices, one per series. Its
+#'   forecast slots are `NULL`.
+#'
+#' @seealso [forecast.mvgam()] extrapolates the fitted state.
+#'   [posterior_predict.mvgam()] and [posterior_epred.mvgam()] predict
+#'   from the covariate part of the model. The
+#'   `r mvgam_article("mvbf", "multivariate article")` compares
+#'   `type = "trend"` hindcasts of one latent state from a joint model
+#'   and from each data source alone. The
+#'   `r mvgam_article("nmix", "N-mixture article")` summarises
+#'   `type = "latent_state"` hindcasts of abundance.
 #' @examples
 #' \dontrun{
-#' simdat <- sim_mvgam(n_series = 3, trend_model = AR())
-#' mod <- mvgam(y ~ s(season, bs = 'cc'),
-#'              trend_model = AR(),
-#'              noncentred = TRUE,
-#'              data = simdat$data_train,
-#'              chains = 2,
-#'              silent = 2)
+#' set.seed(11)
+#' simdat <- sim_mvgam(family = poisson(), n_series = 1L,
+#'                      n_timepoints = 120L, trend_model = AR())
 #'
-#' # Hindcasts on response scale
+#' mod <- mvgam(
+#'   y ~ s(x, k = 5),
+#'   trend_formula = ~ AR(p = 1),
+#'   data    = simdat$data_train,
+#'   family  = poisson(),
+#'   chains  = 2, silent = 2
+#' )
+#'
+#' # The fitted states track the training counts
 #' hc <- hindcast(mod)
-#' str(hc)
-#' head(summary(hc), 12)
-#' plot(hc, series = 1)
-#' plot(hc, series = 2)
-#' plot(hc, series = 3)
+#' plot(hc)
 #'
-#' # Hindcasts as expectations
-#' hc <- hindcast(mod, type = 'expected')
-#' head(summary(hc), 12)
-#' plot(hc, series = 1)
-#' plot(hc, series = 2)
-#' plot(hc, series = 3)
+#' # The AR(1) trend on the log scale
+#' plot(hindcast(mod, type = "trend"))
 #'
-#' # Estimated latent trends
-#' hc <- hindcast(mod, type = 'trend')
-#' head(summary(hc), 12)
-#' plot(hc, series = 1)
-#' plot(hc, series = 2)
-#' plot(hc, series = 3)
+#' # Fresh innovations in place of the fitted states give the wider
+#' # spread a model without the observed history would predict
+#' plot(hindcast(mod, process_error = TRUE))
+#'
+#' # A local linear trend's slope, the level's growth per step
+#' mod_llt <- update(mod, trend_formula = ~ LLT())
+#' plot(hindcast(mod_llt, type = "trend", component = "slope"))
+#'
+#' # Next, forecast the held-out times with forecast()
 #' }
-#'@export
-hindcast.mvgam = function(object, type = 'response', ...) {
-  # Check arguments
-  series <- 'all'
-  type <- match.arg(
-    arg = type,
-    choices = c(
-      "link",
-      "response",
-      "trend",
-      "expected",
-      "latent_N",
-      "detection"
-    )
+#'
+#' @family predictions
+#' @family forecasting
+#' @method hindcast mvgam
+#' @export
+hindcast.mvgam <- function(object,
+                           ...,
+                           type = c("response", "link",
+                                    "expected", "trend",
+                                    "latent_state"),
+                           component = NULL,
+                           ndraws = NULL,
+                           draw_ids = NULL,
+                           obs_uncertainty = TRUE,
+                           process_error = FALSE,
+                           resp = NULL) {
+  checkmate::assert_class(object, "mvgam")
+  require_fitted_model(object, "hindcast")
+  require_series_axis(object, "hindcast")
+  # The arguments follow `...` and are matched by name only. A
+  # misspelt name would land in `...` and leave its default in place.
+  rlang::check_dots_empty()
+  type <- match.arg(type)
+  validate_draw_selectors(ndraws, draw_ids)
+  checkmate::assert_flag(obs_uncertainty)
+  checkmate::assert_flag(process_error)
+  checkmate::assert_string(resp, null.ok = TRUE)
+  component <- resolve_trend_component(object, component, type)
+  if (!is.null(component) && process_error) {
+    stop(insight::format_error(c(
+      "'component' requires 'process_error = FALSE'.",
+      x = "A state component is the fitted state of each draw.",
+      i = "Drop 'process_error' to hindcast the component."
+    )), call. = FALSE)
+  }
+
+  # The latent state of a closure-unit family is indexed by unit. A
+  # single-season design has no time axis. The result is then an
+  # `mvgam_latent_state` of the per-unit draws of
+  # `posterior_latent_N()`.
+  if (type == "latent_state") {
+    return(hindcast_latent_state(object, ndraws = ndraws,
+                                 draw_ids = draw_ids))
+  }
+
+  # Multivariate fan-out: one `mvgam_forecast` per response, in a
+  # wrapper of the same class. `plot()`, `print()` and `score()`
+  # dispatch on it as on a single forecast.
+  fan <- mv_resp_fan_out(object, resp, class = "mvgam_forecast")
+  if (!is.null(fan)) {
+    return(fan)
+  }
+
+  series_levels <- fitted_series_levels(object)
+  reported <- reported_series(object, resp, series_levels)
+
+  draw_idx <- resolve_draw_indices(posterior::ndraws(object), ndraws,
+                                   draw_ids)
+
+  training <- build_training_arms(object, series_levels, resp = resp)
+  hindcasts <- build_hindcast_arms(
+    object, training, type, draw_idx, obs_uncertainty,
+    process_error = process_error,
+    resp = resp,
+    series_levels = reported,
+    component = component
   )
 
-  data_train <- object$obs_data
-  data_train <- validate_series_time(
-    data_train,
-    trend_model = attr(object$model_data, 'trend_model')
+  family_pars <- if (type == "link") {
+    extract_family_pars_for_draws(object, draw_idx, resp = resp)
+  } else {
+    NULL
+  }
+
+  new_mvgam_forecast(object, type, resp, reported, training,
+                     hindcasts = hindcasts, family_pars = family_pars,
+                     component = component)
+}
+
+
+#' The hindcast of a closure-unit model's latent state
+#'
+#' Builds an `mvgam_latent_state` object from a fitted closure-unit
+#' model. `posterior_latent_N()` gives the per-draw latent state.
+#' `closure_unit_meta()` gives the key values of each draw column.
+#'
+#' @param object Fitted `mvgam` object with a closure-unit family
+#' @param ndraws Integer number of draws to take, or `NULL` for all
+#' @param draw_ids Integer indices of the draws to take, or `NULL`
+#' @return An `mvgam_latent_state` object holding a draws by units
+#'   matrix and one row of key values per unit
+#' @noRd
+hindcast_latent_state <- function(object, ndraws = NULL,
+                                  draw_ids = NULL) {
+  total_draws <- posterior::ndraws(object)
+  draw_idx <- resolve_draw_indices(total_draws, ndraws, draw_ids)
+
+  draws <- posterior_latent_N(object, draw_ids = draw_idx,
+                              incl_autocor = TRUE)
+
+  checkmate::assert_matrix(draws, mode = "numeric",
+                            any.missing = FALSE,
+                            .var.name = "kernel return value")
+
+  # The key values of each unit, in the order of the draw columns
+  unit_df <- closure_unit_meta(object, closure_unit_arrays_for(object))
+
+  # `time` is a time axis when a multi-season fit indexes seasons by
+  # it, or when a trend evolves along it. A single-season fit without
+  # a temporal trend uses it only to identify closure units.
+  has_time <- is_multi_season_family(object$family) ||
+    !get_trend_type(object) %in% c("None", "ZMVN")
+
+  new_mvgam_latent_state(
+    draws       = draws,
+    unit        = unit_df,
+    family      = object$family,
+    has_time    = has_time
   )
-  last_train <- max(data_train$index..time..index) -
-    (min(data_train$index..time..index) - 1)
-
-  n_series <- NCOL(object$ytimes)
-  n_predcols <- dim(mcmc_chains(object$model_output, 'ypred'))
-  ends <- seq(0, n_predcols[2], length.out = NCOL(object$ytimes) + 1)
-  starts <- ends + 1
-  starts <- c(1, starts[-c(1, (NCOL(object$ytimes) + 1))])
-  ends <- ends[-1]
-
-  # Extract hindcasts for storing in the returned object
-  series_hcs <- lapply(seq_len(n_series), function(series) {
-    to_extract <- switch(
-      type,
-      'link' = 'mus',
-      'expected' = 'mus',
-      'response' = 'ypred',
-      'trend' = 'trend',
-      'latent_N' = 'mus',
-      'detection' = 'mus'
-    )
-    if (object$family == 'nmix' & type == 'link') {
-      to_extract <- 'trend'
-    }
-
-    if (object$fit_engine == 'stan') {
-      preds <- mcmc_chains(object$model_output, to_extract)[,
-        seq(series, n_predcols[2], by = n_series),
-        drop = FALSE
-      ][, 1:last_train]
-    } else {
-      preds <- mcmc_chains(object$model_output, to_extract)[,
-        starts[series]:ends[series],
-        drop = FALSE
-      ][, 1:last_train]
-    }
-
-    if (object$family == 'nmix' & type == 'link') {
-      preds <- exp(preds)
-    }
-
-    if (type %in% c('expected', 'latent_N', 'detection')) {
-      # Extract family-specific parameters for this series
-      family_pars <- extract_family_pars(object = object)
-      par_extracts <- lapply(seq_along(family_pars), function(j) {
-        if (is.matrix(family_pars[[j]])) {
-          as.vector(matrix(
-            rep(as.vector(family_pars[[j]][, series]), NCOL(preds)),
-            nrow = NROW(preds),
-            byrow = FALSE
-          ))
-        } else {
-          as.vector(matrix(
-            rep(family_pars[[j]], NCOL(preds)),
-            nrow = NROW(preds),
-            byrow = FALSE
-          ))
-        }
-      })
-      names(par_extracts) <- names(family_pars)
-
-      # Add trial information if this is a Binomial model
-      if (object$family %in% c('binomial', 'beta_binomial')) {
-        trials <- as.vector(matrix(
-          rep(
-            as.vector(attr(object$mgcv_model, 'trials')[, series]),
-            NROW(preds)
-          ),
-          nrow = NROW(preds),
-          byrow = TRUE
-        ))
-        par_extracts$trials <- trials
-      }
-
-      # Compute expectations as one long vector
-      Xpmat <- matrix(as.vector(preds))
-      attr(Xpmat, 'model.offset') <- 0
-
-      if (object$family == 'nmix') {
-        preds <- mcmc_chains(object$model_output, 'detprob')[,
-          object$ytimes[1:last_train, series],
-          drop = FALSE
-        ]
-        Xpmat <- matrix(qlogis(as.vector(preds)))
-        attr(Xpmat, 'model.offset') <- 0
-        latent_lambdas <- as.vector(mcmc_chains(object$model_output, 'trend')[,
-          seq(series, n_predcols[2], by = n_series),
-          drop = FALSE
-        ][, 1:last_train])
-
-        latent_lambdas <- exp(latent_lambdas)
-        cap <- as.vector(t(replicate(
-          n_predcols[1],
-          object$obs_data$cap[which(
-            as.numeric(object$obs_data$series) == series
-          )]
-        )))
-      } else {
-        latent_lambdas <- NULL
-        cap <- NULL
-      }
-
-      if (type == 'latent_N') {
-        preds <- mcmc_chains(object$model_output, 'latent_ypred')[,
-          seq(series, n_predcols[2], by = n_series),
-          drop = FALSE
-        ][, 1:last_train]
-      } else {
-        preds <- matrix(
-          as.vector(mvgam_predict(
-            family = object$family,
-            Xp = Xpmat,
-            latent_lambdas = latent_lambdas,
-            cap = cap,
-            type = type,
-            betas = 1,
-            family_pars = par_extracts
-          )),
-          nrow = NROW(preds)
-        )
-      }
-    }
-    preds
-  })
-  names(series_hcs) <- levels(data_train$series)
-
-  series_obs <- lapply(seq_len(n_series), function(series) {
-    s_name <- levels(data_train$series)[series]
-    data.frame(
-      series = data_train$series,
-      time = data_train$index..time..index,
-      y = data_train$y
-    ) %>%
-      dplyr::filter(series == s_name) %>%
-      dplyr::arrange(time) %>%
-      dplyr::pull(y)
-  })
-  names(series_obs) <- levels(data_train$series)
-
-  series_train_times <- lapply(seq_len(n_series), function(series) {
-    s_name <- levels(data_train$series)[series]
-    data.frame(
-      series = data_train$series,
-      time = data_train$time,
-      y = data_train$y
-    ) %>%
-      dplyr::filter(series == s_name) %>%
-      dplyr::arrange(time) %>%
-      dplyr::pull(time)
-  })
-  names(series_train_times) <- levels(data_train$series)
-
-  series_fcs <- structure(
-    list(
-      call = object$call,
-      trend_call = object$trend_call,
-      family = object$family,
-      trend_model = object$trend_model,
-      drift = object$drift,
-      use_lv = object$use_lv,
-      fit_engine = object$fit_engine,
-      type = type,
-      series_names = levels(data_train$series),
-      train_observations = series_obs,
-      train_times = series_train_times,
-      test_observations = NULL,
-      test_times = NULL,
-      hindcasts = series_hcs,
-      forecasts = NULL
-    ),
-    class = 'mvgam_forecast'
-  )
-  return(series_fcs)
 }

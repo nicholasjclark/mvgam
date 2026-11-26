@@ -1,0 +1,33 @@
+test_that("shared_variation() errors on non-factor mvgam fits", {
+  fake_fit <- structure(
+    list(
+      trend_metadata = list(trend_type = "AR")
+    ),
+    class = c("mvgam", "brmsfit")
+  )
+  expect_error(
+    shared_variation(fake_fit),
+    "requires a latent factor model"
+  )
+})
+
+test_that("shared_variation returns Z Sigma Z', not Z Z'", {
+  case <- mk_factor_obj()
+  testthat::local_mocked_bindings(
+    as_draws_matrix = function(x, ...) x,
+    .package = "posterior"
+  )
+  sv <- shared_variation(case$obj)
+  Sigma <- diag(case$sigma_target^2, nrow = ncol(case$Z_target))
+  expected <- case$Z_target %*% Sigma %*% t(case$Z_target)
+  # The latent scale belongs between the loadings: a column enters
+  # the trend as `sigma_trend[k] * Z[, k]`, so dropping it weights
+  # every column equally when the model does not.
+  expect_equal(unname(sv$delta), expected, tolerance = 1e-8)
+  # The two formulas disagree on this mock, so the assertion
+  # above cannot pass by coincidence.
+  expect_false(isTRUE(all.equal(
+    expected, tcrossprod(case$Z_target)
+  )))
+  expect_identical(unname(rownames(sv$delta)), case$series_levels)
+})

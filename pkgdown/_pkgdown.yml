@@ -1,11 +1,11 @@
 url: https://nicholasjclark.github.io/mvgam/
 
-code:
-  run_dont_run: true
+development:
+  mode: release
 
 authors:
   Nicholas J Clark:
-    href: https://researchers.uq.edu.au/researcher/15140
+    href: https://ecogambler.netlify.app/
 
 template:
   bootstrap: 5
@@ -13,5 +13,285 @@ template:
 
 navbar:
   structure:
-    left: [intro, articles, reference, news]
+    left: [intro, articles, reference, cheatsheets, news]
     right: [search, github]
+  components:
+    cheatsheets:
+      text: Cheatsheets
+      menu:
+      - text: mvgam
+        href: cheatsheets/mvgam_cheatsheet.pdf
+      - text: Joint species distribution models
+        href: cheatsheets/jsdgam_cheatsheet.pdf
+
+articles:
+- title: Getting started
+  desc: >
+    Prepare your data and fit a first state-space model.
+  contents:
+  - mvgam_overview
+  - data
+
+- title: Latent dynamics
+  desc: >
+    Latent trends that model dependence over time. The articles also
+    interpret a fitted trend.
+  contents:
+  - articles/var
+  - articles/hierarchical_var
+  - dfm
+
+- title: Many responses, one process
+  desc: >
+    Sharing a latent state across outcomes measured on different
+    scales, across species, and across survey protocols.
+  contents:
+  - articles/mvbf
+  - articles/jsdgam
+  - articles/idm
+
+- title: Imperfect detection
+  desc: >
+    Closure-unit families that separate what is there from what was
+    seen.
+  contents:
+  - articles/occupancy
+  - articles/nmix
+
+- title: Evaluating forecasts
+  desc: >
+    Scoring rules, rolling-origin cross-validation and ensembles.
+  contents:
+  - articles/forecast_evaluation
+
+reference:
+- title: Model fitting
+  desc: >
+    Entry points that compile a state-space model and sample it.
+  contents:
+  - mvgam
+  - jsdgam
+  - mvgam_multiple
+  - update.mvgam
+  - mvgam-class
+  - print.mvgam
+  - inits.mvgam
+  - control_params.mvgam
+  - mvgam_use_cases
+  - mvgam-package
+
+- title: Formula and trend specification
+  desc: >
+    Building the observation formula and choosing a latent trend
+    process.
+  contents:
+  - mvgam_formula
+  - formula.mvgam
+  - RW
+  - LLT
+  - PW
+  - ZMVN
+  - lv_axis
+  - is.mvgam_trend
+  - list_trend_types
+  - mvgam_trend_specification
+
+- title: Observation families
+  desc: >
+    Families mvgam adds to those of brms, for counts, compositions,
+    occupancy and abundance.
+  contents:
+  - mvgam_families
+  - tweedie
+  - beta_nb
+  - com_binomial
+  - nmix
+  - occ
+  - diri
+  - multi
+  - categ
+  - mvn
+  - mvt
+  - family.mvgam
+  - check_tweedie_truncation
+  - latent_N_saturation
+
+- title: Priors
+  desc: >
+    Inspecting the default prior set and overriding it before a fit.
+  contents:
+  - get_prior
+  - get_prior.default
+  - get_prior.mvgam
+  - get_prior.mvgam_formula
+
+- title: Data preparation and validation
+  desc: >
+    Checking that long-format data carry the columns, levels and
+    response shape a proposed family expects.
+  contents:
+  - mvgam_data
+  - check_newdata
+  - series_to_mvgam
+  - pivot_detection_array
+  - pivot_species_matrix
+
+- title: Simulation
+  desc: >
+    Generative recipes that return the truths they drew from, for
+    recovery checks.
+  contents:
+  - sim_mvgam
+  - sim_closure_unit_data
+  - sim_jsdgam
+
+- title: Prediction and forecasting
+  desc: >
+    Forecasts carry the fitted trend forward in time. Predictions
+    from covariates leave the fitted trend out.
+  contents:
+  - predict.mvgam
+  - fitted.mvgam
+  - posterior_epred.mvgam
+  - posterior_linpred.mvgam
+  - posterior_predict.mvgam
+  - hindcast.mvgam
+  - forecast.mvgam
+  - mvgam_forecast-class
+  - plot.mvgam_forecast
+  - seasonality
+  - forecast_uncertainty
+  - sample_innovations
+  - ensemble.mvgam_forecast
+  - posterior_average.mvgam
+  - posterior_interval.mvgam
+  - predictive_interval.mvgam
+  - predictive_error.mvgam
+
+- title: Model criticism and cross-validation
+  desc: >
+    Posterior predictive checks, residuals, leave-one-out criteria and
+    cross-validation of forecasts.
+  contents:
+  - pp_check.mvgam
+  - residuals.mvgam
+  - log_lik.mvgam
+  - logLik.mvgam
+  - loo.mvgam
+  - waic.mvgam
+  - mvgam_loo_extras
+  - bridge_sampler.mvgam
+  - kfold.mvgam
+  - lfo_cv.mvgam
+  - loo_compare.mvgam_lfo
+  - loo_model_weights.mvgam_lfo
+  - score.mvgam_forecast
+  - compare_scores
+  - compare_elpds
+
+- title: Posterior summaries and diagnostics
+  desc: >
+    Parameter summaries and convergence checks for a fit. The Stan
+    program and data that produced it.
+  contents:
+  - summary.mvgam
+  - summary.mvgam_pooled
+  - print.mvgam_pooled_summary
+  - tidy.mvgam
+  - glance.mvgam
+  - augment.mvgam
+  - mvgam_draws
+  - mvgam_diagnostics
+  - index-mvgam
+  - ranef.mvgam
+  - VarCorr.mvgam
+  - ngrps.mvgam
+  - nobs.mvgam
+  - model.frame.mvgam
+  - terms.mvgam
+  - smooths.mvgam
+  - posterior_smooths.mvgam
+  - conditional_smooths.mvgam
+  - hypothesis.mvgam
+  - stancode.mvgam_formula
+  - stancode.formula
+
+- title: Reporting a model
+  desc: >
+    Methods text for a fitted model. Each tool writes one part: the
+    paragraph with its references, the equations with their priors or
+    the BibTeX file.
+  contents:
+  - how_to_cite.mvgam
+  - methods_md
+  - bibtex
+
+- title: Marginal and conditional effects
+  desc: >
+    Covariate effect summaries through the marginaleffects and
+    insight interfaces.
+  contents:
+  - conditional_effects.mvgam
+  - mvgam_marginaleffects
+  - mvgam_insight
+
+- title: Interrogating a fitted VAR
+  desc: >
+    Impulse responses, variance decompositions and stability measures
+    computed from the posterior of a VAR trend.
+  contents:
+  - irf.mvgam
+  - mvgam_irf-class
+  - fevd.mvgam
+  - mvgam_fevd-class
+  - stability.mvgam
+  - plot.mvgam_var_surface_summary
+  - posterior_transition_matrix
+
+- title: Correlations among series
+  desc: >
+    The correlations a factor model, correlated innovations or a
+    hierarchical trend implies among the series.
+  contents:
+  - residual_cor
+  - mvgam_residcor-class
+
+- title: Latent factors and joint species distribution models
+  desc: >
+    Ordinations, loading comparisons, factor activity, each species'
+    responses to covariates and community summaries.
+  contents:
+  - ordinate
+  - active_factors
+  - compare_loadings
+  - shared_variation
+  - species_effects
+  - variance_partition
+  - community
+  - trait_slopes_helpers
+
+- title: Plotting
+  desc: >
+    Plot methods for a fitted model. mvgam_theme() styles every
+    figure.
+  contents:
+  - plot.mvgam
+  - mcmc_plot.mvgam
+  - pairs.mvgam
+  - mvgam_theme
+
+- title: Datasets
+  desc: >
+    Example data used across the vignettes, articles and examples.
+  contents:
+  - birdsong
+  - portal_data
+  - coral_surveys
+  - lake_chemistry
+
+- title: Re-exports
+  desc: >
+    Generics re-exported from brms, posterior, loo and
+    marginaleffects.
+  contents:
+  - reexports

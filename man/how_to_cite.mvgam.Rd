@@ -3,81 +3,71 @@
 \name{how_to_cite.mvgam}
 \alias{how_to_cite.mvgam}
 \alias{how_to_cite}
-\title{Generate a methods description for \pkg{mvgam} models}
+\title{A methods paragraph and references for an \pkg{mvgam} model}
 \usage{
 how_to_cite(object, ...)
 
 \method{how_to_cite}{mvgam}(object, ...)
 }
 \arguments{
-\item{object}{\code{list} object of class \code{mvgam} resulting from a call
-to \code{\link[=mvgam]{mvgam()}} or \code{\link[=jsdgam]{jsdgam()}}}
+\item{object}{A fitted \code{mvgam} or \code{jsdgam} object.}
 
-\item{...}{ignored}
+\item{...}{Unused. Anything passed here is refused.}
 }
 \value{
-An object of class \code{how_to_cite} containing a text description
-of the methods as well as lists of both primary and additional references.
+A \code{how_to_cite} object holding the \code{methods_text}, the
+\code{citations} it makes, an \code{other_citations} list of related
+references and a \code{bibtex} list keyed by reference. \code{\link[=bibtex]{bibtex()}}
+extracts the BibTeX entries. \code{print()} shows every section.
 }
 \description{
-Create a brief but fully referenced methods description, along with a useful
-list of references, for fitted \code{mvgam} and \code{jsdgam} models.
-}
-\details{
-This function uses the model's structure to come up with a very
-basic but hopefully useful methods description that can help users to
-appropriately acknowledge the hard work of developers and champion open
-science. Please do not consider the text returned by this function to be a
-completely adequate methods section; it is only meant to get you started.
+Drafts a methods paragraph for a fitted model, with the references
+it cites and their BibTeX entries. The text and references follow
+the model's structure: the family and link, the trend, the factor
+identification and loadings prior, Gaussian process smooths,
+piecewise trends, the Stan backend and the sampling algorithm.
 }
 \examples{
 \dontrun{
-#--------------------------------------------------
-# Simulate 4 time series with hierarchical seasonality
-# and a VAR(1) dynamic process
-#--------------------------------------------------
-set.seed(0)
+set.seed(13)
+simdat <- sim_mvgam(family = poisson(), n_series = 1L,
+                     n_timepoints = 120L, trend_model = AR())
+mod <- mvgam(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1),
+              data    = simdat$data_train,
+              family  = poisson(),
+              chains  = 2, silent = 2)
 
-simdat <- sim_mvgam(
-  seasonality = 'hierarchical',
-  trend_model = VAR(cor = TRUE),
-  family = gaussian()
-)
+# A methods paragraph naming the Poisson family, the smooth and
+# the AR(1) trend, with the references it cites
+cite <- how_to_cite(mod)
+cite
 
-# Fit an appropriate model
-mod1 <- mvgam(
-  y ~ s(season, bs = 'cc', k = 6),
-  data = simdat$data_train,
-  family = gaussian(),
-  trend_model = VAR(cor = TRUE),
-  chains = 2,
-  silent = 2
-)
+# The BibTeX entries, for a reference manager
+bibtex(cite)
 
-how_to_cite(mod1)
-
-#--------------------------------------------------
-# For a GP example, simulate data using the mgcv package
-#--------------------------------------------------
-dat <- mgcv::gamSim(1, n = 30, scale = 2)
-
-# Fit a model that uses an approximate GP from brms
-mod2 <- mvgam(
-  y ~ gp(x2, k = 12),
-  data = dat,
-  family = gaussian(),
-  chains = 2,
-  silent = 2
-)
-
-how_to_cite(mod2)
+# Next, methods_md() writes the model's equations
 }
 
 }
 \seealso{
-\code{\link[utils]{citation}}, \code{\link{mvgam}},
-\code{\link{jsdgam}}
+\code{\link[=methods_md]{methods_md()}} writes the model's equations to accompany
+the paragraph. \code{\link[utils:citation]{utils::citation()}} cites the package itself.
+
+Other posterior summaries: 
+\code{\link{VarCorr.mvgam}()},
+\code{\link{bibtex}()},
+\code{\link{hypothesis.mvgam}()},
+\code{\link{index-mvgam}},
+\code{\link{mcmc_plot.mvgam}()},
+\code{\link{methods_md}()},
+\code{\link{mvgam_draws}},
+\code{\link{pairs.mvgam}()},
+\code{\link{posterior_interval.mvgam}()},
+\code{\link{ranef.mvgam}()},
+\code{\link{smooths.mvgam}()},
+\code{\link{summary.mvgam}()}
 }
 \author{
 Nicholas J Clark
 }
+\concept{posterior summaries}
