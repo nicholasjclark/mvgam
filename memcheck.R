@@ -122,88 +122,43 @@ err <- tryCatch(
 stopifnot(grepl("innovations", err))
 
 
-# CAR(1) kernel
-cat("[12] CAR(1) regular intervals (Δt = 1)\n")
-n_series <- 3L; h_car <- 50L
-out_car <- car1_recursC(
-  phi = rep(0.7, n_series),
-  sigma = rep(0.5, n_series),
-  time_dis = rep(1.0, h_car),
-  innovations = matrix(rnorm(h_car * n_series), h_car, n_series),
-  last_trend = rep(0, n_series),
-  h = h_car
-)
-stopifnot(identical(dim(out_car), c(50L, 3L)), all(is.finite(out_car)))
+# Piecewise trend kernel
+pw <- function(n_series, h, n_change, growth_type) {
+  pw_trendC(
+    t = seq_len(h) / h,
+    k = rnorm(n_series, 0, 0.5),
+    m = rnorm(n_series),
+    delta = matrix(rnorm(n_change * n_series, 0, 0.1), n_change, n_series),
+    t_change = sort(runif(n_change)),
+    cap = matrix(10, h, n_series),
+    growth_type = growth_type
+  )
+}
 
-cat("[13] CAR(1) irregular intervals (Δt ~ Uniform(1, 6))\n")
-set.seed(7)
-out_car <- car1_recursC(
-  phi = rep(0.7, n_series),
-  sigma = rep(0.5, n_series),
-  time_dis = runif(h_car, 1, 6),
-  innovations = matrix(rnorm(h_car * n_series), h_car, n_series),
-  last_trend = rep(0, n_series),
-  h = h_car
-)
-stopifnot(identical(dim(out_car), c(50L, 3L)), all(is.finite(out_car)))
+cat("[12] Piecewise linear trend, 3 series, 8 changepoints\n")
+out <- pw(3L, 60L, 8L, "linear")
+stopifnot(identical(dim(out), c(60L, 3L)), all(is.finite(out)))
 
-cat("[14] CAR(1) zero-gap guard (Δt = 0 floored at 1e-3)\n")
-out_car <- car1_recursC(
-  phi = rep(0.5, 2L),
-  sigma = rep(0.3, 2L),
-  time_dis = c(0, 1, 0, 0, 1),
-  innovations = matrix(rnorm(5 * 2), 5, 2),
-  last_trend = c(0, 0),
-  h = 5L
-)
-stopifnot(identical(dim(out_car), c(5L, 2L)), all(is.finite(out_car)))
+cat("[13] Piecewise logistic trend, 3 series, 8 changepoints\n")
+out <- pw(3L, 60L, 8L, "logistic")
+stopifnot(identical(dim(out), c(60L, 3L)), all(is.finite(out)))
 
-cat("[15] CAR(1) phi=1 guard fires\n")
+cat("[14] Piecewise trend without changepoints\n")
+out <- pw(2L, 20L, 0L, "linear")
+stopifnot(identical(dim(out), c(20L, 2L)), all(is.finite(out)))
+
+cat("[15] Input-shape guard: wrong delta shape errors\n")
 err <- tryCatch(
-  car1_recursC(
-    phi = c(1.0, 0.5), sigma = c(0.3, 0.3),
-    time_dis = rep(1.0, 5),
-    innovations = matrix(0, 5, 2),
-    last_trend = c(0, 0), h = 5L
-  ),
+  pw_trendC(t = 1:5, k = 0.1, m = 0, delta = matrix(0, 2, 2),
+            t_change = c(0.3, 0.6), cap = matrix(10, 5, 1),
+            growth_type = "linear"),
   error = function(e) conditionMessage(e)
 )
-stopifnot(grepl("phi", err))
+stopifnot(grepl("delta", err))
 
-cat("[16] CAR(1) phi<=0 guard fires\n")
-err <- tryCatch(
-  car1_recursC(
-    phi = c(0.0, 0.5), sigma = c(0.3, 0.3),
-    time_dis = rep(1.0, 5),
-    innovations = matrix(0, 5, 2),
-    last_trend = c(0, 0), h = 5L
-  ),
-  error = function(e) conditionMessage(e)
-)
-stopifnot(grepl("phi", err))
-
-cat("[17] CAR(1) sigma<=0 guard fires\n")
-err <- tryCatch(
-  car1_recursC(
-    phi = c(0.5, 0.5), sigma = c(0.0, 0.3),
-    time_dis = rep(1.0, 5),
-    innovations = matrix(0, 5, 2),
-    last_trend = c(0, 0), h = 5L
-  ),
-  error = function(e) conditionMessage(e)
-)
-stopifnot(grepl("sigma", err))
-
-cat("[18] Repeated CAR calls\n")
+cat("[16] Repeated piecewise calls\n")
 for (i in 1:50) {
-  invisible(car1_recursC(
-    phi = rep(0.7, 5L),
-    sigma = rep(0.5, 5L),
-    time_dis = runif(100, 0.5, 5),
-    innovations = matrix(rnorm(100 * 5), 100, 5),
-    last_trend = rep(0, 5L),
-    h = 100L
-  ))
+  invisible(pw(5L, 100L, 10L, if (i %% 2L) "linear" else "logistic"))
 }
 
 cat("\nAll memcheck calls completed without R-level error.\n")

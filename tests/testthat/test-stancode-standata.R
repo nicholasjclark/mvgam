@@ -1394,7 +1394,7 @@ test_that("a CAR trend with nested RE and mo() steps over its gaps", {
   ))
 
   # The gap scales the decay and the innovation together, the step
-  # `car1_recursC()` takes in a forecast
+  # `propagate_car()` takes in a forecast
   expect_true(stan_pattern("real gap = gap_trend[gap_index_trend[i]];",
                            code_with_trend, fixed = TRUE))
   expect_true(stan_pattern(paste0(

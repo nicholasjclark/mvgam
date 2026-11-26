@@ -562,7 +562,7 @@ test_that("the newdata battery holds on an irregular grid", {
 
 
 test_that("the CAR innovation scales with the gap it spans", {
-  # `car1_recursC()` steps the state as
+  # `propagate_car()` steps the state as
   #   phi^dt * prev + sigma * sqrt((1 - phi^(2 dt)) / (1 - phi^2)) * z
   # The sampled program describes that same process. Ground truth
   # here is that formula, taken from the stationary continuous-time
