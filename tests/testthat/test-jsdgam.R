@@ -163,6 +163,9 @@ test_that("build_jsdgam_loadings_prior threads phylo into distances$phylo", {
     traits = NULL, phylo = d, loadings_prior = NULL,
     species_levels = species_4()
   )
+  expect_identical(names(spec), "distances")
+  expect_equal(spec$distances$phylo,
+               mvgam:::jsdgam_phylo_to_dist(d, species_4()))
 })
 
 test_that("build_jsdgam_loadings_prior forwards explicit loadings_prior", {

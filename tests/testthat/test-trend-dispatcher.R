@@ -453,12 +453,6 @@ test_that("time parameter works correctly in trend constructors", {
 
 })
 
-# Test integration with formula parsing
-test_that("time parameter integrates correctly with formula parsing", {
-  
-
-})
-
 # Test series parameter functionality
 test_that("series parameter works correctly in trend constructors", {
 
