@@ -11,6 +11,15 @@ template:
   bootstrap: 5
   bootswatch: pulse
 
+home:
+  links:
+  - text: Methods paper (Methods in Ecology and Evolution)
+    href: https://doi.org/10.1111/2041-210X.13974
+  - text: Worked examples on the GAMbler blog
+    href: https://ecogambler.netlify.app/tags/mvgam/
+  - text: Discussion board
+    href: https://github.com/nicholasjclark/mvgam/discussions
+
 navbar:
   structure:
     left: [intro, articles, reference, cheatsheets, blog, news]
