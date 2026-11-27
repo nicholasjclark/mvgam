@@ -1,0 +1,57 @@
+# mvgam
+
+> mvgam is an R package for Bayesian State-Space models of univariate and multivariate time series. brms writes the observation model, from a formula in brms syntax. mvgam adds a latent dynamic process to it, from a second formula (`trend_formula`), and fits the model in Stan.
+
+The observation formula takes the brms syntax: smooths from mgcv, random effects, distributional regression, monotonic effects and nearly every brms family. The latent process is a term in `trend_formula`: `RW()`, `AR()`, `CAR()`, `VAR()`, `ZMVN()`, `PW()` or `LLT()`. Each accepts covariates, correlated process errors (`cor = TRUE`), dynamic factors (`n_lv`) and hierarchical grouping (`gr`, `subgr`). mvgam adds families for occupancy (`occ()`), N-mixture (`nmix()`), compositions (`diri()`, `multi()`, `categ()`) and Tweedie data (`tweedie()`). `jsdgam()` fits joint species distribution models.
+
+Fitted models work with the time series functions (`forecast()`, `hindcast()`, `lfo_cv()`, `score()`). They also work with the brms post-processing functions (`loo()`, `pp_check()`, `conditional_effects()`) and with the marginaleffects package. VAR fits add impulse responses (`irf()`), variance decompositions (`fevd()`) and stability measures (`stability()`). Version 2.0 replaced the version 1 argument `trend_model`. Code that passes it fails.
+
+Example:
+
+```r
+library(mvgam)
+fit <- mvgam(
+  y ~ s(x, k = 5),
+  trend_formula = ~ AR(p = 1),
+  data = dat,          # long format: one row per series and time
+  family = poisson()
+)
+forecast(fit, newdata = dat_test)
+```
+
+## Getting started
+
+- [Overview of the mvgam package](https://nicholasjclark.github.io/mvgam/articles/mvgam_overview.md): the two formulas, a first model and how to interpret it
+- [Formatting data for mvgam](https://nicholasjclark.github.io/mvgam/articles/data.md): the long data format with its series and time columns, missing values, irregular times
+- [Function reference](https://nicholasjclark.github.io/mvgam/reference/index.md)
+- [Changelog](https://nicholasjclark.github.io/mvgam/news/index.md): every change from version 1
+
+## Articles
+
+- [State-space vector autoregressions](https://nicholasjclark.github.io/mvgam/articles/var.md)
+- [Hierarchical vector autoregressions](https://nicholasjclark.github.io/mvgam/articles/hierarchical_var.md)
+- [Dynamic factor models](https://nicholasjclark.github.io/mvgam/articles/dfm.md)
+- [One latent process, several observation models](https://nicholasjclark.github.io/mvgam/articles/mvbf.md)
+- [Joint species distribution models](https://nicholasjclark.github.io/mvgam/articles/jsdgam.md)
+- [Integrated distribution models](https://nicholasjclark.github.io/mvgam/articles/idm.md)
+- [Occupancy models](https://nicholasjclark.github.io/mvgam/articles/occupancy.md)
+- [N-mixture models](https://nicholasjclark.github.io/mvgam/articles/nmix.md)
+- [Forecast evaluation](https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.md)
+
+## Key reference pages
+
+- [mvgam()](https://nicholasjclark.github.io/mvgam/reference/mvgam.md): fit a model
+- [Trend constructors](https://nicholasjclark.github.io/mvgam/reference/trend_constructors.md): the arguments of each latent process
+- [mvgam_formula()](https://nicholasjclark.github.io/mvgam/reference/mvgam_formula.md): the observation and trend formulas
+- [Observation families](https://nicholasjclark.github.io/mvgam/reference/mvgam_families.md)
+- [get_prior()](https://nicholasjclark.github.io/mvgam/reference/get_prior.md): default priors and how to change them
+- [forecast()](https://nicholasjclark.github.io/mvgam/reference/forecast.mvgam.md): forecasts carry the fitted trend forward in time
+- [predict()](https://nicholasjclark.github.io/mvgam/reference/predict.mvgam.md): predictions from covariates leave the fitted trend out
+- [jsdgam()](https://nicholasjclark.github.io/mvgam/reference/jsdgam.md): joint species distribution models
+
+## Optional
+
+- [Full documentation in one file](https://nicholasjclark.github.io/mvgam/llms-full.txt)
+- [Worked examples on the GAMbler blog](https://ecogambler.netlify.app/tags/mvgam/)
+- [Methods paper: Clark and Wells (2023), Methods in Ecology and Evolution](https://doi.org/10.1111/2041-210X.13974)
+- [Source code](https://github.com/nicholasjclark/mvgam)

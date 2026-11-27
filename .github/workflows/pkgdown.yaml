@@ -85,6 +85,15 @@ jobs:
         run: pkgdown::build_site_github_pages(lazy = TRUE, run_dont_run = TRUE, new_process = FALSE, install = FALSE)
         shell: Rscript {0}
 
+      # pkgdown writes llms.txt as the whole README plus every index. The
+      # llms.txt convention expects a short summary with curated links,
+      # which pkgdown/llms.txt holds. pkgdown's file is kept as
+      # llms-full.txt, the convention's name for the complete text.
+      - name: Install the curated llms.txt
+        run: |
+          mv docs/llms.txt docs/llms-full.txt
+          cp pkgdown/llms.txt docs/llms.txt
+
       # A clean deploy leaves gh-pages holding exactly this build. A page
       # the package drops leaves the site with it, unless the site
       # configuration redirects its old address.
