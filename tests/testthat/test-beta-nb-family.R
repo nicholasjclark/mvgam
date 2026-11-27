@@ -138,8 +138,19 @@ test_that("pbeta_nb_mvgam() has no mass below zero", {
   # constant and biases every observation.
   expect_identical(mvgam:::pbeta_nb_mvgam(-1, 5, 2, 2, log.p = TRUE), -Inf)
   expect_identical(mvgam:::pbeta_nb_mvgam(-3, 5, 2, 2, log.p = TRUE), -Inf)
+  expect_identical(mvgam:::pbeta_nb_mvgam(c(-Inf, Inf), 5, 2, 2), c(0, 1))
+  expect_identical(
+    mvgam:::pbeta_nb_mvgam(c(-Inf, Inf), 5, 2, 2, lower.tail = FALSE,
+                           log.p = TRUE),
+    c(0, -Inf)
+  )
   expect_equal(mvgam:::pbeta_nb_mvgam(-1, 5, 2, 2), 0)
-  expect_equal(mvgam:::dbeta_nb_mvgam(-1, 5, 2, 2), 0)
+  expect_equal(mvgam:::dbeta_nb_mvgam(c(-1, 1.5, Inf), 5, 2, 2), c(0, 0, 0))
+  # Clamping accumulated log-CDF at 0 keeps the upper tail finite in the far right tail
+  far <- mvgam:::pbeta_nb_mvgam(5000, 1, 2, 5, lower.tail = FALSE,
+                                log.p = TRUE)
+  expect_false(is.nan(far))
+  expect_true(far <= 0)
 })
 
 test_that("pbeta_nb_mvgam() equals the mass function at zero", {
@@ -213,6 +224,12 @@ test_that("cens() and trunc() are applied post-fit through the spec", {
   mass <- mvgam:::dist_cdf(spec, linpred, 20) -
     mvgam:::dist_cdf(spec, linpred, 1)
   expect_equal(trunc_ll, ll - log(mass))
+  # Lower-only truncation passes ub = Inf through log_interval_mass()
+  lower_trunc_ll <- mvgam:::apply_truncation_to_loglik(
+    ll, rep(1, 3), NULL, spec, linpred, discrete = TRUE
+  )
+  lower_mass <- 1 - mvgam:::dist_cdf(spec, linpred, 0)
+  expect_equal(lower_trunc_ll, ll - log(lower_mass))
 })
 
 test_that("the Stan distribution function guards against negative counts", {
