@@ -88,6 +88,9 @@ jobs:
       # A clean deploy leaves gh-pages holding exactly this build. A page
       # the package drops leaves the site with it, unless the site
       # configuration redirects its old address.
+      # Each build in release mode is the whole site. A development-mode
+      # build writes only dev/. A clean deploy of that build would delete
+      # the released site.
       - name: Deploy to GitHub pages 🚀
         if: github.event_name != 'pull_request'
         uses: JamesIves/github-pages-deploy-action@v4.4.1
