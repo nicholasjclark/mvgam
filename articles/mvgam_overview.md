@@ -203,23 +203,23 @@ summary(fit_ar)
 #> == Observation Model ==
 #> Regression Coefficients:
 #>           Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> Intercept     0.86      0.56    -0.27     2.03 1.00     1487     1405
+#> Intercept     0.83      0.59    -0.39     2.00 1.01      872      395
 #> 
 #> == Trend Model ==
 #> Smoothing Spline Hyperparameters:
 #>                   Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> sds(smintemp_1)       1.06      0.95     0.03     3.59 1.00     2383     2439
-#> sds(sndvi_ma12_1)     2.48      1.65     0.18     6.64 1.00     1693     1503
+#> sds(smintemp_1)       1.12      1.00     0.04     3.70 1.00     1648     1965
+#> sds(sndvi_ma12_1)     2.46      1.62     0.17     6.42 1.00     1357     1346
 #> 
 #> Regression Coefficients:
 #>              Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> smintemp_1       3.48      2.28    -0.86     8.53 1.00     1701     1771
-#> sndvi_ma12_1     3.08      4.31    -4.39    12.99 1.00     1512     1156
+#> smintemp_1       3.53      2.25    -0.70     8.25 1.01     1073     1598
+#> sndvi_ma12_1     3.20      4.24    -4.32    13.08 1.00     1417      436
 #> 
 #> Trend Specific Parameters:
 #>                 Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> sigma_trend[PP]     0.67      0.14     0.43     0.97 1.00     1320     2349
-#> ar1_trend[PP]       0.82      0.09     0.61     0.97 1.00     1255     1134
+#> sigma_trend[PP]     0.67      0.14     0.43     0.98 1.00     1152     1633
+#> ar1_trend[PP]       0.82      0.10     0.60     0.96 1.01      987      498
 #> 
 #> Draws were sampled using sampling(NUTS). For each parameter, Bulk_ESS
 #> and Tail_ESS are effective sample size measures, and Rhat is the potential
@@ -323,25 +323,25 @@ summary(scores)
 #> # A tibble: 12 × 4
 #>    series eval_horizon    GAM     AR
 #>    <fct>         <int>  <dbl>  <dbl>
-#>  1 PP                1  8.34   4.88 
-#>  2 PP                2 14.3   10.0  
+#>  1 PP                1  8.35   4.81 
+#>  2 PP                2 14.4    9.95 
 #>  3 PP                3 NA     NA    
-#>  4 PP                4  0.485  1.61 
-#>  5 PP                5  6.11   3.98 
-#>  6 PP                6  4.45   3.05 
-#>  7 PP                7  2.10   1.81 
-#>  8 PP                8  0.363  0.729
-#>  9 PP                9  1.48   1.64 
-#> 10 PP               10  4.41   3.36 
-#> 11 PP               11  9.80   7.12 
-#> 12 PP               12  9.12   6.53
+#>  4 PP                4  0.484  1.57 
+#>  5 PP                5  6.18   4.01 
+#>  6 PP                6  4.48   3.12 
+#>  7 PP                7  2.14   1.87 
+#>  8 PP                8  0.383  0.733
+#>  9 PP                9  1.51   1.63 
+#> 10 PP               10  4.41   3.41 
+#> 11 PP               11  9.77   7.25 
+#> 12 PP               12  9.15   6.67
 plot(scores, relative = "GAM")
 ```
 
 ![](mvgam_overview_files/figure-html/scores-1.png)
 
 The latent state improves the forecasts. The AR model has the lower CRPS
-in 8 of the 11 scored months. Its CRPS sums to 44.7 against 60.9 for the
+in 8 of the 11 scored months. Its CRPS sums to 45 against 61.2 for the
 smooth-only model. Its 90% intervals contain 11 of the 11 held-out
 counts. Those of the model without a latent state contain 4.
 
@@ -432,7 +432,7 @@ plot(rc)
 ![](mvgam_overview_files/figure-html/cor-resid-1.png)
 
 The two pocket mouse species, PB and PP, share the strongest
-correlation, 0.54 (95% interval 0.11 to 0.84). `n_lv` would instead
+correlation, 0.53 (95% interval 0.10 to 0.85). `n_lv` would instead
 estimate a few shared latent factors for many species.
 [`VAR()`](https://nicholasjclark.github.io/mvgam/reference/trend_constructors.md)
 would estimate how each species’ state affects the others at the next
@@ -513,7 +513,7 @@ Every other parameter takes an improper flat prior on its support.
 
 #### Implementation
 
-Fitted with mvgam 2.0.0 (brms 2.23.2; Stan 2.40.0 via cmdstanr).
+Fitted with mvgam 2.0.0.9000 (brms 2.23.2; Stan 2.40.0 via cmdstanr).
 Hamiltonian Monte Carlo: 4 chains, 1000 warmup + 1000 sampling
 iterations per chain.
 
@@ -532,7 +532,7 @@ iterations per chain.
 
 how_to_cite(fit_ar)
 #> Methods text skeleton
-#> We used the R package mvgam (version 2.0.0; Clark & Wells, 2023) to
+#> We used the R package mvgam (version 2.0.0.9000; Clark & Wells, 2023) to
 #>   construct, fit and interrogate the model. mvgam fits Bayesian
 #>   state-space models that combine flexible predictor effects in both the
 #>   process and observation components, using functionality from the brms
@@ -613,6 +613,21 @@ how_to_cite(fit_ar)
   [`lfo_cv()`](https://nicholasjclark.github.io/mvgam/reference/lfo_cv.mvgam.md)
   and combines them with
   [`ensemble()`](https://nicholasjclark.github.io/mvgam/reference/ensemble.mvgam_forecast.md).
+
+Three blog posts work through related models with `mvgam`:
+
+- [Temporal autocorrelation in
+  GAMs](https://ecogambler.netlify.app/blog/autocorrelated-gams/) shows
+  why smooths of time extrapolate poorly. A latent autoregressive trend
+  takes their place.
+- [Time-varying
+  seasonality](https://ecogambler.netlify.app/blog/time-varying-seasonality/)
+  captures a seasonal pattern that changes over time, with tensor
+  products and Fourier terms.
+- [Distributed
+  lags](https://ecogambler.netlify.app/blog/distributed-lags-mgcv/)
+  models delayed effects of temperature and vegetation greenness on the
+  same Portal rodent captures.
 
 ## References
 

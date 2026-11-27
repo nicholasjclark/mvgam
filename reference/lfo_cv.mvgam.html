@@ -27,7 +27,7 @@ model. loo.mvgam() explains the ELPD and the Pareto k diagnostic."><meta propert
 
     <a class="navbar-brand me-2" href="../index.html">mvgam</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Released version">2.0.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Released version">2.0.0.9000</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -35,14 +35,42 @@ model. loo.mvgam() explains the ELPD and the Pareto k diagnostic."><meta propert
     </button>
 
     <div id="navbar" class="collapse navbar-collapse ms-3">
-      <ul class="navbar-nav me-auto"><li class="nav-item"><a class="nav-link" href="../articles/index.html">Articles</a></li>
+      <ul class="navbar-nav me-auto"><li class="nav-item dropdown">
+  <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
+  <ul class="dropdown-menu" aria-labelledby="dropdown-articles"><li><a class="dropdown-item" href="../articles/mvgam_overview.html">Overview of the mvgam package</a></li>
+    <li><a class="dropdown-item" href="../articles/data.html">Formatting data for mvgam</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Latent dynamics</h6></li>
+    <li><a class="dropdown-item" href="../articles/var.html">State-space vector autoregressions with mvgam</a></li>
+    <li><a class="dropdown-item" href="../articles/hierarchical_var.html">Hierarchical vector autoregressions with mvgam</a></li>
+    <li><a class="dropdown-item" href="../articles/dfm.html">Dynamic factor models</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Many responses, one process</h6></li>
+    <li><a class="dropdown-item" href="../articles/mvbf.html">One latent process, several observation models</a></li>
+    <li><a class="dropdown-item" href="../articles/jsdgam.html">Joint species distribution models with mvgam</a></li>
+    <li><a class="dropdown-item" href="../articles/idm.html">Integrated distribution models with mvgam</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Imperfect detection</h6></li>
+    <li><a class="dropdown-item" href="../articles/occupancy.html">Occupancy models with mvgam</a></li>
+    <li><a class="dropdown-item" href="../articles/nmix.html">N-mixture models with mvgam</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Evaluating forecasts</h6></li>
+    <li><a class="dropdown-item" href="../articles/forecast_evaluation.html">Forecast evaluation in mvgam</a></li>
+  </ul></li>
 <li class="active nav-item"><a class="nav-link" href="../reference/index.html">Reference</a></li>
 <li class="nav-item dropdown">
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-cheatsheets" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Cheatsheets</button>
   <ul class="dropdown-menu" aria-labelledby="dropdown-cheatsheets"><li><a class="dropdown-item" href="../cheatsheets/mvgam_cheatsheet.pdf">mvgam</a></li>
     <li><a class="dropdown-item" href="../cheatsheets/jsdgam_cheatsheet.pdf">Joint species distribution models</a></li>
   </ul></li>
-<li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
+<li class="nav-item"><a class="external-link nav-link" href="https://ecogambler.netlify.app/tags/mvgam/">Blog</a></li>
+<li class="nav-item dropdown">
+  <button class="nav-link dropdown-toggle" type="button" id="dropdown-news" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">News</button>
+  <ul class="dropdown-menu" aria-labelledby="dropdown-news"><li><h6 class="dropdown-header" data-toc-skip>Releases</h6></li>
+    <li><a class="external-link dropdown-item" href="https://ecogambler.netlify.app/blog/mvgam-2/">mvgam 2.0.0</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><a class="dropdown-item" href="../news/index.html">Changelog</a></li>
+  </ul></li>
       </ul><ul class="navbar-nav"><li class="nav-item"><form class="form-inline" role="search">
  <input class="form-control" type="search" name="search-input" id="search-input" autocomplete="off" aria-label="Search site" placeholder="Search for" data-search-index="../search.json"></form></li>
 <li class="nav-item"><a class="external-link nav-link" href="https://github.com/nicholasjclark/mvgam/" aria-label="GitHub"><span class="fa fab fa-github fa-lg"></span></a></li>
@@ -256,21 +284,21 @@ stacking weights.</p>
 <span class="r-in"><span>  family  <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>  chains  <span class="op">=</span> <span class="fl">2</span>, seed <span class="op">=</span> <span class="fl">1</span>, silent <span class="op">=</span> <span class="fl">2</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 19 of 2000 (1.0%) transitions ended with a divergence.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 24 of 2000 (1.0%) transitions ended with a divergence.</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> See https://mc-stan.org/misc/warnings for details.</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Forecasts one time step after each origin from t = 60, scored by</span></span></span>
 <span class="r-in"><span><span class="co"># ELPD and CRPS. The model is refitted only where the Pareto k is high.</span></span></span>
 <span class="r-in"><span><span class="va">lfo</span> <span class="op">&lt;-</span> <span class="fu">lfo_cv</span><span class="op">(</span><span class="va">mod</span>, min_t <span class="op">=</span> <span class="fl">60L</span>, score <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"elpd"</span>, <span class="st">"crps"</span><span class="op">)</span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 15 of 2000 (1.0%) transitions ended with a divergence.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 39 of 2000 (2.0%) transitions ended with a divergence.</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> See https://mc-stan.org/misc/warnings for details.</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 16 of 2000 (1.0%) transitions ended with a divergence.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 67 of 2000 (3.0%) transitions ended with a divergence.</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> See https://mc-stan.org/misc/warnings for details.</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 157 of 2000 (8.0%) transitions ended with a divergence.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 9 of 2000 (0.0%) transitions ended with a divergence.</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> See https://mc-stan.org/misc/warnings for details.</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 24 of 2000 (1.0%) transitions ended with a divergence.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 14 of 2000 (1.0%) transitions ended with a divergence.</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> See https://mc-stan.org/misc/warnings for details.</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 17 of 2000 (1.0%) transitions ended with a divergence.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 32 of 2000 (2.0%) transitions ended with a divergence.</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> See https://mc-stan.org/misc/warnings for details.</span>
 <span class="r-in"><span><span class="va">lfo</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Approximate leave-future-out cross-validation</span>
@@ -278,8 +306,8 @@ stacking weights.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   pareto_k_threshold : 0.697 (adaptive)</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   evaluation points  : 30</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   refits             : 5</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   ELPD               : sum = -79.08, mean = -2.64</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   crps               : sum = 60.89, mean = 2.03</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   ELPD               : sum = -78.98, mean = -2.63</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   crps               : sum = 59.89, mean = 2</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Pareto k, ELPD and CRPS at each origin. Points past the dashed</span></span></span>
 <span class="r-in"><span><span class="co"># line are highlighted</span></span></span>
@@ -291,16 +319,16 @@ stacking weights.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #949494;"># A tibble: 30 × 6</span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>    eval_time refit_here pareto_k n_obs  elpd  crps</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>        <span style="color: #949494; font-style: italic;">&lt;int&gt;</span> <span style="color: #949494; font-style: italic;">&lt;lgl&gt;</span>         <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> <span style="color: #949494; font-style: italic;">&lt;int&gt;</span> <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 1</span>        61 TRUE        <span style="color: #BB0000;">NA</span>          1 -<span style="color: #BB0000;">2.52</span> 1.52 </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 2</span>        62 FALSE       -<span style="color: #BB0000;">1.71</span>       1 -<span style="color: #BB0000;">1.68</span> 0.616</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 3</span>        63 FALSE       -<span style="color: #BB0000;">0.825</span>      1 -<span style="color: #BB0000;">2.47</span> 1.41 </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 4</span>        64 FALSE       -<span style="color: #BB0000;">0.583</span>      1 -<span style="color: #BB0000;">2.42</span> 0.996</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 5</span>        65 FALSE       -<span style="color: #BB0000;">0.337</span>      1 -<span style="color: #BB0000;">1.66</span> 0.964</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 6</span>        66 FALSE       -<span style="color: #BB0000;">0.153</span>      1 -<span style="color: #BB0000;">2.49</span> 1.82 </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 7</span>        67 FALSE        0.089<span style="text-decoration: underline;">2</span>     1 -<span style="color: #BB0000;">2.85</span> 3.38 </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 8</span>        68 FALSE        0.574      1 -<span style="color: #BB0000;">2.96</span> 2.16 </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 9</span>        69 FALSE        0.689      1 -<span style="color: #BB0000;">2.68</span> 2.51 </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">10</span>        70 TRUE         0.741      1 -<span style="color: #BB0000;">2.86</span> 2.81 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 1</span>        61 TRUE        <span style="color: #BB0000;">NA</span>          1 -<span style="color: #BB0000;">2.51</span> 1.52 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 2</span>        62 FALSE       -<span style="color: #BB0000;">1.56</span>       1 -<span style="color: #BB0000;">1.71</span> 0.551</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 3</span>        63 FALSE       -<span style="color: #BB0000;">0.880</span>      1 -<span style="color: #BB0000;">2.48</span> 1.34 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 4</span>        64 FALSE       -<span style="color: #BB0000;">0.586</span>      1 -<span style="color: #BB0000;">2.43</span> 1.02 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 5</span>        65 FALSE       -<span style="color: #BB0000;">0.286</span>      1 -<span style="color: #BB0000;">1.68</span> 1.05 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 6</span>        66 FALSE       -<span style="color: #BB0000;">0.060</span><span style="color: #BB0000; text-decoration: underline;">9</span>     1 -<span style="color: #BB0000;">2.40</span> 1.33 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 7</span>        67 FALSE       -<span style="color: #BB0000;">0.047</span><span style="color: #BB0000; text-decoration: underline;">3</span>     1 -<span style="color: #BB0000;">2.81</span> 3.16 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 8</span>        68 FALSE        0.326      1 -<span style="color: #BB0000;">2.82</span> 1.63 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 9</span>        69 FALSE        0.628      1 -<span style="color: #BB0000;">2.69</span> 2.91 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">10</span>        70 TRUE         0.795      1 -<span style="color: #BB0000;">2.86</span> 2.75 </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #949494;"># ℹ 20 more rows</span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Next, rank models by their forecasts with loo_compare()</span></span></span>

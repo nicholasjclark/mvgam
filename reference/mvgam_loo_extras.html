@@ -23,7 +23,7 @@ are the brms aliases of loo.mvgam() and waic.mvgam()."><meta property="og:image"
 
     <a class="navbar-brand me-2" href="../index.html">mvgam</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Released version">2.0.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Released version">2.0.0.9000</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -31,14 +31,42 @@ are the brms aliases of loo.mvgam() and waic.mvgam()."><meta property="og:image"
     </button>
 
     <div id="navbar" class="collapse navbar-collapse ms-3">
-      <ul class="navbar-nav me-auto"><li class="nav-item"><a class="nav-link" href="../articles/index.html">Articles</a></li>
+      <ul class="navbar-nav me-auto"><li class="nav-item dropdown">
+  <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
+  <ul class="dropdown-menu" aria-labelledby="dropdown-articles"><li><a class="dropdown-item" href="../articles/mvgam_overview.html">Overview of the mvgam package</a></li>
+    <li><a class="dropdown-item" href="../articles/data.html">Formatting data for mvgam</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Latent dynamics</h6></li>
+    <li><a class="dropdown-item" href="../articles/var.html">State-space vector autoregressions with mvgam</a></li>
+    <li><a class="dropdown-item" href="../articles/hierarchical_var.html">Hierarchical vector autoregressions with mvgam</a></li>
+    <li><a class="dropdown-item" href="../articles/dfm.html">Dynamic factor models</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Many responses, one process</h6></li>
+    <li><a class="dropdown-item" href="../articles/mvbf.html">One latent process, several observation models</a></li>
+    <li><a class="dropdown-item" href="../articles/jsdgam.html">Joint species distribution models with mvgam</a></li>
+    <li><a class="dropdown-item" href="../articles/idm.html">Integrated distribution models with mvgam</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Imperfect detection</h6></li>
+    <li><a class="dropdown-item" href="../articles/occupancy.html">Occupancy models with mvgam</a></li>
+    <li><a class="dropdown-item" href="../articles/nmix.html">N-mixture models with mvgam</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Evaluating forecasts</h6></li>
+    <li><a class="dropdown-item" href="../articles/forecast_evaluation.html">Forecast evaluation in mvgam</a></li>
+  </ul></li>
 <li class="active nav-item"><a class="nav-link" href="../reference/index.html">Reference</a></li>
 <li class="nav-item dropdown">
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-cheatsheets" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Cheatsheets</button>
   <ul class="dropdown-menu" aria-labelledby="dropdown-cheatsheets"><li><a class="dropdown-item" href="../cheatsheets/mvgam_cheatsheet.pdf">mvgam</a></li>
     <li><a class="dropdown-item" href="../cheatsheets/jsdgam_cheatsheet.pdf">Joint species distribution models</a></li>
   </ul></li>
-<li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
+<li class="nav-item"><a class="external-link nav-link" href="https://ecogambler.netlify.app/tags/mvgam/">Blog</a></li>
+<li class="nav-item dropdown">
+  <button class="nav-link dropdown-toggle" type="button" id="dropdown-news" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">News</button>
+  <ul class="dropdown-menu" aria-labelledby="dropdown-news"><li><h6 class="dropdown-header" data-toc-skip>Releases</h6></li>
+    <li><a class="external-link dropdown-item" href="https://ecogambler.netlify.app/blog/mvgam-2/">mvgam 2.0.0</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><a class="dropdown-item" href="../news/index.html">Changelog</a></li>
+  </ul></li>
       </ul><ul class="navbar-nav"><li class="nav-item"><form class="form-inline" role="search">
  <input class="form-control" type="search" name="search-input" id="search-input" autocomplete="off" aria-label="Search site" placeholder="Search for" data-search-index="../search.json"></form></li>
 <li class="nav-item"><a class="external-link nav-link" href="https://github.com/nicholasjclark/mvgam/" aria-label="GitHub"><span class="fa fab fa-github fa-lg"></span></a></li>
@@ -330,28 +358,28 @@ forecasts of data the model has not seen.</p>
 <span class="r-in"><span>                    n_timepoints <span class="op">=</span> <span class="fl">120L</span>, trend_model <span class="op">=</span> <span class="st">"None"</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="va">mod</span> <span class="op">&lt;-</span> <span class="fu"><a href="mvgam.html">mvgam</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="fu">s</span><span class="op">(</span><span class="va">x</span><span class="op">)</span>, data <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span>,</span></span>
 <span class="r-in"><span>             family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson</a></span><span class="op">(</span><span class="op">)</span>, chains <span class="op">=</span> <span class="fl">2</span>, silent <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 11 of 2000 (1.0%) transitions ended with a divergence.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 5 of 2000 (0.0%) transitions ended with a divergence.</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> See https://mc-stan.org/misc/warnings for details.</span>
 <span class="r-in"><span><span class="co"># }</span></span></span>
 <span class="r-in"><span><span class="co"># \dontrun{</span></span></span>
 <span class="r-in"><span><span class="co"># The leave-one-out R^2 is lower than the in-sample one</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://mc-stan.org/rstantools/reference/bayes_R2.html" class="external-link">loo_R2</a></span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>     Estimate  Est.Error      Q2.5    Q97.5</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> R2 0.5858806 0.06563688 0.4374937 0.692272</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>     Estimate  Est.Error      Q2.5     Q97.5</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> R2 0.5855756 0.06635884 0.4361466 0.6927905</span>
 <span class="r-in"><span><span class="fu"><a href="https://mc-stan.org/rstantools/reference/bayes_R2.html" class="external-link">bayes_R2</a></span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>    Estimate  Est.Error      Q2.5     Q97.5</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> R2 0.630727 0.04941012 0.5139853 0.7126687</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>     Estimate  Est.Error      Q2.5     Q97.5</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> R2 0.6313402 0.04892968 0.5197279 0.7093959</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># One PSIS object serves every leave-one-out prediction</span></span></span>
 <span class="r-in"><span><span class="va">psis</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://mc-stan.org/loo/reference/loo.html" class="external-link">loo</a></span><span class="op">(</span><span class="va">mod</span>, save_psis <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span><span class="op">$</span><span class="va">psis_object</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="fu"><a href="https://mc-stan.org/rstantools/reference/loo-prediction.html" class="external-link">loo_predict</a></span><span class="op">(</span><span class="va">mod</span>, psis_object <span class="op">=</span> <span class="va">psis</span><span class="op">)</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>           mean</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1,]  2.727864</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [2,] 12.898318</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [3,]  7.103390</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [4,]  8.620246</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [5,]  2.916558</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [6,]  9.095455</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1,]  2.718588</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [2,] 13.052882</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [3,]  7.121861</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [4,]  8.625145</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [5,]  2.919068</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [6,]  9.045683</span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="fu"><a href="https://mc-stan.org/rstantools/reference/loo-prediction.html" class="external-link">loo_predictive_interval</a></span><span class="op">(</span><span class="va">mod</span>, psis_object <span class="op">=</span> <span class="va">psis</span><span class="op">)</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>      q5 q95</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> [1,]  0   6</span>

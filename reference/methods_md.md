@@ -84,7 +84,7 @@ mod <- mvgam(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1),
               data    = simdat$data_train,
               family  = poisson(),
               chains  = 2, silent = 2)
-#> Warning: 8 of 2000 (0.0%) transitions ended with a divergence.
+#> Warning: 6 of 2000 (0.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 
 # The equations, glossary and priors as Markdown
@@ -138,7 +138,7 @@ md
 #> 
 #> ## Implementation
 #> 
-#> Fitted with mvgam 2.0.0 (brms 2.23.2; Stan 2.40.0 via cmdstanr). Hamiltonian Monte Carlo: 2 chains, 1000 warmup + 1000 sampling iterations per chain.
+#> Fitted with mvgam 2.0.0.9000 (brms 2.23.2; Stan 2.40.0 via cmdstanr). Hamiltonian Monte Carlo: 2 chains, 1000 warmup + 1000 sampling iterations per chain.
 #> 
 #> ```
 #> mvgam(

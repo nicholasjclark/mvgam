@@ -137,7 +137,7 @@ plot(mod_joint, type = "series")
 ```
 
 ![The three simulated records: counts, occupancy detections and
-opportunistic sightings.](idm_files/figure-html/series-1.png)
+opportunistic sightings.](figures/idm-series-1.png)
 
 The three simulated records: counts, occupancy detections and
 opportunistic sightings.
@@ -166,28 +166,28 @@ summary(mod_joint)
 #> == Observation Model ==
 #> Regression Coefficients:
 #>                 Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> count_Intercept     1.03      0.14     0.75     1.30 1.00     3238     2497
-#> pa_Intercept       -0.23      0.15    -0.55     0.07 1.00     3562     2607
-#> po_Intercept        0.33      0.10     0.12     0.52 1.00     2565     1997
+#> count_Intercept     1.03      0.14     0.74     1.29 1.00     4339     3068
+#> pa_Intercept       -0.23      0.15    -0.54     0.05 1.00     5266     3110
+#> po_Intercept        0.33      0.10     0.11     0.51 1.00     3800     2524
 #> 
 #> == Trend Model ==
 #> Smoothing Spline Hyperparameters:
 #>             Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> sds(senv_1)     1.98      1.15     0.45     4.91 1.00     1434     1491
+#> sds(senv_1)     2.07      1.21     0.46     5.02 1.00     1271     1591
 #> 
 #> Regression Coefficients:
 #>        Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> senv_1    -0.81      3.52    -9.17     5.17 1.00     1469     1588
+#> senv_1    -0.92      3.58    -9.16     5.08 1.00     1875     1143
 #> 
 #> Trend Specific Parameters:
 #>                       Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS
-#> sigma_trend[species1]     0.34      0.09     0.17     0.54 1.00     1294
-#> ar1_trend[species1]       0.12      0.24    -0.38     0.57 1.00     1417
-#> ar12_trend[species1]     -0.10      0.30    -0.67     0.46 1.00     1050
+#> sigma_trend[species1]     0.34      0.09     0.18     0.53 1.00     1460
+#> ar1_trend[species1]       0.13      0.25    -0.38     0.60 1.00     1579
+#> ar12_trend[species1]     -0.11      0.30    -0.66     0.45 1.00     1476
 #>                       Tail_ESS
-#> sigma_trend[species1]     2131
-#> ar1_trend[species1]       2084
-#> ar12_trend[species1]      1557
+#> sigma_trend[species1]     2235
+#> ar1_trend[species1]       1548
+#> ar12_trend[species1]      2361
 #> 
 #> Draws were sampled using sampling(NUTS). For each parameter, Bulk_ESS
 #> and Tail_ESS are effective sample size measures, and Rhat is the potential
@@ -223,8 +223,8 @@ constants <- hypothesis(mod_joint, c(
 constants
 #> Hypothesis Tests for class :
 #>     Hypothesis Estimate Est.Error CI.Lower CI.Upper Evid.Ratio Post.Prob Star
-#> 1     log area    -1.26      0.20    -1.64    -0.88         NA        NA    *
-#> 2 log thinning    -0.69      0.16    -1.01    -0.38         NA        NA    *
+#> 1     log area    -1.26      0.19    -1.63    -0.89         NA        NA    *
+#> 2 log thinning    -0.70      0.16    -1.01    -0.39         NA        NA    *
 #> ---
 #> 'CI': 90%-CI for one-sided and 95%-CI for two-sided hypotheses.
 #> '*': For one-sided hypotheses, the posterior probability exceeds 95%;
@@ -248,7 +248,7 @@ pp_check(mod_joint, ndraws = 50)
 ```
 
 ![Posterior predictive checks for each data
-source.](idm_files/figure-html/ppc-1.png)
+source.](figures/idm-ppc-1.png)
 
 Posterior predictive checks for each data source.
 
@@ -263,7 +263,7 @@ plot(mod_joint, type = "smooths")
 ```
 
 ![The smooth of env from the joint model, with its 95% credible
-interval.](idm_files/figure-html/smooth-1.png)
+interval.](figures/idm-smooth-1.png)
 
 The smooth of env from the joint model, with its 95% credible interval.
 
@@ -281,7 +281,7 @@ patchwork::wrap_plots(plot(ce, plot = FALSE), nrow = 1)
 
 ![Expected count, detection probability and sighting rate along env from
 the joint model, with 95% credible
-intervals.](idm_files/figure-html/effects-1.png)
+intervals.](figures/idm-effects-1.png)
 
 Expected count, detection probability and sighting rate along env from
 the joint model, with 95% credible intervals.
@@ -319,8 +319,7 @@ plot(hc_joint)
 ```
 
 ![Expected counts per unit effort from the joint model. Points are the
-counts of the first two
-years.](idm_files/figure-html/hindcast-joint-1.png)
+counts of the first two years.](figures/idm-hindcast-joint-1.png)
 
 Expected counts per unit effort from the joint model. Points are the
 counts of the first two years.
@@ -332,7 +331,7 @@ plot(hc_count)
 
 ![Expected counts per unit effort from the model fitted to the counts
 alone. Its y-axis extends ten times further than that of the joint
-model.](idm_files/figure-html/hindcast-count-1.png)
+model.](figures/idm-hindcast-count-1.png)
 
 Expected counts per unit effort from the model fitted to the counts
 alone. Its y-axis extends ten times further than that of the joint
@@ -389,7 +388,7 @@ ggplot(curves, aes(env)) +
 
 ![Posterior medians and 95% credible intervals of the response to env
 from the joint model and from the counts alone. The black line is the
-simulated response.](idm_files/figure-html/response-plot-1.png)
+simulated response.](figures/idm-response-plot-1.png)
 
 Posterior medians and 95% credible intervals of the response to env from
 the joint model and from the counts alone. The black line is the
@@ -423,7 +422,7 @@ plot(fc)
 
 ![Expected values for each data source over the training months and a
 12-month forecast. Points are the
-observations.](idm_files/figure-html/forecast-1.png)
+observations.](figures/idm-forecast-1.png)
 
 Expected values for each data source over the training months and a
 12-month forecast. Points are the observations.

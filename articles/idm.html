@@ -25,7 +25,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">mvgam</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Released version">2.0.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Released version">2.0.0.9000</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -34,7 +34,30 @@
 
     <div id="navbar" class="collapse navbar-collapse ms-3">
       <ul class="navbar-nav me-auto">
-<li class="active nav-item"><a class="nav-link" href="../articles/index.html">Articles</a></li>
+<li class="active nav-item dropdown">
+  <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
+  <ul class="dropdown-menu" aria-labelledby="dropdown-articles">
+<li><a class="dropdown-item" href="../articles/mvgam_overview.html">Overview of the mvgam package</a></li>
+    <li><a class="dropdown-item" href="../articles/data.html">Formatting data for mvgam</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Latent dynamics</h6></li>
+    <li><a class="dropdown-item" href="../articles/var.html">State-space vector autoregressions with mvgam</a></li>
+    <li><a class="dropdown-item" href="../articles/hierarchical_var.html">Hierarchical vector autoregressions with mvgam</a></li>
+    <li><a class="dropdown-item" href="../articles/dfm.html">Dynamic factor models</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Many responses, one process</h6></li>
+    <li><a class="dropdown-item" href="../articles/mvbf.html">One latent process, several observation models</a></li>
+    <li><a class="dropdown-item" href="../articles/jsdgam.html">Joint species distribution models with mvgam</a></li>
+    <li><a class="dropdown-item" href="../articles/idm.html">Integrated distribution models with mvgam</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Imperfect detection</h6></li>
+    <li><a class="dropdown-item" href="../articles/occupancy.html">Occupancy models with mvgam</a></li>
+    <li><a class="dropdown-item" href="../articles/nmix.html">N-mixture models with mvgam</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Evaluating forecasts</h6></li>
+    <li><a class="dropdown-item" href="../articles/forecast_evaluation.html">Forecast evaluation in mvgam</a></li>
+  </ul>
+</li>
 <li class="nav-item"><a class="nav-link" href="../reference/index.html">Reference</a></li>
 <li class="nav-item dropdown">
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-cheatsheets" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Cheatsheets</button>
@@ -43,7 +66,16 @@
     <li><a class="dropdown-item" href="../cheatsheets/jsdgam_cheatsheet.pdf">Joint species distribution models</a></li>
   </ul>
 </li>
-<li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
+<li class="nav-item"><a class="external-link nav-link" href="https://ecogambler.netlify.app/tags/mvgam/">Blog</a></li>
+<li class="nav-item dropdown">
+  <button class="nav-link dropdown-toggle" type="button" id="dropdown-news" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">News</button>
+  <ul class="dropdown-menu" aria-labelledby="dropdown-news">
+<li><h6 class="dropdown-header" data-toc-skip>Releases</h6></li>
+    <li><a class="external-link dropdown-item" href="https://ecogambler.netlify.app/blog/mvgam-2/">mvgam 2.0.0</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><a class="dropdown-item" href="../news/index.html">Changelog</a></li>
+  </ul>
+</li>
       </ul>
 <ul class="navbar-nav">
 <li class="nav-item"><form class="form-inline" role="search">
@@ -212,7 +244,7 @@ month 24:</p>
 <div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">mod_joint</span>, type <span class="op">=</span> <span class="st">"series"</span><span class="op">)</span></span></code></pre></div>
 <div class="figure" style="text-align: center">
-<img src="idm_files/figure-html/series-1.png" class="r-plt" alt="The three simulated records: counts, occupancy detections and opportunistic sightings." width="85%"><p class="caption">
+<img src="figures/idm-series-1.png" alt="The three simulated records: counts, occupancy detections and opportunistic sightings." width="85%"><p class="caption">
 The three simulated records: counts, occupancy detections and
 opportunistic sightings.
 </p>
@@ -239,28 +271,28 @@ observations of each data source:</p>
 <span><span class="co">#&gt; == Observation Model ==</span></span>
 <span><span class="co">#&gt; Regression Coefficients:</span></span>
 <span><span class="co">#&gt;                 Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS</span></span>
-<span><span class="co">#&gt; count_Intercept     1.03      0.14     0.75     1.30 1.00     3238     2497</span></span>
-<span><span class="co">#&gt; pa_Intercept       -0.23      0.15    -0.55     0.07 1.00     3562     2607</span></span>
-<span><span class="co">#&gt; po_Intercept        0.33      0.10     0.12     0.52 1.00     2565     1997</span></span>
+<span><span class="co">#&gt; count_Intercept     1.03      0.14     0.74     1.29 1.00     4339     3068</span></span>
+<span><span class="co">#&gt; pa_Intercept       -0.23      0.15    -0.54     0.05 1.00     5266     3110</span></span>
+<span><span class="co">#&gt; po_Intercept        0.33      0.10     0.11     0.51 1.00     3800     2524</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; == Trend Model ==</span></span>
 <span><span class="co">#&gt; Smoothing Spline Hyperparameters:</span></span>
 <span><span class="co">#&gt;             Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS</span></span>
-<span><span class="co">#&gt; sds(senv_1)     1.98      1.15     0.45     4.91 1.00     1434     1491</span></span>
+<span><span class="co">#&gt; sds(senv_1)     2.07      1.21     0.46     5.02 1.00     1271     1591</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Regression Coefficients:</span></span>
 <span><span class="co">#&gt;        Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS</span></span>
-<span><span class="co">#&gt; senv_1    -0.81      3.52    -9.17     5.17 1.00     1469     1588</span></span>
+<span><span class="co">#&gt; senv_1    -0.92      3.58    -9.16     5.08 1.00     1875     1143</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Trend Specific Parameters:</span></span>
 <span><span class="co">#&gt;                       Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS</span></span>
-<span><span class="co">#&gt; sigma_trend[species1]     0.34      0.09     0.17     0.54 1.00     1294</span></span>
-<span><span class="co">#&gt; ar1_trend[species1]       0.12      0.24    -0.38     0.57 1.00     1417</span></span>
-<span><span class="co">#&gt; ar12_trend[species1]     -0.10      0.30    -0.67     0.46 1.00     1050</span></span>
+<span><span class="co">#&gt; sigma_trend[species1]     0.34      0.09     0.18     0.53 1.00     1460</span></span>
+<span><span class="co">#&gt; ar1_trend[species1]       0.13      0.25    -0.38     0.60 1.00     1579</span></span>
+<span><span class="co">#&gt; ar12_trend[species1]     -0.11      0.30    -0.66     0.45 1.00     1476</span></span>
 <span><span class="co">#&gt;                       Tail_ESS</span></span>
-<span><span class="co">#&gt; sigma_trend[species1]     2131</span></span>
-<span><span class="co">#&gt; ar1_trend[species1]       2084</span></span>
-<span><span class="co">#&gt; ar12_trend[species1]      1557</span></span>
+<span><span class="co">#&gt; sigma_trend[species1]     2235</span></span>
+<span><span class="co">#&gt; ar1_trend[species1]       1548</span></span>
+<span><span class="co">#&gt; ar12_trend[species1]      2361</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Draws were sampled using sampling(NUTS). For each parameter, Bulk_ESS</span></span>
 <span><span class="co">#&gt; and Tail_ESS are effective sample size measures, and Rhat is the potential</span></span>
@@ -293,8 +325,8 @@ intervals:</p>
 <span><span class="va">constants</span></span>
 <span><span class="co">#&gt; Hypothesis Tests for class :</span></span>
 <span><span class="co">#&gt;     Hypothesis Estimate Est.Error CI.Lower CI.Upper Evid.Ratio Post.Prob Star</span></span>
-<span><span class="co">#&gt; 1     log area    -1.26      0.20    -1.64    -0.88         NA        NA    *</span></span>
-<span><span class="co">#&gt; 2 log thinning    -0.69      0.16    -1.01    -0.38         NA        NA    *</span></span>
+<span><span class="co">#&gt; 1     log area    -1.26      0.19    -1.63    -0.89         NA        NA    *</span></span>
+<span><span class="co">#&gt; 2 log thinning    -0.70      0.16    -1.01    -0.39         NA        NA    *</span></span>
 <span><span class="co">#&gt; ---</span></span>
 <span><span class="co">#&gt; 'CI': 90%-CI for one-sided and 95%-CI for two-sided hypotheses.</span></span>
 <span><span class="co">#&gt; '*': For one-sided hypotheses, the posterior probability exceeds 95%;</span></span>
@@ -313,7 +345,7 @@ of the binary occupancy record:</p>
 <div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/pp_check.mvgam.html">pp_check</a></span><span class="op">(</span><span class="va">mod_joint</span>, ndraws <span class="op">=</span> <span class="fl">50</span><span class="op">)</span></span></code></pre></div>
 <div class="figure" style="text-align: center">
-<img src="idm_files/figure-html/ppc-1.png" class="r-plt" alt="Posterior predictive checks for each data source." width="85%"><p class="caption">
+<img src="figures/idm-ppc-1.png" alt="Posterior predictive checks for each data source." width="85%"><p class="caption">
 Posterior predictive checks for each data source.
 </p>
 </div>
@@ -326,7 +358,7 @@ log-intensity scale:</p>
 <div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">mod_joint</span>, type <span class="op">=</span> <span class="st">"smooths"</span><span class="op">)</span></span></code></pre></div>
 <div class="figure" style="text-align: center">
-<img src="idm_files/figure-html/smooth-1.png" class="r-plt" alt="The smooth of env from the joint model, with its 95% credible interval." width="85%"><p class="caption">
+<img src="figures/idm-smooth-1.png" alt="The smooth of env from the joint model, with its 95% credible interval." width="85%"><p class="caption">
 The smooth of env from the joint model, with its 95% credible interval.
 </p>
 </div>
@@ -338,7 +370,7 @@ autoregressive part of the trend and sets effort to one:</p>
 <code class="sourceCode R"><span><span class="va">ce</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://paulbuerkner.com/brms/reference/conditional_effects.brmsfit.html" class="external-link">conditional_effects</a></span><span class="op">(</span><span class="va">mod_joint</span><span class="op">)</span></span>
 <span><span class="fu">patchwork</span><span class="fu">::</span><span class="fu"><a href="https://patchwork.data-imaginist.com/reference/wrap_plots.html" class="external-link">wrap_plots</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">ce</span>, plot <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span>, nrow <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span></code></pre></div>
 <div class="figure" style="text-align: center">
-<img src="idm_files/figure-html/effects-1.png" class="r-plt" alt="Expected count, detection probability and sighting rate along env from the joint model, with 95% credible intervals." width="95%"><p class="caption">
+<img src="figures/idm-effects-1.png" alt="Expected count, detection probability and sighting rate along env from the joint model, with 95% credible intervals." width="95%"><p class="caption">
 Expected count, detection probability and sighting rate along env from
 the joint model, with 95% credible intervals.
 </p>
@@ -367,7 +399,7 @@ counts:</p>
 <div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">hc_joint</span><span class="op">)</span></span></code></pre></div>
 <div class="figure" style="text-align: center">
-<img src="idm_files/figure-html/hindcast-joint-1.png" class="r-plt" alt="Expected counts per unit effort from the joint model. Points are the counts of the first two years." width="85%"><p class="caption">
+<img src="figures/idm-hindcast-joint-1.png" alt="Expected counts per unit effort from the joint model. Points are the counts of the first two years." width="85%"><p class="caption">
 Expected counts per unit effort from the joint model. Points are the
 counts of the first two years.
 </p>
@@ -375,7 +407,7 @@ counts of the first two years.
 <div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">hc_count</span><span class="op">)</span></span></code></pre></div>
 <div class="figure" style="text-align: center">
-<img src="idm_files/figure-html/hindcast-count-1.png" class="r-plt" alt="Expected counts per unit effort from the model fitted to the counts alone. Its y-axis extends ten times further than that of the joint model." width="85%"><p class="caption">
+<img src="figures/idm-hindcast-count-1.png" alt="Expected counts per unit effort from the model fitted to the counts alone. Its y-axis extends ten times further than that of the joint model." width="85%"><p class="caption">
 Expected counts per unit effort from the model fitted to the counts
 alone. Its y-axis extends ten times further than that of the joint
 model.
@@ -424,7 +456,7 @@ differ between the models. Only the response to env remains:</p>
 <span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/facet_wrap.html" class="external-link">facet_wrap</a></span><span class="op">(</span><span class="op">~</span> <span class="va">model</span><span class="op">)</span> <span class="op">+</span></span>
 <span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/labs.html" class="external-link">labs</a></span><span class="op">(</span>x <span class="op">=</span> <span class="st">"env"</span>, y <span class="op">=</span> <span class="st">"Shift in log-intensity"</span><span class="op">)</span></span></code></pre></div>
 <div class="figure" style="text-align: center">
-<img src="idm_files/figure-html/response-plot-1.png" class="r-plt" alt="Posterior medians and 95% credible intervals of the response to env from the joint model and from the counts alone. The black line is the simulated response." width="95%"><p class="caption">
+<img src="figures/idm-response-plot-1.png" alt="Posterior medians and 95% credible intervals of the response to env from the joint model and from the counts alone. The black line is the simulated response." width="95%"><p class="caption">
 Posterior medians and 95% credible intervals of the response to env from
 the joint model and from the counts alone. The black line is the
 simulated response.
@@ -454,7 +486,7 @@ the detection probability and the expected number of sightings:</p>
 <span><span class="va">fc</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://generics.r-lib.org/reference/forecast.html" class="external-link">forecast</a></span><span class="op">(</span><span class="va">mod_joint</span>, newdata <span class="op">=</span> <span class="va">future</span>, type <span class="op">=</span> <span class="st">"expected"</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fc</span><span class="op">)</span></span></code></pre></div>
 <div class="figure" style="text-align: center">
-<img src="idm_files/figure-html/forecast-1.png" class="r-plt" alt="Expected values for each data source over the training months and a 12-month forecast. Points are the observations." width="85%"><p class="caption">
+<img src="figures/idm-forecast-1.png" alt="Expected values for each data source over the training months and a 12-month forecast. Points are the observations." width="85%"><p class="caption">
 Expected values for each data source over the training months and a
 12-month forecast. Points are the observations.
 </p>

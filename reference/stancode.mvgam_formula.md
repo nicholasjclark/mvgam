@@ -253,7 +253,7 @@ mf <- mvgam_formula(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1))
 # parameters carry a `_trend` suffix.
 code <- stancode(mf, data = dat, family = poisson())
 code
-#> // Generated with mvgam 2.0.0 using brms 2.23.2
+#> // Generated with mvgam 2.0.0.9000 using brms 2.23.2
 #> functions {
 #>   
 #> }

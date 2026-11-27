@@ -41,7 +41,7 @@ row of one combination stays in the same fold."><meta property="og:image" conten
 
     <a class="navbar-brand me-2" href="../index.html">mvgam</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Released version">2.0.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Released version">2.0.0.9000</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -49,14 +49,42 @@ row of one combination stays in the same fold."><meta property="og:image" conten
     </button>
 
     <div id="navbar" class="collapse navbar-collapse ms-3">
-      <ul class="navbar-nav me-auto"><li class="nav-item"><a class="nav-link" href="../articles/index.html">Articles</a></li>
+      <ul class="navbar-nav me-auto"><li class="nav-item dropdown">
+  <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
+  <ul class="dropdown-menu" aria-labelledby="dropdown-articles"><li><a class="dropdown-item" href="../articles/mvgam_overview.html">Overview of the mvgam package</a></li>
+    <li><a class="dropdown-item" href="../articles/data.html">Formatting data for mvgam</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Latent dynamics</h6></li>
+    <li><a class="dropdown-item" href="../articles/var.html">State-space vector autoregressions with mvgam</a></li>
+    <li><a class="dropdown-item" href="../articles/hierarchical_var.html">Hierarchical vector autoregressions with mvgam</a></li>
+    <li><a class="dropdown-item" href="../articles/dfm.html">Dynamic factor models</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Many responses, one process</h6></li>
+    <li><a class="dropdown-item" href="../articles/mvbf.html">One latent process, several observation models</a></li>
+    <li><a class="dropdown-item" href="../articles/jsdgam.html">Joint species distribution models with mvgam</a></li>
+    <li><a class="dropdown-item" href="../articles/idm.html">Integrated distribution models with mvgam</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Imperfect detection</h6></li>
+    <li><a class="dropdown-item" href="../articles/occupancy.html">Occupancy models with mvgam</a></li>
+    <li><a class="dropdown-item" href="../articles/nmix.html">N-mixture models with mvgam</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Evaluating forecasts</h6></li>
+    <li><a class="dropdown-item" href="../articles/forecast_evaluation.html">Forecast evaluation in mvgam</a></li>
+  </ul></li>
 <li class="active nav-item"><a class="nav-link" href="../reference/index.html">Reference</a></li>
 <li class="nav-item dropdown">
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-cheatsheets" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Cheatsheets</button>
   <ul class="dropdown-menu" aria-labelledby="dropdown-cheatsheets"><li><a class="dropdown-item" href="../cheatsheets/mvgam_cheatsheet.pdf">mvgam</a></li>
     <li><a class="dropdown-item" href="../cheatsheets/jsdgam_cheatsheet.pdf">Joint species distribution models</a></li>
   </ul></li>
-<li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
+<li class="nav-item"><a class="external-link nav-link" href="https://ecogambler.netlify.app/tags/mvgam/">Blog</a></li>
+<li class="nav-item dropdown">
+  <button class="nav-link dropdown-toggle" type="button" id="dropdown-news" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">News</button>
+  <ul class="dropdown-menu" aria-labelledby="dropdown-news"><li><h6 class="dropdown-header" data-toc-skip>Releases</h6></li>
+    <li><a class="external-link dropdown-item" href="https://ecogambler.netlify.app/blog/mvgam-2/">mvgam 2.0.0</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><a class="dropdown-item" href="../news/index.html">Changelog</a></li>
+  </ul></li>
       </ul><ul class="navbar-nav"><li class="nav-item"><form class="form-inline" role="search">
  <input class="form-control" type="search" name="search-input" id="search-input" autocomplete="off" aria-label="Search site" placeholder="Search for" data-search-index="../search.json"></form></li>
 <li class="nav-item"><a class="external-link nav-link" href="https://github.com/nicholasjclark/mvgam/" aria-label="GitHub"><span class="fa fab fa-github fa-lg"></span></a></li>
@@ -265,7 +293,7 @@ compares models by cross-validation.</p>
 <span class="r-in"><span>              data    <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span>,</span></span>
 <span class="r-in"><span>              family  <span class="op">=</span> <span class="fu"><a href="https://paulbuerkner.com/brms/reference/brmsfamily.html" class="external-link">negbinomial</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>              chains  <span class="op">=</span> <span class="fl">2</span>, seed <span class="op">=</span> <span class="fl">1</span>, silent <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 5 of 2000 (0.0%) transitions ended with a divergence.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 4 of 2000 (0.0%) transitions ended with a divergence.</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> See https://mc-stan.org/misc/warnings for details.</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Neighbouring times share information through the trend. Folds of</span></span></span>
@@ -274,33 +302,31 @@ compares models by cross-validation.</p>
 <span class="r-in"><span><span class="va">blocks</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/cut.html" class="external-link">cut</a></span><span class="op">(</span><span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span><span class="op">$</span><span class="va">time</span>, breaks <span class="op">=</span> <span class="fl">4L</span>, labels <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="va">k</span> <span class="op">&lt;-</span> <span class="fu">kfold</span><span class="op">(</span><span class="va">mod</span>, folds <span class="op">=</span> <span class="va">blocks</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> kfold: refitting 4 fold(s) ...</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 17 of 2000 (1.0%) transitions ended with a divergence.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 3 of 2000 (0.0%) transitions ended with a divergence.</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> See https://mc-stan.org/misc/warnings for details.</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 10 of 2000 (0.0%) transitions ended with a divergence.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 40 of 2000 (2.0%) transitions ended with a divergence.</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> See https://mc-stan.org/misc/warnings for details.</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 2 of 2000 (0.0%) transitions ended with a divergence.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 5 of 2000 (0.0%) transitions ended with a divergence.</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> See https://mc-stan.org/misc/warnings for details.</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 1 of 2 chains had an E-BFMI less than 0.3.</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> See https://mc-stan.org/misc/warnings for details.</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 6 of 2000 (0.0%) transitions ended with a divergence.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 21 of 2000 (1.0%) transitions ended with a divergence.</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> See https://mc-stan.org/misc/warnings for details.</span>
 <span class="r-in"><span><span class="va">k</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> mvgam k-fold cross-validation</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   elpd_kfold : -275.39 (SE 14.90)</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   kfoldic    : 550.78 (SE 29.80)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   elpd_kfold : -276.31 (SE 14.90)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   kfoldic    : 552.63 (SE 29.80)</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   groups     : 4 (fold)</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   refits     : 4 of 4 folds</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   Pareto k   : max 0.91, median 0.88, threshold 0.70 (adaptive)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   Pareto k   : max 1.05, median 1.01, threshold 0.70 (adaptive)</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Lowest ELPD (share of the total):</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   4                    -77.29 (28.1%)</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   2                    -70.75 (25.7%)</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   1                    -68.05 (24.7%)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   4                    -77.42 (28.0%)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   2                    -70.88 (25.7%)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   1                    -68.61 (24.8%)</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Largest change from PSIS to refit:</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   4                    -75.42 -&gt; -77.29</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   2                    -69.58 -&gt; -70.75</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   1                    -67.11 -&gt; -68.05</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   1                    -66.97 -&gt; -68.61</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   4                    -76.04 -&gt; -77.42</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   2                    -69.96 -&gt; -70.88</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># The ELPD and Pareto k of each block</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">k</span><span class="op">)</span></span></span>

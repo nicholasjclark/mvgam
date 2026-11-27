@@ -74,7 +74,7 @@ ggplot(growth, aes(year, growth, colour = country)) +
 
 ![Annual growth in real GDP, consumption and investment for the eight
 economies, 1971 to 2019, as the difference in log
-levels.](hierarchical_var_files/figure-html/plot-growth-1.png)
+levels.](figures/hierarchical_var-plot-growth-1.png)
 
 Annual growth in real GDP, consumption and investment for the eight
 economies, 1971 to 2019, as the difference in log levels.
@@ -211,7 +211,7 @@ mcmc_plot(fit, variable = "alpha_cor_trend", type = "hist")
 ```
 
 ![Posterior distribution of the weight on the shared correlation of the
-shocks.](hierarchical_var_files/figure-html/alpha-1.png)
+shocks.](figures/hierarchical_var-alpha-1.png)
 
 Posterior distribution of the weight on the shared correlation of the
 shocks.
@@ -233,15 +233,15 @@ summary(rc)
 #> # A tibble: 3 × 11
 #>   series_1    series_2    Estimate Est.Error Q_lower Q_upper   ESS prob_positive
 #>   <chr>       <chr>          <dbl>     <dbl>   <dbl>   <dbl> <dbl>         <dbl>
-#> 1 GDP         Investment     0.921    0.190    0.853   0.966 2326.             1
-#> 2 GDP         Consumption    0.873    0.148    0.795   0.930 2321.             1
-#> 3 Consumption Investment     0.662    0.0998   0.549   0.765 3075.             1
+#> 1 GDP         Investment     0.920    0.184    0.850   0.963 2747.             1
+#> 2 GDP         Consumption    0.874    0.148    0.798   0.932 1682.             1
+#> 3 Consumption Investment     0.661    0.0996   0.550   0.767 2772.             1
 #> # ℹ 3 more variables: prob_negative <dbl>, prob_nonzero <dbl>, sig <lgl>
 ```
 
-GDP shocks correlate with investment shocks at 0.92 \[0.85, 0.97\] and
-with consumption shocks at 0.87 \[0.79, 0.93\]. Consumption and
-investment shocks correlate at 0.66 \[0.55, 0.76\]. Savage’s estimates
+GDP shocks correlate with investment shocks at 0.92 \[0.85, 0.96\] and
+with consumption shocks at 0.87 \[0.80, 0.93\]. Consumption and
+investment shocks correlate at 0.66 \[0.55, 0.77\]. Savage’s estimates
 were 0.93, 0.89 and 0.74, in the same order.
 
 `by_group = TRUE` returns the correlation of each economy’s shocks:
@@ -254,7 +254,7 @@ plot(rc_groups, include_global = FALSE)
 
 ![Posterior mean correlations of the shocks in each economy. Outlined
 pairs have a posterior probability of their sign above
-0.95.](hierarchical_var_files/figure-html/rc-groups-1.png)
+0.95.](figures/hierarchical_var-rc-groups-1.png)
 
 Posterior mean correlations of the shocks in each economy. Outlined
 pairs have a posterior probability of their sign above 0.95.
@@ -279,8 +279,7 @@ plot(A_all, type = "diagonal")
 ```
 
 ![Posterior means and 95% credible intervals of the diagonal of each
-economy's transition
-matrix.](hierarchical_var_files/figure-html/A-diag-1.png)
+economy's transition matrix.](figures/hierarchical_var-A-diag-1.png)
 
 Posterior means and 95% credible intervals of the diagonal of each
 economy’s transition matrix.
@@ -295,22 +294,22 @@ A
 #> Lag-1 VAR transition matrix from an mvgam fit
 #>   Group      : mean over groups
 #>   Dimension  : 3 x 3
-#>   Mean |A_ij| (i != j): 0.12
+#>   Mean |A_ij| (i != j): 0.11
 #>   Point estimate:
 #>              GDP Consumption Investment
-#> GDP         0.05        0.27       0.13
+#> GDP         0.05        0.27       0.12
 #> Consumption 0.05        0.47       0.02
 #> Investment  0.09        0.14       0.21
 #>   95% CI on each cell available in `A_lower` / `A_upper`.
 ```
 
 On average, consumption growth is the most persistent of the three
-outcomes. The average diagonal coefficient is 0.47 \[0.34, 0.60\] for
-consumption and 0.05 \[-0.16, 0.25\] for GDP.
+outcomes. The average diagonal coefficient is 0.47 \[0.33, 0.60\] for
+consumption and 0.05 \[-0.16, 0.24\] for GDP.
 
-Consider the United States. Its GDP diagonal is -0.90 \[-1.82, -0.12\]
-and its GDP growth loads on last year’s consumption growth at 1.08
-\[0.50, 1.80\]. In the United States, the states of GDP and consumption
+Consider the United States. Its GDP diagonal is -0.88 \[-1.78, -0.09\]
+and its GDP growth loads on last year’s consumption growth at 1.07
+\[0.46, 1.78\]. In the United States, the states of GDP and consumption
 correlate at 0.82, the most strongly of the eight. Last year’s GDP and
 consumption then carry nearly the same information about this year. The
 model can trade a negative coefficient on one against a positive
@@ -345,17 +344,16 @@ plot(irfs, series = "Australia_Investment", responses = aus)
 
 ![Generalised impulse responses of Australian GDP, consumption and
 investment to a one standard deviation shock in Australian investment,
-with 95% credible
-intervals.](hierarchical_var_files/figure-html/plot-irf-1.png)
+with 95% credible intervals.](figures/hierarchical_var-plot-irf-1.png)
 
 Generalised impulse responses of Australian GDP, consumption and
 investment to a one standard deviation shock in Australian investment,
 with 95% credible intervals.
 
-The shock raises Australian investment by 0.61 \[0.51, 0.75\] standard
+The shock raises Australian investment by 0.60 \[0.51, 0.74\] standard
 deviations in its first year. Because investment and GDP shocks
 correlate, GDP moves with it, by 0.37 \[0.29, 0.47\]. In the second year
-consumption is at 0.14 \[0.05, 0.24\]. Every response stays within 0.01
+consumption is at 0.14 \[0.05, 0.23\]. Every response stays within 0.01
 of zero from year 5.
 
 ## Variance decompositions
@@ -377,12 +375,12 @@ plot(fevds, series = aus, contributing = aus)
 
 ![Median share of the forecast error variance of each Australian outcome
 that each Australian source of shocks generates, by forecast
-horizon.](hierarchical_var_files/figure-html/fevd-1.png)
+horizon.](figures/hierarchical_var-fevd-1.png)
 
 Median share of the forecast error variance of each Australian outcome
 that each Australian source of shocks generates, by forecast horizon.
 
-In the first year, GDP shocks generate 59% of the forecast variance of
+In the first year, GDP shocks generate 58% of the forecast variance of
 Australian investment. That share is the part of two correlated shocks
 the ordering assigns to GDP. The shares barely move with the horizon. At
 eight years GDP shocks generate 97% of the forecast variance of GDP
@@ -415,16 +413,16 @@ plot(stab)
 
 ![Posterior medians and 95% credible intervals of reactivity and of the
 mean and variance return rates of each economy. The dashed line marks
-zero reactivity.](hierarchical_var_files/figure-html/stability-1.png)
+zero reactivity.](figures/hierarchical_var-stability-1.png)
 
 Posterior medians and 95% credible intervals of reactivity and of the
 mean and variance return rates of each economy. The dashed line marks
 zero reactivity.
 
-The median mean return rates run from 0.38 to 0.64. A deviation of
+The median mean return rates run from 0.39 to 0.64. A deviation of
 growth from its mean halves within two years in every economy.
 Reactivity intervals lie above zero for the United States. The United
-States has a reactivity of 0.88 \[0.14, 1.42\], shaped by the large
+States has a reactivity of 0.86 \[0.09, 1.41\], shaped by the large
 offsetting coefficients of its transition matrix.
 
 Partial pooling puts four fifths of the weight on a correlation of
@@ -464,6 +462,11 @@ Related articles:
   data](https://nicholasjclark.github.io/mvgam/articles/data.md) covers
   the long data format and
   [`mvgam_data()`](https://nicholasjclark.github.io/mvgam/reference/mvgam_data.md).
+
+The blog post [State-space vector autoregressions in
+mvgam](https://ecogambler.netlify.app/blog/vector-autoregressions/) fits
+a single VAR(1) to kestrel counts from three regions, with impulse
+responses, variance decompositions and stability measures.
 
 ## References
 

@@ -115,7 +115,7 @@ plot(fc_gam)
 ![GAM hindcasts and forecasts of each species' captures, with 50%, 80%
 and 95% credible intervals on the forecast. Points are the observed
 captures. The dashed line marks the end of the training
-data.](forecast_evaluation_files/figure-html/plot-gam-1.png)
+data.](figures/forecast_evaluation-plot-gam-1.png)
 
 GAM hindcasts and forecasts of each species’ captures, with 50%, 80% and
 95% credible intervals on the forecast. Points are the observed
@@ -123,7 +123,7 @@ captures. The dashed line marks the end of the training data.
 
 Each smooth of time extrapolates the slope at the end of its series. For
 DO, whose captures rose over the final training months, the median
-forecast reaches 125 captures by month 12. The held-out months recorded
+forecast reaches 121 captures by month 12. The held-out months recorded
 at most 14. The AR forecast carries its latent state forward instead:
 
 ``` r
@@ -132,7 +132,7 @@ plot(fc_ar)
 ```
 
 ![AR hindcasts and forecasts of each species'
-captures.](forecast_evaluation_files/figure-html/plot-ar-1.png)
+captures.](figures/forecast_evaluation-plot-ar-1.png)
 
 AR hindcasts and forecasts of each species’ captures.
 
@@ -154,9 +154,9 @@ unc_ar
 #> Forecast uncertainty by source, predictor, 500 draws, 20 replicates
 #> 
 #>  series sd_first sd_last dominant      support changes_at
-#>  DM     0.24     0.41    process error 1                 
-#>  DO     0.56     0.90    process error 1                 
-#>  PB     0.63     1.40    process error 1                 
+#>  DM     0.25     0.41    process error 1                 
+#>  DO     0.57     0.92    process error 1                 
+#>  PB     0.62     1.30    process error 1                 
 #>  PP     0.83     1.20    process error 1                 
 #> 
 #> summary() gives every source at every horizon.
@@ -164,17 +164,16 @@ plot(unc_ar)
 ```
 
 ![Variance of the AR model's forecast predictor at each horizon, split
-by kind of
-source.](forecast_evaluation_files/figure-html/uncertainty-1.png)
+by kind of source.](figures/forecast_evaluation-uncertainty-1.png)
 
 Variance of the AR model’s forecast predictor at each horizon, split by
 kind of source.
 
 Process error, the variance the state’s innovations add, leads for every
 species by month 12. Because this variance belongs to the process, more
-data will not shrink it. For DO it grows from 55% of the variance at
-month 1 to 74% at month 12. Because an AR(1) state loses its memory of
-the last training month, the latent dynamics fade from 28% to 4% over
+data will not shrink it. For DO it grows from 54% of the variance at
+month 1 to 76% at month 12. Because an AR(1) state loses its memory of
+the last training month, the latent dynamics fade from 38% to 11% over
 the same months.
 
 The bars jump at month 8. With `by = "source"` and `type = "share"`, the
@@ -186,7 +185,7 @@ plot(unc_ar, type = "share", by = "source", series = "DO")
 ```
 
 ![Share of the variance of the DO forecast held by each
-term.](forecast_evaluation_files/figure-html/uncertainty-terms-1.png)
+term.](figures/forecast_evaluation-uncertainty-terms-1.png)
 
 Share of the variance of the DO forecast held by each term.
 
@@ -213,14 +212,14 @@ plot(sc, series = "DO")
 ![Difference in the DO forecast's predictor between a future one
 standard deviation warmer and the observed one, with nested 20%, 40%,
 60% and 80% credible
-intervals.](forecast_evaluation_files/figure-html/scenarios-1.png)
+intervals.](figures/forecast_evaluation-scenarios-1.png)
 
 Difference in the DO forecast’s predictor between a future one standard
 deviation warmer and the observed one, with nested 20%, 40%, 60% and 80%
 credible intervals.
 
 The median difference at month 12 is -0.11, with a 95% interval from
--0.53 to 0.32. The largest median difference, -0.21, falls at month 8.
+-0.53 to 0.33. The largest median difference, -0.18, falls at month 8.
 
 ## Scoring the holdout
 
@@ -240,16 +239,16 @@ plot(crps, relative = "GAM")
 
 ![CRPS of the AR and PW forecasts minus that of the GAM at each horizon.
 Negative values favour the AR or PW model. No species was observed at
-horizon 3.](forecast_evaluation_files/figure-html/crps-1.png)
+horizon 3.](figures/forecast_evaluation-crps-1.png)
 
 CRPS of the AR and PW forecasts minus that of the GAM at each horizon.
 Negative values favour the AR or PW model. No species was observed at
 horizon 3.
 
 Between AR and the GAM, the lower mean CRPS goes to AR on DM, AR on DO,
-the GAM on PB and the GAM on PP. On DO the mean CRPS is 3.31 for AR and
-33.51 for the GAM. PB and PP recorded few or no captures over long
-stretches. Averaged over the species, AR scores 3.98 against 3.85 for
+the GAM on PB and the GAM on PP. On DO the mean CRPS is 3.25 for AR and
+32.77 for the GAM. PB and PP recorded few or no captures over long
+stretches. Averaged over the species, AR scores 3.95 against 3.86 for
 PW.
 
 The energy score grades the four forecasts at each horizon as one
@@ -266,11 +265,11 @@ plot(energy)
 ```
 
 ![Energy score of the joint forecast of the four species at each
-horizon.](forecast_evaluation_files/figure-html/energy-1.png)
+horizon.](figures/forecast_evaluation-energy-1.png)
 
 Energy score of the joint forecast of the four species at each horizon.
 
-The GAM’s energy score runs from 7 to 93 over the twelve months. AR and
+The GAM’s energy score runs from 7 to 90 over the twelve months. AR and
 PW stay below 13.
 [`score()`](https://nicholasjclark.github.io/mvgam/reference/score.mvgam_forecast.md)
 offers nine more rules, among them the variogram score for the
@@ -310,13 +309,13 @@ lfo_pw <- run_lfo(mod_pw)
 loo_compare(lfo_gam, lfo_ar, lfo_pw, model_names = c("GAM", "AR", "PW"))
 #>  model elpd_diff se_diff p_worse diag_diff diag_elpd
 #>     AR       0.0     0.0      NA                    
-#>     PW     -39.2    12.1    1.00   N < 100          
-#>    GAM     -76.3    14.8    1.00   N < 100
+#>     PW     -34.3     7.7    1.00   N < 100          
+#>    GAM     -69.5     4.7    1.00   N < 100
 ```
 
-AR leads. PW trails it by 39 (SE 12) and GAM by 76 (SE 15). The log
-score penalises an observation in the tail of a forecast far more
-heavily than the CRPS does.
+AR leads. PW trails it by 34 (SE 8) and GAM by 70 (SE 5). The log score
+penalises an observation in the tail of a forecast far more heavily than
+the CRPS does.
 [`compare_elpds()`](https://nicholasjclark.github.io/mvgam/reference/compare_elpds.md)
 tabulates the ELPD at each origin:
 
@@ -329,7 +328,7 @@ plot(elpds, cumulative = TRUE)
 
 ![Cumulative ELPD over the forecast origins. Open circles mark the
 origins at which the model was
-refit.](forecast_evaluation_files/figure-html/lfo-plot-1.png)
+refit.](figures/forecast_evaluation-lfo-plot-1.png)
 
 Cumulative ELPD over the forecast origins. Open circles mark the origins
 at which the model was refit.
@@ -355,8 +354,8 @@ weights
 #> ------
 #>     weight
 #> GAM 0.000 
-#> AR  0.697 
-#> PW  0.303
+#> AR  0.668 
+#> PW  0.332
 fc_ens <- ensemble(fc_gam, fc_ar, fc_pw, weights = weights,
                    seed = 2026)
 crps_ens <- compare_scores(fc_gam, fc_ar, fc_pw, fc_ens, score = "crps",
@@ -364,21 +363,21 @@ crps_ens <- compare_scores(fc_gam, fc_ar, fc_pw, fc_ens, score = "crps",
 aggregate(score ~ model, FUN = mean,
           data = subset(crps_ens, series != "all_series"))
 #>      model     score
-#> 1      GAM 11.346268
-#> 2       AR  3.977615
-#> 3       PW  3.853498
-#> 4 Ensemble  3.812617
+#> 1      GAM 11.132286
+#> 2       AR  3.945342
+#> 3       PW  3.855793
+#> 4 Ensemble  3.796325
 ```
 
-Stacking gives 0 to the GAM, 0.7 to AR and 0.3 to PW. The ensemble’s
-mean CRPS on the holdout is 3.81, the lowest of the four.
+Stacking gives 0 to the GAM, 0.67 to AR and 0.33 to PW. The ensemble’s
+mean CRPS on the holdout is 3.80, the lowest of the four.
 
 ## Summary
 
 The CRPS and the energy score compared the three forecasts on the
 holdout. Under leave-future-out cross-validation AR led in ELPD. The
 GAM’s smooths of time extrapolated the end of each series. Stacking
-combined the three forecasts into an ensemble with a mean CRPS of 3.81.
+combined the three forecasts into an ensemble with a mean CRPS of 3.80.
 Each step took one or two function calls on the fitted models. The CRPS
 and the log score can rank models differently. Choose the scoring rule
 before scoring any forecast.

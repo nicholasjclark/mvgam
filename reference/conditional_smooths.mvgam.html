@@ -13,7 +13,7 @@ and a smooth of two as a heatmap."><meta property="og:image" content="https://ni
 
     <a class="navbar-brand me-2" href="../index.html">mvgam</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Released version">2.0.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Released version">2.0.0.9000</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -21,14 +21,42 @@ and a smooth of two as a heatmap."><meta property="og:image" content="https://ni
     </button>
 
     <div id="navbar" class="collapse navbar-collapse ms-3">
-      <ul class="navbar-nav me-auto"><li class="nav-item"><a class="nav-link" href="../articles/index.html">Articles</a></li>
+      <ul class="navbar-nav me-auto"><li class="nav-item dropdown">
+  <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
+  <ul class="dropdown-menu" aria-labelledby="dropdown-articles"><li><a class="dropdown-item" href="../articles/mvgam_overview.html">Overview of the mvgam package</a></li>
+    <li><a class="dropdown-item" href="../articles/data.html">Formatting data for mvgam</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Latent dynamics</h6></li>
+    <li><a class="dropdown-item" href="../articles/var.html">State-space vector autoregressions with mvgam</a></li>
+    <li><a class="dropdown-item" href="../articles/hierarchical_var.html">Hierarchical vector autoregressions with mvgam</a></li>
+    <li><a class="dropdown-item" href="../articles/dfm.html">Dynamic factor models</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Many responses, one process</h6></li>
+    <li><a class="dropdown-item" href="../articles/mvbf.html">One latent process, several observation models</a></li>
+    <li><a class="dropdown-item" href="../articles/jsdgam.html">Joint species distribution models with mvgam</a></li>
+    <li><a class="dropdown-item" href="../articles/idm.html">Integrated distribution models with mvgam</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Imperfect detection</h6></li>
+    <li><a class="dropdown-item" href="../articles/occupancy.html">Occupancy models with mvgam</a></li>
+    <li><a class="dropdown-item" href="../articles/nmix.html">N-mixture models with mvgam</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Evaluating forecasts</h6></li>
+    <li><a class="dropdown-item" href="../articles/forecast_evaluation.html">Forecast evaluation in mvgam</a></li>
+  </ul></li>
 <li class="active nav-item"><a class="nav-link" href="../reference/index.html">Reference</a></li>
 <li class="nav-item dropdown">
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-cheatsheets" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Cheatsheets</button>
   <ul class="dropdown-menu" aria-labelledby="dropdown-cheatsheets"><li><a class="dropdown-item" href="../cheatsheets/mvgam_cheatsheet.pdf">mvgam</a></li>
     <li><a class="dropdown-item" href="../cheatsheets/jsdgam_cheatsheet.pdf">Joint species distribution models</a></li>
   </ul></li>
-<li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
+<li class="nav-item"><a class="external-link nav-link" href="https://ecogambler.netlify.app/tags/mvgam/">Blog</a></li>
+<li class="nav-item dropdown">
+  <button class="nav-link dropdown-toggle" type="button" id="dropdown-news" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">News</button>
+  <ul class="dropdown-menu" aria-labelledby="dropdown-news"><li><h6 class="dropdown-header" data-toc-skip>Releases</h6></li>
+    <li><a class="external-link dropdown-item" href="https://ecogambler.netlify.app/blog/mvgam-2/">mvgam 2.0.0</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><a class="dropdown-item" href="../news/index.html">Changelog</a></li>
+  </ul></li>
       </ul><ul class="navbar-nav"><li class="nav-item"><form class="form-inline" role="search">
  <input class="form-control" type="search" name="search-input" id="search-input" autocomplete="off" aria-label="Search site" placeholder="Search for" data-search-index="../search.json"></form></li>
 <li class="nav-item"><a class="external-link nav-link" href="https://github.com/nicholasjclark/mvgam/" aria-label="GitHub"><span class="fa fab fa-github fa-lg"></span></a></li>
@@ -197,7 +225,7 @@ response.</p>
 <span class="r-in"><span>              data    <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span>,</span></span>
 <span class="r-in"><span>              family  <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>              chains  <span class="op">=</span> <span class="fl">2</span>, silent <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 8 of 2000 (0.0%) transitions ended with a divergence.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 6 of 2000 (0.0%) transitions ended with a divergence.</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> See https://mc-stan.org/misc/warnings for details.</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># The smooth with 30 of its draws</span></span></span>
@@ -206,12 +234,12 @@ response.</p>
 <span class="r-plt img"><img src="conditional_smooths.mvgam-1.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">cs</span><span class="op">[[</span><span class="fl">1</span><span class="op">]</span><span class="op">]</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>           x effect1__ cond__ estimate__      se__     lower__   upper__</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1 -1.956267 -1.956267      1  0.3120155 0.1896215 -0.12565254 0.6177492</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2 -1.916330 -1.916330      1  0.3407099 0.2008300 -0.06082007 0.6401446</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3 -1.876393 -1.876393      1  0.3773745 0.1854515  0.00392799 0.6624951</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4 -1.836457 -1.836457      1  0.4132541 0.1785957  0.06845771 0.6847287</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 5 -1.796520 -1.796520      1  0.4474188 0.1755073  0.14088681 0.7067439</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 6 -1.756583 -1.756583      1  0.4811837 0.1719354  0.21984178 0.7284141</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1 -1.956267 -1.956267      1  0.2559833 0.3205608 -0.37905676 0.7282614</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2 -1.916330 -1.916330      1  0.3005362 0.3119913 -0.28595649 0.7263335</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3 -1.876393 -1.876393      1  0.3290462 0.3001270 -0.19297713 0.7244162</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4 -1.836457 -1.836457      1  0.3571165 0.2721643 -0.10031001 0.7225241</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5 -1.796520 -1.796520      1  0.3879156 0.2431236 -0.01870421 0.7206754</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6 -1.756583 -1.756583      1  0.4273215 0.2213016  0.03022359 0.7203144</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Next, plot(mod, type = "smooths") draws the same panels in one</span></span></span>
 <span class="r-in"><span><span class="co"># figure</span></span></span>

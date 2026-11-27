@@ -77,8 +77,7 @@ ggplot(observed, aes(time, value)) +
 ```
 
 ![The three simulated monitoring records. The camera record has gaps in
-the months the cameras did not
-run.](mvbf_files/figure-html/plot-data-1.png)
+the months the cameras did not run.](figures/mvbf-plot-data-1.png)
 
 The three simulated monitoring records. The camera record has gaps in
 the months the cameras did not run.
@@ -128,7 +127,7 @@ pp_check(mod_joint, ndraws = 50)
 ![Posterior predictive checks for each response. A rootogram compares
 the frequency of each count. A density overlay checks the biomass
 record. Bars give the share of each camera
-outcome.](mvbf_files/figure-html/ppc-1.png)
+outcome.](figures/mvbf-ppc-1.png)
 
 Posterior predictive checks for each response. A rootogram compares the
 frequency of each count. A density overlay checks the biomass record.
@@ -147,7 +146,7 @@ wrap_plots(plot(ce, plot = FALSE), ncol = 2)
 
 ![Expected biomass by month and camera detection probability by
 deployment days, with 95% credible
-intervals.](mvbf_files/figure-html/effects-1.png)
+intervals.](figures/mvbf-effects-1.png)
 
 Expected biomass by month and camera detection probability by deployment
 days, with 95% credible intervals.
@@ -194,7 +193,7 @@ wrap_plots(lapply(names(fits), function(nm) {
 
 ![Posterior medians and 95% credible intervals of the latent state from
 the joint model and from each method alone. Crosses mark the simulated
-state.](mvbf_files/figure-html/recovery-plot-1.png)
+state.](figures/mvbf-recovery-plot-1.png)
 
 Posterior medians and 95% credible intervals of the latent state from
 the joint model and from each method alone. Crosses mark the simulated
@@ -210,13 +209,13 @@ recovery <- t(vapply(fits, function(fit) {
 round(recovery, 2)
 #>               RMSE Interval width
 #> Joint         0.26           1.24
-#> Counts alone  0.33           1.34
-#> Biomass alone 0.41           1.77
-#> Camera alone  0.56           4.39
+#> Counts alone  0.33           1.35
+#> Biomass alone 0.43           1.77
+#> Camera alone  0.56           4.14
 ```
 
 Ordered by root mean squared error against the simulated state, the fits
-rank joint (0.26), counts alone (0.33), biomass alone (0.41), and camera
+rank joint (0.26), counts alone (0.33), biomass alone (0.43), and camera
 alone (0.56). Intervals are narrowest in the joint fit and widest in the
 camera alone fit. A single binary record per month constrains abundance
 weakly.
@@ -246,7 +245,7 @@ plot(fc)
 
 ![Expected values for each response over the training months and a
 six-month forecast. Points are the
-observations.](mvbf_files/figure-html/forecast-1.png)
+observations.](figures/mvbf-forecast-1.png)
 
 Expected values for each response over the training months and a
 six-month forecast. Points are the observations.

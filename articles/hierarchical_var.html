@@ -25,7 +25,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">mvgam</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Released version">2.0.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Released version">2.0.0.9000</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -34,7 +34,30 @@
 
     <div id="navbar" class="collapse navbar-collapse ms-3">
       <ul class="navbar-nav me-auto">
-<li class="active nav-item"><a class="nav-link" href="../articles/index.html">Articles</a></li>
+<li class="active nav-item dropdown">
+  <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
+  <ul class="dropdown-menu" aria-labelledby="dropdown-articles">
+<li><a class="dropdown-item" href="../articles/mvgam_overview.html">Overview of the mvgam package</a></li>
+    <li><a class="dropdown-item" href="../articles/data.html">Formatting data for mvgam</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Latent dynamics</h6></li>
+    <li><a class="dropdown-item" href="../articles/var.html">State-space vector autoregressions with mvgam</a></li>
+    <li><a class="dropdown-item" href="../articles/hierarchical_var.html">Hierarchical vector autoregressions with mvgam</a></li>
+    <li><a class="dropdown-item" href="../articles/dfm.html">Dynamic factor models</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Many responses, one process</h6></li>
+    <li><a class="dropdown-item" href="../articles/mvbf.html">One latent process, several observation models</a></li>
+    <li><a class="dropdown-item" href="../articles/jsdgam.html">Joint species distribution models with mvgam</a></li>
+    <li><a class="dropdown-item" href="../articles/idm.html">Integrated distribution models with mvgam</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Imperfect detection</h6></li>
+    <li><a class="dropdown-item" href="../articles/occupancy.html">Occupancy models with mvgam</a></li>
+    <li><a class="dropdown-item" href="../articles/nmix.html">N-mixture models with mvgam</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Evaluating forecasts</h6></li>
+    <li><a class="dropdown-item" href="../articles/forecast_evaluation.html">Forecast evaluation in mvgam</a></li>
+  </ul>
+</li>
 <li class="nav-item"><a class="nav-link" href="../reference/index.html">Reference</a></li>
 <li class="nav-item dropdown">
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-cheatsheets" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Cheatsheets</button>
@@ -43,7 +66,16 @@
     <li><a class="dropdown-item" href="../cheatsheets/jsdgam_cheatsheet.pdf">Joint species distribution models</a></li>
   </ul>
 </li>
-<li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
+<li class="nav-item"><a class="external-link nav-link" href="https://ecogambler.netlify.app/tags/mvgam/">Blog</a></li>
+<li class="nav-item dropdown">
+  <button class="nav-link dropdown-toggle" type="button" id="dropdown-news" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">News</button>
+  <ul class="dropdown-menu" aria-labelledby="dropdown-news">
+<li><h6 class="dropdown-header" data-toc-skip>Releases</h6></li>
+    <li><a class="external-link dropdown-item" href="https://ecogambler.netlify.app/blog/mvgam-2/">mvgam 2.0.0</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><a class="dropdown-item" href="../news/index.html">Changelog</a></li>
+  </ul>
+</li>
       </ul>
 <ul class="navbar-nav">
 <li class="nav-item"><form class="form-inline" role="search">
@@ -131,7 +163,7 @@ economy:</p>
 <span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/facet_wrap.html" class="external-link">facet_wrap</a></span><span class="op">(</span><span class="op">~</span> <span class="va">outcome</span>, ncol <span class="op">=</span> <span class="fl">1</span>, scales <span class="op">=</span> <span class="st">"free_y"</span><span class="op">)</span> <span class="op">+</span></span>
 <span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/labs.html" class="external-link">labs</a></span><span class="op">(</span>x <span class="op">=</span> <span class="cn">NULL</span>, y <span class="op">=</span> <span class="st">"Growth (log difference)"</span>, colour <span class="op">=</span> <span class="cn">NULL</span><span class="op">)</span></span></code></pre></div>
 <div class="figure" style="text-align: center">
-<img src="hierarchical_var_files/figure-html/plot-growth-1.png" class="r-plt" alt="Annual growth in real GDP, consumption and investment for the eight economies, 1971 to 2019, as the difference in log levels." width="85%"><p class="caption">
+<img src="figures/hierarchical_var-plot-growth-1.png" alt="Annual growth in real GDP, consumption and investment for the eight economies, 1971 to 2019, as the difference in log levels." width="85%"><p class="caption">
 Annual growth in real GDP, consumption and investment for the eight
 economies, 1971 to 2019, as the difference in log levels.
 </p>
@@ -274,7 +306,7 @@ on the shared correlation:</p>
 <div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://paulbuerkner.com/brms/reference/mcmc_plot.brmsfit.html" class="external-link">mcmc_plot</a></span><span class="op">(</span><span class="va">fit</span>, variable <span class="op">=</span> <span class="st">"alpha_cor_trend"</span>, type <span class="op">=</span> <span class="st">"hist"</span><span class="op">)</span></span></code></pre></div>
 <div class="figure" style="text-align: center">
-<img src="hierarchical_var_files/figure-html/alpha-1.png" class="r-plt" alt="Posterior distribution of the weight on the shared correlation of the shocks." width="85%"><p class="caption">
+<img src="figures/hierarchical_var-alpha-1.png" alt="Posterior distribution of the weight on the shared correlation of the shocks." width="85%"><p class="caption">
 Posterior distribution of the weight on the shared correlation of the
 shocks.
 </p>
@@ -290,16 +322,16 @@ through each economy’s transition matrix:</p>
 <div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">rc</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/residual_cor.html">residual_cor</a></span><span class="op">(</span><span class="va">fit</span>, covariance <span class="op">=</span> <span class="st">"innovation"</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">rc</span><span class="op">)</span></span>
-<span><span class="co">#&gt; <span style="color: #949494;"># A tibble: 3 × 11</span></span></span>
+<span><span class="co">#&gt; # A tibble: 3 × 11</span></span>
 <span><span class="co">#&gt;   series_1    series_2    Estimate Est.Error Q_lower Q_upper   ESS prob_positive</span></span>
-<span><span class="co">#&gt;   <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>       <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>          <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>     <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>   <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>   <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>         <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span></span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">1</span> GDP         Investment     0.921    0.190    0.853   0.966 <span style="text-decoration: underline;">2</span>326.             1</span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">2</span> GDP         Consumption    0.873    0.148    0.795   0.930 <span style="text-decoration: underline;">2</span>321.             1</span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">3</span> Consumption Investment     0.662    0.099<span style="text-decoration: underline;">8</span>   0.549   0.765 <span style="text-decoration: underline;">3</span>075.             1</span></span>
-<span><span class="co">#&gt; <span style="color: #949494;"># ℹ 3 more variables: prob_negative &lt;dbl&gt;, prob_nonzero &lt;dbl&gt;, sig &lt;lgl&gt;</span></span></span></code></pre></div>
-<p>GDP shocks correlate with investment shocks at 0.92 [0.85, 0.97] and
-with consumption shocks at 0.87 [0.79, 0.93]. Consumption and investment
-shocks correlate at 0.66 [0.55, 0.76]. Savage’s estimates were 0.93,
+<span><span class="co">#&gt;   &lt;chr&gt;       &lt;chr&gt;          &lt;dbl&gt;     &lt;dbl&gt;   &lt;dbl&gt;   &lt;dbl&gt; &lt;dbl&gt;         &lt;dbl&gt;</span></span>
+<span><span class="co">#&gt; 1 GDP         Investment     0.920    0.184    0.850   0.963 2747.             1</span></span>
+<span><span class="co">#&gt; 2 GDP         Consumption    0.874    0.148    0.798   0.932 1682.             1</span></span>
+<span><span class="co">#&gt; 3 Consumption Investment     0.661    0.0996   0.550   0.767 2772.             1</span></span>
+<span><span class="co">#&gt; # ℹ 3 more variables: prob_negative &lt;dbl&gt;, prob_nonzero &lt;dbl&gt;, sig &lt;lgl&gt;</span></span></code></pre></div>
+<p>GDP shocks correlate with investment shocks at 0.92 [0.85, 0.96] and
+with consumption shocks at 0.87 [0.80, 0.93]. Consumption and investment
+shocks correlate at 0.66 [0.55, 0.77]. Savage’s estimates were 0.93,
 0.89 and 0.74, in the same order.</p>
 <p><code>by_group = TRUE</code> returns the correlation of each
 economy’s shocks:</p>
@@ -307,7 +339,7 @@ economy’s shocks:</p>
 <code class="sourceCode R"><span><span class="va">rc_groups</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/residual_cor.html">residual_cor</a></span><span class="op">(</span><span class="va">fit</span>, covariance <span class="op">=</span> <span class="st">"innovation"</span>, by_group <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">rc_groups</span>, include_global <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></code></pre></div>
 <div class="figure" style="text-align: center">
-<img src="hierarchical_var_files/figure-html/rc-groups-1.png" class="r-plt" alt="Posterior mean correlations of the shocks in each economy. Outlined pairs have a posterior probability of their sign above 0.95." width="85%"><p class="caption">
+<img src="figures/hierarchical_var-rc-groups-1.png" alt="Posterior mean correlations of the shocks in each economy. Outlined pairs have a posterior probability of their sign above 0.95." width="85%"><p class="caption">
 Posterior mean correlations of the shocks in each economy. Outlined
 pairs have a posterior probability of their sign above 0.95.
 </p>
@@ -331,7 +363,7 @@ next:</p>
 <code class="sourceCode R"><span><span class="va">A_all</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/posterior_transition_matrix.html">posterior_transition_matrix</a></span><span class="op">(</span><span class="va">fit</span>, groups <span class="op">=</span> <span class="st">"all"</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">A_all</span>, type <span class="op">=</span> <span class="st">"diagonal"</span><span class="op">)</span></span></code></pre></div>
 <div class="figure" style="text-align: center">
-<img src="hierarchical_var_files/figure-html/A-diag-1.png" class="r-plt" alt="Posterior means and 95% credible intervals of the diagonal of each economy's transition matrix." width="85%"><p class="caption">
+<img src="figures/hierarchical_var-A-diag-1.png" alt="Posterior means and 95% credible intervals of the diagonal of each economy's transition matrix." width="85%"><p class="caption">
 Posterior means and 95% credible intervals of the diagonal of each
 economy’s transition matrix.
 </p>
@@ -344,19 +376,19 @@ in each posterior draw:</p>
 <span><span class="co">#&gt; Lag-1 VAR transition matrix from an mvgam fit</span></span>
 <span><span class="co">#&gt;   Group      : mean over groups</span></span>
 <span><span class="co">#&gt;   Dimension  : 3 x 3</span></span>
-<span><span class="co">#&gt;   Mean |A_ij| (i != j): 0.12</span></span>
+<span><span class="co">#&gt;   Mean |A_ij| (i != j): 0.11</span></span>
 <span><span class="co">#&gt;   Point estimate:</span></span>
 <span><span class="co">#&gt;              GDP Consumption Investment</span></span>
-<span><span class="co">#&gt; GDP         0.05        0.27       0.13</span></span>
+<span><span class="co">#&gt; GDP         0.05        0.27       0.12</span></span>
 <span><span class="co">#&gt; Consumption 0.05        0.47       0.02</span></span>
 <span><span class="co">#&gt; Investment  0.09        0.14       0.21</span></span>
 <span><span class="co">#&gt;   95% CI on each cell available in `A_lower` / `A_upper`.</span></span></code></pre></div>
 <p>On average, consumption growth is the most persistent of the three
-outcomes. The average diagonal coefficient is 0.47 [0.34, 0.60] for
-consumption and 0.05 [-0.16, 0.25] for GDP.</p>
-<p>Consider the United States. Its GDP diagonal is -0.90 [-1.82, -0.12]
-and its GDP growth loads on last year’s consumption growth at 1.08
-[0.50, 1.80]. In the United States, the states of GDP and consumption
+outcomes. The average diagonal coefficient is 0.47 [0.33, 0.60] for
+consumption and 0.05 [-0.16, 0.24] for GDP.</p>
+<p>Consider the United States. Its GDP diagonal is -0.88 [-1.78, -0.09]
+and its GDP growth loads on last year’s consumption growth at 1.07
+[0.46, 1.78]. In the United States, the states of GDP and consumption
 correlate at 0.82, the most strongly of the eight. Last year’s GDP and
 consumption then carry nearly the same information about this year. The
 model can trade a negative coefficient on one against a positive
@@ -380,16 +412,16 @@ states to a shock in Australian investment:</p>
 <code class="sourceCode R"><span><span class="va">aus</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Australia_GDP"</span>, <span class="st">"Australia_Consumption"</span>, <span class="st">"Australia_Investment"</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">irfs</span>, series <span class="op">=</span> <span class="st">"Australia_Investment"</span>, responses <span class="op">=</span> <span class="va">aus</span><span class="op">)</span></span></code></pre></div>
 <div class="figure" style="text-align: center">
-<img src="hierarchical_var_files/figure-html/plot-irf-1.png" class="r-plt" alt="Generalised impulse responses of Australian GDP, consumption and investment to a one standard deviation shock in Australian investment, with 95% credible intervals." width="85%"><p class="caption">
+<img src="figures/hierarchical_var-plot-irf-1.png" alt="Generalised impulse responses of Australian GDP, consumption and investment to a one standard deviation shock in Australian investment, with 95% credible intervals." width="85%"><p class="caption">
 Generalised impulse responses of Australian GDP, consumption and
 investment to a one standard deviation shock in Australian investment,
 with 95% credible intervals.
 </p>
 </div>
-<p>The shock raises Australian investment by 0.61 [0.51, 0.75] standard
+<p>The shock raises Australian investment by 0.60 [0.51, 0.74] standard
 deviations in its first year. Because investment and GDP shocks
 correlate, GDP moves with it, by 0.37 [0.29, 0.47]. In the second year
-consumption is at 0.14 [0.05, 0.24]. Every response stays within 0.01 of
+consumption is at 0.14 [0.05, 0.23]. Every response stays within 0.01 of
 zero from year 5.</p>
 </div>
 <div class="section level2">
@@ -407,12 +439,12 @@ outcome that comes first, here GDP.</p>
 <code class="sourceCode R"><span><span class="va">fevds</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/fevd.mvgam.html">fevd</a></span><span class="op">(</span><span class="va">fit</span>, h <span class="op">=</span> <span class="fl">8</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fevds</span>, series <span class="op">=</span> <span class="va">aus</span>, contributing <span class="op">=</span> <span class="va">aus</span><span class="op">)</span></span></code></pre></div>
 <div class="figure" style="text-align: center">
-<img src="hierarchical_var_files/figure-html/fevd-1.png" class="r-plt" alt="Median share of the forecast error variance of each Australian outcome that each Australian source of shocks generates, by forecast horizon." width="85%"><p class="caption">
+<img src="figures/hierarchical_var-fevd-1.png" alt="Median share of the forecast error variance of each Australian outcome that each Australian source of shocks generates, by forecast horizon." width="85%"><p class="caption">
 Median share of the forecast error variance of each Australian outcome
 that each Australian source of shocks generates, by forecast horizon.
 </p>
 </div>
-<p>In the first year, GDP shocks generate 59% of the forecast variance
+<p>In the first year, GDP shocks generate 58% of the forecast variance
 of Australian investment. That share is the part of two correlated
 shocks the ordering assigns to GDP. The shares barely move with the
 horizon. At eight years GDP shocks generate 97% of the forecast variance
@@ -441,16 +473,16 @@ for every economy:</p>
 <code class="sourceCode R"><span><span class="va">stab</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/stability.mvgam.html">stability</a></span><span class="op">(</span><span class="va">fit</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">stab</span><span class="op">)</span></span></code></pre></div>
 <div class="figure" style="text-align: center">
-<img src="hierarchical_var_files/figure-html/stability-1.png" class="r-plt" alt="Posterior medians and 95% credible intervals of reactivity and of the mean and variance return rates of each economy. The dashed line marks zero reactivity." width="85%"><p class="caption">
+<img src="figures/hierarchical_var-stability-1.png" alt="Posterior medians and 95% credible intervals of reactivity and of the mean and variance return rates of each economy. The dashed line marks zero reactivity." width="85%"><p class="caption">
 Posterior medians and 95% credible intervals of reactivity and of the
 mean and variance return rates of each economy. The dashed line marks
 zero reactivity.
 </p>
 </div>
-<p>The median mean return rates run from 0.38 to 0.64. A deviation of
+<p>The median mean return rates run from 0.39 to 0.64. A deviation of
 growth from its mean halves within two years in every economy.
 Reactivity intervals lie above zero for the United States. The United
-States has a reactivity of 0.88 [0.14, 1.42], shaped by the large
+States has a reactivity of 0.86 [0.09, 1.41], shaped by the large
 offsetting coefficients of its transition matrix.</p>
 <p>Partial pooling puts four fifths of the weight on a correlation of
 shocks shared by all eight economies, close to Savage’s estimate from an
@@ -486,6 +518,10 @@ observation and trend formulas.</li>
 <a href="data.html">Formatting data</a> covers the long data format
 and <code><a href="../reference/mvgam_data.html">mvgam_data()</a></code>.</li>
 </ul>
+<p>The blog post <a href="https://ecogambler.netlify.app/blog/vector-autoregressions/" class="external-link">State-space
+vector autoregressions in mvgam</a> fits a single VAR(1) to kestrel
+counts from three regions, with impulse responses, variance
+decompositions and stability measures.</p>
 </div>
 <div class="section level2">
 <h2 id="references">References<a class="anchor" aria-label="anchor" href="#references"></a>

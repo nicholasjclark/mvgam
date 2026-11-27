@@ -177,7 +177,7 @@ get_prior(f, data = simdat$data_train, family = poisson())
 #>       default
 #>       default
 stancode(f, data = simdat$data_train, family = poisson())
-#> // Generated with mvgam 2.0.0 using brms 2.23.2
+#> // Generated with mvgam 2.0.0.9000 using brms 2.23.2
 #> functions {
 #>   
 #> }

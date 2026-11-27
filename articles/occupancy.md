@@ -156,7 +156,7 @@ ggplot(histories, aes(x = time, y = site, fill = factor(y))) +
 
 ![Number of detections from four visits at each site in each training
 season. Sites are ordered by forest cover, with the most forested sites
-at the top.](occupancy_files/figure-html/histories-1.png)
+at the top.](figures/occupancy-histories-1.png)
 
 Number of detections from four visits at each site in each training
 season. Sites are ordered by forest cover, with the most forested sites
@@ -182,7 +182,7 @@ ggplot(by_site, aes(x = forest, y = y)) +
 
 ![Proportion of training seasons with at least one detection at each
 site, against standardised forest
-cover.](occupancy_files/figure-html/naive-forest-1.png)
+cover.](figures/occupancy-naive-forest-1.png)
 
 Proportion of training seasons with at least one detection at each site,
 against standardised forest cover.
@@ -238,23 +238,23 @@ summary(mod)
 #> == Observation Model ==
 #> Smoothing Spline Hyperparameters:
 #>                Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> sds(sforest_1)     2.04      1.75     0.07     6.68 1.00     1337      908
+#> sds(sforest_1)     2.25      1.98     0.09     7.51 1.01     1109      849
 #> 
 #> Regression Coefficients:
 #>             Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> Intercept      -0.42      0.28    -0.99     0.09 1.00     1412     1312
-#> p_Intercept     0.60      0.19     0.22     0.96 1.00     4286     2731
-#> p_rain         -1.96      0.32    -2.61    -1.34 1.00     3839     2969
-#> sforest_1       8.86      3.62     0.38    14.92 1.00     1240      631
+#> Intercept      -0.40      0.28    -0.96     0.10 1.00     1497     1808
+#> p_Intercept     0.59      0.19     0.22     0.96 1.00     3802     2840
+#> p_rain         -1.96      0.33    -2.60    -1.31 1.00     1767     1248
+#> sforest_1       8.33      4.09    -1.62    14.91 1.01      641      241
 #> 
 #> == Trend Model ==
 #> Trend Specific Parameters:
 #>                       Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS
-#> sigma_trend[species1]     0.38      0.17     0.14     0.78 1.00     1804
-#> ar1_trend[species1]       0.06      0.40    -0.71     0.81 1.00     1566
+#> sigma_trend[species1]     0.37      0.17     0.15     0.79 1.00     1219
+#> ar1_trend[species1]       0.07      0.42    -0.73     0.85 1.00      999
 #>                       Tail_ESS
-#> sigma_trend[species1]     1925
-#> ar1_trend[species1]       1378
+#> sigma_trend[species1]     1338
+#> ar1_trend[species1]        405
 #> 
 #> Draws were sampled using sampling(NUTS). For each parameter, Bulk_ESS
 #> and Tail_ESS are effective sample size measures, and Rhat is the potential
@@ -269,8 +269,8 @@ summary(mod)
 #> Use `how_to_cite(fit)` for a methods paragraph and `methods_md(fit)` for its equations.
 ```
 
-The estimated effect of rain on detection (`p_rain`) is -1.96 \[-2.61,
--1.34\] on the logit scale, which is close to the true simulated value
+The estimated effect of rain on detection (`p_rain`) is -1.96 \[-2.60,
+-1.31\] on the logit scale, which is close to the true simulated value
 of $`-2`$.
 
 ## Estimating the proportion of sites occupied
@@ -303,7 +303,7 @@ plot(hc) +
 ![Expected proportion of sites occupied in each training season, with
 50% and 95% credible intervals. Black points show the true proportion.
 Open circles show naive occupancy, the proportion of sites with at least
-one detection.](occupancy_files/figure-html/occupancy-plot-1.png)
+one detection.](figures/occupancy-occupancy-plot-1.png)
 
 Expected proportion of sites occupied in each training season, with 50%
 and 95% credible intervals. Black points show the true proportion. Open
@@ -327,7 +327,7 @@ never detected. In the training data there are 194 combinations of site
 and season with no detections. The species was present in 17 of them.
 `as.data.frame(hc)` returns one row per site and season, which makes it
 easy to inspect these directly. The model’s estimated occupancy
-probability averages 0.20 at the sites that were occupied but missed,
+probability averages 0.21 at the sites that were occupied but missed,
 compared to 0.07 at the sites that were empty. The forest cover effect
 explains this difference, as the occupied but missed sites are more
 heavily forested (average standardised forest cover of 0.72 vs -0.47).
@@ -352,7 +352,7 @@ plot(conditional_effects(mod, effects = "forest", type = "latent_state"),
 
 ![Occupancy probability against standardised forest cover, with its 95%
 credible interval. The dashed line is the true simulated
-function.](occupancy_files/figure-html/forest-effect-1.png)
+function.](figures/occupancy-forest-effect-1.png)
 
 Occupancy probability against standardised forest cover, with its 95%
 credible interval. The dashed line is the true simulated function.
@@ -370,7 +370,7 @@ plot(conditional_effects(mod, effects = "rain", type = "detection"),
 ```
 
 ![Detection probability against the rain index, with its 95% credible
-interval.](occupancy_files/figure-html/rain-effect-1.png)
+interval.](figures/occupancy-rain-effect-1.png)
 
 Detection probability against the rain index, with its 95% credible
 interval.
@@ -398,13 +398,13 @@ plot(fc) +
 
 ![Expected proportion of sites occupied over the training seasons and
 the two held-out seasons. Points show the true
-proportion.](occupancy_files/figure-html/forecast-1.png)
+proportion.](figures/occupancy-forecast-1.png)
 
 Expected proportion of sites occupied over the training seasons and the
 two held-out seasons. Points show the true proportion.
 
-The forecast proportions of sites occupied are 0.45 \[0.27, 0.62\] and
-0.44 \[0.27, 0.62\] for the two held-out seasons, compared to true
+The forecast proportions of sites occupied are 0.45 \[0.28, 0.61\] and
+0.45 \[0.28, 0.61\] for the two held-out seasons, compared to true
 proportions of 0.57 and 0.45. The forecast intervals are much wider than
 the hindcast intervals because no detections from these seasons enter
 the model. If we instead want forecasts of the detections themselves,
@@ -431,10 +431,10 @@ fit_stat
 #>   Statistic:        chi-squared
 #>   Aggregation:      closure unit
 #>   Posterior draws:  500
-#>   Bayesian p-value: 0.508
+#>   Bayesian p-value: 0.480
 ```
 
-The value here, 0.51, gives no sign of lack of fit. We can also inspect
+The value here, 0.48, gives no sign of lack of fit. We can also inspect
 randomised quantile residuals, which `mvgam` computes for each site in
 each season from its total detections:
 
@@ -444,7 +444,7 @@ plot(mod, type = "residuals")
 ```
 
 ![Normal Q-Q plot of the randomised quantile residuals, one for each
-site in each season.](occupancy_files/figure-html/residuals-1.png)
+site in each season.](figures/occupancy-residuals-1.png)
 
 Normal Q-Q plot of the randomised quantile residuals, one for each site
 in each season.
@@ -528,7 +528,7 @@ Every other parameter takes an improper flat prior on its support.
 
 ### Implementation
 
-Fitted with mvgam 2.0.0 (brms 2.23.2; Stan 2.40.0 via cmdstanr).
+Fitted with mvgam 2.0.0 (brms 2.23.0; Stan 2.38.0 via cmdstanr).
 Hamiltonian Monte Carlo: 4 chains, 1000 warmup + 1000 sampling
 iterations per chain.
 

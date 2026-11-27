@@ -165,46 +165,46 @@ summary(mod)
 #> == Observation Model ==
 #> Regression Coefficients:
 #>              Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> Intercept        3.53      0.15     3.26     3.84 1.00     1541     1690
-#> p_Intercept      0.54      0.24     0.08     1.00 1.00     2513     2664
-#> seriessp_2      -0.92      0.24    -1.37    -0.45 1.00     1130     1121
-#> seriessp_3      -0.40      0.26    -0.90     0.07 1.00     1755     2096
-#> seriessp_4      -1.17      0.25    -1.63    -0.68 1.01     1537     1985
-#> p_seriessp_2     0.42      0.28    -0.13     0.95 1.00     2584     2782
-#> p_seriessp_3    -0.98      0.29    -1.52    -0.39 1.00     2439     2348
-#> p_seriessp_4    -0.09      0.34    -0.80     0.52 1.00     2364     2717
-#> p_wind          -1.37      0.12    -1.62    -1.14 1.00     2962     2871
+#> Intercept        3.52      0.16     3.24     3.82 1.00     1375      998
+#> p_Intercept      0.55      0.24     0.10     1.01 1.00     2478     2575
+#> seriessp_2      -0.91      0.24    -1.40    -0.46 1.00     1180     1059
+#> seriessp_3      -0.39      0.25    -0.92     0.09 1.00     1457     1000
+#> seriessp_4      -1.15      0.26    -1.63    -0.60 1.00     1426     1294
+#> p_seriessp_2     0.41      0.27    -0.15     0.93 1.00     2955     2136
+#> p_seriessp_3    -0.98      0.28    -1.51    -0.42 1.00     2580     2505
+#> p_seriessp_4    -0.12      0.36    -0.89     0.52 1.00     2363     1950
+#> p_wind          -1.37      0.12    -1.61    -1.14 1.00     2828     2849
 #> 
 #> == Trend Model ==
 #> Smoothing Spline Hyperparameters:
 #>                        Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS
-#> sds(stempseriessp_1_1)     1.43      1.26     0.05     4.55 1.01      907
-#> sds(stempseriessp_2_1)     3.95      1.74     1.74     8.51 1.00     2404
-#> sds(stempseriessp_3_1)     1.02      1.03     0.02     3.89 1.00     1546
-#> sds(stempseriessp_4_1)     1.21      1.06     0.05     3.93 1.00     1477
+#> sds(stempseriessp_1_1)     1.39      1.17     0.04     4.24 1.00     1147
+#> sds(stempseriessp_2_1)     3.94      1.76     1.72     8.38 1.00     2236
+#> sds(stempseriessp_3_1)     0.97      0.89     0.03     3.32 1.00     1513
+#> sds(stempseriessp_4_1)     1.24      1.11     0.04     4.24 1.00     1656
 #>                        Tail_ESS
-#> sds(stempseriessp_1_1)      604
-#> sds(stempseriessp_2_1)     3029
-#> sds(stempseriessp_3_1)     1684
-#> sds(stempseriessp_4_1)     1150
+#> sds(stempseriessp_1_1)     1745
+#> sds(stempseriessp_2_1)     2598
+#> sds(stempseriessp_3_1)     1352
+#> sds(stempseriessp_4_1)     1770
 #> 
 #> Regression Coefficients:
 #>                    Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> stemp:seriessp_1_1     1.59      1.89    -2.87     4.44 1.01      857      596
-#> stemp:seriessp_2_1     2.05      3.00    -3.82     7.81 1.00     1598     2227
-#> stemp:seriessp_3_1    -2.99      1.53    -6.09     0.40 1.00     1529     1199
-#> stemp:seriessp_4_1    -1.11      1.66    -4.16     2.70 1.00     2026     2238
+#> stemp:seriessp_1_1     1.64      1.85    -2.42     4.45 1.00     1188     1684
+#> stemp:seriessp_2_1     2.07      2.98    -3.76     8.10 1.00     2240     2253
+#> stemp:seriessp_3_1    -3.00      1.43    -6.07    -0.12 1.00     1743     1921
+#> stemp:seriessp_4_1    -1.06      1.70    -4.18     2.92 1.00     2077     2139
 #> 
 #> Trend Specific Parameters:
 #>                   Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> sigma_trend[sp_1]     0.22      0.07     0.11     0.37 1.00     1785     2664
-#> sigma_trend[sp_2]     0.24      0.08     0.12     0.43 1.00     1640      749
-#> sigma_trend[sp_3]     0.26      0.08     0.13     0.45 1.00     1783     1517
-#> sigma_trend[sp_4]     0.23      0.08     0.12     0.42 1.00     2857     2355
-#> ar1_trend[sp_1]       0.05      0.37    -0.62     0.79 1.00     1511     1748
-#> ar1_trend[sp_2]       0.19      0.39    -0.56     0.90 1.00     1354      992
-#> ar1_trend[sp_3]       0.20      0.35    -0.50     0.84 1.00     1666     1833
-#> ar1_trend[sp_4]       0.06      0.36    -0.64     0.77 1.00     2075      933
+#> sigma_trend[sp_1]     0.22      0.07     0.11     0.37 1.00     2011     2809
+#> sigma_trend[sp_2]     0.24      0.08     0.12     0.43 1.00     2140     2477
+#> sigma_trend[sp_3]     0.26      0.08     0.13     0.45 1.00     2226     2457
+#> sigma_trend[sp_4]     0.23      0.08     0.11     0.44 1.00     3322     2996
+#> ar1_trend[sp_1]       0.06      0.37    -0.62     0.84 1.00      757      421
+#> ar1_trend[sp_2]       0.19      0.39    -0.61     0.88 1.00     1282      924
+#> ar1_trend[sp_3]       0.19      0.35    -0.48     0.85 1.00     1390     1357
+#> ar1_trend[sp_4]       0.05      0.35    -0.63     0.75 1.00     2994     2289
 #> 
 #> Draws were sampled using sampling(NUTS). For each parameter, Bulk_ESS
 #> and Tail_ESS are effective sample size measures, and Rhat is the potential
@@ -219,7 +219,7 @@ summary(mod)
 #> Use `how_to_cite(fit)` for a methods paragraph and `methods_md(fit)` for its equations.
 ```
 
-The wind coefficient `p_wind` is -1.37 \[-1.62, -1.14\] on the logit
+The wind coefficient `p_wind` is -1.37 \[-1.61, -1.14\] on the logit
 scale, against the simulated value of $`-1.5`$.
 
 ## Latent abundance
@@ -243,8 +243,7 @@ plot(hc) +
 
 ![Posterior medians with 50% and 95% credible intervals of each species'
 abundance. Black points are the simulated abundances. Open circles are
-the largest count in each
-year.](nmix_files/figure-html/latent-plot-1.png)
+the largest count in each year.](figures/nmix-latent-plot-1.png)
 
 Posterior medians with 50% and 95% credible intervals of each species’
 abundance. Black points are the simulated abundances. Open circles are
@@ -273,7 +272,7 @@ plot(
 ```
 
 ![Expected abundance of each species against temperature, with 95%
-credible intervals.](nmix_files/figure-html/temp-effects-1.png)
+credible intervals.](figures/nmix-temp-effects-1.png)
 
 Expected abundance of each species against temperature, with 95%
 credible intervals.
@@ -290,7 +289,7 @@ plot(conditional_effects(mod, effects = "wind", type = "detection"),
 ```
 
 ![Detection probability against wind speed, with its 95% credible
-interval.](nmix_files/figure-html/wind-effect-1.png)
+interval.](figures/nmix-wind-effect-1.png)
 
 Detection probability against wind speed, with its 95% credible
 interval.
@@ -310,7 +309,7 @@ plot(fc)
 
 ![Counts predicted on each visit over the training years and the three
 held-out years. Points are the observed
-counts.](nmix_files/figure-html/forecast-1.png)
+counts.](figures/nmix-forecast-1.png)
 
 Counts predicted on each visit over the training years and the three
 held-out years. Points are the observed counts.
@@ -339,11 +338,11 @@ fit_stat
 #>   Statistic:        chi-squared
 #>   Aggregation:      closure unit
 #>   Posterior draws:  500
-#>   Bayesian p-value: 0.562
+#>   Bayesian p-value: 0.604
 ```
 
 A Bayesian p-value near 0 would mean the replicates rarely reach the
-discrepancy of the observed counts. The value here, 0.56, gives no sign
+discrepancy of the observed counts. The value here, 0.60, gives no sign
 of lack of fit.
 [`latent_N_saturation()`](https://nicholasjclark.github.io/mvgam/reference/latent_N_saturation.md)
 reports the posterior probability that $`N`$ reaches the cap in each
@@ -353,11 +352,11 @@ unit:
 
 sat <- latent_N_saturation(mod)
 max(sat$p_saturated)
-#> [1] 0.026
+#> [1] 0.03025
 ```
 
 The largest probability any unit gives to reaching the cap of 80 is
-0.026.
+0.030.
 
 ## Other observation processes
 

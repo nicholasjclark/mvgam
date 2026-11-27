@@ -70,7 +70,7 @@ mod <- mvgam(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1),
               data    = simdat$data_train,
               family  = poisson(),
               chains  = 2, silent = 2)
-#> Warning: 8 of 2000 (0.0%) transitions ended with a divergence.
+#> Warning: 6 of 2000 (0.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 
 # A methods paragraph naming the Poisson family, the smooth and
@@ -78,7 +78,7 @@ mod <- mvgam(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1),
 cite <- how_to_cite(mod)
 cite
 #> Methods text skeleton
-#> We used the R package mvgam (version 2.0.0; Clark & Wells, 2023) to
+#> We used the R package mvgam (version 2.0.0.9000; Clark & Wells, 2023) to
 #>   construct, fit and interrogate the model. mvgam fits Bayesian
 #>   state-space models that combine flexible predictor effects in both the
 #>   process and observation components, using functionality from the brms

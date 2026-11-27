@@ -133,12 +133,14 @@ simdat <- sim_mvgam(family = poisson(), n_series = 1L,
 # lfo_cv() refits it to shorter stretches of the series
 mod_gam <- mvgam(y ~ s(x, k = 5), data = simdat$data_train,
                  family = poisson(), chains = 2, silent = 2)
-#> Warning: 12 of 2000 (1.0%) transitions ended with a divergence.
+#> Warning: 8 of 2000 (0.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 mod_ar <- mvgam(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1),
                 data = simdat$data_train, family = poisson(),
                 chains = 2, silent = 2,
                 control = list(adapt_delta = 0.95))
+#> Warning: 1 of 2000 (0.0%) transitions ended with a divergence.
+#> See https://mc-stan.org/misc/warnings for details.
 # }
 # \dontrun{
 fc_gam <- forecast(mod_gam, newdata = simdat$data_test)
@@ -152,16 +154,16 @@ summary(scores)
 #> # A tibble: 30 × 4
 #>    series   eval_horizon    GAM    AR
 #>    <fct>           <int>  <dbl> <dbl>
-#>  1 series_1            1  2.54  1.38 
-#>  2 series_1            2  2.46  1.24 
-#>  3 series_1            3 10.5   6.63 
-#>  4 series_1            4  8.11  5.98 
-#>  5 series_1            5  8.77  4.15 
-#>  6 series_1            6  4.14  2.12 
-#>  7 series_1            7  0.741 0.801
-#>  8 series_1            8  0.844 0.799
-#>  9 series_1            9  2.91  1.98 
-#> 10 series_1           10  4.49  2.74 
+#>  1 series_1            1  2.54  1.32 
+#>  2 series_1            2  2.53  1.22 
+#>  3 series_1            3 10.5   6.46 
+#>  4 series_1            4  8.16  6.02 
+#>  5 series_1            5  8.80  4.24 
+#>  6 series_1            6  4.20  2.21 
+#>  7 series_1            7  0.729 0.839
+#>  8 series_1            8  0.816 0.856
+#>  9 series_1            9  2.87  2.04 
+#> 10 series_1           10  4.49  2.67 
 #> # ℹ 20 more rows
 
 # The AR model's DRPS minus the GAM's. Negative values favour the

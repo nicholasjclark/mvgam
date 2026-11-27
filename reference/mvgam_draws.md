@@ -162,18 +162,18 @@ mod <- mvgam(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1),
               data    = simdat$data_train,
               family  = poisson(),
               chains  = 2, silent = 2)
-#> Warning: 8 of 2000 (0.0%) transitions ended with a divergence.
+#> Warning: 6 of 2000 (0.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 
 # Trend-dynamics parameters as a data frame of draws
 head(as.data.frame(mod, variable = "trend_params"))
 #>   sigma_trend[series_1] ar1_trend[series_1] .chain .iteration .draw
-#> 1             0.4033876           0.4968148      1          1     1
-#> 2             0.4579160           0.6299953      1          2     2
-#> 3             0.4201176           0.4269402      1          3     3
-#> 4             0.4593055           0.5105594      1          4     4
-#> 5             0.3973191           0.6110067      1          5     5
-#> 6             0.5106540           0.4092412      1          6     6
+#> 1             0.4565808           0.5878378      1          1     1
+#> 2             0.4334876           0.5858157      1          2     2
+#> 3             0.5206846           0.5594192      1          3     3
+#> 4             0.4327825           0.5289924      1          4     4
+#> 5             0.5482182           0.4196327      1          5     5
+#> 6             0.4880451           0.4612177      1          6     6
 
 # Regular expressions select by pattern, here the smooth's basis
 # coefficients and its smoothing SD
@@ -189,7 +189,7 @@ as_draws_rvars(mod, variable = "trend_params")
 #> 
 #> $ar1_trend: rvar<1000,2>[1] mean ± sd:
 #>     series_1 
-#> 0.57 ± 0.14  
+#> 0.56 ± 0.14  
 #> 
 
 # Next, mcmc_plot(mod) plots the same draws

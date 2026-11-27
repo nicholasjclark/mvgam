@@ -71,7 +71,7 @@ ggplot(moments, aes(mean, var)) +
 
 ![Mean and variance of each species' counts on log1p axes. The dashed
 line marks the equality a Poisson family would
-imply.](jsdgam_files/figure-html/mean-variance-1.png)
+imply.](figures/jsdgam-mean-variance-1.png)
 
 Mean and variance of each species’ counts on log1p axes. The dashed line
 marks the equality a Poisson family would imply.
@@ -106,7 +106,7 @@ ordinate(mod_base)
 
 ![Biplot of the site scores (numbered points) and species loadings
 (arrows) from the model with latent factors
-alone.](jsdgam_files/figure-html/ordinate-base-1.png)
+alone.](figures/jsdgam-ordinate-base-1.png)
 
 Biplot of the site scores (numbered points) and species loadings
 (arrows) from the model with latent factors alone.
@@ -138,13 +138,13 @@ mod_env <- jsdgam(
   chains = 4, seed = 2025, silent = 2
 )
 fixef(mod_env, trend_effects = TRUE)
-#>                               Estimate Est.Error       Q2.5     Q97.5
-#> Bare.ground:.trend1_trend   0.14757957 0.2299146 -0.3253114 0.5851231
-#> Bare.ground:.trend2_trend   0.14904403 0.2375116 -0.3283565 0.6094964
-#> .trend1:Canopy.cover_trend  0.38902847 0.3817168 -0.4469189 1.0555936
-#> .trend2:Canopy.cover_trend  0.55781086 0.4310188 -0.5233924 1.2117815
-#> .trend1:Shrub.cover_trend  -0.02135222 0.2207813 -0.4441711 0.4091492
-#> .trend2:Shrub.cover_trend   0.09645195 0.2345308 -0.3851571 0.5364400
+#>                                Estimate Est.Error       Q2.5     Q97.5
+#> Bare.ground:.trend1_trend   0.135920869 0.2246674 -0.3161984 0.5727267
+#> Bare.ground:.trend2_trend   0.138474012 0.2402835 -0.3471773 0.5986654
+#> .trend1:Canopy.cover_trend  0.409699649 0.3950048 -0.4941376 1.0748073
+#> .trend2:Canopy.cover_trend  0.540998805 0.4532449 -0.5594951 1.2252004
+#> .trend1:Shrub.cover_trend  -0.007575108 0.2152181 -0.4332874 0.4147369
+#> .trend2:Shrub.cover_trend   0.099059212 0.2335979 -0.3686123 0.5473352
 ```
 
 [`fixef()`](https://rdrr.io/pkg/nlme/man/fixed.effects.html) reports the
@@ -165,15 +165,15 @@ plot(se)
 ![Posterior mean response of each species to one standard deviation of
 each covariate, on the log scale of expected counts. Outlined cells have
 a posterior probability of their sign above
-0.95.](jsdgam_files/figure-html/species-effects-1.png)
+0.95.](figures/jsdgam-species-effects-1.png)
 
 Posterior mean response of each species to one standard deviation of
 each covariate, on the log scale of expected counts. Outlined cells have
 a posterior probability of their sign above 0.95.
 
-Under denser canopy 8 of the 41 species become more abundant and 10 less
+Under denser canopy 8 of the 41 species become more abundant and 9 less
 abundant, each with a posterior probability above 0.95. The mean
-responses run from -0.99 for Monomorium rothsteini to 1.89 for
+responses run from -0.98 for Monomorium rothsteini to 1.93 for
 Aphaenogaster longiceps. `summary(se)` lists every species’ estimate and
 interval.
 
@@ -212,12 +212,12 @@ mcmc_plot(mod_traits, variable = "theta_features", regex = TRUE,
 ```
 
 ![Posterior medians with 50% and 90% credible intervals of the length
-scale of each trait.](jsdgam_files/figure-html/theta-1.png)
+scale of each trait.](figures/jsdgam-theta-1.png)
 
 Posterior medians with 50% and 90% credible intervals of the length
 scale of each trait.
 
-The median length scale of Femur length, 0.28, is the shortest of the
+The median length scale of Femur length, 0.29, is the shortest of the
 traits. It falls below the 5% quantile of every other trait’s length
 scale. A shorter length scale gives a trait’s differences between
 species more weight in the loadings prior.
@@ -234,7 +234,7 @@ compare_loadings(mod_base, mod_traits,
 
 ![Posterior median loadings of each species without and with the trait
 prior, aligned to a shared basis. Labels mark the ten species that moved
-furthest.](jsdgam_files/figure-html/compare-loadings-1.png)
+furthest.](figures/jsdgam-compare-loadings-1.png)
 
 Posterior median loadings of each species without and with the trait
 prior, aligned to a shared basis. Labels mark the ten species that moved
@@ -249,12 +249,12 @@ loo_cmp <- loo_compare(list(uninformed = loo(mod_base),
                             `trait-informed` = loo(mod_traits)))
 loo_cmp
 #>           model elpd_diff se_diff p_worse diag_diff       diag_elpd
-#>  trait-informed       0.0     0.0      NA           21 k_psis > 0.7
-#>      uninformed     -30.0     7.3    1.00           18 k_psis > 0.7
+#>  trait-informed       0.0     0.0      NA           18 k_psis > 0.7
+#>      uninformed     -33.3     7.5    1.00           22 k_psis > 0.7
 ```
 
 Leave-one-out ranks the trait-informed prior first. The other trails it
-by 30.0 (SE 7.3) in expected log predictive density.
+by 33.3 (SE 7.5) in expected log predictive density.
 
 ## Residual correlations
 
@@ -271,12 +271,12 @@ plot(rcor, cluster = TRUE)
 
 ![Posterior mean residual correlations from the trait-informed model.
 Outlined cells have a posterior probability of their sign above
-0.95.](jsdgam_files/figure-html/resid-cor-1.png)
+0.95.](figures/jsdgam-resid-cor-1.png)
 
 Posterior mean residual correlations from the trait-informed model.
 Outlined cells have a posterior probability of their sign above 0.95.
 
-Of the 820 species pairs, 346 correlate positively and 62 negatively,
+Of the 820 species pairs, 343 correlate positively and 62 negatively,
 each with a posterior probability of its sign above 0.95. A residual
 correlation may reflect a shared response to an unmeasured driver or an
 interaction between species. The model alone cannot tell the two apart.
@@ -300,13 +300,13 @@ plot(cm)
 
 ![Posterior median expected richness along canopy cover, with nested
 20%, 40%, 60% and 80% credible
-intervals.](jsdgam_files/figure-html/community-1.png)
+intervals.](figures/jsdgam-community-1.png)
 
 Posterior median expected richness along canopy cover, with nested 20%,
 40%, 60% and 80% credible intervals.
 
-Expected richness barely changes, from 23.5 species at the most open
-sites to 22.9 under the densest canopy. The posterior probability that
+Expected richness barely changes, from 22.4 species at the most open
+sites to 21.8 under the densest canopy. The posterior probability that
 dense canopy holds fewer species is 0.60.
 
 Richness counts species without regard to how common they are. Each
@@ -321,13 +321,13 @@ plot(cm, type = "diversity")
 
 ![Hill numbers and abundance-weighted mean traits along canopy cover,
 with nested 20%, 40%, 60% and 80% credible
-intervals.](jsdgam_files/figure-html/community-diversity-1.png)
+intervals.](figures/jsdgam-community-diversity-1.png)
 
 Hill numbers and abundance-weighted mean traits along canopy cover, with
 nested 20%, 40%, 60% and 80% credible intervals.
 
 The exponential of Shannon entropy, the Hill number of order one, peaks
-at 27 species near a canopy cover of -0.1 and falls to 19 under the
+at 26 species near a canopy cover of -0.1 and falls to 18 under the
 densest canopy. Dense canopy keeps a list of species as long as open
 ground does, while a few of them come to dominate the counts.
 
@@ -371,8 +371,7 @@ plot(af)
 ```
 
 ![Posterior probability that each factor, largest first, is active. The
-dashed line marks the
-threshold.](jsdgam_files/figure-html/active-factors-1.png)
+dashed line marks the threshold.](figures/jsdgam-active-factors-1.png)
 
 Posterior probability that each factor, largest first, is active. The
 dashed line marks the threshold.
@@ -384,8 +383,8 @@ models fixed.
 
 The trait prior and column shrinkage tested two assumptions of the first
 ant community models: independent loadings and two factors.
-Leave-one-out ranked the trait-informed prior first, by 30.0 in expected
-log predictive density against a standard error of 7.3. Given a ceiling
+Leave-one-out ranked the trait-informed prior first, by 33.3 in expected
+log predictive density against a standard error of 7.5. Given a ceiling
 of 6 factors, the shrinkage prior kept 2 active, against the 2 the first
 models assumed. Each extension is one argument to a single
 [`jsdgam()`](https://nicholasjclark.github.io/mvgam/reference/jsdgam.md)

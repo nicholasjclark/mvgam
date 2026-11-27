@@ -21,7 +21,7 @@ temperature (SST) driver through a smooth nonlinear effect."><meta property="og:
 
     <a class="navbar-brand me-2" href="../index.html">mvgam</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Released version">2.0.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Released version">2.0.0.9000</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -29,14 +29,42 @@ temperature (SST) driver through a smooth nonlinear effect."><meta property="og:
     </button>
 
     <div id="navbar" class="collapse navbar-collapse ms-3">
-      <ul class="navbar-nav me-auto"><li class="nav-item"><a class="nav-link" href="../articles/index.html">Articles</a></li>
+      <ul class="navbar-nav me-auto"><li class="nav-item dropdown">
+  <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
+  <ul class="dropdown-menu" aria-labelledby="dropdown-articles"><li><a class="dropdown-item" href="../articles/mvgam_overview.html">Overview of the mvgam package</a></li>
+    <li><a class="dropdown-item" href="../articles/data.html">Formatting data for mvgam</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Latent dynamics</h6></li>
+    <li><a class="dropdown-item" href="../articles/var.html">State-space vector autoregressions with mvgam</a></li>
+    <li><a class="dropdown-item" href="../articles/hierarchical_var.html">Hierarchical vector autoregressions with mvgam</a></li>
+    <li><a class="dropdown-item" href="../articles/dfm.html">Dynamic factor models</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Many responses, one process</h6></li>
+    <li><a class="dropdown-item" href="../articles/mvbf.html">One latent process, several observation models</a></li>
+    <li><a class="dropdown-item" href="../articles/jsdgam.html">Joint species distribution models with mvgam</a></li>
+    <li><a class="dropdown-item" href="../articles/idm.html">Integrated distribution models with mvgam</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Imperfect detection</h6></li>
+    <li><a class="dropdown-item" href="../articles/occupancy.html">Occupancy models with mvgam</a></li>
+    <li><a class="dropdown-item" href="../articles/nmix.html">N-mixture models with mvgam</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Evaluating forecasts</h6></li>
+    <li><a class="dropdown-item" href="../articles/forecast_evaluation.html">Forecast evaluation in mvgam</a></li>
+  </ul></li>
 <li class="active nav-item"><a class="nav-link" href="../reference/index.html">Reference</a></li>
 <li class="nav-item dropdown">
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-cheatsheets" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Cheatsheets</button>
   <ul class="dropdown-menu" aria-labelledby="dropdown-cheatsheets"><li><a class="dropdown-item" href="../cheatsheets/mvgam_cheatsheet.pdf">mvgam</a></li>
     <li><a class="dropdown-item" href="../cheatsheets/jsdgam_cheatsheet.pdf">Joint species distribution models</a></li>
   </ul></li>
-<li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
+<li class="nav-item"><a class="external-link nav-link" href="https://ecogambler.netlify.app/tags/mvgam/">Blog</a></li>
+<li class="nav-item dropdown">
+  <button class="nav-link dropdown-toggle" type="button" id="dropdown-news" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">News</button>
+  <ul class="dropdown-menu" aria-labelledby="dropdown-news"><li><h6 class="dropdown-header" data-toc-skip>Releases</h6></li>
+    <li><a class="external-link dropdown-item" href="https://ecogambler.netlify.app/blog/mvgam-2/">mvgam 2.0.0</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><a class="dropdown-item" href="../news/index.html">Changelog</a></li>
+  </ul></li>
       </ul><ul class="navbar-nav"><li class="nav-item"><form class="form-inline" role="search">
  <input class="form-control" type="search" name="search-input" id="search-input" autocomplete="off" aria-label="Search site" placeholder="Search for" data-search-index="../search.json"></form></li>
 <li class="nav-item"><a class="external-link nav-link" href="https://github.com/nicholasjclark/mvgam/" aria-label="GitHub"><span class="fa fab fa-github fa-lg"></span></a></li>
@@ -142,7 +170,7 @@ thin-plate basis.</p></li>
 <span class="r-in"><span>  family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">binomial</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>  chains <span class="op">=</span> <span class="fl">2</span>, silent <span class="op">=</span> <span class="fl">2</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 20 of 2000 (1.0%) transitions ended with a divergence.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 32 of 2000 (2.0%) transitions ended with a divergence.</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> See https://mc-stan.org/misc/warnings for details.</span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  Family: binomial </span>
@@ -157,31 +185,31 @@ thin-plate basis.</p></li>
 <span class="r-out co"><span class="r-pr">#&gt;</span> == Observation Model ==</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Smoothing Spline Hyperparameters:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>             Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> sds(ssst_1)     2.47      1.32     0.68     5.52 1.01      693     1265</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sds(ssst_1)     2.48      1.33     0.76     5.72 1.00      689      974</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Regression Coefficients:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>                Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Intercept         -0.65      0.17    -0.98    -0.34 1.00     1589     1216</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> seriesmyrmidon    -0.81      0.61    -1.84     0.53 1.00      611      389</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> seriespixie       -0.60      0.40    -1.39     0.16 1.00     1100      787</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> ssst_1            13.28      4.79     6.00    24.35 1.01      817      760</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Intercept         -0.63      0.27    -0.96    -0.23 1.00      616      408</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> seriesmyrmidon    -0.83      0.61    -1.90     0.58 1.00      537      454</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> seriespixie       -0.62      0.50    -1.62     0.34 1.00      626      362</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ssst_1            13.22      4.81     6.10    24.73 1.00      821      946</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> == Trend Model ==</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Trend Specific Parameters:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>                       Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> sigma_trend[flynn]        0.55      0.11     0.34     0.79 1.00      593</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> sigma_trend[myrmidon]     0.45      0.11     0.26     0.70 1.00      840</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> sigma_trend[pixie]        0.47      0.09     0.31     0.68 1.00     1016</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> ar1_trend[flynn]          0.47      0.19     0.09     0.83 1.00      767</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> ar1_trend[myrmidon]       0.82      0.12     0.51     0.98 1.00      610</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> ar1_trend[pixie]          0.76      0.12     0.49     0.95 1.00      671</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sigma_trend[flynn]        0.55      0.11     0.34     0.78 1.00      703</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sigma_trend[myrmidon]     0.44      0.11     0.26     0.69 1.00      975</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sigma_trend[pixie]        0.47      0.09     0.31     0.67 1.00     1063</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ar1_trend[flynn]          0.47      0.20     0.08     0.84 1.01      489</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ar1_trend[myrmidon]       0.82      0.12     0.50     0.98 1.00      707</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ar1_trend[pixie]          0.77      0.12     0.49     0.97 1.00      616</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>                       Tail_ESS</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> sigma_trend[flynn]        1031</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> sigma_trend[myrmidon]     1121</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> sigma_trend[pixie]        1192</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> ar1_trend[flynn]           957</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> ar1_trend[myrmidon]        578</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> ar1_trend[pixie]           866</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sigma_trend[flynn]        1283</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sigma_trend[myrmidon]     1374</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sigma_trend[pixie]        1174</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ar1_trend[flynn]           407</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ar1_trend[myrmidon]        930</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ar1_trend[pixie]           505</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Draws were sampled using sampling(NUTS). For each parameter, Bulk_ESS</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> and Tail_ESS are effective sample size measures, and Rhat is the potential</span>

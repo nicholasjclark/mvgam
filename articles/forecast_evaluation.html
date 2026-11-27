@@ -25,7 +25,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">mvgam</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Released version">2.0.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Released version">2.0.0.9000</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -34,7 +34,30 @@
 
     <div id="navbar" class="collapse navbar-collapse ms-3">
       <ul class="navbar-nav me-auto">
-<li class="active nav-item"><a class="nav-link" href="../articles/index.html">Articles</a></li>
+<li class="active nav-item dropdown">
+  <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
+  <ul class="dropdown-menu" aria-labelledby="dropdown-articles">
+<li><a class="dropdown-item" href="../articles/mvgam_overview.html">Overview of the mvgam package</a></li>
+    <li><a class="dropdown-item" href="../articles/data.html">Formatting data for mvgam</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Latent dynamics</h6></li>
+    <li><a class="dropdown-item" href="../articles/var.html">State-space vector autoregressions with mvgam</a></li>
+    <li><a class="dropdown-item" href="../articles/hierarchical_var.html">Hierarchical vector autoregressions with mvgam</a></li>
+    <li><a class="dropdown-item" href="../articles/dfm.html">Dynamic factor models</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Many responses, one process</h6></li>
+    <li><a class="dropdown-item" href="../articles/mvbf.html">One latent process, several observation models</a></li>
+    <li><a class="dropdown-item" href="../articles/jsdgam.html">Joint species distribution models with mvgam</a></li>
+    <li><a class="dropdown-item" href="../articles/idm.html">Integrated distribution models with mvgam</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Imperfect detection</h6></li>
+    <li><a class="dropdown-item" href="../articles/occupancy.html">Occupancy models with mvgam</a></li>
+    <li><a class="dropdown-item" href="../articles/nmix.html">N-mixture models with mvgam</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Evaluating forecasts</h6></li>
+    <li><a class="dropdown-item" href="../articles/forecast_evaluation.html">Forecast evaluation in mvgam</a></li>
+  </ul>
+</li>
 <li class="nav-item"><a class="nav-link" href="../reference/index.html">Reference</a></li>
 <li class="nav-item dropdown">
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-cheatsheets" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Cheatsheets</button>
@@ -43,7 +66,16 @@
     <li><a class="dropdown-item" href="../cheatsheets/jsdgam_cheatsheet.pdf">Joint species distribution models</a></li>
   </ul>
 </li>
-<li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
+<li class="nav-item"><a class="external-link nav-link" href="https://ecogambler.netlify.app/tags/mvgam/">Blog</a></li>
+<li class="nav-item dropdown">
+  <button class="nav-link dropdown-toggle" type="button" id="dropdown-news" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">News</button>
+  <ul class="dropdown-menu" aria-labelledby="dropdown-news">
+<li><h6 class="dropdown-header" data-toc-skip>Releases</h6></li>
+    <li><a class="external-link dropdown-item" href="https://ecogambler.netlify.app/blog/mvgam-2/">mvgam 2.0.0</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><a class="dropdown-item" href="../news/index.html">Changelog</a></li>
+  </ul>
+</li>
       </ul>
 <ul class="navbar-nav">
 <li class="nav-item"><form class="form-inline" role="search">
@@ -161,7 +193,7 @@ the forecast after the hindcast of the training months:</p>
 <div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fc_gam</span><span class="op">)</span></span></code></pre></div>
 <div class="figure" style="text-align: center">
-<img src="forecast_evaluation_files/figure-html/plot-gam-1.png" class="r-plt" alt="GAM hindcasts and forecasts of each species' captures, with 50%, 80% and 95% credible intervals on the forecast. Points are the observed captures. The dashed line marks the end of the training data." width="85%"><p class="caption">
+<img src="figures/forecast_evaluation-plot-gam-1.png" alt="GAM hindcasts and forecasts of each species' captures, with 50%, 80% and 95% credible intervals on the forecast. Points are the observed captures. The dashed line marks the end of the training data." width="85%"><p class="caption">
 GAM hindcasts and forecasts of each species’ captures, with 50%, 80% and
 95% credible intervals on the forecast. Points are the observed
 captures. The dashed line marks the end of the training data.
@@ -169,13 +201,13 @@ captures. The dashed line marks the end of the training data.
 </div>
 <p>Each smooth of time extrapolates the slope at the end of its series.
 For DO, whose captures rose over the final training months, the median
-forecast reaches 125 captures by month 12. The held-out months recorded
+forecast reaches 121 captures by month 12. The held-out months recorded
 at most 14. The AR forecast carries its latent state forward
 instead:</p>
 <div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fc_ar</span><span class="op">)</span></span></code></pre></div>
 <div class="figure" style="text-align: center">
-<img src="forecast_evaluation_files/figure-html/plot-ar-1.png" class="r-plt" alt="AR hindcasts and forecasts of each species' captures." width="85%"><p class="caption">
+<img src="figures/forecast_evaluation-plot-ar-1.png" alt="AR hindcasts and forecasts of each species' captures." width="85%"><p class="caption">
 AR hindcasts and forecasts of each species’ captures.
 </p>
 </div>
@@ -196,31 +228,31 @@ link scale, where the parts of the model add:</p>
 <span><span class="co">#&gt; Forecast uncertainty by source, predictor, 500 draws, 20 replicates</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt;  series sd_first sd_last dominant      support changes_at</span></span>
-<span><span class="co">#&gt;  DM     0.24     0.41    process error 1                 </span></span>
-<span><span class="co">#&gt;  DO     0.56     0.90    process error 1                 </span></span>
-<span><span class="co">#&gt;  PB     0.63     1.40    process error 1                 </span></span>
+<span><span class="co">#&gt;  DM     0.25     0.41    process error 1                 </span></span>
+<span><span class="co">#&gt;  DO     0.57     0.92    process error 1                 </span></span>
+<span><span class="co">#&gt;  PB     0.62     1.30    process error 1                 </span></span>
 <span><span class="co">#&gt;  PP     0.83     1.20    process error 1                 </span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; summary() gives every source at every horizon.</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">unc_ar</span><span class="op">)</span></span></code></pre></div>
 <div class="figure" style="text-align: center">
-<img src="forecast_evaluation_files/figure-html/uncertainty-1.png" class="r-plt" alt="Variance of the AR model's forecast predictor at each horizon, split by kind of source." width="85%"><p class="caption">
+<img src="figures/forecast_evaluation-uncertainty-1.png" alt="Variance of the AR model's forecast predictor at each horizon, split by kind of source." width="85%"><p class="caption">
 Variance of the AR model’s forecast predictor at each horizon, split by
 kind of source.
 </p>
 </div>
 <p>Process error, the variance the state’s innovations add, leads for
 every species by month 12. Because this variance belongs to the process,
-more data will not shrink it. For DO it grows from 55% of the variance
-at month 1 to 74% at month 12. Because an AR(1) state loses its memory
-of the last training month, the latent dynamics fade from 28% to 4% over
-the same months.</p>
+more data will not shrink it. For DO it grows from 54% of the variance
+at month 1 to 76% at month 12. Because an AR(1) state loses its memory
+of the last training month, the latent dynamics fade from 38% to 11%
+over the same months.</p>
 <p>The bars jump at month 8. With <code>by = "source"</code> and
 <code>type = "share"</code>, the plot names the term responsible:</p>
 <div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">unc_ar</span>, type <span class="op">=</span> <span class="st">"share"</span>, by <span class="op">=</span> <span class="st">"source"</span>, series <span class="op">=</span> <span class="st">"DO"</span><span class="op">)</span></span></code></pre></div>
 <div class="figure" style="text-align: center">
-<img src="forecast_evaluation_files/figure-html/uncertainty-terms-1.png" class="r-plt" alt="Share of the variance of the DO forecast held by each term." width="85%"><p class="caption">
+<img src="figures/forecast_evaluation-uncertainty-terms-1.png" alt="Share of the variance of the DO forecast held by each term." width="85%"><p class="caption">
 Share of the variance of the DO forecast held by each term.
 </p>
 </div>
@@ -239,14 +271,14 @@ innovations, their difference isolates what the covariates change:</p>
 <span>                           ndraws <span class="op">=</span> <span class="fl">500</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">sc</span>, series <span class="op">=</span> <span class="st">"DO"</span><span class="op">)</span></span></code></pre></div>
 <div class="figure" style="text-align: center">
-<img src="forecast_evaluation_files/figure-html/scenarios-1.png" class="r-plt" alt="Difference in the DO forecast's predictor between a future one standard deviation warmer and the observed one, with nested 20%, 40%, 60% and 80% credible intervals." width="85%"><p class="caption">
+<img src="figures/forecast_evaluation-scenarios-1.png" alt="Difference in the DO forecast's predictor between a future one standard deviation warmer and the observed one, with nested 20%, 40%, 60% and 80% credible intervals." width="85%"><p class="caption">
 Difference in the DO forecast’s predictor between a future one standard
 deviation warmer and the observed one, with nested 20%, 40%, 60% and 80%
 credible intervals.
 </p>
 </div>
 <p>The median difference at month 12 is -0.11, with a 95% interval from
--0.53 to 0.32. The largest median difference, -0.21, falls at month
+-0.53 to 0.33. The largest median difference, -0.18, falls at month
 8.</p>
 </div>
 <div class="section level2">
@@ -262,16 +294,16 @@ model’s score minus that of a baseline:</p>
 <span>                       model_names <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"GAM"</span>, <span class="st">"AR"</span>, <span class="st">"PW"</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">crps</span>, relative <span class="op">=</span> <span class="st">"GAM"</span><span class="op">)</span></span></code></pre></div>
 <div class="figure" style="text-align: center">
-<img src="forecast_evaluation_files/figure-html/crps-1.png" class="r-plt" alt="CRPS of the AR and PW forecasts minus that of the GAM at each horizon. Negative values favour the AR or PW model. No species was observed at horizon 3." width="85%"><p class="caption">
+<img src="figures/forecast_evaluation-crps-1.png" alt="CRPS of the AR and PW forecasts minus that of the GAM at each horizon. Negative values favour the AR or PW model. No species was observed at horizon 3." width="85%"><p class="caption">
 CRPS of the AR and PW forecasts minus that of the GAM at each horizon.
 Negative values favour the AR or PW model. No species was observed at
 horizon 3.
 </p>
 </div>
 <p>Between AR and the GAM, the lower mean CRPS goes to AR on DM, AR on
-DO, the GAM on PB and the GAM on PP. On DO the mean CRPS is 3.31 for AR
-and 33.51 for the GAM. PB and PP recorded few or no captures over long
-stretches. Averaged over the species, AR scores 3.98 against 3.85 for
+DO, the GAM on PB and the GAM on PP. On DO the mean CRPS is 3.25 for AR
+and 32.77 for the GAM. PB and PP recorded few or no captures over long
+stretches. Averaged over the species, AR scores 3.95 against 3.86 for
 PW.</p>
 <p>The energy score grades the four forecasts at each horizon as one
 multivariate distribution (Gneiting et al. <a href="https://doi.org/10.1007/s11749-008-0114-x" class="external-link">2008</a>).
@@ -282,11 +314,11 @@ series is <code>all_series</code>:</p>
 <span>                         model_names <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"GAM"</span>, <span class="st">"AR"</span>, <span class="st">"PW"</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">energy</span><span class="op">)</span></span></code></pre></div>
 <div class="figure" style="text-align: center">
-<img src="forecast_evaluation_files/figure-html/energy-1.png" class="r-plt" alt="Energy score of the joint forecast of the four species at each horizon." width="85%"><p class="caption">
+<img src="figures/forecast_evaluation-energy-1.png" alt="Energy score of the joint forecast of the four species at each horizon." width="85%"><p class="caption">
 Energy score of the joint forecast of the four species at each horizon.
 </p>
 </div>
-<p>The GAM’s energy score runs from 7 to 93 over the twelve months. AR
+<p>The GAM’s energy score runs from 7 to 90 over the twelve months. AR
 and PW stay below 13. <code><a href="../reference/score.mvgam_forecast.html">score()</a></code> offers nine more rules, among
 them the variogram score for the dependence between series and
 threshold-weighted scores for a range of the response.</p>
@@ -320,9 +352,9 @@ that the stacking weights below require:</p>
 <span><span class="fu"><a href="https://mc-stan.org/loo/reference/loo_compare.html" class="external-link">loo_compare</a></span><span class="op">(</span><span class="va">lfo_gam</span>, <span class="va">lfo_ar</span>, <span class="va">lfo_pw</span>, model_names <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"GAM"</span>, <span class="st">"AR"</span>, <span class="st">"PW"</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt;  model elpd_diff se_diff p_worse diag_diff diag_elpd</span></span>
 <span><span class="co">#&gt;     AR       0.0     0.0      NA                    </span></span>
-<span><span class="co">#&gt;     PW     -39.2    12.1    1.00   N &lt; 100          </span></span>
-<span><span class="co">#&gt;    GAM     -76.3    14.8    1.00   N &lt; 100</span></span></code></pre></div>
-<p>AR leads. PW trails it by 39 (SE 12) and GAM by 76 (SE 15). The log
+<span><span class="co">#&gt;     PW     -34.3     7.7    1.00   N &lt; 100          </span></span>
+<span><span class="co">#&gt;    GAM     -69.5     4.7    1.00   N &lt; 100</span></span></code></pre></div>
+<p>AR leads. PW trails it by 34 (SE 8) and GAM by 70 (SE 5). The log
 score penalises an observation in the tail of a forecast far more
 heavily than the CRPS does. <code><a href="../reference/compare_elpds.html">compare_elpds()</a></code> tabulates the
 ELPD at each origin:</p>
@@ -331,7 +363,7 @@ ELPD at each origin:</p>
 <span>                       model_names <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"GAM"</span>, <span class="st">"AR"</span>, <span class="st">"PW"</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">elpds</span>, cumulative <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></code></pre></div>
 <div class="figure" style="text-align: center">
-<img src="forecast_evaluation_files/figure-html/lfo-plot-1.png" class="r-plt" alt="Cumulative ELPD over the forecast origins. Open circles mark the origins at which the model was refit." width="85%"><p class="caption">
+<img src="figures/forecast_evaluation-lfo-plot-1.png" alt="Cumulative ELPD over the forecast origins. Open circles mark the origins at which the model was refit." width="85%"><p class="caption">
 Cumulative ELPD over the forecast origins. Open circles mark the origins
 at which the model was refit.
 </p>
@@ -354,8 +386,8 @@ its components:</p>
 <span><span class="co">#&gt; ------</span></span>
 <span><span class="co">#&gt;     weight</span></span>
 <span><span class="co">#&gt; GAM 0.000 </span></span>
-<span><span class="co">#&gt; AR  0.697 </span></span>
-<span><span class="co">#&gt; PW  0.303</span></span>
+<span><span class="co">#&gt; AR  0.668 </span></span>
+<span><span class="co">#&gt; PW  0.332</span></span>
 <span><span class="va">fc_ens</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/ensemble.mvgam_forecast.html">ensemble</a></span><span class="op">(</span><span class="va">fc_gam</span>, <span class="va">fc_ar</span>, <span class="va">fc_pw</span>, weights <span class="op">=</span> <span class="va">weights</span>,</span>
 <span>                   seed <span class="op">=</span> <span class="fl">2026</span><span class="op">)</span></span>
 <span><span class="va">crps_ens</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/compare_scores.html">compare_scores</a></span><span class="op">(</span><span class="va">fc_gam</span>, <span class="va">fc_ar</span>, <span class="va">fc_pw</span>, <span class="va">fc_ens</span>, score <span class="op">=</span> <span class="st">"crps"</span>,</span>
@@ -363,12 +395,12 @@ its components:</p>
 <span><span class="fu"><a href="https://rdrr.io/r/stats/aggregate.html" class="external-link">aggregate</a></span><span class="op">(</span><span class="va">score</span> <span class="op">~</span> <span class="va">model</span>, FUN <span class="op">=</span> <span class="va">mean</span>,</span>
 <span>          data <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/subset.html" class="external-link">subset</a></span><span class="op">(</span><span class="va">crps_ens</span>, <span class="va">series</span> <span class="op">!=</span> <span class="st">"all_series"</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt;      model     score</span></span>
-<span><span class="co">#&gt; 1      GAM 11.346268</span></span>
-<span><span class="co">#&gt; 2       AR  3.977615</span></span>
-<span><span class="co">#&gt; 3       PW  3.853498</span></span>
-<span><span class="co">#&gt; 4 Ensemble  3.812617</span></span></code></pre></div>
-<p>Stacking gives 0 to the GAM, 0.7 to AR and 0.3 to PW. The ensemble’s
-mean CRPS on the holdout is 3.81, the lowest of the four.</p>
+<span><span class="co">#&gt; 1      GAM 11.132286</span></span>
+<span><span class="co">#&gt; 2       AR  3.945342</span></span>
+<span><span class="co">#&gt; 3       PW  3.855793</span></span>
+<span><span class="co">#&gt; 4 Ensemble  3.796325</span></span></code></pre></div>
+<p>Stacking gives 0 to the GAM, 0.67 to AR and 0.33 to PW. The
+ensemble’s mean CRPS on the holdout is 3.80, the lowest of the four.</p>
 </div>
 <div class="section level2">
 <h2 id="summary">Summary<a class="anchor" aria-label="anchor" href="#summary"></a>
@@ -376,7 +408,7 @@ mean CRPS on the holdout is 3.81, the lowest of the four.</p>
 <p>The CRPS and the energy score compared the three forecasts on the
 holdout. Under leave-future-out cross-validation AR led in ELPD. The
 GAM’s smooths of time extrapolated the end of each series. Stacking
-combined the three forecasts into an ensemble with a mean CRPS of 3.81.
+combined the three forecasts into an ensemble with a mean CRPS of 3.80.
 Each step took one or two function calls on the fitted models. The CRPS
 and the log score can rank models differently. Choose the scoring rule
 before scoring any forecast.</p>

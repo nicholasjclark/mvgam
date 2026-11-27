@@ -218,21 +218,21 @@ mod <- mvgam(
   family  = poisson(),
   chains  = 2, seed = 1, silent = 2
 )
-#> Warning: 19 of 2000 (1.0%) transitions ended with a divergence.
+#> Warning: 24 of 2000 (1.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 
 # Forecasts one time step after each origin from t = 60, scored by
 # ELPD and CRPS. The model is refitted only where the Pareto k is high.
 lfo <- lfo_cv(mod, min_t = 60L, score = c("elpd", "crps"))
-#> Warning: 15 of 2000 (1.0%) transitions ended with a divergence.
+#> Warning: 39 of 2000 (2.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
-#> Warning: 16 of 2000 (1.0%) transitions ended with a divergence.
+#> Warning: 67 of 2000 (3.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
-#> Warning: 157 of 2000 (8.0%) transitions ended with a divergence.
+#> Warning: 9 of 2000 (0.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
-#> Warning: 24 of 2000 (1.0%) transitions ended with a divergence.
+#> Warning: 14 of 2000 (1.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
-#> Warning: 17 of 2000 (1.0%) transitions ended with a divergence.
+#> Warning: 32 of 2000 (2.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 lfo
 #> Approximate leave-future-out cross-validation
@@ -240,8 +240,8 @@ lfo
 #>   pareto_k_threshold : 0.697 (adaptive)
 #>   evaluation points  : 30
 #>   refits             : 5
-#>   ELPD               : sum = -79.08, mean = -2.64
-#>   crps               : sum = 60.89, mean = 2.03
+#>   ELPD               : sum = -78.98, mean = -2.63
+#>   crps               : sum = 59.89, mean = 2
 
 # Pareto k, ELPD and CRPS at each origin. Points past the dashed
 # line are highlighted
@@ -253,16 +253,16 @@ summary(lfo)
 #> # A tibble: 30 × 6
 #>    eval_time refit_here pareto_k n_obs  elpd  crps
 #>        <int> <lgl>         <dbl> <int> <dbl> <dbl>
-#>  1        61 TRUE        NA          1 -2.52 1.52 
-#>  2        62 FALSE       -1.71       1 -1.68 0.616
-#>  3        63 FALSE       -0.825      1 -2.47 1.41 
-#>  4        64 FALSE       -0.583      1 -2.42 0.996
-#>  5        65 FALSE       -0.337      1 -1.66 0.964
-#>  6        66 FALSE       -0.153      1 -2.49 1.82 
-#>  7        67 FALSE        0.0892     1 -2.85 3.38 
-#>  8        68 FALSE        0.574      1 -2.96 2.16 
-#>  9        69 FALSE        0.689      1 -2.68 2.51 
-#> 10        70 TRUE         0.741      1 -2.86 2.81 
+#>  1        61 TRUE        NA          1 -2.51 1.52 
+#>  2        62 FALSE       -1.56       1 -1.71 0.551
+#>  3        63 FALSE       -0.880      1 -2.48 1.34 
+#>  4        64 FALSE       -0.586      1 -2.43 1.02 
+#>  5        65 FALSE       -0.286      1 -1.68 1.05 
+#>  6        66 FALSE       -0.0609     1 -2.40 1.33 
+#>  7        67 FALSE       -0.0473     1 -2.81 3.16 
+#>  8        68 FALSE        0.326      1 -2.82 1.63 
+#>  9        69 FALSE        0.628      1 -2.69 2.91 
+#> 10        70 TRUE         0.795      1 -2.86 2.75 
 #> # ℹ 20 more rows
 
 # Next, rank models by their forecasts with loo_compare()

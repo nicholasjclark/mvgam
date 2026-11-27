@@ -1,6 +1,10 @@
 # Changelog
 
+## mvgam (development version)
+
 ## mvgam 2.0.0
+
+CRAN release: 2026-11-27
 
 mvgam now builds its models through ‘brms’. The observation model takes
 the full ‘brms’ formula syntax. `trend_formula` specifies the latent

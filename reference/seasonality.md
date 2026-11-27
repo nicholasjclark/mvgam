@@ -203,8 +203,8 @@ s
 #> 
 #> Period 12 (season)
 #>   series_1
-#>     amplitude 0.19 -> 0.21, P(larger) = 0.80
-#>     peak Aug (0.62) -> Aug (0.51), P(earlier) = 0.28, P(later) = 0.17
+#>     amplitude 0.19 -> 0.21, P(larger) = 0.82
+#>     peak Aug (0.62) -> Aug (0.52), P(earlier) = 0.27, P(later) = 0.17
 #>     strength 0.94 -> 0.92
 
 # The season by month in the first, last and forecast years
@@ -220,7 +220,7 @@ summary(s)$change
 #> # A tibble: 1 × 13
 #>   series period from_cycle to_cycle ratio_Q50 ratio_Q2.5 ratio_Q97.5 prob_larger
 #>   <chr>  <chr>       <int>    <int>     <dbl>      <dbl>       <dbl>       <dbl>
-#> 1 serie… season          1       12      1.10      0.899        1.47       0.804
+#> 1 serie… season          1       12      1.11      0.897        1.44       0.816
 #> # ℹ 5 more variables: shift_Q50 <dbl>, shift_Q2.5 <dbl>, shift_Q97.5 <dbl>,
 #> #   prob_earlier <dbl>, prob_later <dbl>
 
