@@ -27,6 +27,11 @@ navbar:
       - text: Joint species distribution models
         href: cheatsheets/jsdgam_cheatsheet.pdf
 
+news:
+  releases:
+  - text: "mvgam 2.0.0"
+    href: https://ecogambler.netlify.app/blog/mvgam-2/
+
 articles:
 - title: Getting started
   navbar: ~
