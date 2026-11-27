@@ -1,6 +1,7 @@
 ---
 title: "Forecast evaluation in mvgam"
 author: "Nicholas J Clark"
+description: "Score and compare the forecasts of Bayesian time series models in R with proper scoring rules, using mvgam and observations held out of the fit."
 date: "2026-11-27"
 output:
   rmarkdown::html_document:

@@ -1,6 +1,7 @@
 ---
 title: "One latent process, several observation models"
 author: "Nicholas J Clark"
+description: "Fit several observation models to one latent process in R with mvgam. Every monitoring method then informs a single estimate of abundance."
 date: "2026-11-27"
 output:
   rmarkdown::html_document:

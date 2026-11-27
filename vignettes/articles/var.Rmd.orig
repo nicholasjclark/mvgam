@@ -1,6 +1,7 @@
 ---
 title: "State-space vector autoregressions with mvgam"
 author: "Nicholas J Clark"
+description: "Fit State-Space vector autoregressions to multivariate time series in R with mvgam, with impulse responses and variance decompositions."
 date: "`r Sys.Date()`"
 output:
   rmarkdown::html_document:

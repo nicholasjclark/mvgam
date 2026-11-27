@@ -1,6 +1,7 @@
 ---
 title: "Hierarchical vector autoregressions with mvgam"
 author: "Nicholas J Clark"
+description: "Fit hierarchical panel vector autoregressions in R with mvgam, sharing dynamics across groups such as countries while each group keeps its own."
 date: "`r Sys.Date()`"
 output:
   rmarkdown::html_document:

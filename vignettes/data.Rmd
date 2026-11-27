@@ -1,6 +1,7 @@
 ---
 title: "Formatting data for mvgam"
 author: "Nicholas J Clark"
+description: "Format data for mvgam in R: long format with one row per series and time, missing values, factor levels and forecast data."
 date: "`r Sys.Date()`"
 output:
   rmarkdown::html_vignette:

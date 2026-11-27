@@ -1,6 +1,7 @@
 ---
 title: "N-mixture models with mvgam"
 author: "Nicholas J Clark"
+description: "Fit N-mixture models in R with mvgam to separate abundance from imperfect detection in repeated counts, including dynamic abundance over time."
 date: "2026-11-27"
 output:
   rmarkdown::html_document:

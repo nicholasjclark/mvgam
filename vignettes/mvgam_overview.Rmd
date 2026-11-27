@@ -1,6 +1,7 @@
 ---
 title: "Overview of the mvgam package"
 author: "Nicholas J Clark"
+description: "An overview of mvgam, an R package for Bayesian State-Space models that pairs a brms observation model with a latent dynamic process."
 date: "`r Sys.Date()`"
 output:
   rmarkdown::html_vignette:

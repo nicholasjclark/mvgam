@@ -1,6 +1,7 @@
 ---
 title: "Joint species distribution models with mvgam"
 author: "Nicholas J Clark"
+description: "Fit joint species distribution models in R with mvgam, using latent factors for residual species correlations and ordination."
 date: "`r Sys.Date()`"
 output:
   rmarkdown::html_document:

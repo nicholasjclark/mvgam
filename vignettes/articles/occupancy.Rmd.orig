@@ -1,6 +1,7 @@
 ---
 title: "Occupancy models with mvgam"
 author: "Nicholas J Clark"
+description: "Fit multi-season occupancy models in R with mvgam for species detected imperfectly, with covariates on occupancy and detection."
 date: "`r Sys.Date()`"
 output:
   rmarkdown::html_document:

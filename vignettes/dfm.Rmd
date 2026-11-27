@@ -1,6 +1,7 @@
 ---
 title: "Dynamic factor models"
 author: "Nicholas J Clark"
+description: "Fit dynamic factor models in R with mvgam, where a few latent trends drive many observed time series."
 date: "`r Sys.Date()`"
 output:
   rmarkdown::html_vignette:
