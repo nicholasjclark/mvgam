@@ -65,8 +65,8 @@ Enhances:
     gratia (>= 0.9.0)
 SystemRequirements: Stan (>= 2.36.0 for simplex multi-response
   families `diri()`, `multi()`, `categ()`; >= 2.26.0 otherwise).
-  Install via `cmdstanr::install_cmdstan()` or rstan from
-  `https://mc-stan.org/r-packages/`.
-Additional_repositories: https://mc-stan.org/r-packages/
+  Install via rstan or `cmdstanr::install_cmdstan()`. cmdstanr
+  installs from `https://stan-dev.r-universe.dev/`.
+Additional_repositories: https://stan-dev.r-universe.dev/
 LinkingTo: Rcpp, RcppArmadillo
 VignetteBuilder: knitr
