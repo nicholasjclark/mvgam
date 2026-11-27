@@ -34,9 +34,11 @@ rbeta_nb_mvgam <- function(n, mu, shape, mtail) {
 dbeta_nb_mvgam <- function(x, mu, shape, mtail, log = FALSE) {
   alpha <- 1 + mtail
   beta <- mu * mtail / shape
-  out <- lgamma(x + shape) - lgamma(x + 1) - lgamma(shape) +
-    lbeta(beta + x, alpha + shape) - lbeta(beta, alpha)
-  out[!is.na(x) & x < 0] <- -Inf
+  x_safe <- x
+  x_safe[!is.na(x) & (!is.finite(x) | x < 0)] <- 0
+  out <- lgamma(x_safe + shape) - lgamma(x_safe + 1) - lgamma(shape) +
+    lbeta(beta + x_safe, alpha + shape) - lbeta(beta, alpha)
+  out[!is.na(x) & (!is.finite(x) | x < 0 | x != floor(x))] <- -Inf
   if (log) out else exp(out)
 }
 
@@ -46,7 +48,8 @@ dbeta_nb_mvgam <- function(x, mu, shape, mtail, log = FALSE) {
 # p(k+1)/p(k) = (r+k)(beta+k) / ((k+1)(alpha+beta+r+k)),
 # which is exact for counts and avoids re-evaluating log-gamma at every
 # step. All arguments recycle. Every element steps together up to the
-# largest quantile. A quantile below zero has no mass.
+# largest finite quantile. A quantile below zero has no mass; an
+# infinite upper quantile has mass one.
 pbeta_nb_mvgam <- function(q, mu, shape, mtail, lower.tail = TRUE,
                            log.p = FALSE) {
   n <- max(length(q), length(mu), length(shape), length(mtail))
@@ -58,17 +61,20 @@ pbeta_nb_mvgam <- function(q, mu, shape, mtail, lower.tail = TRUE,
   beta <- mu * mtail / shape
   lp <- dbeta_nb_mvgam(0, mu, shape, mtail, log = TRUE)
   acc <- lp
-  k_max <- if (all(is.na(q))) 0 else max(q, na.rm = TRUE)
+  fin <- !is.na(q) & is.finite(q) & q >= 0
+  k_max <- if (any(fin)) max(q[fin]) else 0
   k <- 0
   while (k < k_max) {
-    step <- !is.na(q) & k < q
+    step <- fin & k < q
     lp[step] <- lp[step] + log(shape[step] + k) + log(beta[step] + k) -
       log(k + 1) - log(alpha[step] + beta[step] + shape[step] + k)
     acc[step] <- log_add_exp(acc[step], lp[step])
     k <- k + 1
   }
   acc[!is.na(q) & q < 0] <- -Inf
+  acc[!is.na(q) & q == Inf] <- 0
   acc[is.na(q)] <- NA_real_
+  acc <- pmin(acc, 0)
   if (!lower.tail) {
     acc <- log1mexp(-acc)
   }
