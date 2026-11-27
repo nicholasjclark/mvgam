@@ -1,3 +1,5 @@
+# mvgam (development version)
+
 # mvgam 2.0.0
 
 mvgam now builds its models through 'brms'. The observation model takes the full 'brms' formula syntax. `trend_formula` specifies the latent process. Most 1.1.x code needs rewriting. Start with `vignette("mvgam_overview")` and `vignette("data")`. The [articles](https://nicholasjclark.github.io/mvgam/articles/) work through each model class.
