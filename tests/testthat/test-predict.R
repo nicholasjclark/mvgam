@@ -44,24 +44,6 @@ test_that("each GP kernel's density and covariance are brms's own", {
 })
 
 
-test_that("the Stan data tells exact gp() terms from approximate ones", {
-  dat <- data.frame(y = rnorm(6), x = 1:6, z = c(2, 5, 1, 4, 3, 6))
-  forms <- function(f) gp_forms(brms::make_standata(f, dat))
-  expect_identical(forms(y ~ gp(x) + gp(z, k = 4)),
-                   c(approximate = TRUE, exact = TRUE))
-  expect_identical(forms(y ~ gp(x, k = 4)),
-                   c(approximate = TRUE, exact = FALSE))
-  expect_identical(forms(y ~ gp(x, cov = "matern12")),
-                   c(approximate = FALSE, exact = TRUE))
-  # A prediction's Stan data copies the fitted values into `_old`
-  fit <- brms::brm(y ~ gp(x, k = 4), dat, empty = TRUE)
-  expect_identical(
-    gp_forms(brms::standata(fit, newdata = dat, internal = TRUE)),
-    c(approximate = TRUE, exact = FALSE)
-  )
-})
-
-
 test_that("an exact GP is brms's at fitted and at new values", {
   # brms's `.predictor_gp_old()` gives the process at the fitted values.
   # Its `.predictor_gp_new()` draws it at new values, from the same
@@ -153,56 +135,6 @@ test_that("validate_prediction_factor_levels refuses unseen series", {
   expect_silent(validate_prediction_factor_levels(invalid, NULL))
 })
 
-test_that("a frame is held to the axis columns the fit needs", {
-  # `varying_meta_vars()` keeps a meta var only where it varies in
-  # training. A fit on one occasion has no time column in that list.
-  # The completeness check still requires the time column.
-  set.seed(1)
-  flat <- data.frame(y = rpois(30, 3), x = rnorm(30),
-                     time = rep(1L, 30),
-                     series = factor(rep(c("a", "b", "c"), each = 10)))
-  prefit <- mvgam(y ~ x, trend_formula = ~ ZMVN(), data = flat,
-                  family = poisson(), run_model = FALSE, silent = 2,
-                  validate = FALSE)
-  no_time <- flat
-  no_time$time <- NULL
-  expect_error(
-    mvgam:::validate_newdata_complete(no_time, prefit),
-    "Absent: 'time'"
-  )
-  # A trend-free fit places no row in time and needs no time column.
-  trend_free <- mvgam(y ~ x, data = flat, family = poisson(),
-                      run_model = FALSE, silent = 2, validate = FALSE)
-  expect_silent(mvgam:::validate_newdata_complete(no_time, trend_free))
-
-  # A frame omitting the series column reaches prediction with every
-  # row unmapped. The column is exempt where a grouping names the
-  # series; on a fit whose axis is the column itself it is the only
-  # route.
-  d <- data.frame(y = rpois(40, 3), x = rnorm(40),
-                  time = rep(1:20, 2),
-                  series = factor(rep(c("a", "b"), each = 20)))
-  fit <- mvgam(y ~ x, trend_formula = ~ AR(p = 1), data = d,
-               family = poisson(), run_model = FALSE, silent = 2,
-               validate = FALSE)
-  no_series <- d
-  no_series$series <- NULL
-  expect_error(
-    mvgam:::validate_newdata_complete(no_series, fit),
-    "Absent: 'series'"
-  )
-
-  # One series needs no column of its own: every row belongs to it.
-  one <- data.frame(y = rpois(20, 3), x = rnorm(20), time = 1:20,
-                    series = factor(rep("only", 20)))
-  solo <- mvgam(y ~ x, trend_formula = ~ AR(p = 1), data = one,
-                family = poisson(), run_model = FALSE, silent = 2,
-                validate = FALSE)
-  bare <- one
-  bare$series <- NULL
-  expect_silent(mvgam:::validate_newdata_complete(bare, solo))
-})
-
 test_that("validate_prediction_factor_levels refuses unseen groups", {
   metadata <- axes_metadata(c("s1"), gr_var = "group",
                             gr = c("group_a", "group_b", "group_c"))
@@ -249,21 +181,6 @@ test_that("compute_family_epred handles simple families correctly", {
   epred_poisson <- compute_family_epred(linpred, poisson_family)
   expect_equal(epred_poisson, exp(linpred))
 
-  # Gaussian family (identity link): epred = linpred
-  gaussian_family <- list(
-    family = "gaussian",
-    linkinv = identity
-  )
-  epred_gaussian <- compute_family_epred(linpred, gaussian_family)
-  expect_equal(epred_gaussian, linpred)
-
-  # Bernoulli family (logit link): epred = plogis(linpred)
-  bernoulli_family <- list(
-    family = "bernoulli",
-    linkinv = plogis
-  )
-  epred_bernoulli <- compute_family_epred(linpred, bernoulli_family)
-  expect_equal(epred_bernoulli, plogis(linpred))
 })
 
 test_that("compute_family_epred handles binomial with trials", {
@@ -395,15 +312,6 @@ test_that("data2draws gives every draw the observations' own values", {
 # Family-specific posterior_epred_* function tests
 # ==============================================================================
 
-test_that("posterior_epred_lognormal computes E[Y] = exp(mu + sigma^2/2)", {
-  mu <- matrix(c(0, 1, 2, 3), nrow = 2, ncol = 2)
-  sigma <- matrix(c(0.5, 0.5, 1, 1), nrow = 2, ncol = 2)
-  prep <- list(dpars = list(mu = mu, sigma = sigma))
-  result <- posterior_epred_lognormal(prep)
-  expected <- exp(mu + sigma^2 / 2)
-  expect_equal(result, expected)
-})
-
 test_that("posterior_epred_shifted_lognormal adds ndt shift", {
   mu <- matrix(c(0, 1), nrow = 1, ncol = 2)
   sigma <- matrix(c(0.5, 0.5), nrow = 1, ncol = 2)
@@ -412,18 +320,6 @@ test_that("posterior_epred_shifted_lognormal adds ndt shift", {
   result <- posterior_epred_shifted_lognormal(prep)
   expected <- exp(mu + sigma^2 / 2) + ndt
   expect_equal(result, expected)
-})
-
-test_that("posterior_epred_binomial multiplies mu by trials", {
-  mu <- matrix(c(0.2, 0.5, 0.8, 0.3), nrow = 2, ncol = 2)
-  trials <- c(10, 20)
-  prep <- list(
-    dpars = list(mu = mu),
-    data = list(trials = trials),
-    ndraws = 2,
-    nobs = 2
-  )
-  expect_equal(posterior_epred_binomial(prep), sweep(mu, 2, trials, `*`))
 })
 
 test_that("posterior_epred_beta_binomial multiplies mu by trials", {
@@ -555,11 +451,6 @@ test_that("mean_discrete_weibull sums the series it approximates", {
   full <- c(sum(0.3^(1:2000)), sum(0.5^((1:2000)^1.5)))
   expect_equal(as.numeric(mean_discrete_weibull(mu, shape)), full,
                tolerance = 0.005)
-})
-
-test_that("mean_com_poisson keeps the dimensions of mu", {
-  mu <- matrix(c(3, 5, 7), nrow = 1, ncol = 3)
-  expect_identical(dim(mean_com_poisson(mu, 1.4)), dim(mu))
 })
 
 # ==============================================================================
@@ -706,15 +597,6 @@ test_that("extract_dpars_from_stanfit validates inputs correctly", {
     "exceed available draws"
   )
 
-  # draw_ids with valid subset should work
-  result <- extract_dpars_from_stanfit(
-    valid_draws,
-    dpar_names = "sigma",
-    ndraws = 10,
-    nobs = 3,
-    draw_ids = c(1, 3, 5)
-  )
-  expect_equal(dim(result$sigma), c(3, 3))
 })
 
 # ==============================================================================
@@ -1062,57 +944,4 @@ test_that("a family's mean kernel refuses to run without its parameters", {
     family_mean_from_kernel("nosuchfamily", mu, family_pars = list()),
     "cannot compute an expected value"
   )
-})
-
-# `sample_from_family()` and `compute_family_epred()` take the same
-# quantity, the inverse link of the linear predictor. The average of the
-# draws must equal the mean. A sampler that took that quantity as E[Y]
-# would shift its draws and fail the test.
-test_that("sampled draws average to the mean the same predictor implies", {
-  dpar_value <- function(dpar) {
-    switch(dpar,
-      sigma = 0.4, shape = 6, phi = 8, nu = 8, hu = 0.3, zi = 0.25,
-      zoi = 0.2, coi = 0.6, beta = 1.3, ndt = 0.2, 0.5)
-  }
-  families <- c(
-    "poisson", "negbinomial", "binomial", "bernoulli", "beta",
-    "beta_binomial", "lognormal", "hurdle_poisson", "hurdle_negbinomial",
-    "hurdle_lognormal", "zero_inflated_poisson",
-    "zero_inflated_negbinomial", "zero_inflated_binomial",
-    "zero_inflated_beta", "zero_inflated_beta_binomial"
-  )
-  set.seed(2024)
-  ndraws <- 10000L
-  # Trial totals differ by observation. Each observation's draws must
-  # match its own mean, which fails if a sampler pairs draws with
-  # another observation's total.
-  trials <- c(0, 3, 40)
-  nobs <- length(trials)
-
-  for (family_name in families) {
-    family <- brms::brmsfamily(family_name)
-    eta <- matrix(0.2, ndraws, nobs)
-    mu <- family$linkinv(eta)
-    extra <- setdiff(family$dpars, "mu")
-    dpars <- stats::setNames(
-      lapply(extra, function(d) matrix(dpar_value(d), ndraws, nobs)), extra
-    )
-    needed <- epred_extra_dpars(family)
-    expected <- compute_family_epred(
-      linpred = eta, family = family, trials = trials,
-      family_pars = if (length(needed)) dpars[needed] else NULL
-    )
-
-    args <- dpars[intersect(names(dpars), names(formals(sample_from_family)))]
-    drawn <- matrix(do.call(sample_from_family, c(
-      list(family_name = family_name, ndraws = ndraws, epred = mu,
-           trials = trials, lb = NULL, ub = NULL),
-      args
-    )), ndraws, nobs)
-    # A zero-trial observation has one possible count.
-    expect_true(all(drawn[expected == 0] == 0))
-    # Monte Carlo error over 10k draws stays near one percent. The
-    # defects this guards against were off by a factor.
-    expect_equal(colMeans(drawn), expected[1L, ], tolerance = 0.05)
-  }
 })

@@ -19,9 +19,16 @@ Work happens on `feature/brms-integration`. Use `gh` for GitHub.
 
 - No test errors or warnings and no `document()` warnings. Trace every warning
   to its cause. Never mute it with `suppressWarnings()`.
-- Tests never use `try()`, `tryCatch()` or `skip()`. `skip_on_cran()` may gate
-  a heavy sweep whose core cases still run on CRAN. The CI suite stays under
+- Tests never use `try()`, `tryCatch()` or `skip()`. The CI suite stays under
   10 minutes.
+- A test that builds a model (`stancode()`, `standata()`, `mvgam()`,
+  `jsdgam()`, `update()`, `brms::brm()`, `get_prior()`) or runs for 0.2 s or
+  more goes in `tests/testthat/test-extra-<topic>.R`. That file opens with
+  `skip_on_cran()` and holds no other skip. Helpers that it and
+  `test-<topic>.R` share go in `helper-<topic>.R`. CRAN runs the rest, under
+  40 s on Linux. One assembly costs 0.6 s on Linux and 1.5 s on win-builder.
+- Only a win-builder R-devel run proves CRAN's check time. A local or GitHub
+  runner time does not.
 - CI tests never fit Stan models or depend on cached fixtures. Fits live in
   `tests/local/`.
 - Never patch package code with wrappers, placeholders or `tryCatch()` to make

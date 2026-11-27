@@ -321,22 +321,6 @@ test_that("constructors fail-fast on malformed trend_map shapes", {
 
 # ---- The map on the constructor ------------------------
 
-test_that("a constructor's trend_map reaches the Stan data", {
-  set.seed(1L)
-  d <- data.frame(
-    series = factor(rep(c("a", "b", "c"), each = 10L)),
-    time = rep(1:10, 3L),
-    y = rpois(30L, 5)
-  )
-  tm <- data.frame(series = factor(c("a", "b", "c")),
-                   trend = c(1L, 1L, 2L))
-  prefit <- mvgam(
-    y ~ 1, trend_formula = ~ AR(p = 1, trend_map = tm), data = d,
-    family = poisson(), run_model = FALSE, validate = FALSE
-  )
-  expect_equal(unname(prefit$standata$Z),
-               matrix(c(1, 1, 0, 0, 0, 1), nrow = 3L))
-})
 
 test_that("a top-level trend_map points to the trend constructor", {
   # The map belongs on the constructor, which also takes `n_lv`

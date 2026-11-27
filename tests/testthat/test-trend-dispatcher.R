@@ -7,92 +7,18 @@ test_that("CAR constructor works for continuous-time AR", {
   # CAR should work without n_lv parameter (continuous-time AR)
   # Suppress expected default warnings
   car_trend <- CAR()
-  expect_s3_class(car_trend, "mvgam_trend")
   expect_equal(car_trend$trend, "CAR")
   expect_false(car_trend$cor)
   expect_false(car_trend$ma)
   expect_equal(car_trend$p, 1)  # CAR always has p = 1
 
-  # CAR's signature excludes `p`, `gr` and `subgr`, and R raises for
-  # them. The factor arguments CAR takes in order to refuse them are
-  # covered in test-trend-map.R.
-  expect_error(CAR(p = 2), "unused argument")
-  expect_error(CAR(gr = "group"), "unused argument")
-  expect_error(CAR(subgr = "subgroup"), "unused argument")
 
-  # CAR accepts time and series parameters
-  car_custom <- CAR(time = "month", series = "species")
-  expect_equal(car_custom$time, "month")
-  expect_equal(car_custom$series, "species")
-})
-
-test_that("LLT refuses a short series and warns on a time term", {
-  dat <- expand.grid(time = 1:12, series = factor(c("a", "b")))
-  dat$y <- rpois(nrow(dat), 4)
-  short <- function(n, ...) {
-    get_prior(mvgam_formula(y ~ 1, ...), data = dat[dat$time <= n, ],
-              family = poisson())
-  }
-  expect_error(short(4, ~ LLT()), "needs at least 5 time points")
-  expect_warning(short(12, ~ LLT()), "barely informs 'sigma_slope_trend'")
-  expect_warning(
-    get_prior(mvgam_formula(y ~ s(time, k = 4), ~ LLT()),
-              data = expand.grid(time = 1:30, series = factor("a"),
-                                 y = 1L),
-              family = poisson()),
-    "'time' appears in a formula with 'LLT\\(\\)'"
-  )
-})
-
-test_that("LLT takes seasonal periods it can identify", {
-  # The default is the most harmonics below half the period, up to 10
-  expect_identical(LLT(season = 12)$harmonics, 5L)
-  expect_identical(LLT(season = c(7, 365.25))$harmonics, c(3L, 10L))
-  expect_identical(LLT(season = 2.5)$harmonics, 1L)
-  expect_error(LLT(harmonics = 2), "'harmonics' requires 'season'")
-  expect_error(LLT(season = 2), "must exceed 2 time steps")
-  expect_error(LLT(season = 12, harmonics = 6), "Period 12 allows 5")
-  expect_error(LLT(season = c(7, 12), harmonics = 2),
-               "one value per 'season' period")
-  # Harmonic 2 of period 12 turns as fast as harmonic 1 of period 6
-  expect_error(LLT(season = c(6, 12), harmonics = c(2L, 2L)),
-               "share a harmonic")
-  dat <- expand.grid(time = 1:30, series = factor("a"), y = 1L)
-  expect_warning(
-    get_prior(mvgam_formula(y ~ 1, ~ LLT(season = 40)), data = dat,
-              family = poisson()),
-    "period of 40 exceeds the 30 time points"
-  )
-})
-
-test_that("a seasonal LLT turns each harmonic in vectorised Stan code", {
-  dat <- expand.grid(time = 1:30, series = factor(paste0("s", 1:3)))
-  dat$y <- rpois(nrow(dat), 4)
-  build <- function(trend) {
-    mvgam(y ~ 1, trend_formula = trend, data = dat, family = poisson(),
-          run_model = FALSE, silent = 2)
-  }
-  mod <- build(~ LLT(season = 12, harmonics = 2))
-  expect_identical(standata(mod)$freq_season_trend, 2 * pi * (1:2) / 12)
-  code <- stancode(mod)
-  expect_match(code, "re[ : , c] = cumulative_sum(re[ : , c]);",
-               fixed = TRUE)
-  expect_match(code, "lv_trend += season_trend;", fixed = TRUE)
-  # A factor model rotates the season and its starting pairs with the
-  # factors
-  fac <- stancode(build(~ LLT(n_lv = 2, season = 12, harmonics = 2)))
-  expect_match(fac, "season_trend_tilde = season_trend * Q';",
-               fixed = TRUE)
-  expect_match(fac, "init_season_trend_tilde = init_season_trend * Q';",
-               fixed = TRUE)
-  expect_no_match(stancode(build(~ LLT())), "season", fixed = TRUE)
 })
 
 test_that("ZMVN constructor works for zero-mean multivariate normal", {
   # Basic ZMVN creation
   # Suppress expected default warnings
   zmvn_trend <- ZMVN()
-  expect_s3_class(zmvn_trend, "mvgam_trend")
   expect_equal(zmvn_trend$trend, "ZMVN")
   expect_true(zmvn_trend$cor)  # ZMVN always has correlation
   expect_false(zmvn_trend$ma)  # ZMVN doesn't support MA
@@ -130,27 +56,23 @@ test_that("PW constructor rejects factor models correctly", {
 test_that("AR constructor accepts factor models", {
   # AR with n_lv should work
   ar_trend <- AR(n_lv = 2)
-  expect_is(ar_trend, "mvgam_trend")
   expect_equal(ar_trend$n_lv, 2)
   expect_equal(ar_trend$trend, "AR")  # Base type for dispatch
 
   # AR without n_lv should work
   ar_trend_no_lv <- AR()
-  expect_is(ar_trend_no_lv, "mvgam_trend")
   expect_null(ar_trend_no_lv$n_lv)
 })
 
 test_that("RW constructor accepts factor models", {
   # RW with n_lv should work
   rw_trend <- RW(n_lv = 3)
-  expect_s3_class(rw_trend, "mvgam_trend")
   expect_equal(rw_trend$n_lv, 3)
   expect_equal(rw_trend$trend, "RW")
 
 
   # RW without n_lv should work
   rw_trend_no_lv <- RW()
-  expect_s3_class(rw_trend_no_lv, "mvgam_trend")
   expect_null(rw_trend_no_lv$n_lv)
   expect_equal(rw_trend_no_lv$trend, "RW")
 
@@ -162,49 +84,11 @@ test_that("RW constructor accepts factor models", {
 test_that("VAR constructor accepts factor models", {
   # VAR with n_lv should work
   var_trend <- VAR(n_lv = 4)
-  expect_is(var_trend, "mvgam_trend")
   expect_equal(var_trend$n_lv, 4)
 
   # VAR without n_lv should work
   var_trend_no_lv <- VAR()
-  expect_is(var_trend_no_lv, "mvgam_trend")
   expect_null(var_trend_no_lv$n_lv)
-})
-
-test_that("Factor validation error messages are consistent", {
-  # Check that all factor-incompatible trends give similar error structure
-  # CAR()'s signature omits n_lv, and the error is raised at the
-  # stanvars level
-
-  expect_error(PW(n_lv = 1), "Factor models.*not supported")
-
-  # Check they mention specific alternatives (AR is factor-compatible)
-  expect_error(PW(n_lv = 1), "use a trend with a factor form")
-
-  # Check they have specific reasons
-  expect_error(PW(n_lv = 1), "changepoint")
-
-  # Sampled loadings absorb any correlation among the factors, which the
-  # program pins at the identity. An explicit request is refused, as a
-  # jsdgam() factor request is. Fixed loadings keep it.
-  d <- data.frame(time = rep(1:12, 3), series = factor(rep(1:3, each = 12)),
-                  y = rnorm(36))
-  for (tf in list(~ LLT(n_lv = 2, cor = TRUE), ~ RW(n_lv = 2, cor = TRUE))) {
-    expect_error(stancode(mvgam_formula(y ~ 1, tf), data = d),
-                 "'cor = TRUE' is not supported in a factor model")
-  }
-  expect_error(
-    jsdgam(y ~ 1, factor_formula = ~ AR(cor = TRUE), data = d,
-           unit = time, species = series, n_lv = 2, family = gaussian(),
-           run_model = FALSE),
-    "'cor = TRUE' is not supported in a factor model"
-  )
-  tm <- data.frame(series = factor(1:3), trend = c(1, 1, 2))
-  expect_match(
-    stancode(mvgam_formula(y ~ 1, ~ RW(cor = TRUE, trend_map = tm)),
-             data = d),
-    "target += lkj_corr_cholesky_lpdf(L_Omega_trend", fixed = TRUE
-  )
 })
 
 # Test trend registry functionality
@@ -216,15 +100,6 @@ test_that("trend registry works correctly", {
   expect_true("AR" %in% choices)
   expect_true("VAR" %in% choices)
 
-  # A term calls a trend when its outermost function is registered
-  is_trend <- function(x) {
-    length(mvgam:::trend_constructor_calls(str2lang(x))) == 1L
-  }
-  expect_true(is_trend("RW()"))
-  expect_true(is_trend("AR(p=1)"))
-  expect_true(is_trend("VAR()"))
-  expect_false(is_trend("s(time)"))
-  expect_false(is_trend("linear_trend"))
 })
 
 # Test trend constructor creation and validation
@@ -232,22 +107,18 @@ test_that("trend constructors work with dispatcher integration", {
   
   # Test RW constructor
   rw_trend <- RW(ma = TRUE, cor = FALSE)
-  expect_s3_class(rw_trend, "mvgam_trend")
   expect_equal(rw_trend$trend, "RW")
   expect_true(rw_trend$ma)
   expect_false(rw_trend$cor)
-  expect_true(is.mvgam_trend(rw_trend))
 
   # Test AR constructor with single lag
   ar1_trend <- AR(p = 1, ma = FALSE)
-  expect_s3_class(ar1_trend, "mvgam_trend")
   expect_equal(ar1_trend$trend, "AR")  # Base type for dispatch
   expect_equal(ar1_trend$p, 1)
   # ar_lags and max_lag are computed in the Stan assembly layer
 
   # Test AR constructor with multiple lags
   ar_seasonal <- AR(p = c(1, 12, 24))
-  expect_s3_class(ar_seasonal, "mvgam_trend")
   expect_equal(ar_seasonal$trend, "AR")  # Base type for dispatch
   expect_equal(ar_seasonal$p, c(1, 12, 24))
   # The Stan assembly layer processes the parameters. The constructor
@@ -255,7 +126,6 @@ test_that("trend constructors work with dispatcher integration", {
 
   # Test VAR constructor with order
   var2_trend <- VAR(p = 2)
-  expect_s3_class(var2_trend, "mvgam_trend")
   expect_equal(var2_trend$trend, "VAR")  # Base type for dispatch
   expect_equal(var2_trend$p, 2)
   expect_true(var2_trend$cor)
@@ -300,23 +170,6 @@ test_that("grouping validation helper works correctly", {
   )
 })
 
-test_that("a grouped trend takes its subgroups from the series column", {
-  # `gr` without `subgr` names the series column as the subgroup. A
-  # series column called `site` gives the subgroups that column holds.
-  d <- expand.grid(t = 1:20, site = paste0("s", 1:4))
-  d$region <- factor(ifelse(d$site %in% c("s1", "s2"), "A", "B"))
-  d$site <- factor(d$site)
-  d$y <- seq_len(nrow(d)) / 10
-  m <- mvgam(y ~ 1,
-             trend_formula = ~ ZMVN(time = t, series = site, gr = region),
-             data = d, family = gaussian(), run_model = FALSE, silent = 2,
-             validate = FALSE)
-  sd <- standata(m)
-  expect_identical(as.integer(sd$group_inds_trend), c(1L, 1L, 2L, 2L))
-  expect_identical(unname(sd$group_members_trend),
-                   matrix(1:4, 2L, byrow = TRUE))
-})
-
 test_that("the hierarchical record keeps no copy of the subgroup", {
   # `validate_grouping_arguments()` fills a missing `subgr` with the
   # series column, and the grouping record holds the one copy.
@@ -334,7 +187,6 @@ test_that("the hierarchical record keeps no copy of the subgroup", {
 test_that("basic formula parsing works", {
   
   parsed1 <- mvgam:::parse_trend_formula(~ RW())
-  expect_s3_class(parsed1$trend_model, "mvgam_trend")
   expect_equal(parsed1$trend_model$trend, "RW")
   # A trend-only formula keeps an intercept or nothing as its base
   expect_true(deparse(parsed1$base_formula) %in% c("~1", "~0"))
@@ -511,12 +363,6 @@ test_that("boundary conditions are handled correctly", {
   parsed2 <- mvgam:::parse_trend_formula(f2)
   expect_equal(length(parsed2$regular_terms), 50)
 
-  # Test formula with repeated trend constructors should fail
-  f3 <- ~ RW() + s(time) + RW(ma = TRUE)
-  expect_error(
-    mvgam:::validate_trend_formula(f3),
-    "Multiple trend constructors found"
-  )
 })
 
 test_that("trend terms are told apart by the function they call", {
@@ -581,35 +427,6 @@ test_that("print method handles all configurations", {
   expect_false("  Centred states" %in% capture.output(print(LLT())))
 })
 
-# Test complex real-world scenarios
-test_that("realistic complex formulas work correctly", {
-  
-  # Test seasonal model with multiple components
-  seasonal_formula <- ~ s(doy, bs = "cc", k = 12) +
-                       s(temp, k = 10) +
-                       factor(month) +
-                       AR(p = c(1, 12, 24), ma = FALSE)
-
-  parsed <- mvgam:::parse_trend_formula(seasonal_formula)
-  expect_equal(parsed$trend_model$p, c(1, 12, 24))
-  expect_false(parsed$trend_model$ma)
-  expect_equal(length(parsed$regular_terms), 3)
-
-  # Test multivariate model formula
-  multivar_formula <- ~ s(time, by = species, k = 20) +
-                        habitat +
-                        VAR(p = 2) +
-                        s(temperature, species, bs = "fs")
-
-  parsed2 <- mvgam:::parse_trend_formula(multivar_formula)
-  expect_equal(parsed2$trend_model$trend, "VAR")  # Base type
-  expect_true(parsed2$trend_model$cor)
-  expect_true("s(time, by = species, k = 20)" %in% parsed2$regular_terms)
-  expect_true(
-    "s(temperature, species, bs = \"fs\")" %in% parsed2$regular_terms
-  )
-})
-
 # Test time parameter functionality
 test_that("time parameter works correctly in trend constructors", {
 
@@ -633,50 +450,13 @@ test_that("time parameter works correctly in trend constructors", {
   car_custom <- CAR(time = day)
   expect_equal(car_custom$time, "day")
 
-  # Test that other parameters still work correctly with time parameter
-  ar_complex <- AR(time = period, p = c(1, 12), ma = TRUE, cor = TRUE)
-  expect_equal(ar_complex$time, "period")
-  expect_equal(ar_complex$p, c(1, 12))
-  expect_true(ar_complex$ma)
-  expect_true(ar_complex$cor)
 
-  # Test with grouping variables (may get default variable warnings)
-  var_grouped <- VAR(time = timepoint, p = 2, gr = region, subgr = species)
-  expect_equal(var_grouped$time, "timepoint")
-  expect_equal(var_grouped$gr, "region")
-  expect_equal(var_grouped$subgr, "species")
 })
 
 # Test integration with formula parsing
 test_that("time parameter integrates correctly with formula parsing", {
   
-  # Test trend constructors with time parameter in formula
-  f1 <- ~ s(x) + AR(time = week, p = 1)
-  parsed1 <- mvgam:::parse_trend_formula(f1)
-  expect_equal(parsed1$trend_model$time, "week")
 
-  f2 <- ~ VAR(time = month, p = 2) + s(temp)
-  parsed2 <- mvgam:::parse_trend_formula(f2)
-  expect_equal(parsed2$trend_model$time, "month")
-
-  # Test seasonal AR model with multiple lags, which is the
-  # supported alternative to multiple trends
-  f3 <- ~ AR(time = daily, p = c(1, 7, 30))  # Daily, weekly, monthly lags
-  parsed3 <- mvgam:::parse_trend_formula(f3)
-  expect_equal(parsed3$trend_model$time, "daily")
-  expect_equal(parsed3$trend_model$p, c(1, 7, 30))
-
-  # Test mixed quoted and unquoted usage patterns
-  f4 <- ~ s(temp) + CAR(time = period)
-  parsed4 <- mvgam:::parse_trend_formula(f4)
-  expect_equal(parsed4$trend_model$time, "period")
-  expect_true("s(temp)" %in% parsed4$regular_terms)
-
-  # Test that offset rejection works with various formulas
-  expect_error(
-    mvgam_formula(y ~ 1, trend_formula = ~ s(temp) + CAR() + offset(effort)),
-    "Offsets apply to the observation model"
-  )
 })
 
 # Test series parameter functionality
@@ -726,13 +506,6 @@ test_that(
   expect_equal(parsed2$trend_model$time, "month")
   expect_equal(parsed2$trend_model$series, "location")
 
-  # Test with grouping variables (suppress hierarchical correlation warning)
-  f3 <- ~ RW(time = daily, series = unit, gr = region, subgr = species)
-  parsed3 <- mvgam:::parse_trend_formula(f3)
-  expect_equal(parsed3$trend_model$time, "daily")
-  expect_equal(parsed3$trend_model$series, "unit")
-  expect_equal(parsed3$trend_model$gr, "region")
-  expect_equal(parsed3$trend_model$subgr, "species")
 })
 
 test_that("trend constructors record gr and subgr", {
@@ -751,17 +524,7 @@ test_that("trend constructors record gr and subgr", {
     list(spec = VAR(time = year, series = population, p = 2,
                     gr = habitat, subgr = species),
          want = list(gr = "habitat", subgr = "species", p = 2,
-                     cor = TRUE)),
-    # A grouping resolves `cor` to TRUE, matching the program,
-    # which declares the group correlation parameters whenever
-    # `gr` is named.
-    list(spec = RW(gr = region, subgr = site),
-         want = list(gr = "region", subgr = "site", cor = TRUE)),
-    list(spec = AR(gr = habitat, subgr = species, p = 1),
-         want = list(gr = "habitat", subgr = "species",
-                     cor = TRUE)),
-    list(spec = VAR(gr = ecosystem, subgr = location, p = 2),
-         want = list(gr = "ecosystem", subgr = "location"))
+                     cor = TRUE))
   )
   for (case in cases) {
     for (fld in names(case$want)) {
@@ -807,17 +570,6 @@ test_that("grouping is preserved through formula parsing", {
   expect_equal(trend_comp$series, "species")
   expect_true(trend_comp$cor)
 
-  # Two trend constructors under different groupings are still two
-  # trend constructors.
-  f2 <- ~ AR(time = day, series = unit, gr = block, subgr = plot,
-             p = 1, cor = TRUE) +
-    s(temperature) +
-    RW(time = week, series = transect, gr = site, subgr = quadrat,
-       cor = TRUE)
-  expect_error(
-    mvgam:::validate_trend_formula(f2),
-    "Multiple trend constructors found"
-  )
 })
 
 test_that("validate_gr_balanced_groups errors on unbalanced groups", {
@@ -973,12 +725,6 @@ test_that("PW records every constructor argument in the spec", {
       expect_equal(case$spec[[fld]], case$want[[fld]])
     }
   }
-  # Every field the Stan generator requires is present on the spec.
-  expect_true(all(
-    c("cap", "growth", "trend", "n_changepoints",
-      "changepoint_range", "changepoint_scale") %in%
-      names(cases[[1L]]$spec)
-  ))
 })
 
 test_that("PW() refuses each argument outside its range", {

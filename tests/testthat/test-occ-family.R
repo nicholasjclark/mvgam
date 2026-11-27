@@ -45,23 +45,6 @@ test_that(
   expect_null(attr(fam, "mvgam_stanvars", exact = TRUE))
 })
 
-# ------------------------------------------------------------
-# validate_closure_unit_data() binary-response branch
-# ------------------------------------------------------------
-
-make_occ_data <- function(n_unit = 5, n_visit = 4, seed = 1) {
-  set.seed(seed)
-  n_total <- n_unit * n_visit
-  data.frame(
-    series = factor(rep(seq_len(n_unit), each = n_visit)),
-    time   = rep(1L, n_total),
-    visit  = rep(seq_len(n_visit), n_unit),
-    y      = rbinom(n_total, 1L, 0.4),
-    elev   = rep(rnorm(n_unit), each = n_visit),
-    tod    = stats::runif(n_total)
-  )
-}
-
 test_that(
   "validate_closure_unit_data() treats cap as optional for occ", {
   d <- make_occ_data()
@@ -133,37 +116,6 @@ test_that(
   expect_true(all(arrs$Y_max %in% c(0L, 1L)))
   expect_identical(arrs$N_unit, 3L)
   expect_identical(arrs$n_rep, rep(4L, 3))
-})
-
-# ------------------------------------------------------------
-# Stancode + standata emission via the mvgam_formula pipeline
-# ------------------------------------------------------------
-
-test_that(
-  "stancode() for occ emits the occ_lpmf signature and omits K_max", {
-  d <- make_occ_data()
-  mf <- mvgam_formula(bf(y ~ elev, p ~ tod))
-  sc <- as.character(stancode(mf, data = d, family = occ(), validate = FALSE))
-  sd <- standata(mf, data = d, family = occ())
-  # The vector density and the overload brms calls for a scalar p
-  expect_match(
-    sc, "real occ_lpmf\\(\\s*array\\[\\] int y,\\s*vector mu,\\s*vector p,"
-  )
-  expect_match(sc, "rep_vector\\(p, N\\)")
-  # target += occ_lpmf(Y | mu, p, N_unit, n_rep, Y_max, visit_idx)
-  expect_match(sc, "occ_lpmf\\(Y \\| mu, p, N_unit, n_rep, Y_max, visit_idx\\)")
-  # K_max is absent for occ (binary latent state, no truncation).
-  expect_false("K_max" %in% names(sd))
-  expect_true(all(c("N_unit", "n_rep", "Y_max", "visit_idx") %in% names(sd)))
-  expect_true(all(sd$Y_max %in% c(0L, 1L)))
-})
-
-test_that(
-  "stancode for occ declares scalar p in (0, 1) when p is unmodelled", {
-  d <- make_occ_data()
-  mf <- mvgam_formula(y ~ elev)
-  sc <- as.character(stancode(mf, data = d, family = occ(), validate = FALSE))
-  expect_match(sc, "real<lower=0, ?upper=1> p;")
 })
 
 # ------------------------------------------------------------

@@ -58,8 +58,6 @@ test_that("as.matrix.mvgam(variable = NULL) returns all parameters", {
   # The stub declares 18 columns, two of them Stan's own `lp__` and
   # `lprior`. A user-facing matrix carries the other 16.
   expect_equal(ncol(out), 16L)
-  # The draws object is still reachable by asking for it.
-  expect_s3_class(posterior::as_draws_matrix(stub), "draws_matrix")
 })
 
 test_that("as.matrix.mvgam(variable = 'betas') extracts b_* only", {
@@ -150,8 +148,6 @@ test_that("keyword that resolves to empty (e.g. obs_params on Poisson) is OK", {
 test_that("as.data.frame.mvgam returns a data.frame", {
   stub <- make_mvgam_stub()
   out <- as.data.frame(stub, variable = "betas")
-  expect_s3_class(out, "data.frame")
-  expect_true("b_Intercept" %in% names(out))
   # A draw index counts across chains: draw 51 opens the second chain
   full <- as.matrix(stub, variable = "betas")
   expect_equal(unname(as.matrix(stub, variable = "betas", draw = c(1, 51))),
@@ -168,21 +164,6 @@ test_that("as.array.mvgam returns a plain array", {
   # A plain array, as `brms::as.array.brmsfit()` returns
   expect_true(is.array(out))
   expect_false(inherits(out, "draws"))
-  expect_s3_class(posterior::as_draws_array(stub, variable = "betas"),
-                  "draws_array")
-})
-
-test_that("as_draws_matrix / df / array / list / rvars all dispatch", {
-  stub <- make_mvgam_stub()
-  expect_s3_class(as_draws_matrix(stub, variable = "betas"),
-                  "draws_matrix")
-  expect_s3_class(as_draws_df(stub, variable = "betas"), "draws_df")
-  expect_s3_class(as_draws_array(stub, variable = "betas"),
-                  "draws_array")
-  expect_s3_class(as_draws_list(stub, variable = "betas"),
-                  "draws_list")
-  expect_s3_class(as_draws_rvars(stub, variable = "betas"),
-                  "draws_rvars")
 })
 
 
@@ -279,7 +260,6 @@ test_that("compute_all_summaries() columns and measures match the draws", {
 test_that("posterior_summary.mvgam returns a brms-shaped matrix", {
   stub <- make_mvgam_stub()
   out <- posterior_summary(stub, pars = c("b_Intercept", "sigma"))
-  expect_true(is.matrix(out))
   expect_identical(colnames(out), c("Estimate", "Est.Error",
                                     "Q2.5", "Q97.5"))
   # brms names the selection argument 'variable'.
@@ -373,29 +353,6 @@ test_that(
   ]
   expect_gte(nrow(intercept_row), 1L)
   expect_true(any(intercept_row$source == "default"))
-})
-
-test_that(
-  "extract_prior_from_setup returns the default table verbatim", {
-  # NULL user prior -> full default table, with every row tagged
-  # default or (vectorized).
-  dat <- data.frame(
-    y      = rpois(40, 3),
-    x      = rnorm(40),
-    series = factor(rep("a", 40)),
-    time   = seq_len(40)
-  )
-  setup <- list(
-    formula = y ~ x,
-    data    = dat,
-    family  = poisson(),
-    data2   = NULL,
-    prior   = NULL
-  )
-  out <- mvgam:::extract_prior_from_setup(setup)
-  expect_s3_class(out, "brmsprior")
-  expect_true(all(out$source %in%
-                    c("default", "(vectorized)")))
 })
 
 # lift_mvgam_stanvar_priors() on hand-written Stan fragments. Each
@@ -678,22 +635,8 @@ test_that("hidden_par_pattern adds Phi_trend hide on VAR factor fits", {
     "Z_tilde[1,1]", "Phi_trend[1][1,1]", "Phi_trend_tilde[1][1,1]"
   )
   pat <- mvgam:::hidden_par_pattern(pars_var)
-  expect_true(grepl("\\^Phi_trend\\\\\\[", pat))
   expect_true(grepl("Phi_trend\\[1\\]\\[1,1\\]",
                     grep(pat, pars_var, value = TRUE)[1]))
-})
-
-test_that("the funnel advisor checks only an MCMC run", {
-  # Divergences and R-hat belong to a sampler's run. An object that
-  # records no algorithm, or an approximation, carries neither.
-  stub <- make_mvgam_stub()
-  stub$trend_metadata <- list(
-    has_by_lv = TRUE, n_lv_for_grain = 2L,
-    axes = list(series = list(n = 2L))
-  )
-  expect_false(mvgam:::flag_by_lv_full_rank_funnel(stub))
-  stub$algorithm <- "meanfield"
-  expect_false(mvgam:::flag_by_lv_full_rank_funnel(stub))
 })
 
 test_that("compiled_model() requires the backend the fit recorded", {

@@ -1,3 +1,6 @@
+# The tests of test-prefit-surface.R that assemble a model or run for
+# 0.2 s or more. CRAN skips this file. CI and local runs take it.
+skip_on_cran()
 # What a `run_model = FALSE` stub gives the caller.
 #
 # A prefit carries the program, its data, the formula and the axis

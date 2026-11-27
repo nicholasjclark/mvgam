@@ -318,7 +318,7 @@ test_that("a variational fit reports its algorithm alone", {
   # brms records arguments a method never takes as zero-length values
   stub <- structure(
     list(
-      fit = methods::new("stanfit", stan_args = list(list(
+      fit = methods::new(stanfit_class(), stan_args = list(list(
         method = "variational", algorithm = "meanfield",
         iter = integer(0), warmup = NULL,
         control = list(adapt_delta = NULL, max_treedepth = NULL)
@@ -344,7 +344,7 @@ test_that("the recorded thread count is reported where the program threads", {
   # cmdstanr records `num_threads` whether or not the program threads
   stub <- structure(
     list(
-      fit = methods::new("stanfit", stan_args = list(list(
+      fit = methods::new(stanfit_class(), stan_args = list(list(
         method = "sample", num_threads = "4", iter = 2000, warmup = 1000
       ))),
       backend = "cmdstanr",

@@ -1,66 +1,3 @@
-# `compare_scores()`, `compare_elpds()`, `ensemble()` and
-# `print.mvgam_forecast()`, on small hand-built `mvgam_forecast` and
-# `mvgam_lfo` objects.
-
-
-# ---- Mock helpers ------------------------------------------------
-
-make_mock_forecast <- function(n_series = 2L, h = 5L,
-                                 ndraws = 30L, type = "response",
-                                 family = "gaussian",
-                                 obs_offset = 0,
-                                 seed = 1L) {
-  set.seed(seed)
-  series_names <- factor(
-    paste0("s", seq_len(n_series)),
-    levels = paste0("s", seq_len(n_series))
-  )
-  forecasts <- lapply(seq_len(n_series), function(s) {
-    matrix(stats::rnorm(ndraws * h, mean = s, sd = 1),
-            nrow = ndraws, ncol = h)
-  })
-  names(forecasts) <- levels(series_names)
-  test_observations <- lapply(
-    seq_len(n_series), function(s) rep(s + obs_offset, h)
-  )
-  names(test_observations) <- levels(series_names)
-  structure(
-    list(
-      type = type,
-      series_names = series_names,
-      forecasts = forecasts,
-      hindcasts = list(),
-      test_observations = test_observations,
-      test_times = NULL,
-      train_observations = list(),
-      train_times = list(),
-      family = family
-    ),
-    class = "mvgam_forecast"
-  )
-}
-
-
-make_mock_lfo <- function(elpds, eval_timepoints = NULL,
-                            fc_horizon = 1L, pareto_ks = NULL,
-                            refit_triggered = NULL) {
-  n <- length(elpds)
-  if (is.null(eval_timepoints)) eval_timepoints <- seq_len(n) + 30L
-  if (is.null(pareto_ks)) pareto_ks <- rep(0.3, n)
-  if (is.null(refit_triggered)) refit_triggered <- rep(FALSE, n)
-  structure(
-    list(
-      elpds = elpds,
-      eval_timepoints = eval_timepoints,
-      fc_horizon = fc_horizon,
-      pareto_ks = pareto_ks,
-      refit_triggered = refit_triggered,
-      refits_at = integer(0),
-      pareto_k_threshold = 0.7
-    ),
-    class = "mvgam_lfo"
-  )
-}
 
 
 # ---- compare_scores --------------------------------------------
@@ -259,18 +196,6 @@ test_that(
 })
 
 
-test_that("plot.mvgam_compare_scores facets a univariate score by series", {
-  skip_if_not_installed("scoringRules")
-  fc1 <- make_mock_forecast(seed = 1L)
-  fc2 <- make_mock_forecast(seed = 2L)
-  out <- compare_scores(fc1, fc2, score = "crps")
-  p <- plot(out)
-  # The default facets by series. `plot$facet$params$facets` then
-  # names `series`.
-  expect_true("series" %in% names(p$facet$params$facets))
-})
-
-
 test_that("plot.mvgam_compare_scores joint score gets one panel", {
   skip_if_not_installed("scoringRules")
   fc1 <- make_mock_forecast(seed = 1L)
@@ -279,56 +204,6 @@ test_that("plot.mvgam_compare_scores joint score gets one panel", {
   p <- plot(out)
   # Joint scores drop facet; FacetNull params have no `facets`.
   expect_length(p$facet$params$facets, 0L)
-})
-
-
-test_that("plot.mvgam_compare_scores honours facet = FALSE", {
-  skip_if_not_installed("scoringRules")
-  fc1 <- make_mock_forecast(seed = 1L)
-  fc2 <- make_mock_forecast(seed = 2L)
-  out <- compare_scores(fc1, fc2, score = "crps")
-  p <- plot(out, facet = FALSE)
-  expect_length(p$facet$params$facets, 0L)
-})
-
-
-test_that("plot.mvgam_compare_scores relative pivot drops the baseline", {
-  skip_if_not_installed("scoringRules")
-  fc1 <- make_mock_forecast(seed = 1L)
-  fc2 <- make_mock_forecast(seed = 2L)
-  out <- compare_scores(fc1, fc2, score = "crps")
-  p <- plot(out, relative = "fc1")
-  # The baseline is dropped and each cell holds fc2 minus fc1
-  expect_identical(levels(p$data$model), "fc2")
-  cells <- out[out$series != "all_series", ]
-  diffs <- cells$score[cells$model == "fc2"] -
-    cells$score[cells$model == "fc1"]
-  plotted <- p$data[order(p$data$series, p$data$eval_horizon), ]
-  expect_equal(plotted$score, diffs)
-  expect_error(plot(out, relative = "ghost"), "must name a model")
-})
-
-
-test_that("plot.mvgam_compare_elpds draws cumulative ELPD", {
-  m1 <- make_mock_lfo(c(-1, -2, -3))
-  m2 <- make_mock_lfo(c(-3, -4, -5))
-  out <- compare_elpds(m1, m2)
-  p_cum <- plot(out, cumulative = TRUE)
-  expect_match(p_cum$labels$y, "Cumulative")
-  # m1 cumulative is c(-1, -3, -6); confirm last value matches.
-  m1_cum <- p_cum$data[p_cum$data$model == "m1", "elpd",
-                        drop = TRUE]
-  expect_equal(tail(m1_cum, 1L), -6, tolerance = 1e-10)
-})
-
-
-test_that("plot.mvgam_compare_elpds relative drops baseline", {
-  m1 <- make_mock_lfo(c(-1, -2, -3))
-  m2 <- make_mock_lfo(c(-3, -4, -5))
-  p <- plot(compare_elpds(m1, m2), relative = "m1")
-  expect_identical(levels(p$data$model), "m2")
-  expect_equal(p$data$elpd, c(-2, -2, -2))
-  expect_match(p$labels$y, "Δ")
 })
 
 

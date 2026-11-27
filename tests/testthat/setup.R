@@ -25,6 +25,13 @@ expect_range <- function(object, lower = -Inf, upper = Inf, ...) {
 SM <- suppressMessages
 SW <- suppressWarnings
 
+# The `stanfit` class, which rstan defines. `methods::new("stanfit")`
+# finds it only after some earlier file has loaded rstan. Naming the
+# namespace loads rstan, one of mvgam's Imports, in any file order.
+stanfit_class <- function() {
+  methods::getClass("stanfit", where = asNamespace("rstan"))
+}
+
 # A warning raised with `rlang::warn(.frequency = "once")` is shown
 # once per R session. A second `devtools::test()` in one session
 # meets a cache already set. An `expect_warning()` on such a warning

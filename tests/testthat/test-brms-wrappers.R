@@ -1,42 +1,6 @@
 # The methods of brms and rstantools generics, on stub fits. Their
 # agreement with brms on real fits is checked in tests/local/.
 
-
-make_wrapper_stub <- function(with_re = FALSE) {
-  varnames <- c(
-    "b_Intercept", "b_x", "Intercept", "sigma",
-    if (with_re) c("sd_grp__Intercept", "r_grp[a,Intercept]") else NULL,
-    "lp__"
-  )
-  set.seed(2L)
-  arr <- array(
-    rnorm(50L * 2L * length(varnames)),
-    dim = c(50L, 2L, length(varnames)),
-    dimnames = list(NULL, NULL, varnames)
-  )
-  drws <- posterior::as_draws_array(arr)
-  std <- list(N = 8L, X = matrix(rnorm(16L), 8L, 2L,
-                                  dimnames = list(NULL,
-                                                  c("Intercept", "x"))))
-  if (with_re) {
-    std$M_1 <- 1L
-    std$N_1 <- 1L
-  }
-  form <- if (with_re) brms::bf(y ~ x + (1 | grp)) else brms::bf(y ~ x)
-  structure(
-    list(
-      fit = drws,
-      formula = form,
-      data = data.frame(y = rnorm(8L), x = rnorm(8L),
-                         grp = factor("a")),
-      family = brms::brmsfamily("gaussian"),
-      standata = std
-    ),
-    class = "mvgam"
-  )
-}
-
-
 # ---- Signature parity ----------------------------------------------
 
 test_that("each method takes every argument its brmsfit method takes", {
@@ -69,16 +33,6 @@ test_that("ngrps.mvgam returns NULL on a no-RE fit", {
 
 
 # ---- Aliasing semantics on wrappers --------------------------------
-
-test_that("posterior_interval.mvgam respects pars / variable / prob", {
-  stub <- make_wrapper_stub()
-  # The brms default `prob = 0.95`
-  expect_identical(colnames(posterior_interval(stub)), c("2.5%", "97.5%"))
-  expect_identical(colnames(posterior_interval(stub, prob = 0.5)),
-                   c("25%", "75%"))
-  expect_identical(rownames(posterior_interval(stub, variable = "b_x")),
-                   "b_x")
-})
 
 
 test_that("posterior_interval pars alias falls back to variable", {

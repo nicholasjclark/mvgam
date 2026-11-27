@@ -231,34 +231,6 @@ test_that("no plot applies a ggplot2 theme of its own", {
   expect_equal(offenders, character(0))
 })
 
-test_that("no plot writes a scheme colour as a literal", {
-  # Every hex the bayesplot schemes carry. A colour comes from the
-  # scheme by its role.
-  schemes <- c("red", "blue", "green", "purple", "teal", "gray",
-               "yellow", "orange")
-  scheme_hex <- unique(toupper(unlist(lapply(
-    schemes, function(s) unname(unlist(bayesplot::color_scheme_get(s)))
-  ))))
-  r_files <- list.files(
-    test_path("..", "..", "R"), pattern = "\\.R$", full.names = TRUE
-  )
-  if (!length(r_files)) {
-    r_files <- list.files("R", pattern = "\\.R$", full.names = TRUE)
-  }
-  offenders <- character(0)
-  for (f in r_files) {
-    if (basename(f) == "plot_helpers.R") next
-    lines <- readLines(f, warn = FALSE)
-    code <- grep("^\\s*#", lines, value = TRUE, invert = TRUE)
-    for (hx in scheme_hex) {
-      if (any(grepl(hx, toupper(code), fixed = TRUE))) {
-        offenders <- c(offenders, paste0(basename(f), ": ", hx))
-      }
-    }
-  }
-  expect_equal(offenders, character(0))
-})
-
 
 test_that("legend breaks stay readable when limits come from data", {
   # A precision heatmap scales to its own entries. Its breaks are

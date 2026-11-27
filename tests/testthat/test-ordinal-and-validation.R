@@ -251,18 +251,6 @@ test_that("thresholds that vary by group cut each row by its own set", {
                                       brms::cumulative())[, 1, ]), 0))
 })
 
-test_that("thresholds that vary by group build", {
-  set.seed(5)
-  d <- data.frame(
-    y = sample(1:4, 40, TRUE), x = stats::rnorm(40),
-    g = factor(rep(c("u", "v"), 20)),
-    time = rep(1:20, 2), series = factor(rep(c("a", "b"), each = 20))
-  )
-  code <- stancode(mvgam_formula(y | thres(gr = g) ~ x), data = d,
-                   family = cumulative(), validate = FALSE)
-  expect_match(code, "merged_Intercept", fixed = TRUE)
-})
-
 
 # -------------------------------------------------------------------------
 # Link inverses
@@ -334,12 +322,6 @@ test_that("loo_compare.mvgam: criterion + incl_dynamics live after `...`", {
   expect_true(length(dots_idx) == 1L)
   expect_gt(which(fmls == "criterion"), dots_idx)
   expect_gt(which(fmls == "incl_dynamics"), dots_idx)
-})
-
-test_that("pp_check.mvgam: resp + draw_ids are accepted (brms parity)", {
-  fmls <- names(formals(getS3method("pp_check", "mvgam")))
-  expect_true("resp" %in% fmls)
-  expect_true("draw_ids" %in% fmls)
 })
 
 

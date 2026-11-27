@@ -1,30 +1,3 @@
-# Tests for the closure-unit pp_check helpers. Structural coverage
-# of the `closure_unit_pp_check_setup()` aggregation hook and
-# the `refuse_unit_varying()` group / x validator;
-# end-to-end MCMC integration on the cached occ fixture lives in
-# tests/local/test-closure-unit-pp-check.R.
-
-# Helpers shared with the residuals tests.
-make_pp_check_grid <- function(n_unit = 4L, n_visit = 3L,
-                                seed = 17L) {
-  set.seed(seed)
-  n_total <- n_unit * n_visit
-  data.frame(
-    series = factor(rep(seq_len(n_unit), each = n_visit)),
-    time   = rep(1L, n_total),
-    visit  = rep(seq_len(n_visit), n_unit),
-    y      = sample(c(0L, 1L), n_total, replace = TRUE),
-    elev   = rep(rnorm(n_unit), each = n_visit),
-    tod    = stats::runif(n_total)
-  )
-}
-
-mock_pp_check_object <- function(data, family = occ()) {
-  structure(
-    list(data = data, formula = y ~ 1, family = family),
-    class = "mvgam"
-  )
-}
 
 # ------------------------------------------------------------
 # closure_unit_pp_check_setup(): aggregates per-visit y / yrep to
@@ -76,29 +49,6 @@ test_that(
 })
 
 # ------------------------------------------------------------
-# Closure-unit pp_check type validation: per-row scatter and
-# fitted-vs-residual types are blocked because they do not match
-# the closure-unit grain.
-# ------------------------------------------------------------
-
-test_that(
-  "pp_check.mvgam blocks closure-unit-incompatible types with a pointer", {
-  d <- make_pp_check_grid()
-  obj <- mock_pp_check_object(d)
-  blocked <- c("scatter_avg", "scatter_avg_grouped",
-               "error_scatter_avg", "error_scatter_avg_vs_x",
-               "error_binned",
-               "resid_acf", "resid_pacf", "resid_vs_fitted",
-               "resid_ribbon", "resid_ribbon_grouped")
-  for (t in blocked) {
-    expect_error(
-      pp_check(obj, type = t),
-      "not supported for\\s+closure-unit"
-    )
-  }
-})
-
-# ------------------------------------------------------------
 # Unit-constant validator: per-visit covariates passed to
 # `group =` or `x =` must be constant within every closure
 # unit. The fixture `tod` varies within a unit; `elev` does not.
@@ -125,39 +75,6 @@ test_that("refuse_unit_varying() refuses only a per-visit covariate", {
     refuse_unit_varying_predictors(d, arrays, occ(),
                                    list(mu = y ~ elev, p = p ~ tod))
   )
-})
-
-# ------------------------------------------------------------
-# pp_check(type = "fit_stat"): chi-squared / Freeman-Tukey
-# discrepancy GOF (Gelman et al. 1996). The discrepancy compares a
-# unit's aggregated visits against their aggregated expectation, so
-# it is offered to the families that aggregate rather than to every
-# family sharing the closure-unit pipeline. The math is small and
-# tested directly: chi-squared at y == E[y] is zero, and the F-T
-# form is scale-equivariant under shared sqrt.
-# ------------------------------------------------------------
-
-test_that("pp_check(type = 'fit_stat') is refused where no unit aggregates", {
-  stub <- function(fam) {
-    d <- data.frame(y = rnorm(10L), x = rnorm(10L),
-                    series = factor(rep(1L, 10L)),
-                    time = seq_len(10L))
-    structure(list(data = d, formula = y ~ x, family = fam),
-              class = "mvgam")
-  }
-  expect_error(
-    pp_check(stub(gaussian()), type = "fit_stat"),
-    "applies to the detection"
-  )
-  # These five share the closure-unit layout but never sum the rows of
-  # a unit. A composition's rows sum to one whatever the fit says. The
-  # discrepancy then has nothing to test.
-  for (fam in list(diri(), multi(), categ(), mvn(), mvt())) {
-    expect_error(
-      pp_check(stub(fam), type = "fit_stat"),
-      "one observation per row"
-    )
-  }
 })
 
 test_that("mvgam_ppc_fit_stat print names the direction of a far p-value", {
