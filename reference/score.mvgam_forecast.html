@@ -259,7 +259,7 @@ compares models by their scores at each horizon.</p>
 <span class="r-in"><span>             data <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span>,</span></span>
 <span class="r-in"><span>             family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>             chains <span class="op">=</span> <span class="fl">2</span>, seed <span class="op">=</span> <span class="fl">3</span>, silent <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 53 of 2000 (3.0%) transitions ended with a divergence.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 103 of 2000 (5.0%) transitions ended with a divergence.</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> See https://mc-stan.org/misc/warnings for details.</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Forecast the held-out times, then score each series</span></span></span>
@@ -267,12 +267,12 @@ compares models by their scores at each horizon.</p>
 <span class="r-in"><span><span class="va">sc</span> <span class="op">&lt;-</span> <span class="fu">score</span><span class="op">(</span><span class="va">fc</span>, score <span class="op">=</span> <span class="st">"drps"</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">sc</span><span class="op">$</span><span class="va">series_1</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>       score in_interval interval_width eval_horizon score_type</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1 11.731359           0            0.9            1       drps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2  6.692346           1            0.9            2       drps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3  5.115161           0            0.9            3       drps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4  4.976637           1            0.9            4       drps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 5 33.065510           0            0.9            5       drps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 6  3.045878           1            0.9            6       drps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1 11.753521           0            0.9            1       drps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2  6.451015           1            0.9            2       drps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3  4.978820           0            0.9            3       drps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4  4.782506           1            0.9            4       drps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5 32.767567           0            0.9            5       drps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6  3.016403           1            0.9            6       drps</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># The DRPS summed over series at each forecast horizon</span></span></span>
 <span class="r-in"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://ggplot2.tidyverse.org" class="external-link">ggplot2</a></span><span class="op">)</span></span></span>
@@ -286,12 +286,12 @@ compares models by their scores at each horizon.</p>
 <span class="r-in"><span><span class="co"># A joint score of both series at each horizon</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="fu">score</span><span class="op">(</span><span class="va">fc</span>, score <span class="op">=</span> <span class="st">"energy"</span><span class="op">)</span><span class="op">$</span><span class="va">all_series</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>       score eval_horizon score_type</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1 10.922544            1     energy</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2 10.396461            2     energy</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3  5.222400            3     energy</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4  5.711729            4     energy</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 5 32.739767            5     energy</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 6  3.351500            6     energy</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1 10.874835            1     energy</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2 10.294140            2     energy</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3  5.121168            3     energy</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4  5.596065            4     energy</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5 32.457764            5     energy</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6  3.319619            6     energy</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Next: compare_scores() ranks several models by one rule</span></span></span>
 <span class="r-in"><span><span class="co"># }</span></span></span>

@@ -101,15 +101,15 @@ simdat <- sim_mvgam(family = poisson(), n_series = 1L,
 mod <- mvgam(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1),
              data = simdat$data_train, family = poisson(),
              chains = 2, silent = 2)
-#> Warning: 6 of 2000 (0.0%) transitions ended with a divergence.
+#> Warning: 8 of 2000 (0.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 
 # 90 percent intervals of the autoregression and its innovation SD
 posterior_interval(mod, variable = c("ar1_trend", "sigma_trend"),
                    prob = 0.9)
 #>                              5%       95%
-#> ar1_trend[series_1]   0.3159997 0.7854880
-#> sigma_trend[series_1] 0.3562363 0.6006447
+#> ar1_trend[series_1]   0.3124826 0.7833867
+#> sigma_trend[series_1] 0.3536349 0.5918526
 
 # Next: summary() reports these with convergence diagnostics
 # }

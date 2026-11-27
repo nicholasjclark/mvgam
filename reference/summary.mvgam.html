@@ -238,7 +238,7 @@ checks the fit against the data.
 <span class="r-in"><span>              data <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span>,</span></span>
 <span class="r-in"><span>              family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>              chains <span class="op">=</span> <span class="fl">2</span>, silent <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 6 of 2000 (0.0%) transitions ended with a divergence.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 8 of 2000 (0.0%) transitions ended with a divergence.</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> See https://mc-stan.org/misc/warnings for details.</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span></span>
@@ -253,21 +253,21 @@ checks the fit against the data.
 <span class="r-out co"><span class="r-pr">#&gt;</span> == Observation Model ==</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Smoothing Spline Hyperparameters:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>           Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> sds(sx_1)     5.08      2.16     2.33    10.95 1.00      820      918</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sds(sx_1)     5.03      1.93     2.50     9.93 1.00     1532     1174</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Regression Coefficients:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>           Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Intercept     1.63      0.14     1.35     1.92 1.00      962     1027</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> sx_1          8.52      2.20     4.26    12.83 1.00     1146     1419</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Intercept     1.64      0.14     1.37     1.93 1.00     1608     1220</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sx_1          8.51      2.16     4.26    12.86 1.00     1832     1687</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> == Trend Model ==</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Trend Specific Parameters:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>                       Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> sigma_trend[series_1]     0.47      0.07     0.34     0.62 1.01      638</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> ar1_trend[series_1]       0.56      0.14     0.28     0.82 1.00      443</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sigma_trend[series_1]     0.47      0.07     0.33     0.62 1.00      739</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ar1_trend[series_1]       0.57      0.14     0.27     0.83 1.00      621</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>                       Tail_ESS</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> sigma_trend[series_1]      908</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> ar1_trend[series_1]        730</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sigma_trend[series_1]     1260</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ar1_trend[series_1]        943</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Draws were sampled using sampling(NUTS). For each parameter, Bulk_ESS</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> and Tail_ESS are effective sample size measures, and Rhat is the potential</span>
@@ -283,11 +283,11 @@ checks the fit against the data.
 <span class="r-in"><span><span class="co"># Each block is a data frame, such as the trend's dynamics</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">mod</span><span class="op">)</span><span class="op">$</span><span class="va">trend_spec</span>, <span class="fl">2</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>                       Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> sigma_trend[series_1]     0.47      0.07     0.34     0.62 1.01   637.52</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> ar1_trend[series_1]       0.56      0.14     0.28     0.82 1.00   442.75</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sigma_trend[series_1]     0.47      0.07     0.33     0.62    1   738.69</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ar1_trend[series_1]       0.57      0.14     0.27     0.83    1   621.35</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>                       Tail_ESS</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> sigma_trend[series_1]   907.74</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> ar1_trend[series_1]     730.39</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sigma_trend[series_1]  1259.92</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ar1_trend[series_1]     942.58</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Next: pp_check(mod) compares draws from the model with the data</span></span></span>
 <span class="r-in"><span><span class="co"># }</span></span></span>

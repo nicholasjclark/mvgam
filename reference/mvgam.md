@@ -572,7 +572,7 @@ mod <- mvgam(
   chains        = 2,
   silent        = 2
 )
-#> Warning: 10 of 2000 (0.0%) transitions ended with a divergence.
+#> Warning: 12 of 2000 (1.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 summary(mod)
 #>  Family: poisson 
@@ -586,21 +586,21 @@ summary(mod)
 #> == Observation Model ==
 #> Smoothing Spline Hyperparameters:
 #>           Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> sds(sx_1)     4.22      1.90     1.66     8.98 1.01      646      844
+#> sds(sx_1)     4.17      1.82     1.69     8.91 1.00      728      972
 #> 
 #> Regression Coefficients:
 #>           Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> Intercept     1.54      0.15     1.25     1.83 1.01      706      881
-#> sx_1          7.21      2.84     1.37    12.74 1.00      694      909
+#> Intercept     1.55      0.15     1.25     1.85 1.00      673      763
+#> sx_1          7.15      2.80     1.66    12.44 1.00      598      932
 #> 
 #> == Trend Model ==
 #> Trend Specific Parameters:
 #>                       Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS
-#> sigma_trend[series_1]     0.53      0.09     0.38     0.72 1.00      511
-#> ar1_trend[series_1]       0.48      0.17     0.12     0.79 1.01      399
+#> sigma_trend[series_1]     0.53      0.09     0.37     0.72 1.00      416
+#> ar1_trend[series_1]       0.47      0.17     0.09     0.77 1.01      360
 #>                       Tail_ESS
-#> sigma_trend[series_1]      939
-#> ar1_trend[series_1]        716
+#> sigma_trend[series_1]      725
+#> ar1_trend[series_1]        676
 #> 
 #> Draws were sampled using sampling(NUTS). For each parameter, Bulk_ESS
 #> and Tail_ESS are effective sample size measures, and Rhat is the potential

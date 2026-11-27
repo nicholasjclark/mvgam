@@ -613,7 +613,7 @@ mod <- mvgam(
   chains        = 2,
   silent        = 2
 )
-#> Warning: 1 of 2000 (0.0%) transitions ended with a divergence.
+#> Warning: 2 of 2000 (0.0%) transitions ended with a divergence.
 #> See https://mc-stan.org/misc/warnings for details.
 summary(mod)
 #>  Family: poisson 
@@ -628,28 +628,28 @@ summary(mod)
 #> == Observation Model ==
 #> Smoothing Spline Hyperparameters:
 #>                Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> sds(sseason_1)     1.54      0.66     0.72     3.34 1.00      795      866
+#> sds(sseason_1)     1.52      0.68     0.69     3.44 1.00      923     1338
 #> 
 #> Regression Coefficients:
 #>           Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> Intercept     1.58      0.09     1.40     1.76 1.00     1184     1485
+#> Intercept     1.58      0.09     1.40     1.74 1.00     1739     1588
 #> 
 #> == Trend Model ==
 #> Trend Specific Parameters:
 #>                       Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS
-#> sigma_trend[series_1]     0.33      0.09     0.18     0.52 1.00      969
-#> sigma_trend[series_2]     0.47      0.12     0.25     0.74 1.00      827
-#> sigma_trend[series_3]     0.57      0.12     0.39     0.86 1.00      955
-#> ar1_trend[series_1]       0.58      0.22     0.08     0.91 1.01      473
-#> ar1_trend[series_2]       0.43      0.22     0.04     0.83 1.00      645
-#> ar1_trend[series_3]       0.18      0.14     0.01     0.53 1.00      943
+#> sigma_trend[series_1]     0.32      0.09     0.17     0.51 1.00      981
+#> sigma_trend[series_2]     0.47      0.12     0.26     0.73 1.00     1097
+#> sigma_trend[series_3]     0.57      0.12     0.38     0.83 1.00     1405
+#> ar1_trend[series_1]       0.60      0.21     0.12     0.92 1.00      681
+#> ar1_trend[series_2]       0.41      0.22     0.04     0.83 1.00      929
+#> ar1_trend[series_3]       0.18      0.15     0.01     0.54 1.00     1621
 #>                       Tail_ESS
-#> sigma_trend[series_1]     1214
-#> sigma_trend[series_2]     1220
-#> sigma_trend[series_3]     1280
-#> ar1_trend[series_1]        818
-#> ar1_trend[series_2]       1169
-#> ar1_trend[series_3]       1305
+#> sigma_trend[series_1]     1175
+#> sigma_trend[series_2]     1416
+#> sigma_trend[series_3]     1526
+#> ar1_trend[series_1]       1144
+#> ar1_trend[series_2]       1248
+#> ar1_trend[series_3]       1219
 #> 
 #> Draws were sampled using sampling(NUTS). For each parameter, Bulk_ESS
 #> and Tail_ESS are effective sample size measures, and Rhat is the potential
@@ -669,7 +669,7 @@ residual_cor(mod)
 #>   Source     : correlated innovations
 #>   Covariance : stationary
 #>   Series     : 3
-#>   Mean |r_ij| (i != j): 0.21 [0.07, 0.40]
+#>   Mean |r_ij| (i != j): 0.21 [0.06, 0.41]
 #>   Pairs with prob_nonzero > 0.95: 0 / 3
 
 # Residual checks. Each series has gaps of differing length. A
@@ -707,12 +707,12 @@ summary(mod_big)
 #> == Observation Model ==
 #> Regression Coefficients:
 #>           Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> Intercept     5.02      0.12     4.78     5.25 1.00      240      566
+#> Intercept     4.88      0.14     4.59     5.15 1.01      226      487
 #> 
 #> == Trend Model ==
 #> Trend Specific Parameters:
 #>                 Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> sigma_trend[s1]     0.10      0.02     0.07     0.13 1.00      551     1128
+#> sigma_trend[s1]     0.12      0.02     0.09     0.16 1.00      537      858
 #> 
 #> Draws were sampled using sampling(NUTS). For each parameter, Bulk_ESS
 #> and Tail_ESS are effective sample size measures, and Rhat is the potential
