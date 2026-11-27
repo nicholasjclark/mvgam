@@ -85,10 +85,13 @@ jobs:
         run: pkgdown::build_site_github_pages(lazy = TRUE, run_dont_run = TRUE, new_process = FALSE, install = FALSE)
         shell: Rscript {0}
 
+      # A clean deploy leaves gh-pages holding exactly this build. A page
+      # the package drops leaves the site with it, unless the site
+      # configuration redirects its old address.
       - name: Deploy to GitHub pages 🚀
         if: github.event_name != 'pull_request'
         uses: JamesIves/github-pages-deploy-action@v4.4.1
         with:
-          clean: false
+          clean: true
           branch: gh-pages
           folder: docs

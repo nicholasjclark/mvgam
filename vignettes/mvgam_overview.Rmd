@@ -406,6 +406,18 @@ how_to_cite(fit_ar)
   compares models with `score()` and `lfo_cv()` and combines them
   with `ensemble()`.
 
+Three blog posts work through related models with `mvgam`:
+
+- [Temporal autocorrelation in GAMs](https://ecogambler.netlify.app/blog/autocorrelated-gams/)
+  shows why smooths of time extrapolate poorly. A latent
+  autoregressive trend takes their place.
+- [Time-varying seasonality](https://ecogambler.netlify.app/blog/time-varying-seasonality/)
+  captures a seasonal pattern that changes over time, with tensor
+  products and Fourier terms.
+- [Distributed lags](https://ecogambler.netlify.app/blog/distributed-lags-mgcv/)
+  models delayed effects of temperature and vegetation greenness on
+  the same Portal rodent captures.
+
 ## References
 
 Bürkner, P.-C. (2017). brms: An R package for Bayesian

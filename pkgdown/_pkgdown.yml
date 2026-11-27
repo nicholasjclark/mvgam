@@ -29,6 +29,7 @@ navbar:
 
 articles:
 - title: Getting started
+  navbar: ~
   desc: >
     Prepare your data and fit a first state-space model.
   contents:
@@ -36,6 +37,7 @@ articles:
   - data
 
 - title: Latent dynamics
+  navbar: Latent dynamics
   desc: >
     Latent trends that model dependence over time. The articles also
     interpret a fitted trend.
@@ -45,6 +47,7 @@ articles:
   - dfm
 
 - title: Many responses, one process
+  navbar: Many responses, one process
   desc: >
     Sharing a latent state across outcomes measured on different
     scales, across species, and across survey protocols.
@@ -54,6 +57,7 @@ articles:
   - articles/idm
 
 - title: Imperfect detection
+  navbar: Imperfect detection
   desc: >
     Closure-unit families that separate what is there from what was
     seen.
@@ -62,6 +66,7 @@ articles:
   - articles/nmix
 
 - title: Evaluating forecasts
+  navbar: Evaluating forecasts
   desc: >
     Scoring rules, rolling-origin cross-validation and ensembles.
   contents:
@@ -298,3 +303,56 @@ reference:
     marginaleffects.
   contents:
   - reexports
+
+# Pages of mvgam 1.x, removed in 2.0, sent to their 2.0 equivalents.
+redirects:
+- [articles/data_in_mvgam.html, articles/data.html]
+- [articles/nmixtures.html, articles/nmix.html]
+- [articles/shared_states.html, articles/mvbf.html]
+- [articles/time_varying_effects.html, articles/mvgam_overview.html]
+- [articles/trend_formulas.html, articles/mvgam_overview.html]
+- [reference/add_residuals.html, reference/residuals.mvgam.html]
+- [reference/add_residuals.mvgam.html, reference/residuals.mvgam.html]
+- [reference/all_neon_tick_data.html, reference/index.html]
+- [reference/code.html, reference/stancode.mvgam_formula.html]
+- [reference/compare_mvgams.html, reference/score.mvgam_forecast.html]
+- [reference/drawDotmvgam.html, reference/conditional_smooths.mvgam.html]
+- [reference/draw.mvgam.html, reference/conditional_smooths.mvgam.html]
+- [reference/dynamic.html, reference/mvgam_use_cases.html]
+- [reference/eval_mvgam.html, reference/score.mvgam_forecast.html]
+- [reference/eval_smoothDothilbertDotsmooth.html, reference/conditional_smooths.mvgam.html]
+- [reference/eval_smoothDotmodDotsmooth.html, reference/conditional_smooths.mvgam.html]
+- [reference/eval_smoothDotmoiDotsmooth.html, reference/conditional_smooths.mvgam.html]
+- [reference/eval_smooth.hilbert.smooth.html, reference/conditional_smooths.mvgam.html]
+- [reference/eval_smooth.mod.smooth.html, reference/conditional_smooths.mvgam.html]
+- [reference/eval_smooth.moi.smooth.html, reference/conditional_smooths.mvgam.html]
+- [reference/evaluate_mvgams.html, reference/score.mvgam_forecast.html]
+- [reference/get_mvgam_priors.html, reference/get_prior.html]
+- [reference/GP.html, reference/mvgam_trend_specification.html]
+- [reference/gratia_mvgam_enhancements.html, reference/conditional_smooths.mvgam.html]
+- [reference/lv_correlations.html, reference/residual_cor.html]
+- [reference/monotonic.html, reference/mvgam_use_cases.html]
+- [reference/mvgam_formulae.html, reference/mvgam_formula.html]
+- [reference/mvgam_trends.html, reference/mvgam_trend_specification.html]
+- [reference/ordinate.jsdgam.html, reference/ordinate.html]
+- [reference/pipe.html, reference/reexports.html]
+- [reference/plot_mvgam_factors.html, reference/plot.mvgam.html]
+- [reference/plot_mvgam_fc.html, reference/plot.mvgam_forecast.html]
+- [reference/plot_mvgam_forecasts.html, reference/plot.mvgam_forecast.html]
+- [reference/plot_mvgam_pterms.html, reference/plot.mvgam.html]
+- [reference/plot_mvgam_randomeffects.html, reference/plot.mvgam.html]
+- [reference/plot_mvgam_resids.html, reference/plot.mvgam.html]
+- [reference/plot_mvgam_series.html, reference/plot.mvgam.html]
+- [reference/plot_mvgam_smooth.html, reference/plot.mvgam.html]
+- [reference/plot_mvgam_trend.html, reference/plot.mvgam.html]
+- [reference/plot_mvgam_uncertainty.html, reference/forecast_uncertainty.html]
+- [reference/ppc.html, reference/pp_check.mvgam.html]
+- [reference/ppc.mvgam.html, reference/pp_check.mvgam.html]
+- [reference/Predict.matrix.mod.smooth.html, reference/mvgam_use_cases.html]
+- [reference/Predict.matrix.moi.smooth.html, reference/mvgam_use_cases.html]
+- [reference/residual_cor.jsdgam.html, reference/residual_cor.html]
+- [reference/roll_eval_mvgam.html, reference/score.mvgam_forecast.html]
+- [reference/smooth.construct.mod.smooth.spec.html, reference/mvgam_use_cases.html]
+- [reference/smooth.construct.moi.smooth.spec.html, reference/mvgam_use_cases.html]
+- [reference/stancode.mvgam_prefit.html, reference/stancode.mvgam_formula.html]
+- [reference/standata.mvgam_prefit.html, reference/stancode.mvgam_formula.html]

@@ -533,6 +533,11 @@ Related articles:
 - [Formatting data](data.html)
   covers the long data format and `mvgam_data()`.
 
+The blog post
+[State-space vector autoregressions in mvgam](https://ecogambler.netlify.app/blog/vector-autoregressions/)
+fits a single VAR(1) to kestrel counts from three regions, with
+impulse responses, variance decompositions and stability measures.
+
 ## References
 
 Arel-Bundock V (2013). WDI: World Development Indicators and other

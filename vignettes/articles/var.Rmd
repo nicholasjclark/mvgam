@@ -607,6 +607,14 @@ Chapter 8 of the
 lab book fits multivariate autoregressive state-space models to the
 same Lake Washington plankton with MARSS.
 
+The blog post
+[State-space vector autoregressions in mvgam](https://ecogambler.netlify.app/blog/vector-autoregressions/)
+fits a VAR(1) with a Gamma observation model to American kestrel
+counts from three regions of British Columbia. It compares models
+with and without correlated process errors through `loo_compare()`,
+then computes impulse responses, variance decompositions and
+stability measures.
+
 ## References
 
 Arel-Bundock V, Greifer N and Heiss A (2024). How to interpret
