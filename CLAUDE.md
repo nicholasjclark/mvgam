@@ -99,6 +99,12 @@ stop(insight::format_error(c(
 ## Documentation
 
 - NEWS holds one line per change against the released 1.x.
+- The articles in `vignettes/articles/` are knitted locally. Edit
+  `<name>.Rmd.orig`, then run
+  `Rscript vignettes/articles/precompile.R <name>` and commit the
+  knitted `<name>.Rmd` with its `figures/`. Never edit a knitted
+  `.Rmd`. Re-knit every article before a release. The three CRAN
+  vignettes in `vignettes/` knit in CI.
 - Fitting examples stay in `\dontrun{}`. A few fast models may run unguarded.
 - `forecast()` propagates the fitted state. `posterior_predict()` marginalises
   over the trend. Docs keep the two apart.

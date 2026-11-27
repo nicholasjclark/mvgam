@@ -1,31 +1,16 @@
 ---
 title: "Joint species distribution models with mvgam"
 author: "Nicholas J Clark"
-date: "`r Sys.Date()`"
+date: "2026-11-27"
 output:
   rmarkdown::html_document:
     toc: yes
     toc_float: yes
 ---
 
-```{r, echo = FALSE}
-knitr::opts_chunk$set(
-  collapse = TRUE,
-  comment = "#>",
-  message = FALSE,
-  warning = FALSE
-)
-```
 
-```{r setup, include = FALSE}
-knitr::opts_chunk$set(
-  echo = TRUE, dpi = 100, fig.asp = 0.62, fig.width = 7,
-  out.width = "85%", fig.align = "center"
-)
-library(mvgam)
-library(ggplot2)
-theme_set(mvgam_theme(base_size = 12))
-```
+
+
 
 Joint species distribution models (JSDMs) assign the species
 co-occurrence that remains once the measured environment is accounted
@@ -54,7 +39,8 @@ at 30 sites, five environmental covariates and five species traits.
 Two traits are ordinal scores, which the code below converts to
 numbers. `jsdgam()` takes one row per site and species:
 
-```{r data}
+
+``` r
 data(antTraits, package = "mvabund")
 abund <- antTraits$abund
 # Restore the species names that make.names() mangled, such as
@@ -81,7 +67,8 @@ ant_data <- cbind(ant_data, env[ant_data$site, ])
 Because the variance of each species' counts rises well above its
 mean, the counts take a negative binomial family:
 
-```{r mean-variance, fig.cap = "Mean and variance of each species' counts on log1p axes. The dashed line marks the equality a Poisson family would imply."}
+
+``` r
 moments <- data.frame(
   mean = tapply(ant_data$counts, ant_data$species, mean),
   var = tapply(ant_data$counts, ant_data$species, var)
@@ -94,12 +81,18 @@ ggplot(moments, aes(mean, var)) +
   labs(x = "Mean count", y = "Variance of counts")
 ```
 
+<div class="figure" style="text-align: center">
+<img src="figures/jsdgam-mean-variance-1.png" alt="Mean and variance of each species' counts on log1p axes. The dashed line marks the equality a Poisson family would imply." width="85%" />
+<p class="caption">Mean and variance of each species' counts on log1p axes. The dashed line marks the equality a Poisson family would imply.</p>
+</div>
+
 ## Latent factors alone
 
 The first model leaves all structure among species to two latent
 factors. `factor_formula = ~ -1` puts no covariates on the factors:
 
-```{r mod-base}
+
+``` r
 mod_base <- jsdgam(
   counts ~ 1,
   factor_formula = ~ -1,
@@ -115,21 +108,19 @@ mod_base <- jsdgam(
 `ordinate()` draws the posterior medians of the site scores and the
 species loadings as a biplot:
 
-```{r ordinate-base, fig.asp = 0.85, fig.cap = "Biplot of the site scores (numbered points) and species loadings (arrows) from the model with latent factors alone."}
+
+``` r
 ordinate(mod_base)
 ```
 
-```{r base-numbers, include = FALSE}
-# Squared length of each species' loading vector, which no rotation of
-# the factors changes
-z <- apply(as_draws_matrix(mod_base, variable = "Z_tilde", regex = TRUE),
-           2, median)
-sp <- sub("^Z_tilde\\[(.*),[0-9]+\\]$", "\\1", names(z))
-norms <- sort(tapply(z^2, sp, sum), decreasing = TRUE)
-lead <- names(norms)[1:2]
-```
+<div class="figure" style="text-align: center">
+<img src="figures/jsdgam-ordinate-base-1.png" alt="Biplot of the site scores (numbered points) and species loadings (arrows) from the model with latent factors alone." width="85%" />
+<p class="caption">Biplot of the site scores (numbered points) and species loadings (arrows) from the model with latent factors alone.</p>
+</div>
 
-The loadings of `r lead[1]` and `r lead[2]` lie furthest from the
+
+
+The loadings of Aphaenogaster longiceps and Crematogaster sp. A lie furthest from the
 origin. Their abundances vary most across sites beyond what the
 intercepts predict.
 
@@ -140,7 +131,8 @@ the factors. `lv_axis()` in `factor_formula` gives each factor its own
 slope on a covariate. Each species then responds to the covariate
 through its loadings, with two slopes per covariate in place of 41:
 
-```{r mod-env}
+
+``` r
 mod_env <- jsdgam(
   counts ~ 1,
   factor_formula = ~ -1 + Bare.ground:lv_axis() +
@@ -153,6 +145,13 @@ mod_env <- jsdgam(
   chains = 4, seed = 2025, silent = 2
 )
 fixef(mod_env, trend_effects = TRUE)
+#>                                Estimate Est.Error       Q2.5     Q97.5
+#> Bare.ground:.trend1_trend   0.135920869 0.2246674 -0.3161984 0.5727267
+#> Bare.ground:.trend2_trend   0.138474012 0.2402835 -0.3471773 0.5986654
+#> .trend1:Canopy.cover_trend  0.409699649 0.3950048 -0.4941376 1.0748073
+#> .trend2:Canopy.cover_trend  0.540998805 0.4532449 -0.5594951 1.2252004
+#> .trend1:Shrub.cover_trend  -0.007575108 0.2152181 -0.4332874 0.4147369
+#> .trend2:Shrub.cover_trend   0.099059212 0.2335979 -0.3686123 0.5473352
 ```
 
 `fixef()` reports the slopes in the same rotated basis as the
@@ -162,25 +161,24 @@ species' response to each covariate, draw by draw, on the log scale of
 expected counts. A black outline marks a response whose sign has a
 posterior probability above 0.95:
 
-```{r species-effects, fig.asp = 1.4, fig.cap = "Posterior mean response of each species to one standard deviation of each covariate, on the log scale of expected counts. Outlined cells have a posterior probability of their sign above 0.95."}
+
+``` r
 se <- species_effects(mod_env, variables = c("Bare.ground", "Canopy.cover",
                                              "Shrub.cover"))
 plot(se)
 ```
 
-```{r canopy-numbers, include = FALSE}
-canopy_fx <- subset(summary(se), effect == "Canopy.cover")
-n_up <- sum(canopy_fx$sig & canopy_fx$Estimate > 0)
-n_down <- sum(canopy_fx$sig & canopy_fx$Estimate < 0)
-top <- canopy_fx$species[which.max(canopy_fx$Estimate)]
-bottom <- canopy_fx$species[which.min(canopy_fx$Estimate)]
-fe_range <- sprintf("%.2f", range(canopy_fx$Estimate))
-```
+<div class="figure" style="text-align: center">
+<img src="figures/jsdgam-species-effects-1.png" alt="Posterior mean response of each species to one standard deviation of each covariate, on the log scale of expected counts. Outlined cells have a posterior probability of their sign above 0.95." width="85%" />
+<p class="caption">Posterior mean response of each species to one standard deviation of each covariate, on the log scale of expected counts. Outlined cells have a posterior probability of their sign above 0.95.</p>
+</div>
 
-Under denser canopy `r n_up` of the 41 species become more abundant and
-`r n_down` less abundant, each with a posterior probability above 0.95.
-The mean responses run from `r fe_range[1]` for `r bottom` to
-`r fe_range[2]` for `r top`. `summary(se)` lists every species'
+
+
+Under denser canopy 8 of the 41 species become more abundant and
+9 less abundant, each with a posterior probability above 0.95.
+The mean responses run from -0.98 for Monomorium rothsteini to
+1.93 for Aphaenogaster longiceps. `summary(se)` lists every species'
 estimate and interval.
 
 ## Trait-informed loadings
@@ -194,7 +192,8 @@ traits, with one length scale per trait. A short length scale lets
 that trait separate species' loadings. A long one leaves them
 exchangeable.
 
-```{r mod-traits}
+
+``` r
 mod_traits <- jsdgam(
   counts ~ 1,
   factor_formula = ~ -1,
@@ -211,52 +210,56 @@ mod_traits <- jsdgam(
 
 Each length scale is named for its trait:
 
-```{r theta, fig.asp = 0.5, fig.cap = "Posterior medians with 50% and 90% credible intervals of the length scale of each trait."}
+
+``` r
 mcmc_plot(mod_traits, variable = "theta_features", regex = TRUE,
           type = "intervals")
 ```
 
-```{r theta-numbers, include = FALSE}
-theta <- as_draws_matrix(mod_traits, variable = "theta_features",
-                         regex = TRUE)
-theta_med <- apply(theta, 2, median)
-short <- which.min(theta_med)
-shortest <- sub("theta_features_", "", names(theta_med)[short])
-n_below <- sum(theta_med[short] <
-                 apply(theta[, -short, drop = FALSE], 2, quantile, 0.05))
-```
+<div class="figure" style="text-align: center">
+<img src="figures/jsdgam-theta-1.png" alt="Posterior medians with 50% and 90% credible intervals of the length scale of each trait." width="85%" />
+<p class="caption">Posterior medians with 50% and 90% credible intervals of the length scale of each trait.</p>
+</div>
 
-The median length scale of `r gsub("\\.", " ", shortest)`,
-`r sprintf("%.2f", theta_med[short])`, is the shortest of the traits.
-It falls below the 5% quantile of `r if (n_below == length(theta_med) - 1) "every other trait's length scale" else paste(n_below, "of the other", length(theta_med) - 1, "traits' length scales")`. A shorter length scale
+
+
+The median length scale of Femur length,
+0.29, is the shortest of the traits.
+It falls below the 5% quantile of every other trait's length scale. A shorter length scale
 gives a trait's differences between species more weight in the
 loadings prior. `compare_loadings()`
 aligns the two fits' loadings by a Procrustes rotation and draws how
 far each species moved:
 
-```{r compare-loadings, fig.asp = 0.75, fig.cap = "Posterior median loadings of each species without and with the trait prior, aligned to a shared basis. Labels mark the ten species that moved furthest."}
+
+``` r
 compare_loadings(mod_base, mod_traits,
                  labels = c("uninformed", "trait-informed"),
                  label_species = "shift")
 ```
 
+<div class="figure" style="text-align: center">
+<img src="figures/jsdgam-compare-loadings-1.png" alt="Posterior median loadings of each species without and with the trait prior, aligned to a shared basis. Labels mark the ten species that moved furthest." width="85%" />
+<p class="caption">Posterior median loadings of each species without and with the trait prior, aligned to a shared basis. Labels mark the ten species that moved furthest.</p>
+</div>
+
 Leave-one-out cross-validation compares the two priors on the same
 likelihood:
 
-```{r loo}
+
+``` r
 loo_cmp <- loo_compare(list(uninformed = loo(mod_base),
                             `trait-informed` = loo(mod_traits)))
 loo_cmp
+#>           model elpd_diff se_diff p_worse diag_diff       diag_elpd
+#>  trait-informed       0.0     0.0      NA           18 k_psis > 0.7
+#>      uninformed     -33.3     7.5    1.00           22 k_psis > 0.7
 ```
 
-```{r loo-numbers, include = FALSE}
-loo_first <- loo_cmp$model[1]
-fe_diff <- sprintf("%.1f", -loo_cmp[2, "elpd_diff"])
-fe_se <- sprintf("%.1f", loo_cmp[2, "se_diff"])
-```
 
-Leave-one-out ranks the `r loo_first` prior first. The other trails
-it by `r fe_diff` (SE `r fe_se`) in expected log predictive density.
+
+Leave-one-out ranks the trait-informed prior first. The other trails
+it by 33.3 (SE 7.5) in expected log predictive density.
 
 ## Residual correlations
 
@@ -264,19 +267,21 @@ it by `r fe_diff` (SE `r fe_se`) in expected log predictive density.
 between every pair of species. `plot(cluster = TRUE)` orders the
 species to bring blocks of co-occurring species onto the diagonal:
 
-```{r resid-cor, fig.asp = 1, out.width = "95%", fig.cap = "Posterior mean residual correlations from the trait-informed model. Outlined cells have a posterior probability of their sign above 0.95."}
+
+``` r
 rcor <- residual_cor(mod_traits)
 plot(rcor, cluster = TRUE)
 ```
 
-```{r cor-numbers, include = FALSE}
-pairs <- summary(rcor)
-clear_pos <- sum(pairs$sig & pairs$Estimate > 0)
-clear_neg <- sum(pairs$sig & pairs$Estimate < 0)
-```
+<div class="figure" style="text-align: center">
+<img src="figures/jsdgam-resid-cor-1.png" alt="Posterior mean residual correlations from the trait-informed model. Outlined cells have a posterior probability of their sign above 0.95." width="95%" />
+<p class="caption">Posterior mean residual correlations from the trait-informed model. Outlined cells have a posterior probability of their sign above 0.95.</p>
+</div>
 
-Of the `r nrow(pairs)` species pairs, `r clear_pos` correlate
-positively and `r clear_neg` negatively, each with a posterior
+
+
+Of the 820 species pairs, 343 correlate
+positively and 62 negatively, each with a posterior
 probability of its sign above 0.95. A residual correlation may reflect a shared
 response to an unmeasured driver or an interaction between species.
 The model alone cannot tell the two apart.
@@ -289,27 +294,25 @@ every species along a gradient of canopy cover and combines the
 predictions draw by draw. It averages over the latent factors, which
 gives the expected community of a site with that cover:
 
-```{r community, fig.cap = "Posterior median expected richness along canopy cover, with nested 20%, 40%, 60% and 80% credible intervals."}
+
+``` r
 canopy <- data.frame(Canopy.cover = seq(-1.5, 1.5, length.out = 25),
                      Bare.ground = 0, Shrub.cover = 0, site = 1)
 cm <- community(mod_env, newdata = canopy, traits = traits)
 plot(cm)
 ```
 
-```{r community-numbers, include = FALSE}
-ends <- c(1L, ncol(cm$richness))
-rich_med <- sprintf("%.1f", apply(cm$richness[, ends], 2, median))
-p_fewer <- sprintf("%.2f", mean(cm$richness[, ends[2]] <
-                                  cm$richness[, ends[1]]))
-shannon <- apply(cm$diversity$`Hill q = 1`, 2, median)
-peak <- canopy$Canopy.cover[which.max(shannon)]
-shannon_med <- sprintf("%.0f", c(max(shannon), shannon[ends[2]]))
-```
+<div class="figure" style="text-align: center">
+<img src="figures/jsdgam-community-1.png" alt="Posterior median expected richness along canopy cover, with nested 20%, 40%, 60% and 80% credible intervals." width="85%" />
+<p class="caption">Posterior median expected richness along canopy cover, with nested 20%, 40%, 60% and 80% credible intervals.</p>
+</div>
 
-Expected richness barely changes, from `r rich_med[1]` species at the
-most open sites to `r rich_med[2]` under the densest canopy. The
+
+
+Expected richness barely changes, from 22.4 species at the
+most open sites to 21.8 under the densest canopy. The
 posterior probability that dense canopy holds fewer species is
-`r p_fewer`.
+0.60.
 
 Richness counts species without regard to how common they are. Each
 species weighs into diversity and traits by its expected count. A Hill
@@ -317,13 +320,19 @@ number gives how many equally common species would match the
 community's evenness. Each trait panel gives the trait of an average
 individual ant:
 
-```{r community-diversity, fig.asp = 1, fig.cap = "Hill numbers and abundance-weighted mean traits along canopy cover, with nested 20%, 40%, 60% and 80% credible intervals."}
+
+``` r
 plot(cm, type = "diversity")
 ```
 
+<div class="figure" style="text-align: center">
+<img src="figures/jsdgam-community-diversity-1.png" alt="Hill numbers and abundance-weighted mean traits along canopy cover, with nested 20%, 40%, 60% and 80% credible intervals." width="85%" />
+<p class="caption">Hill numbers and abundance-weighted mean traits along canopy cover, with nested 20%, 40%, 60% and 80% credible intervals.</p>
+</div>
+
 The exponential of Shannon entropy, the Hill number of order one,
-peaks at `r shannon_med[1]` species near a canopy cover of
-`r sprintf("%.1f", peak)` and falls to `r shannon_med[2]` under the
+peaks at 26 species near a canopy cover of
+-0.1 and falls to 18 under the
 densest canopy. Dense canopy keeps a list of species as long as open
 ground does, while a few of them come to dominate the counts.
 
@@ -339,7 +348,8 @@ loadings more strongly than the one before. With a generous ceiling,
 the data decide how many columns stay away from zero. The prior
 combines with the trait kernel through `loadings_prior`:
 
-```{r mod-mgp}
+
+``` r
 mod_mgp <- jsdgam(
   counts ~ 1,
   factor_formula = ~ -1,
@@ -358,26 +368,30 @@ species into principal dimensions. A dimension is active when its
 variance is at least a tenth of the leading dimension's, with
 posterior probability of at least one half.
 
-```{r active-factors, fig.asp = 0.5, fig.cap = "Posterior probability that each factor, largest first, is active. The dashed line marks the threshold."}
+
+``` r
 af <- active_factors(mod_mgp)
 plot(af)
 ```
 
-```{r af-numbers, include = FALSE}
-n_active <- sum(af$per_factor$is_active)
-```
+<div class="figure" style="text-align: center">
+<img src="figures/jsdgam-active-factors-1.png" alt="Posterior probability that each factor, largest first, is active. The dashed line marks the threshold." width="85%" />
+<p class="caption">Posterior probability that each factor, largest first, is active. The dashed line marks the threshold.</p>
+</div>
 
-In this fit, `r n_active` of the 6 factors are active, against the 2
+
+
+In this fit, 2 of the 6 factors are active, against the 2
 the earlier models fixed.
 
 ## Summary
 
 The trait prior and column shrinkage tested two assumptions of the
 first ant community models: independent loadings and two factors.
-Leave-one-out ranked the `r loo_first` prior first, by `r fe_diff` in
+Leave-one-out ranked the trait-informed prior first, by 33.3 in
 expected log predictive density against a standard error of
-`r fe_se`. Given a ceiling of 6 factors, the shrinkage prior kept
-`r n_active` active, against the 2 the first models assumed. Each
+7.5. Given a ceiling of 6 factors, the shrinkage prior kept
+2 active, against the 2 the first models assumed. Each
 extension is one argument to a single `jsdgam()` call, as are the
 environmental slopes that gave all 41 species a canopy response from
 three covariates.

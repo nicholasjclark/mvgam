@@ -1,31 +1,16 @@
 ---
 title: "N-mixture models with mvgam"
 author: "Nicholas J Clark"
-date: "`r Sys.Date()`"
+date: "2026-11-27"
 output:
   rmarkdown::html_document:
     toc: yes
     toc_float: yes
 ---
 
-```{r, echo = FALSE}
-knitr::opts_chunk$set(
-  collapse = TRUE,
-  comment = "#>",
-  message = FALSE,
-  warning = FALSE
-)
-```
 
-```{r setup, include = FALSE}
-knitr::opts_chunk$set(
-  echo = TRUE, dpi = 100, fig.asp = 0.62, fig.width = 7,
-  out.width = "85%", fig.align = "center"
-)
-library(mvgam)
-library(ggplot2)
-theme_set(mvgam_theme(base_size = 12))
-```
+
+
 
 A count of animals mixes the number present with the chance of
 detecting each one. A single survey cannot tell a large population
@@ -78,7 +63,8 @@ intermediate temperatures. The third declines. The fourth has a weak
 U shape. On every visit, the detection probability falls with wind
 speed.
 
-```{r simulate}
+
+``` r
 set.seed(11)
 n_sp <- 4
 n_year <- 20
@@ -125,6 +111,13 @@ dat$y <- rbinom(nrow(dat), dat$N, p)
 # Upper bound of the sum over N in each closure unit
 dat$cap <- 80L
 head(dat)
+#>   visit time series temp wind  N  y cap
+#> 1     1    1   sp_1 1.07 0.77 59 25  80
+#> 2     2    1   sp_1 1.07 0.14 59 31  80
+#> 3     3    1   sp_1 1.07 0.50 59 28  80
+#> 4     4    1   sp_1 1.07 0.04 59 47  80
+#> 5     5    1   sp_1 1.07 0.36 59 27  80
+#> 6     1    2   sp_1 1.56 0.20 48 21  80
 ```
 
 Each row is one visit. `series` names the species and `time` the
@@ -132,14 +125,15 @@ year. The visits that share a `(series, time)` pair form one closure
 unit, over which $N$ is fixed. `cap` bounds the sum over $N$ in each
 unit. It must be at least the unit's largest count. The model cannot
 estimate an abundance above it. The simulated abundances peak at
-`r max(dat$N)`, which leaves room below a cap of 80. Each unit of cap
+64, which leaves room below a cap of 80. Each unit of cap
 adds a term to the sum in every closure unit at every iteration. The
 `N` column holds the simulated abundance for comparison. The model
 never sees it.
 
 The last three years are held out to score a forecast:
 
-```{r split}
+
+``` r
 train <- subset(dat, time <= 17)
 test <- subset(dat, time > 17)
 ```
@@ -152,7 +146,8 @@ describes detection. `trend_formula` describes the latent
 log-abundance. In it, `by = lv_axis()` gives each species its own
 smooth of temperature. `AR()` gives each species its own AR(1) state:
 
-```{r fit}
+
+``` r
 mod <- mvgam(
   bf(y ~ series, p ~ series + wind),
   trend_formula = ~ s(temp, by = lv_axis(), k = 5) + AR(),
@@ -163,17 +158,79 @@ mod <- mvgam(
 )
 ```
 
-```{r summary}
+
+``` r
 summary(mod)
+#>  Family: nmix 
+#>   Links: mu = log; p = logit 
+#> Formula: y ~ series 
+#>          p ~ series + wind 
+#>    Data: train (Number of observations: 340) 
+#>  Series: 4 
+#>  Trends: AR(1); formula: ~s(temp, by = lv_axis(), k = 5) 
+#>   Draws: 4 chains, each with iter = 2000; warmup = 1000; thin = 1; 
+#>          total post-warmup draws = 4000
+#> 
+#> == Observation Model ==
+#> Regression Coefficients:
+#>              Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
+#> Intercept        3.52      0.16     3.24     3.82 1.00     1375      998
+#> p_Intercept      0.55      0.24     0.10     1.01 1.00     2478     2575
+#> seriessp_2      -0.91      0.24    -1.40    -0.46 1.00     1180     1059
+#> seriessp_3      -0.39      0.25    -0.92     0.09 1.00     1457     1000
+#> seriessp_4      -1.15      0.26    -1.63    -0.60 1.00     1426     1294
+#> p_seriessp_2     0.41      0.27    -0.15     0.93 1.00     2955     2136
+#> p_seriessp_3    -0.98      0.28    -1.51    -0.42 1.00     2580     2505
+#> p_seriessp_4    -0.12      0.36    -0.89     0.52 1.00     2363     1950
+#> p_wind          -1.37      0.12    -1.61    -1.14 1.00     2828     2849
+#> 
+#> == Trend Model ==
+#> Smoothing Spline Hyperparameters:
+#>                        Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS
+#> sds(stempseriessp_1_1)     1.39      1.17     0.04     4.24 1.00     1147
+#> sds(stempseriessp_2_1)     3.94      1.76     1.72     8.38 1.00     2236
+#> sds(stempseriessp_3_1)     0.97      0.89     0.03     3.32 1.00     1513
+#> sds(stempseriessp_4_1)     1.24      1.11     0.04     4.24 1.00     1656
+#>                        Tail_ESS
+#> sds(stempseriessp_1_1)     1745
+#> sds(stempseriessp_2_1)     2598
+#> sds(stempseriessp_3_1)     1352
+#> sds(stempseriessp_4_1)     1770
+#> 
+#> Regression Coefficients:
+#>                    Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
+#> stemp:seriessp_1_1     1.64      1.85    -2.42     4.45 1.00     1188     1684
+#> stemp:seriessp_2_1     2.07      2.98    -3.76     8.10 1.00     2240     2253
+#> stemp:seriessp_3_1    -3.00      1.43    -6.07    -0.12 1.00     1743     1921
+#> stemp:seriessp_4_1    -1.06      1.70    -4.18     2.92 1.00     2077     2139
+#> 
+#> Trend Specific Parameters:
+#>                   Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
+#> sigma_trend[sp_1]     0.22      0.07     0.11     0.37 1.00     2011     2809
+#> sigma_trend[sp_2]     0.24      0.08     0.12     0.43 1.00     2140     2477
+#> sigma_trend[sp_3]     0.26      0.08     0.13     0.45 1.00     2226     2457
+#> sigma_trend[sp_4]     0.23      0.08     0.11     0.44 1.00     3322     2996
+#> ar1_trend[sp_1]       0.06      0.37    -0.62     0.84 1.00      757      421
+#> ar1_trend[sp_2]       0.19      0.39    -0.61     0.88 1.00     1282      924
+#> ar1_trend[sp_3]       0.19      0.35    -0.48     0.85 1.00     1390     1357
+#> ar1_trend[sp_4]       0.05      0.35    -0.63     0.75 1.00     2994     2289
+#> 
+#> Draws were sampled using sampling(NUTS). For each parameter, Bulk_ESS
+#> and Tail_ESS are effective sample size measures, and Rhat is the potential
+#> scale reduction factor on split chains (at convergence, Rhat = 1).
+#> 
+#> Next steps:
+#>   - `pp_check(fit, type = "fit_stat")`: goodness of fit of unit totals
+#>   - `plot(hindcast(fit, type = "latent_state"))`: posterior abundance of each unit
+#>   - `forecast(fit, newdata = ...)`: out-of-sample forecasts
+#>   - `lfo_cv(fit)`: leave-future-out model comparison
+#>   - `conditional_effects(fit)`: covariate effects
+#> Use `how_to_cite(fit)` for a methods paragraph and `methods_md(fit)` for its equations.
 ```
 
-```{r wind-numbers, include = FALSE}
-wind <- as.numeric(as_draws_matrix(mod, variable = "b_p_wind"))
-fe_wind <- sprintf("%.2f [%.2f, %.2f]", mean(wind),
-                   quantile(wind, 0.025), quantile(wind, 0.975))
-```
 
-The wind coefficient `p_wind` is `r fe_wind` on the logit scale,
+
+The wind coefficient `p_wind` is -1.37 [-1.61, -1.14] on the logit scale,
 against the simulated value of $-1.5$.
 
 ## Latent abundance
@@ -183,7 +240,8 @@ closure unit, conditional on the counts observed there. Its `plot()`
 method returns a `ggplot`, to which we add the simulated abundances
 and the largest count of each year:
 
-```{r latent-plot, fig.asp = 0.75, fig.cap = "Posterior medians with 50% and 95% credible intervals of each species' abundance. Black points are the simulated abundances. Open circles are the largest count in each year."}
+
+``` r
 hc <- hindcast(mod, type = "latent_state")
 truth <- unique(train[, c("series", "time", "N")])
 counts <- aggregate(y ~ series + time, data = train, FUN = max)
@@ -193,17 +251,17 @@ plot(hc) +
   geom_point(data = truth, aes(x = time, y = N), size = 1.6)
 ```
 
-```{r coverage, include = FALSE}
-state <- merge(as.data.frame(hc), truth, by = c("series", "time"))
-state <- merge(state, counts, by = c("series", "time"))
-n_covered <- sum(state$N >= state$lower_95 & state$N <= state$upper_95)
-n_above <- sum(state$median > state$y)
-```
+<div class="figure" style="text-align: center">
+<img src="figures/nmix-latent-plot-1.png" alt="Posterior medians with 50% and 95% credible intervals of each species' abundance. Black points are the simulated abundances. Open circles are the largest count in each year." width="85%" />
+<p class="caption">Posterior medians with 50% and 95% credible intervals of each species' abundance. Black points are the simulated abundances. Open circles are the largest count in each year.</p>
+</div>
+
+
 
 Because detection is imperfect, every count falls below the abundance
 it came from. The posterior median of $N$ exceeds the largest count in
-`r n_above` of the `r nrow(state)` species-years. Its 95% intervals
-contain the simulated abundance in `r n_covered` of them. A model of
+65 of the 68 species-years. Its 95% intervals
+contain the simulated abundance in 68 of them. A model of
 the counts alone would report every population as smaller than it is.
 
 ## Covariate effects
@@ -212,7 +270,8 @@ the counts alone would report every population as smaller than it is.
 `type = "latent_state"` it draws the expected abundance against
 temperature. `series = "all"` gives each species its own panel:
 
-```{r temp-effects, fig.asp = 0.75, fig.cap = "Expected abundance of each species against temperature, with 95% credible intervals."}
+
+``` r
 plot(
   conditional_effects(mod, effects = "temp", type = "latent_state",
                       series = "all"),
@@ -220,15 +279,26 @@ plot(
 )
 ```
 
+<div class="figure" style="text-align: center">
+<img src="figures/nmix-temp-effects-1.png" alt="Expected abundance of each species against temperature, with 95% credible intervals." width="85%" />
+<p class="caption">Expected abundance of each species against temperature, with 95% credible intervals.</p>
+</div>
+
 The four smooths take the shapes we simulated: a saturating rise, a
 hump, a decline and a shallow U. With `type = "detection"`,
 `conditional_effects()` draws the detection probability against wind
 speed:
 
-```{r wind-effect, out.width = "70%", fig.cap = "Detection probability against wind speed, with its 95% credible interval."}
+
+``` r
 plot(conditional_effects(mod, effects = "wind", type = "detection"),
      ask = FALSE)
 ```
+
+<div class="figure" style="text-align: center">
+<img src="figures/nmix-wind-effect-1.png" alt="Detection probability against wind speed, with its 95% credible interval." width="70%" />
+<p class="caption">Detection probability against wind speed, with its 95% credible interval.</p>
+</div>
 
 ## Forecasts
 
@@ -237,10 +307,16 @@ years. It combines the state with the temperature smooths and passes
 the result through detection. The forecast is of the count on each
 held-out visit:
 
-```{r forecast, fig.asp = 0.75, fig.cap = "Counts predicted on each visit over the training years and the three held-out years. Points are the observed counts."}
+
+``` r
 fc <- forecast(mod)
 plot(fc)
 ```
+
+<div class="figure" style="text-align: center">
+<img src="figures/nmix-forecast-1.png" alt="Counts predicted on each visit over the training years and the three held-out years. Points are the observed counts." width="85%" />
+<p class="caption">Counts predicted on each visit over the training years and the three held-out years. Points are the observed counts.</p>
+</div>
 
 `score()` evaluates the forecast against the held-out counts. The
 [forecast evaluation article](forecast_evaluation.html)
@@ -255,32 +331,35 @@ statistic of MacKenzie and Bailey
 ([2004](https://doi.org/10.1198/108571104X3361)). It repeats the
 calculation on counts replicated from the posterior:
 
-```{r fit-stat}
+
+``` r
 fit_stat <- pp_check(mod, type = "fit_stat")
 fit_stat
+#> Posterior predictive check (closure-unit discrepancy)
+#>   Family:           nmix
+#>   Statistic:        chi-squared
+#>   Aggregation:      closure unit
+#>   Posterior draws:  500
+#>   Bayesian p-value: 0.604
 ```
 
-```{r fit-stat-numbers, include = FALSE}
-fe_fit <- if (fit_stat$bayes_p > 0.05) {
-  "gives no sign of lack of fit"
-} else {
-  "suggests the model misses some variation among visits"
-}
-```
+
 
 A Bayesian p-value near 0 would mean the replicates rarely reach the
 discrepancy of the observed counts. The value here,
-`r sprintf("%.2f", fit_stat$bayes_p)`, `r fe_fit`.
+0.60, gives no sign of lack of fit.
 `latent_N_saturation()` reports the posterior probability that $N$
 reaches the cap in each unit:
 
-```{r saturation}
+
+``` r
 sat <- latent_N_saturation(mod)
 max(sat$p_saturated)
+#> [1] 0.03025
 ```
 
 The largest probability any unit gives to reaching the cap of 80 is
-`r sprintf("%.3f", max(sat$p_saturated))`.
+0.030.
 
 ## Other observation processes
 
@@ -299,7 +378,7 @@ same way. Every method used above works with each of them.
 
 From five counts a year, the N-mixture model recovered abundances that
 the counts alone understate. Its 95% intervals covered the simulated
-abundance in `r n_covered` of `r nrow(state)` species-years. The same
+abundance in 68 of 68 species-years. The same
 fit recovered four differently shaped responses to temperature and the
 wind effect on detection. Because the abundance follows an mvgam
 trend, the fit also forecast the held-out counts. All of this came

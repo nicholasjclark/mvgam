@@ -1,32 +1,16 @@
 ---
 title: "One latent process, several observation models"
 author: "Nicholas J Clark"
-date: "`r Sys.Date()`"
+date: "2026-11-27"
 output:
   rmarkdown::html_document:
     toc: yes
     toc_float: yes
 ---
 
-```{r, echo = FALSE}
-knitr::opts_chunk$set(
-  collapse = TRUE,
-  comment = "#>",
-  message = FALSE,
-  warning = FALSE
-)
-```
 
-```{r setup, include = FALSE}
-knitr::opts_chunk$set(
-  echo = TRUE, dpi = 100, fig.asp = 0.62, fig.width = 7,
-  out.width = "85%", fig.align = "center"
-)
-library(mvgam)
-library(ggplot2)
-library(patchwork)
-theme_set(mvgam_theme(base_size = 12))
-```
+
+
 
 Monitoring programmes often measure one quantity with several methods.
 A population might be counted along transects, weighed in traps and
@@ -62,7 +46,8 @@ are Bernoulli with a logit link. Detection rises by 0.05 on the logit
 scale with each day the camera is deployed. The cameras run in only 60
 of the 80 months.
 
-```{r simulate}
+
+``` r
 set.seed(2024)
 n_time <- 80
 z <- numeric(n_time)
@@ -89,7 +74,8 @@ mv_data <- data.frame(
 mv_data$camera[-sort(sample.int(n_time, 60))] <- NA
 ```
 
-```{r plot-data, fig.asp = 0.8, fig.cap = "The three simulated monitoring records. The camera record has gaps in the months the cameras did not run."}
+
+``` r
 observed <- do.call(rbind, lapply(c("count", "biomass", "camera"), function(r) {
   data.frame(time = mv_data$time, value = mv_data[[r]], response = r)
 }))
@@ -102,6 +88,11 @@ ggplot(observed, aes(time, value)) +
   labs(x = "Month", y = NULL)
 ```
 
+<div class="figure" style="text-align: center">
+<img src="figures/mvbf-plot-data-1.png" alt="The three simulated monitoring records. The camera record has gaps in the months the cameras did not run." width="85%" />
+<p class="caption">The three simulated monitoring records. The camera record has gaps in the months the cameras did not run.</p>
+</div>
+
 ## The joint model
 
 Each response enters through its own `bf()`, combined with `+`,
@@ -109,7 +100,8 @@ carrying its family and its covariates. `set_rescor(FALSE)` declares that the re
 share no residual correlation beyond the latent state. A cyclic smooth
 of month captures the seasonal cycle in biomass:
 
-```{r joint-fit}
+
+``` r
 joint_formula <-
   bf(count ~ 1 + offset(log_effort), family = poisson()) +
   bf(biomass ~ 1 + s(month, bs = "cc", k = 8), family = Gamma(link = "log")) +
@@ -135,38 +127,43 @@ biomass likelihoods alone.
 `pp_check()` compares draws from the posterior predictive distribution
 with the data. Without `resp` it draws one panel per response:
 
-```{r ppc, fig.asp = 1, fig.cap = "Posterior predictive checks for each response. A rootogram compares the frequency of each count. A density overlay checks the biomass record. Bars give the share of each camera outcome."}
+
+``` r
 pp_check(mod_joint, ndraws = 50)
 ```
+
+<div class="figure" style="text-align: center">
+<img src="figures/mvbf-ppc-1.png" alt="Posterior predictive checks for each response. A rootogram compares the frequency of each count. A density overlay checks the biomass record. Bars give the share of each camera outcome." width="85%" />
+<p class="caption">Posterior predictive checks for each response. A rootogram compares the frequency of each count. A density overlay checks the biomass record. Bars give the share of each camera outcome.</p>
+</div>
 
 `conditional_effects()` draws each response's covariate effects on
 that response's scale, with the latent process held out. The
 simulated biomass cycle peaks in month 3:
 
-```{r effects, fig.asp = 0.45, fig.width = 8, fig.cap = "Expected biomass by month and camera detection probability by deployment days, with 95% credible intervals."}
+
+``` r
 ce <- conditional_effects(mod_joint)
 wrap_plots(plot(ce, plot = FALSE), ncol = 2)
 ```
 
-```{r slope-numbers, include = FALSE}
-slope <- as.numeric(as_draws_matrix(
-  mod_joint, variable = "b_camera_deploy_days"
-))
-fe_slope <- sprintf("%.2f [%.2f, %.2f]", mean(slope),
-                    quantile(slope, 0.025), quantile(slope, 0.975))
-bm <- ce[["biomass"]][["month"]]$data
-bm_peak <- round(bm$month[which.max(bm$estimate)])
-```
+<div class="figure" style="text-align: center">
+<img src="figures/mvbf-effects-1.png" alt="Expected biomass by month and camera detection probability by deployment days, with 95% credible intervals." width="85%" />
+<p class="caption">Expected biomass by month and camera detection probability by deployment days, with 95% credible intervals.</p>
+</div>
 
-The fitted biomass curve peaks in month `r bm_peak`. The deployment
-slope is `r fe_slope` on the logit scale, against the 0.05 used to
+
+
+The fitted biomass curve peaks in month 3. The deployment
+slope is 0.08 [-0.04, 0.21] on the logit scale, against the 0.05 used to
 simulate the data.
 
 ## What the joint model gains
 
 To compare, we fit each method on its own, with the same AR(1) state:
 
-```{r separate-fits}
+
+``` r
 fit_one <- function(formula, family) {
   mvgam(formula, trend_formula = ~ AR(p = 1), family = family,
         data = mv_data, knots = list(month = c(0.5, 12.5)),
@@ -181,7 +178,8 @@ mod_camera <- fit_one(camera ~ 1 + deploy_days, bernoulli())
 `hindcast(type = "trend")` returns each model's posterior for the
 latent state:
 
-```{r recovery-plot, fig.width = 9, fig.asp = 0.62, out.width = "95%", fig.cap = "Posterior medians and 95% credible intervals of the latent state from the joint model and from each method alone. Crosses mark the simulated state."}
+
+``` r
 fits <- list(
   "Joint" = mod_joint,
   "Counts alone" = mod_count,
@@ -196,31 +194,31 @@ wrap_plots(lapply(names(fits), function(nm) {
 }), ncol = 2)
 ```
 
-```{r recovery-table}
+<div class="figure" style="text-align: center">
+<img src="figures/mvbf-recovery-plot-1.png" alt="Posterior medians and 95% credible intervals of the latent state from the joint model and from each method alone. Crosses mark the simulated state." width="95%" />
+<p class="caption">Posterior medians and 95% credible intervals of the latent state from the joint model and from each method alone. Crosses mark the simulated state.</p>
+</div>
+
+
+``` r
 recovery <- t(vapply(fits, function(fit) {
   s <- summary(hindcast(fit, type = "trend"))
   c(RMSE = sqrt(mean((s$predQ50 - z)^2)),
     `Interval width` = mean(s$predQ97.5 - s$predQ2.5))
 }, numeric(2)))
 round(recovery, 2)
+#>               RMSE Interval width
+#> Joint         0.26           1.24
+#> Counts alone  0.33           1.35
+#> Biomass alone 0.43           1.77
+#> Camera alone  0.56           4.14
 ```
 
-```{r recovery-numbers, include = FALSE}
-by_rmse <- rownames(recovery)[order(recovery[, "RMSE"])]
-fe_ranking <- knitr::combine_words(paste0(
-  tolower(by_rmse), " (", sprintf("%.2f", recovery[by_rmse, "RMSE"]), ")"
-))
-narrowest <- tolower(rownames(recovery)[
-  which.min(recovery[, "Interval width"])
-])
-widest <- tolower(rownames(recovery)[
-  which.max(recovery[, "Interval width"])
-])
-```
+
 
 Ordered by root mean squared error against the simulated state, the
-fits rank `r fe_ranking`. Intervals are narrowest in the `r narrowest`
-fit and widest in the `r widest` fit. A single binary record per month
+fits rank joint (0.26), counts alone (0.33), biomass alone (0.43), and camera alone (0.56). Intervals are narrowest in the joint
+fit and widest in the camera alone fit. A single binary record per month
 constrains abundance weakly.
 
 ## Forecasts
@@ -231,7 +229,8 @@ survey effort, the calendar month of each future time point and 15
 deployment days for the camera. `type = "expected"` returns the
 expected count, the expected biomass and the detection probability:
 
-```{r forecast, fig.asp = 1, fig.cap = "Expected values for each response over the training months and a six-month forecast. Points are the observations."}
+
+``` r
 newdata <- data.frame(
   time = n_time + 1:6,
   series = factor("pop1"),
@@ -243,6 +242,11 @@ newdata <- data.frame(
 fc <- forecast(mod_joint, newdata = newdata, type = "expected")
 plot(fc)
 ```
+
+<div class="figure" style="text-align: center">
+<img src="figures/mvbf-forecast-1.png" alt="Expected values for each response over the training months and a six-month forecast. Points are the observations." width="85%" />
+<p class="caption">Expected values for each response over the training months and a six-month forecast. Points are the observations.</p>
+</div>
 
 The forecast object also feeds `score()` once the held-out
 observations arrive.

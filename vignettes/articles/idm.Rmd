@@ -1,31 +1,16 @@
 ---
 title: "Integrated distribution models with mvgam"
 author: "Nicholas J Clark"
-date: "`r Sys.Date()`"
+date: "2026-11-27"
 output:
   rmarkdown::html_document:
     toc: yes
     toc_float: yes
 ---
 
-```{r, echo = FALSE}
-knitr::opts_chunk$set(
-  collapse = TRUE,
-  comment = "#>",
-  message = FALSE,
-  warning = FALSE
-)
-```
 
-```{r setup, include = FALSE}
-knitr::opts_chunk$set(
-  echo = TRUE, dpi = 100, fig.asp = 0.62, fig.width = 7,
-  out.width = "85%", fig.align = "center"
-)
-library(mvgam)
-library(ggplot2)
-theme_set(mvgam_theme(base_size = 12))
-```
+
+
 
 Species are often monitored in several ways at once. A count
 route, an occupancy survey and opportunistic sightings all record the
@@ -92,7 +77,8 @@ still be estimated from the sightings (Fithian et al.
 [2015](https://doi.org/10.1111/2041-210X.12242); Renner et al.
 [2015](https://doi.org/10.1111/2041-210X.12352)).
 
-```{r simulate}
+
+``` r
 set.seed(2026)
 n_t <- 96
 env <- as.numeric(scale(cumsum(rnorm(n_t, 0, 0.3))))
@@ -135,7 +121,8 @@ of env and the autoregression at lags 1 and 12. The missing counts
 need no special handling. The counts use their 24 surveyed months,
 while the occupancy and sightings records use all 96.
 
-```{r joint-fit}
+
+``` r
 joint_formula <-
   bf(count ~ 1 + offset(log_effort), family = poisson()) +
   bf(pa ~ 1, family = bernoulli(link = "cloglog")) +
@@ -155,34 +142,78 @@ mod_joint <- mvgam(
 distribution and its autocorrelation. The count record stops after
 month 24:
 
-```{r series, fig.asp = 1.25, fig.cap = "The three simulated records: counts, occupancy detections and opportunistic sightings."}
+
+``` r
 plot(mod_joint, type = "series")
 ```
+
+<div class="figure" style="text-align: center">
+<img src="figures/idm-series-1.png" alt="The three simulated records: counts, occupancy detections and opportunistic sightings." width="85%" />
+<p class="caption">The three simulated records: counts, occupancy detections and opportunistic sightings.</p>
+</div>
 
 `summary()` reports one intercept per data source and the trend
 parameters they share. Its data line gives the number of observations
 of each data source:
 
-```{r summary}
+
+``` r
 summary(mod_joint)
+#>  Family: count: poisson 
+#>           pa: bernoulli 
+#>           po: poisson 
+#>   Links: count: mu = log 
+#>         pa: mu = cloglog 
+#>         po: mu = log 
+#> Formula: count ~ 1 + offset(log_effort) 
+#>          pa ~ 1 
+#>          po ~ 1 
+#>    Data: idm_data (Number of observations: 96; observed count: 24, pa: 96, po: 96) 
+#>  Trends: AR({1, 12}); formula: ~s(env, k = 8) 
+#>   Draws: 4 chains, each with iter = 2000; warmup = 1000; thin = 1; 
+#>          total post-warmup draws = 4000
+#> 
+#> == Observation Model ==
+#> Regression Coefficients:
+#>                 Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
+#> count_Intercept     1.03      0.14     0.74     1.29 1.00     4339     3068
+#> pa_Intercept       -0.23      0.15    -0.54     0.05 1.00     5266     3110
+#> po_Intercept        0.33      0.10     0.11     0.51 1.00     3800     2524
+#> 
+#> == Trend Model ==
+#> Smoothing Spline Hyperparameters:
+#>             Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
+#> sds(senv_1)     2.07      1.21     0.46     5.02 1.00     1271     1591
+#> 
+#> Regression Coefficients:
+#>        Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
+#> senv_1    -0.92      3.58    -9.16     5.08 1.00     1875     1143
+#> 
+#> Trend Specific Parameters:
+#>                       Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS
+#> sigma_trend[species1]     0.34      0.09     0.18     0.53 1.00     1460
+#> ar1_trend[species1]       0.13      0.25    -0.38     0.60 1.00     1579
+#> ar12_trend[species1]     -0.11      0.30    -0.66     0.45 1.00     1476
+#>                       Tail_ESS
+#> sigma_trend[species1]     2235
+#> ar1_trend[species1]       1548
+#> ar12_trend[species1]      2361
+#> 
+#> Draws were sampled using sampling(NUTS). For each parameter, Bulk_ESS
+#> and Tail_ESS are effective sample size measures, and Rhat is the potential
+#> scale reduction factor on split chains (at convergence, Rhat = 1).
+#> 
+#> Next steps:
+#>   - `pp_check(fit)`: posterior predictive checks
+#>   - `forecast(fit, newdata = ...)`: out-of-sample forecasts
+#>   - `lfo_cv(fit)`: leave-future-out model comparison
+#>   - `conditional_effects(fit)`: covariate effects
+#> Use `how_to_cite(fit)` for a methods paragraph and `methods_md(fit)` for its equations.
 ```
 
-```{r trend-numbers, include = FALSE}
-trend_pars <- as_draws_matrix(
-  mod_joint, variable = c("ar1_trend", "ar12_trend", "sigma_trend"),
-  regex = TRUE
-)
-trend_ci <- apply(trend_pars, 2, quantile, c(0.025, 0.975))
-trend_cover <- all(trend_ci[1, ] < c(0.55, 0.30, 0.35) &
-                     trend_ci[2, ] > c(0.55, 0.30, 0.35))
-fe_trend <- if (trend_cover) {
-  "The 95% intervals of the two AR coefficients and the innovation SD all contain the values used to simulate the data."
-} else {
-  "Not every 95% interval of the AR coefficients and the innovation SD contains the value used to simulate the data."
-}
-```
 
-`r fe_trend` These intervals are wide, because eight years of data on
+
+The 95% intervals of the two AR coefficients and the innovation SD all contain the values used to simulate the data. These intervals are wide, because eight years of data on
 one species say little about its dynamics.
 
 Each data source has its own intercept. Every data source's linear
@@ -192,60 +223,82 @@ count intercept leaves $\log A$. The sightings intercept minus the
 count intercept leaves the log thinning.
 `hypothesis()` computes both differences with their intervals:
 
-```{r contrasts}
+
+``` r
 constants <- hypothesis(mod_joint, c(
   `log area` = "pa_Intercept - count_Intercept = 0",
   `log thinning` = "po_Intercept - count_Intercept = 0"
 ))
 constants
+#> Hypothesis Tests for class :
+#>     Hypothesis Estimate Est.Error CI.Lower CI.Upper Evid.Ratio Post.Prob Star
+#> 1     log area    -1.26      0.19    -1.63    -0.89         NA        NA    *
+#> 2 log thinning    -0.70      0.16    -1.01    -0.39         NA        NA    *
+#> ---
+#> 'CI': 90%-CI for one-sided and 95%-CI for two-sided hypotheses.
+#> '*': For one-sided hypotheses, the posterior probability exceeds 95%;
+#> for two-sided hypotheses, the value tested against lies outside the 95%-CI.
+#> Posterior probabilities of point hypotheses assume equal prior probabilities.
 ```
 
-```{r contrast-numbers, include = FALSE}
-ci <- constants$hypothesis
-n_cover <- sum(ci$CI.Lower < c(log(area), log_thinning) &
-                 ci$CI.Upper > c(log(area), log_thinning))
-fe_cover <- c("Neither interval contains its constant.",
-              "One of the two intervals contains its constant.",
-              "Both intervals contain them.")[n_cover + 1]
-```
+
 
 The simulated constants are $\log 0.25 = -1.39$ and $-0.8$.
-`r fe_cover` We never gave the model either constant. It estimates
+Both intervals contain them. We never gave the model either constant. It estimates
 them from the two years in which all three data sources overlap.
 
 `pp_check()` draws one panel per data source. Rootograms compare the
 frequency of each count. Bars give the share of each outcome of the
 binary occupancy record:
 
-```{r ppc, fig.asp = 1, fig.cap = "Posterior predictive checks for each data source."}
+
+``` r
 pp_check(mod_joint, ndraws = 50)
 ```
+
+<div class="figure" style="text-align: center">
+<img src="figures/idm-ppc-1.png" alt="Posterior predictive checks for each data source." width="85%" />
+<p class="caption">Posterior predictive checks for each data source.</p>
+</div>
 
 ## The environmental response
 
 `plot(type = "smooths")` draws the smooth of env on the log-intensity
 scale:
 
-```{r smooth, fig.cap = "The smooth of env from the joint model, with its 95% credible interval."}
+
+``` r
 plot(mod_joint, type = "smooths")
 ```
+
+<div class="figure" style="text-align: center">
+<img src="figures/idm-smooth-1.png" alt="The smooth of env from the joint model, with its 95% credible interval." width="85%" />
+<p class="caption">The smooth of env from the joint model, with its 95% credible interval.</p>
+</div>
 
 `conditional_effects()` translates the smooth to the scale of each
 data source: the expected count, the detection probability and the
 expected number of sightings along env. It leaves out the
 autoregressive part of the trend and sets effort to one:
 
-```{r effects, fig.width = 9, fig.asp = 0.4, out.width = "95%", fig.cap = "Expected count, detection probability and sighting rate along env from the joint model, with 95% credible intervals."}
+
+``` r
 ce <- conditional_effects(mod_joint)
 patchwork::wrap_plots(plot(ce, plot = FALSE), nrow = 1)
 ```
+
+<div class="figure" style="text-align: center">
+<img src="figures/idm-effects-1.png" alt="Expected count, detection probability and sighting rate along env from the joint model, with 95% credible intervals." width="95%" />
+<p class="caption">Expected count, detection probability and sighting rate along env from the joint model, with 95% credible intervals.</p>
+</div>
 
 ## Filling the gaps between surveys
 
 To see what the occupancy and sightings records add, we also fit the
 counts alone with the same trend formula:
 
-```{r count-fit}
+
+``` r
 mod_count <- mvgam(
   bf(count ~ 1 + offset(log_effort), family = poisson()),
   trend_formula = trend_formula,
@@ -259,36 +312,41 @@ mod_count <- mvgam(
 data, including the 72 months in which the route was not surveyed.
 For the joint model, `resp = "count"` selects the counts:
 
-```{r hindcasts}
+
+``` r
 hc_joint <- hindcast(mod_joint, type = "expected", resp = "count")
 hc_count <- hindcast(mod_count, type = "expected")
 ```
 
-```{r hindcast-joint, fig.cap = "Expected counts per unit effort from the joint model. Points are the counts of the first two years."}
+
+``` r
 plot(hc_joint)
 ```
 
-```{r hindcast-count, fig.cap = "Expected counts per unit effort from the model fitted to the counts alone. Its y-axis extends ten times further than that of the joint model."}
+<div class="figure" style="text-align: center">
+<img src="figures/idm-hindcast-joint-1.png" alt="Expected counts per unit effort from the joint model. Points are the counts of the first two years." width="85%" />
+<p class="caption">Expected counts per unit effort from the joint model. Points are the counts of the first two years.</p>
+</div>
+
+
+``` r
 plot(hc_count)
 ```
 
-```{r gap-numbers, include = FALSE}
-gap_width <- function(hc) {
-  draws <- hc$hindcasts[[1]][, unsurveyed]
-  q <- apply(draws, 2, quantile, c(0.025, 0.975))
-  stats::median(q[2, ] - q[1, ])
-}
-width_joint <- sprintf("%.1f", gap_width(hc_joint))
-width_count <- sprintf("%.1f", gap_width(hc_count))
-```
+<div class="figure" style="text-align: center">
+<img src="figures/idm-hindcast-count-1.png" alt="Expected counts per unit effort from the model fitted to the counts alone. Its y-axis extends ten times further than that of the joint model." width="85%" />
+<p class="caption">Expected counts per unit effort from the model fitted to the counts alone. Its y-axis extends ten times further than that of the joint model.</p>
+</div>
+
+
 
 After month 24, the counts-alone model has no data on abundance. Its
 estimates come only from the autoregression and the environmental
 index. Its intervals grow wider over time. Across the 72
 unsurveyed months, its 95% intervals have a median width of
-`r width_count` individuals. The joint model still has sightings and
+13.9 individuals. The joint model still has sightings and
 occupancy records in those months. Its intervals have a median width
-of `r width_joint` individuals.
+of 4.8 individuals.
 
 The extra data also sharpen the estimated response to env. To compare
 the two estimates of $f$, we predict each model's linear predictor
@@ -297,7 +355,8 @@ of the grid. The subtraction removes the intercept and the
 autoregressive part of the trend, which differ between the models.
 Only the response to env remains:
 
-```{r response-curves}
+
+``` r
 grid <- seq(min(env), max(env), length.out = 60)
 ref <- which.min(abs(grid - median(grid)))
 newdata <- idm_data[rep(1, length(grid)), ]
@@ -321,7 +380,8 @@ curves <- do.call(rbind, lapply(names(fits), function(nm) {
 curves$model <- factor(curves$model, levels = names(fits))
 ```
 
-```{r response-plot, fig.width = 8, fig.asp = 0.45, out.width = "95%", fig.cap = "Posterior medians and 95% credible intervals of the response to env from the joint model and from the counts alone. The black line is the simulated response."}
+
+``` r
 ggplot(curves, aes(env)) +
   geom_ribbon(aes(ymin = lo, ymax = hi), fill = "#DCBCBC") +
   geom_line(aes(y = med), colour = "#8F2727", linewidth = 0.8) +
@@ -330,16 +390,17 @@ ggplot(curves, aes(env)) +
   labs(x = "env", y = "Shift in log-intensity")
 ```
 
-```{r response-numbers, include = FALSE}
-mean_width <- sapply(split(curves$hi - curves$lo, curves$model), mean)
-narrower <- round(100 * (1 - mean_width[["Joint"]] /
-                           mean_width[["Counts alone"]]))
-```
+<div class="figure" style="text-align: center">
+<img src="figures/idm-response-plot-1.png" alt="Posterior medians and 95% credible intervals of the response to env from the joint model and from the counts alone. The black line is the simulated response." width="95%" />
+<p class="caption">Posterior medians and 95% credible intervals of the response to env from the joint model and from the counts alone. The black line is the simulated response.</p>
+</div>
+
+
 
 The 95% intervals of both models contain the simulated response across
 the whole range of env. With six more years of
 sightings and occupancy records, the joint model's 95% interval is on
-average `r narrower`% narrower.
+average 43% narrower.
 
 ## Forecasts
 
@@ -349,7 +410,8 @@ to one and hold env at its last observed value. With
 `type = "expected"`, the forecasts are the expected count, the
 detection probability and the expected number of sightings:
 
-```{r forecast, fig.asp = 1, fig.cap = "Expected values for each data source over the training months and a 12-month forecast. Points are the observations."}
+
+``` r
 future <- data.frame(
   time = n_t + 1:12,
   series = factor("species1"),
@@ -360,6 +422,11 @@ future <- data.frame(
 fc <- forecast(mod_joint, newdata = future, type = "expected")
 plot(fc)
 ```
+
+<div class="figure" style="text-align: center">
+<img src="figures/idm-forecast-1.png" alt="Expected values for each data source over the training months and a 12-month forecast. Points are the observations." width="85%" />
+<p class="caption">Expected values for each data source over the training months and a 12-month forecast. Points are the observations.</p>
+</div>
 
 All three forecasts come from the same projected trend. The count
 route was last surveyed six years before the forecast starts. The
@@ -376,7 +443,8 @@ own smooth of env in its observation formula. The smooth in the trend
 formula then describes the shared response, while each extra smooth
 describes how that data source departs from it:
 
-```{r source-smooths, eval = FALSE}
+
+``` r
 diff_formula <-
   bf(count ~ 1 + offset(log_effort), family = poisson()) +
   bf(pa ~ 1 + s(env, k = 5), family = bernoulli(link = "cloglog")) +

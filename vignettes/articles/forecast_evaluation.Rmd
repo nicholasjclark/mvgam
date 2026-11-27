@@ -1,31 +1,16 @@
 ---
 title: "Forecast evaluation in mvgam"
 author: "Nicholas J Clark"
-date: "`r Sys.Date()`"
+date: "2026-11-27"
 output:
   rmarkdown::html_document:
     toc: yes
     toc_float: yes
 ---
 
-```{r, echo = FALSE}
-knitr::opts_chunk$set(
-  collapse = TRUE,
-  comment = "#>",
-  message = FALSE,
-  warning = FALSE
-)
-```
 
-```{r setup, include = FALSE}
-knitr::opts_chunk$set(
-  echo = TRUE, dpi = 100, fig.asp = 0.62, fig.width = 7,
-  out.width = "85%", fig.align = "center"
-)
-library(mvgam)
-library(ggplot2)
-theme_set(mvgam_theme(base_size = 12))
-```
+
+
 
 A model that describes its training data well can still forecast
 poorly. To find the model that forecasts best, mvgam scores each
@@ -53,7 +38,8 @@ covariates accompany them: the monthly mean of minimum temperature
 (`mintemp`) and a 12-month moving average of NDVI (`ndvi_ma12`). We
 hold out the last 12 of the 80 months:
 
-```{r split}
+
+``` r
 data(portal_data)
 train <- subset(portal_data, time <= 68)
 test <- subset(portal_data, time > 68)
@@ -66,7 +52,8 @@ Poisson observation model, the two covariates and the sampler settings.
 Each fit receives the holdout as `newdata`, from which `forecast()`
 later takes its forecast times:
 
-```{r fit-helper}
+
+``` r
 fit_portal <- function(formula, trend_formula = NULL) {
   mvgam(formula, trend_formula = trend_formula, family = poisson(),
         data = train, newdata = test, chains = 4, seed = 2026,
@@ -78,7 +65,8 @@ The first model is a generalised additive model with a smooth of time
 for each species. Its forecast extends those smooths past the last
 training month:
 
-```{r fit-gam}
+
+``` r
 mod_gam <- fit_portal(
   captures ~ series + s(mintemp, k = 6) + s(ndvi_ma12, k = 6) +
     s(time, by = series, k = 8)
@@ -90,7 +78,8 @@ covariates move into `trend_formula`, where `by = lv_axis()` gives each
 species its own smooth of temperature. `AR(cor = TRUE)` correlates the
 innovations of the four states:
 
-```{r fit-ar}
+
+``` r
 mod_ar <- fit_portal(
   captures ~ series,
   trend_formula = ~ s(mintemp, by = lv_axis(), k = 6) +
@@ -105,7 +94,8 @@ training months. As in Prophet (Taylor and Letham
 extends the final segment and adds new changepoints at the rate seen in
 training:
 
-```{r fit-pw}
+
+``` r
 mod_pw <- fit_portal(
   captures ~ series,
   trend_formula = ~ s(mintemp, by = lv_axis(), k = 6) +
@@ -119,31 +109,41 @@ mod_pw <- fit_portal(
 each held-out month. Its `plot()` method draws the forecast after the
 hindcast of the training months:
 
-```{r forecasts}
+
+``` r
 set.seed(2026)
 fc_gam <- forecast(mod_gam)
 fc_ar <- forecast(mod_ar)
 fc_pw <- forecast(mod_pw)
 ```
 
-```{r plot-gam, fig.asp = 0.75, fig.cap = "GAM hindcasts and forecasts of each species' captures, with 50%, 80% and 95% credible intervals on the forecast. Points are the observed captures. The dashed line marks the end of the training data."}
+
+``` r
 plot(fc_gam)
 ```
 
-```{r gam-numbers, include = FALSE}
-do_median <- round(median(fc_gam$forecasts$DO[, 12]))
-do_max <- max(test$captures[test$series == "DO"], na.rm = TRUE)
-```
+<div class="figure" style="text-align: center">
+<img src="figures/forecast_evaluation-plot-gam-1.png" alt="GAM hindcasts and forecasts of each species' captures, with 50%, 80% and 95% credible intervals on the forecast. Points are the observed captures. The dashed line marks the end of the training data." width="85%" />
+<p class="caption">GAM hindcasts and forecasts of each species' captures, with 50%, 80% and 95% credible intervals on the forecast. Points are the observed captures. The dashed line marks the end of the training data.</p>
+</div>
+
+
 
 Each smooth of time extrapolates the slope at the end of its series.
 For DO, whose captures rose over the final training months, the median
-forecast reaches `r do_median` captures by month 12. The held-out
-months recorded at most `r do_max`. The AR forecast carries its
+forecast reaches 121 captures by month 12. The held-out
+months recorded at most 14. The AR forecast carries its
 latent state forward instead:
 
-```{r plot-ar, fig.asp = 0.75, fig.cap = "AR hindcasts and forecasts of each species' captures."}
+
+``` r
 plot(fc_ar)
 ```
+
+<div class="figure" style="text-align: center">
+<img src="figures/forecast_evaluation-plot-ar-1.png" alt="AR hindcasts and forecasts of each species' captures." width="85%" />
+<p class="caption">AR hindcasts and forecasts of each species' captures.</p>
+</div>
 
 ## Where the uncertainty comes from
 
@@ -154,41 +154,55 @@ propagated many times, which separates what the posterior leaves
 unknown from what the future adds. The split uses the link scale, where
 the parts of the model add:
 
-```{r uncertainty, fig.asp = 0.75, fig.cap = "Variance of the AR model's forecast predictor at each horizon, split by kind of source."}
+
+``` r
 set.seed(2026)
 unc_ar <- forecast_uncertainty(mod_ar, ndraws = 500)
 unc_ar
+#> Forecast uncertainty by source, predictor, 500 draws, 20 replicates
+#> 
+#>  series sd_first sd_last dominant      support changes_at
+#>  DM     0.25     0.41    process error 1                 
+#>  DO     0.57     0.92    process error 1                 
+#>  PB     0.62     1.30    process error 1                 
+#>  PP     0.83     1.20    process error 1                 
+#> 
+#> summary() gives every source at every horizon.
 plot(unc_ar)
 ```
 
-```{r uncertainty-numbers, include = FALSE}
-unc <- summary(unc_ar)$sources
-do_share <- function(source, h) {
-  paste0(round(100 * unc$share[unc$series == "DO" &
-                                 unc$source == source &
-                                 unc$horizon == h]), "%")
-}
-```
+<div class="figure" style="text-align: center">
+<img src="figures/forecast_evaluation-uncertainty-1.png" alt="Variance of the AR model's forecast predictor at each horizon, split by kind of source." width="85%" />
+<p class="caption">Variance of the AR model's forecast predictor at each horizon, split by kind of source.</p>
+</div>
+
+
 
 Process error, the variance the state's innovations add, leads for every
 species by month 12. Because this variance belongs to the process, more
 data will not shrink it. For DO it grows from
-`r do_share("process error", 1)` of the variance at month 1 to
-`r do_share("process error", 12)` at month 12. Because an AR(1) state
+54% of the variance at month 1 to
+76% at month 12. Because an AR(1) state
 loses its memory of the last training month, the latent dynamics fade
-from `r do_share("latent dynamics", 1)` to
-`r do_share("latent dynamics", 12)` over the same months.
+from 38% to
+11% over the same months.
 
 The bars jump at month 8. With `by = "source"` and `type = "share"`, the
 plot names the term responsible:
 
-```{r uncertainty-terms, fig.asp = 0.6, fig.cap = "Share of the variance of the DO forecast held by each term."}
+
+``` r
 plot(unc_ar, type = "share", by = "source", series = "DO")
 ```
 
+<div class="figure" style="text-align: center">
+<img src="figures/forecast_evaluation-uncertainty-terms-1.png" alt="Share of the variance of the DO forecast held by each term." width="85%" />
+<p class="caption">Share of the variance of the DO forecast held by each term.</p>
+</div>
+
 The temperature smooth peaks at month 8. Minimum temperature that month
-was `r round(min(test$mintemp), 2)`, below the coldest training month at
-`r round(min(train$mintemp, na.rm = TRUE), 2)`. The smooth extrapolates
+was -2.1, below the coldest training month at
+-1.93. The smooth extrapolates
 there, which widens the forecast.
 
 A forecast also depends on the future of its covariates.
@@ -196,7 +210,8 @@ A forecast also depends on the future of its covariates.
 Because every future takes the same draws and the same innovations,
 their difference isolates what the covariates change:
 
-```{r scenarios, fig.asp = 0.6, fig.cap = "Difference in the DO forecast's predictor between a future one standard deviation warmer and the observed one, with nested 20%, 40%, 60% and 80% credible intervals."}
+
+``` r
 warmer <- test
 warmer$mintemp <- warmer$mintemp + 1
 sc <- forecast_uncertainty(mod_ar, newdata = list(observed = test,
@@ -205,18 +220,17 @@ sc <- forecast_uncertainty(mod_ar, newdata = list(observed = test,
 plot(sc, series = "DO")
 ```
 
-```{r scenario-numbers, include = FALSE}
-warm <- summary(sc)$contrasts
-warm <- warm[warm$series == "DO", ]
-largest <- warm[which.max(abs(warm$Q50)), ]
-last <- warm[warm$horizon == max(warm$horizon), ]
-fe2 <- function(x) sprintf("%.2f", x)
-```
+<div class="figure" style="text-align: center">
+<img src="figures/forecast_evaluation-scenarios-1.png" alt="Difference in the DO forecast's predictor between a future one standard deviation warmer and the observed one, with nested 20%, 40%, 60% and 80% credible intervals." width="85%" />
+<p class="caption">Difference in the DO forecast's predictor between a future one standard deviation warmer and the observed one, with nested 20%, 40%, 60% and 80% credible intervals.</p>
+</div>
 
-The median difference at month 12 is `r fe2(last$Q50)`, with a 95%
-interval from `r fe2(last$Q2.5)` to `r fe2(last$Q97.5)`. The largest
-median difference, `r fe2(largest$Q50)`, falls at month
-`r largest$horizon`.
+
+
+The median difference at month 12 is -0.11, with a 95%
+interval from -0.53 to 0.33. The largest
+median difference, -0.18, falls at month
+8.
 
 ## Scoring the holdout
 
@@ -226,52 +240,48 @@ probability score (CRPS) generalises the absolute error to a predictive
 distribution. With `relative`, `plot()` draws each model's score minus
 that of a baseline:
 
-```{r crps, fig.asp = 0.75, fig.cap = "CRPS of the AR and PW forecasts minus that of the GAM at each horizon. Negative values favour the AR or PW model. No species was observed at horizon 3."}
+
+``` r
 crps <- compare_scores(fc_gam, fc_ar, fc_pw, score = "crps",
                        model_names = c("GAM", "AR", "PW"))
 plot(crps, relative = "GAM")
 ```
 
-```{r crps-numbers, include = FALSE}
-fe <- function(x) sprintf("%.2f", x)
-cm <- aggregate(score ~ model + series, FUN = mean,
-                data = subset(crps, series != "all_series"))
-crps_at <- function(m, s) cm$score[cm$model == m & cm$series == s]
-mean_crps <- aggregate(score ~ model, FUN = mean,
-                       data = subset(crps, series != "all_series"))
-crps_of <- function(m) mean_crps$score[mean_crps$model == m]
-# The model with the lower mean CRPS of AR and the GAM on one species
-win <- function(s) {
-  if (crps_at("AR", s) < crps_at("GAM", s)) "AR" else "the GAM"
-}
-```
+<div class="figure" style="text-align: center">
+<img src="figures/forecast_evaluation-crps-1.png" alt="CRPS of the AR and PW forecasts minus that of the GAM at each horizon. Negative values favour the AR or PW model. No species was observed at horizon 3." width="85%" />
+<p class="caption">CRPS of the AR and PW forecasts minus that of the GAM at each horizon. Negative values favour the AR or PW model. No species was observed at horizon 3.</p>
+</div>
 
-Between AR and the GAM, the lower mean CRPS goes to `r win("DM")` on
-DM, `r win("DO")` on DO, `r win("PB")` on PB and `r win("PP")` on PP.
-On DO the mean CRPS is `r fe(crps_at("AR", "DO"))` for AR and
-`r fe(crps_at("GAM", "DO"))` for the GAM. PB and PP recorded few or no
+
+
+Between AR and the GAM, the lower mean CRPS goes to AR on
+DM, AR on DO, the GAM on PB and the GAM on PP.
+On DO the mean CRPS is 3.25 for AR and
+32.77 for the GAM. PB and PP recorded few or no
 captures over long stretches. Averaged over the species, AR scores
-`r fe(crps_of("AR"))` against `r fe(crps_of("PW"))` for PW.
+3.95 against 3.86 for PW.
 
 The energy score grades the four forecasts at each horizon as one
 multivariate distribution (Gneiting et al.
 [2008](https://doi.org/10.1007/s11749-008-0114-x)). `compare_scores()`
 holds a joint score in the rows whose series is `all_series`:
 
-```{r energy, fig.asp = 0.55, fig.cap = "Energy score of the joint forecast of the four species at each horizon."}
+
+``` r
 energy <- compare_scores(fc_gam, fc_ar, fc_pw, score = "energy",
                          model_names = c("GAM", "AR", "PW"))
 plot(energy)
 ```
 
-```{r energy-numbers, include = FALSE}
-ej <- subset(energy, series == "all_series" & !is.na(score))
-e_gam <- round(range(ej$score[ej$model == "GAM"]))
-e_max <- max(ej$score[ej$model != "GAM"])
-```
+<div class="figure" style="text-align: center">
+<img src="figures/forecast_evaluation-energy-1.png" alt="Energy score of the joint forecast of the four species at each horizon." width="85%" />
+<p class="caption">Energy score of the joint forecast of the four species at each horizon.</p>
+</div>
 
-The GAM's energy score runs from `r e_gam[1]` to `r e_gam[2]` over the
-twelve months. AR and PW stay below `r ceiling(e_max)`. `score()` offers nine more
+
+
+The GAM's energy score runs from 7 to 90 over the
+twelve months. AR and PW stay below 13. `score()` offers nine more
 rules, among them the variogram score for the dependence between series
 and threshold-weighted scores for a range of the response.
 
@@ -293,7 +303,8 @@ which turns the comparison into one of interpolation.
 `save_log_lik = TRUE` keeps the pointwise log densities that the
 stacking weights below require:
 
-```{r lfo}
+
+``` r
 run_lfo <- function(mod) {
   lfo_cv(mod, min_t = 56, fc_horizon = 4, save_log_lik = TRUE,
          silent = 2)
@@ -302,29 +313,30 @@ lfo_gam <- run_lfo(mod_gam)
 lfo_ar <- run_lfo(mod_ar)
 lfo_pw <- run_lfo(mod_pw)
 loo_compare(lfo_gam, lfo_ar, lfo_pw, model_names = c("GAM", "AR", "PW"))
+#>  model elpd_diff se_diff p_worse diag_diff diag_elpd
+#>     AR       0.0     0.0      NA                    
+#>     PW     -34.3     7.7    1.00   N < 100          
+#>    GAM     -69.5     4.7    1.00   N < 100
 ```
 
-```{r lfo-numbers, include = FALSE}
-lc <- loo_compare(lfo_gam, lfo_ar, lfo_pw,
-                  model_names = c("GAM", "AR", "PW"))
-gap <- function(m) {
-  row <- lc[lc$model == m, ]
-  sprintf("%.0f (SE %.0f)", -row$elpd_diff, row$se_diff)
-}
-leader <- lc$model[1]
-trailing <- lc$model[-1]
-```
 
-`r leader` leads. `r trailing[1]` trails it by `r gap(trailing[1])` and
-`r trailing[2]` by `r gap(trailing[2])`. The log score penalises an
+
+AR leads. PW trails it by 34 (SE 8) and
+GAM by 70 (SE 5). The log score penalises an
 observation in the tail of a forecast far more heavily than the CRPS
 does. `compare_elpds()` tabulates the ELPD at each origin:
 
-```{r lfo-plot, fig.asp = 0.55, fig.cap = "Cumulative ELPD over the forecast origins. Open circles mark the origins at which the model was refit."}
+
+``` r
 elpds <- compare_elpds(lfo_gam, lfo_ar, lfo_pw,
                        model_names = c("GAM", "AR", "PW"))
 plot(elpds, cumulative = TRUE)
 ```
+
+<div class="figure" style="text-align: center">
+<img src="figures/forecast_evaluation-lfo-plot-1.png" alt="Cumulative ELPD over the forecast origins. Open circles mark the origins at which the model was refit." width="85%" />
+<p class="caption">Cumulative ELPD over the forecast origins. Open circles mark the origins at which the model was refit.</p>
+</div>
 
 ## A weighted ensemble
 
@@ -335,42 +347,43 @@ computes them from the leave-future-out densities. `ensemble()`
 combines the forecasts in those proportions. `compare_scores()` then
 scores the ensemble with its components:
 
-```{r ensemble}
+
+``` r
 weights <- loo_model_weights(lfo_gam, lfo_ar, lfo_pw, method = "stacking",
                              model_names = c("GAM", "AR", "PW"))
 weights
+#> Method: stacking
+#> ------
+#>     weight
+#> GAM 0.000 
+#> AR  0.668 
+#> PW  0.332
 fc_ens <- ensemble(fc_gam, fc_ar, fc_pw, weights = weights,
                    seed = 2026)
 crps_ens <- compare_scores(fc_gam, fc_ar, fc_pw, fc_ens, score = "crps",
                            model_names = c("GAM", "AR", "PW", "Ensemble"))
 aggregate(score ~ model, FUN = mean,
           data = subset(crps_ens, series != "all_series"))
+#>      model     score
+#> 1      GAM 11.132286
+#> 2       AR  3.945342
+#> 3       PW  3.855793
+#> 4 Ensemble  3.796325
 ```
 
-```{r ensemble-numbers, include = FALSE}
-w <- round(as.numeric(weights), 2)
-ens_table <- aggregate(score ~ model, FUN = mean,
-                       data = subset(crps_ens, series != "all_series"))
-ens <- ens_table$score[ens_table$model == "Ensemble"]
-best_single <- min(ens_table$score[ens_table$model != "Ensemble"])
-fe_ens_rank <- if (ens < best_single) {
-  "the lowest of the four"
-} else {
-  paste0("against ", fe(best_single), " for the best single model")
-}
-```
 
-Stacking gives `r w[1]` to the GAM, `r w[2]` to AR and `r w[3]` to PW.
-The ensemble's mean CRPS on the holdout is `r fe(ens)`,
-`r fe_ens_rank`.
+
+Stacking gives 0 to the GAM, 0.67 to AR and 0.33 to PW.
+The ensemble's mean CRPS on the holdout is 3.80,
+the lowest of the four.
 
 ## Summary
 
 The CRPS and the energy score compared the three forecasts on the
-holdout. Under leave-future-out cross-validation `r leader` led in
+holdout. Under leave-future-out cross-validation AR led in
 ELPD. The GAM's smooths of time extrapolated the end of each series.
 Stacking combined the three forecasts into an ensemble with a mean
-CRPS of `r fe(ens)`. Each step took one or two function calls on the
+CRPS of 3.80. Each step took one or two function calls on the
 fitted models. The CRPS and the log score can rank models differently.
 Choose the scoring rule before scoring any forecast.
 

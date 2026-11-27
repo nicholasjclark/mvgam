@@ -1,31 +1,16 @@
 ---
 title: "State-space vector autoregressions with mvgam"
 author: "Nicholas J Clark"
-date: "`r Sys.Date()`"
+date: "2026-11-27"
 output:
   rmarkdown::html_document:
     toc: yes
     toc_float: yes
 ---
 
-```{r, echo = FALSE}
-knitr::opts_chunk$set(
-  collapse = TRUE,
-  comment = "#>",
-  message = FALSE,
-  warning = FALSE
-)
-```
 
-```{r setup, include = FALSE}
-knitr::opts_chunk$set(
-  echo = TRUE, dpi = 100, fig.asp = 0.62, fig.width = 7,
-  out.width = "85%", fig.align = "center"
-)
-library(mvgam)
-library(ggplot2)
-theme_set(mvgam_theme(base_size = 12))
-```
+
+
 
 Do the plankton of a lake regulate one another from month to month,
 or do they rise and fall with the same seasons and nutrients? A
@@ -68,16 +53,15 @@ Lake Washington (Edmondson and Lehman
 phosphorus averaged over the twelve months to each month measures
 that nutrient loading.
 
-```{r download, eval = FALSE}
+
+``` r
 load(url("https://github.com/atsa-es/MARSS/raw/master/data/lakeWAplankton.rda"))
 ```
 
-```{r saved, include = FALSE}
-# A copy saved with the article. A site build then needs no network.
-lakeWAplanktonTrans <- readRDS("data/lakeWAplanktonTrans.rds")
-```
 
-```{r data}
+
+
+``` r
 lake <- as.data.frame(lakeWAplanktonTrans)
 lake$TP_annual <- as.numeric(
   stats::filter(lake$TP, rep(1 / 12, 12), sides = 1)
@@ -102,7 +86,8 @@ names the taxon and `time` counts the months. The order of the
 levels of `series` fixes the order of the taxa in every output
 below. We hold 1994 out to score forecasts against:
 
-```{r split}
+
+``` r
 train <- plankton[plankton$year < 1994, ]
 test <- plankton[plankton$year == 1994, ]
 ```
@@ -110,9 +95,15 @@ test <- plankton[plankton$year == 1994, ]
 `mvgam_data()` checks the data against the model's requirements and
 plots each series, with the held-out months marked:
 
-```{r plot-data, fig.asp = 0.75, fig.cap = "Monthly log densities of the five taxa, z-scored over 1962 to 1994. The final year is held out."}
+
+``` r
 mvgam_data(train, family = gaussian(), newdata = test)
 ```
+
+<div class="figure" style="text-align: center">
+<img src="figures/var-plot-data-1.png" alt="Monthly log densities of the five taxa, z-scored over 1962 to 1994. The final year is held out." width="85%" />
+<p class="caption">Monthly log densities of the five taxa, z-scored over 1962 to 1994. The final year is held out.</p>
+</div>
 
 Each taxon cycles through the seasons. The unicellular algae also
 decline from 1980 until about 1988 and then level off, with two
@@ -173,7 +164,8 @@ observation standard deviation a formula of its own. With
 `sigma ~ 0 + series`, it takes one value per taxon. The observation
 formula `y ~ -1` adds nothing to the latent state.
 
-```{r fit}
+
+``` r
 fit <- mvgam(
   formula = bf(y ~ -1, sigma ~ 0 + series),
   trend_formula = ~ lv_axis() + TP_annual:lv_axis() +
@@ -199,15 +191,7 @@ January, at the boundary that `knots` places between them.
 $\Sigma$. Passing `newdata` stores the held-out year on the model
 for forecasting. `seed` makes the sampling reproducible.
 
-```{r helpers, include = FALSE}
-# Format an estimate with its interval for inline reporting
-ci <- function(est, lo, hi, digits = 2) {
-  # A value that rounds to zero prints without a minus sign
-  f <- function(v) sub("^-(0\\.0+)$", "\\1",
-                       formatC(v, format = "f", digits = digits))
-  paste0(f(est), " [", f(lo), ", ", f(hi), "]")
-}
-```
+
 
 ## Checking the fit
 
@@ -215,10 +199,16 @@ We first checked that the model reproduces the data. `pp_check()`
 draws replicate data sets from the posterior and overlays their
 densities on the observed one, here separately for each taxon:
 
-```{r ppc, fig.asp = 0.75, fig.cap = "Density of the observed values (dark line) and of 50 replicate data sets drawn from the posterior (light lines), one panel per taxon."}
+
+``` r
 pp_check(fit, type = "dens_overlay_grouped", group = "series",
          ndraws = 50)
 ```
+
+<div class="figure" style="text-align: center">
+<img src="figures/var-ppc-1.png" alt="Density of the observed values (dark line) and of 50 replicate data sets drawn from the posterior (light lines), one panel per taxon." width="85%" />
+<p class="caption">Density of the observed values (dark line) and of 50 replicate data sets drawn from the posterior (light lines), one panel per taxon.</p>
+</div>
 
 The simulated densities bracket the observed density of every taxon.
 They reproduce the two peaks of *Daphnia*, which spends winter scarce
@@ -230,23 +220,32 @@ The covariates and seasonal smooths give each taxon's expected log
 density when no taxon deviates from its mean. `fixef()` with
 `trend_effects = TRUE` reports the coefficients of the trend formula:
 
-```{r fixef}
+
+``` r
 round(fixef(fit, trend_effects = TRUE), 2)
+#>                                   Estimate Est.Error  Q2.5 Q97.5
+#> seriesDiatoms_trend                   0.42      0.26 -0.13  0.90
+#> seriesGreens_trend                    0.21      0.38 -0.51  1.00
+#> seriesUnicells_trend                  0.99      0.39  0.28  1.83
+#> seriesCryptomonas_trend               0.53      0.22  0.09  0.94
+#> seriesDaphnia_trend                   0.03      0.22 -0.40  0.46
+#> seriesDiatoms:TP_annual_trend         0.56      0.57 -0.67  1.60
+#> seriesGreens:TP_annual_trend          0.39      0.79 -1.06  2.00
+#> seriesUnicells:TP_annual_trend        2.82      0.80  1.26  4.51
+#> seriesCryptomonas:TP_annual_trend     0.22      0.46 -0.73  1.09
+#> seriesDaphnia:TP_annual_trend        -0.31      0.47 -1.27  0.63
+#> seriesDiatoms:temp_anom_trend        -0.55      0.31 -1.21  0.05
+#> seriesGreens:temp_anom_trend          0.22      0.44 -0.64  1.12
+#> seriesUnicells:temp_anom_trend       -0.06      0.32 -0.67  0.55
+#> seriesCryptomonas:temp_anom_trend     0.33      0.27 -0.21  0.82
+#> seriesDaphnia:temp_anom_trend         0.18      0.24 -0.29  0.66
 ```
 
-```{r fixef-numbers, include = FALSE}
-fe <- fixef(fit, trend_effects = TRUE)
-fx <- function(term) {
-  row <- paste0(term, "_trend")
-  ci(fe[row, "Estimate"], fe[row, "Q2.5"], fe[row, "Q97.5"])
-}
-fe_tp_uni <- fx("seriesUnicells:TP_annual")
-fe_temp_dia <- fx("seriesDiatoms:temp_anom")
-```
+
 
 Because total phosphorus fell across the record, the positive slope
 of the unicellular algae on phosphorus predicts the decline the first
-figure shows. Their slope is `r fe_tp_uni` standard deviations of log
+figure shows. Their slope is 2.82 [1.26, 4.51] standard deviations of log
 density per unit of phosphorus. The intervals of the other four phosphorus slopes span
 zero.
 
@@ -263,9 +262,21 @@ come from the expected log density under either setting.
 slope of the expected log density over the data, here separately for
 each taxon:
 
-```{r slopes}
+
+``` r
 marginaleffects::avg_slopes(fit, variables = "TP_annual",
                             by = "series", type = "expected")
+#> 
+#>       series Estimate  2.5 % 97.5 %
+#>  Diatoms        0.586 -0.671  1.599
+#>  Greens         0.376 -1.058  2.001
+#>  Unicells       2.818  1.263  4.512
+#>  Cryptomonas    0.219 -0.726  1.088
+#>  Daphnia       -0.303 -1.271  0.631
+#> 
+#> Term: TP_annual
+#> Type: expected
+#> Comparison: dY/dX
 ```
 
 In a Gaussian model with an identity link, each slope has the
@@ -275,20 +286,32 @@ then reports the change on the outcome scale, which the coefficients
 do not give directly. `conditional_effects()` draws each effect with
 the other covariates held at their means:
 
-```{r ce-tp, fig.asp = 0.75, fig.cap = "Expected log density against twelve-month total phosphorus for each taxon, with 95% credible intervals."}
+
+``` r
 conditional_effects(fit, effects = "TP_annual", type = "expected")
 ```
 
+<div class="figure" style="text-align: center">
+<img src="figures/var-ce-tp-1.png" alt="Expected log density against twelve-month total phosphorus for each taxon, with 95% credible intervals." width="85%" />
+<p class="caption">Expected log density against twelve-month total phosphorus for each taxon, with 95% credible intervals.</p>
+</div>
+
 The seasonal smooths carry the cycle that dominated the data plot:
 
-```{r ce-month, fig.asp = 0.75, fig.cap = "Seasonal smooths of expected log density by calendar month, with 95% credible intervals."}
+
+``` r
 conditional_effects(fit, effects = "month", type = "expected")
 ```
+
+<div class="figure" style="text-align: center">
+<img src="figures/var-ce-month-1.png" alt="Seasonal smooths of expected log density by calendar month, with 95% credible intervals." width="85%" />
+<p class="caption">Seasonal smooths of expected log density by calendar month, with 95% credible intervals.</p>
+</div>
 
 Diatoms peak in spring and reach their low in autumn. Green algae and
 *Daphnia* peak in mid-summer. *Cryptomonas* peaks in April. The
 temperature anomaly adds little once season is in the model. Its
-largest slope, for the diatoms, is `r fe_temp_dia`.
+largest slope, for the diatoms, is -0.55 [-1.21, 0.05].
 
 ## Interactions among the taxa
 
@@ -296,48 +319,53 @@ largest slope, for the diatoms, is `r fe_temp_dia`.
 cell by cell. Row $i$, column $j$ is the effect of taxon $j$'s deviation last
 month on taxon $i$'s deviation this month:
 
-```{r A}
+
+``` r
 A <- posterior_transition_matrix(fit)
 A
+#> Lag-1 VAR transition matrix from an mvgam fit
+#>   Group      : single-panel
+#>   Dimension  : 5 x 5
+#>   Mean |A_ij| (i != j): 0.10
+#>   Point estimate:
+#>             Diatoms Greens Unicells Cryptomonas Daphnia
+#> Diatoms        0.38  -0.03    -0.02        0.30   -0.19
+#> Greens        -0.08   0.40     0.14        0.05    0.14
+#> Unicells      -0.08   0.02     0.64       -0.12   -0.15
+#> Cryptomonas   -0.05   0.00     0.06        0.50   -0.23
+#> Daphnia        0.04  -0.02     0.08        0.16    0.48
+#>   95% CI on each cell available in `A_lower` / `A_upper`.
 ```
 
-```{r A-numbers, include = FALSE}
-cell <- function(i, j) ci(A$A[i, j], A$A_lower[i, j], A$A_upper[i, j])
-fe_a_dc <- cell("Cryptomonas", "Daphnia")
-fe_a_cd <- cell("Daphnia", "Cryptomonas")
-fe_a_dia <- cell("Diatoms", "Cryptomonas")
-fe_a_cd_pos <- sprintf("%.0f%%",
-                       100 * A$prob_positive["Daphnia", "Cryptomonas"])
-fe_a_diag <- sprintf("%.2f", range(diag(A$A)))
-clear <- A$A_lower > 0 | A$A_upper < 0
-diag(clear) <- FALSE
-n_clear <- sum(clear)
-more_fewer <- function(x) if (x < 0) "fewer" else "more"
-dc_word <- more_fewer(A$A["Cryptomonas", "Daphnia"])
-dia_word <- more_fewer(A$A["Diatoms", "Cryptomonas"])
-```
+
 
 The diagonal describes persistence. Each taxon's deviation carries a
-coefficient between `r fe_a_diag[1]` and `r fe_a_diag[2]` into the
+coefficient between 0.38 and 0.64 into the
 next month. The heatmap outlines each cell whose sign has a posterior
 probability above 0.95:
 
-```{r plot-A, fig.width = 6, fig.asp = 0.8, fig.cap = "Posterior mean of the transition matrix. Rows are the taxa at month t and columns the taxa at month t - 1. Outlined cells have a posterior probability of their sign above 0.95."}
+
+``` r
 plot(A)
 ```
 
-In this fit, `r n_clear` of the 20 off-diagonal cells clear zero.
+<div class="figure" style="text-align: center">
+<img src="figures/var-plot-A-1.png" alt="Posterior mean of the transition matrix. Rows are the taxa at month t and columns the taxa at month t - 1. Outlined cells have a posterior probability of their sign above 0.95." width="85%" />
+<p class="caption">Posterior mean of the transition matrix. Rows are the taxa at month t and columns the taxa at month t - 1. Outlined cells have a posterior probability of their sign above 0.95.</p>
+</div>
+
+In this fit, 1 of the 20 off-diagonal cells clear zero.
 Two cells have an ecological interpretation. The first is grazing. A month
-with more *Daphnia* than expected is followed by `r dc_word`
-*Cryptomonas*, with a coefficient of `r fe_a_dc`. The effect of
-*Cryptomonas* on *Daphnia* is `r fe_a_cd`. It is positive in
-`r fe_a_cd_pos` of the posterior draws, which suggests that more food
+with more *Daphnia* than expected is followed by fewer
+*Cryptomonas*, with a coefficient of -0.23 [-0.44, -0.04]. The effect of
+*Cryptomonas* on *Daphnia* is 0.16 [-0.10, 0.56]. It is positive in
+89% of the posterior draws, which suggests that more food
 in one month brings more grazers in the next. Fourteen years of
 monthly data do not settle that effect.
 
 The second cell links *Cryptomonas* to the diatoms. A month with more
-*Cryptomonas* than expected is followed by `r dia_word` diatoms, with
-a coefficient of `r fe_a_dia`. Because no feeding link runs between
+*Cryptomonas* than expected is followed by more diatoms, with
+a coefficient of 0.30 [-0.01, 0.77]. Because no feeding link runs between
 two phytoplankton groups, the likelier source is a driver the model
 omits, such as a change in mixing that favours one group before the
 other. A coefficient in $A$ records that one deviation predicts
@@ -352,46 +380,55 @@ that the covariates miss would appear as a correlation between the
 shocks of the taxa it affects. `residual_cor()` with
 `covariance = "innovation"` reports these correlations:
 
-```{r rc-innov}
+
+``` r
 rc_innov <- residual_cor(fit, covariance = "innovation")
 summary(rc_innov)
+#> # A tibble: 10 × 11
+#>    series_1    series_2   Estimate Est.Error Q_lower Q_upper   ESS prob_positive
+#>    <chr>       <chr>         <dbl>     <dbl>   <dbl>   <dbl> <dbl>         <dbl>
+#>  1 Unicells    Cryptomon…   0.465     0.136   0.260   0.670   171.         1    
+#>  2 Diatoms     Cryptomon…   0.269     0.134   0.0425  0.518   266.         0.995
+#>  3 Cryptomonas Daphnia      0.245     0.113   0.0371  0.442  1188.         0.987
+#>  4 Diatoms     Unicells     0.171     0.101  -0.0214  0.363   568.         0.959
+#>  5 Unicells    Daphnia     -0.142     0.100  -0.331   0.0543 1136.         0.073
+#>  6 Diatoms     Greens       0.125     0.0928 -0.0646  0.298  1260.         0.908
+#>  7 Diatoms     Daphnia      0.108     0.105  -0.100   0.303   567.         0.850
+#>  8 Greens      Cryptomon…   0.107     0.108  -0.108   0.309   917.         0.849
+#>  9 Greens      Daphnia      0.0333    0.0965 -0.161   0.223   838.         0.639
+#> 10 Greens      Unicells    -0.0120    0.0980 -0.205   0.175  1210.         0.456
+#> # ℹ 3 more variables: prob_negative <dbl>, prob_nonzero <dbl>, sig <lgl>
 ```
 
-```{r rc-numbers, include = FALSE}
-pair <- function(rc, a, b) {
-  s <- summary(rc)
-  r <- s[(s$series_1 == a & s$series_2 == b) |
-           (s$series_1 == b & s$series_2 == a), ]
-  ci(r$Estimate, r$Q_lower, r$Q_upper)
-}
-fe_i_uc <- pair(rc_innov, "Unicells", "Cryptomonas")
-fe_i_cd <- pair(rc_innov, "Cryptomonas", "Daphnia")
-```
+
 
 The shocks of the unicellular algae and *Cryptomonas* correlate most
-strongly, at `r fe_i_uc`. The model holds no covariate that would explain the shared rise.
+strongly, at 0.47 [0.26, 0.67]. The model holds no covariate that would explain the shared rise.
 
 The default, `covariance = "stationary"`, correlates the deviations
 themselves. Each deviation accumulates the shocks of many months,
 passed through $A$:
 
-```{r rc-stat, fig.width = 6, fig.asp = 0.8, fig.cap = "Posterior mean correlations among the deviations of the five taxa. Outlined pairs have a posterior probability of their sign above 0.95."}
+
+``` r
 rc <- residual_cor(fit)
 plot(rc)
 ```
 
-```{r rc-stat-numbers, include = FALSE}
-fe_s_uc <- pair(rc, "Unicells", "Cryptomonas")
-fe_s_cd <- pair(rc, "Cryptomonas", "Daphnia")
-```
+<div class="figure" style="text-align: center">
+<img src="figures/var-rc-stat-1.png" alt="Posterior mean correlations among the deviations of the five taxa. Outlined pairs have a posterior probability of their sign above 0.95." width="85%" />
+<p class="caption">Posterior mean correlations among the deviations of the five taxa. Outlined pairs have a posterior probability of their sign above 0.95.</p>
+</div>
+
+
 
 The two correlations differ where $A$ couples the taxa. The shocks of
-*Cryptomonas* and *Daphnia* correlate at `r fe_i_cd`. Their
-deviations correlate at `r fe_s_cd`. Grazing passes each shock to the
+*Cryptomonas* and *Daphnia* correlate at 0.25 [0.04, 0.44]. Their
+deviations correlate at 0.21 [-0.01, 0.42]. Grazing passes each shock to the
 other taxon over the following months, which changes the correlation
 the shared shocks create. $A$ barely couples the unicellular algae and
-*Cryptomonas*. Their correlations are `r fe_i_uc` for the shocks and
-`r fe_s_uc` for the deviations.
+*Cryptomonas*. Their correlations are 0.47 [0.26, 0.67] for the shocks and
+0.49 [0.27, 0.68] for the deviations.
 
 ## Impulse responses
 
@@ -404,53 +441,33 @@ one taxon brings with it the shocks that its correlated taxa receive
 in the same month, in the proportions $\Sigma$ implies. Horizon 1 is
 the month of the shock.
 
-```{r irf}
+
+``` r
 irfs <- irf(fit, h = 12)
 ```
 
 `plot()` with `series = 5` draws the responses to a shock in the
 fifth taxon, *Daphnia*:
 
-```{r plot-irf, fig.asp = 0.75, fig.cap = "Generalised impulse responses of each taxon to a one standard deviation shock in Daphnia, with 95% credible intervals. Horizon 1 is the month of the shock."}
+
+``` r
 plot(irfs, series = 5)
 ```
 
-```{r irf-numbers, include = FALSE}
-ir <- as.data.frame(irfs)
-resp <- function(shock, h) {
-  r <- ir[ir$shock == shock & ir$horizon == h, ]
-  ci(r$irfQ50, r$irfQ2.5, r$irfQ97.5)
-}
-fe_ir_dd1 <- resp("Daphnia -> Daphnia", 1)
-fe_ir_dc1 <- resp("Daphnia -> Cryptomonas", 1)
-fe_ir_dc3 <- resp("Daphnia -> Cryptomonas", 3)
-fe_ir_du2 <- resp("Daphnia -> Unicells", 2)
-own_d <- ir[ir$shock == "Daphnia -> Daphnia", ]
-h_dd <- own_d$horizon[which(abs(own_d$irfQ50) < 0.05)[1]]
-fe_dd_decay <- if (is.na(h_dd)) {
-  "The rise stays above 0.05 through month twelve."
-} else {
-  paste0("The rise falls below 0.05 by month ", h_dd, ".")
-}
-from_daphnia <- ir[startsWith(ir$shock, "Daphnia ->"), ]
-settled <- vapply(seq_len(12), function(h) {
-  all(abs(from_daphnia$irfQ50[from_daphnia$horizon >= h]) < 0.01)
-}, logical(1))
-fe_settle <- if (any(settled)) {
-  paste0("Every response stays within 0.01 of zero from month ",
-         which(settled)[1], ".")
-} else {
-  "Some responses stay above 0.01 at month twelve."
-}
-```
+<div class="figure" style="text-align: center">
+<img src="figures/var-plot-irf-1.png" alt="Generalised impulse responses of each taxon to a one standard deviation shock in Daphnia, with 95% credible intervals. Horizon 1 is the month of the shock." width="85%" />
+<p class="caption">Generalised impulse responses of each taxon to a one standard deviation shock in Daphnia, with 95% credible intervals. Horizon 1 is the month of the shock.</p>
+</div>
 
-A shock raises *Daphnia* by `r fe_ir_dd1` in its first month.
-`r fe_dd_decay` Because the shocks of *Daphnia* and *Cryptomonas* are
+
+
+A shock raises *Daphnia* by 0.43 [0.36, 0.49] in its first month.
+The rise falls below 0.05 by month 4. Because the shocks of *Daphnia* and *Cryptomonas* are
 correlated, *Cryptomonas* moves with *Daphnia* in the first month, by
-`r fe_ir_dc1`. Grazing then acts through $A$. In the third month
-*Cryptomonas* is at `r fe_ir_dc3` relative to its expected level. The
-unicellular algae change by `r fe_ir_du2` in the second month.
-`r fe_settle`
+0.10 [0.01, 0.19]. Grazing then acts through $A$. In the third month
+*Cryptomonas* is at -0.08 [-0.17, 0.00] relative to its expected level. The
+unicellular algae change by -0.13 [-0.23, -0.04] in the second month.
+Every response stays within 0.01 of zero from month 7.
 
 ## Variance decompositions
 
@@ -462,36 +479,28 @@ shocks of two taxa correlate, the factor assigns the shared part to
 whichever taxon comes first. The diatoms come first and keep all of
 their own shock.
 
-```{r fevd, fig.width = 8, fig.asp = 0.6, fig.cap = "Median share of each taxon's forecast error variance that each source of shocks generates, by forecast horizon. Panels are the taxa forecast. Colours are the taxa whose shocks generate the variance."}
+
+``` r
 fevds <- fevd(fit, h = 12)
 plot(fevds)
 ```
 
-```{r fevd-numbers, include = FALSE}
-fv <- as.data.frame(fevds)
-share <- function(shock, h) {
-  r <- fv[fv$shock == shock & fv$horizon == h, ]
-  sprintf("%.0f%%", 100 * r$fevdQ50)
-}
-fe_fv_uc1 <- share("Unicells -> Cryptomonas", 1)
-fe_fv_uc12 <- share("Unicells -> Cryptomonas", 12)
-fe_fv_cd12 <- share("Cryptomonas -> Daphnia", 12)
-own <- vapply(strsplit(fv$shock, " -> ", fixed = TRUE),
-              function(s) s[1] == s[2], logical(1))
-others <- own & fv$horizon == 12 &
-  fv$shock != "Cryptomonas -> Cryptomonas"
-fe_fv_own <- sprintf("%.0f%%", 100 * range(fv$fevdQ50[others]))
-```
+<div class="figure" style="text-align: center">
+<img src="figures/var-fevd-1.png" alt="Median share of each taxon's forecast error variance that each source of shocks generates, by forecast horizon. Panels are the taxa forecast. Colours are the taxa whose shocks generate the variance." width="85%" />
+<p class="caption">Median share of each taxon's forecast error variance that each source of shocks generates, by forecast horizon. Panels are the taxa forecast. Colours are the taxa whose shocks generate the variance.</p>
+</div>
+
+
 
 For every taxon but *Cryptomonas*, its own shocks generate most of
 its forecast variance. At twelve months those own shares run from
-`r fe_fv_own[1]` to `r fe_fv_own[2]`. For *Cryptomonas*, the unicellular
-algae generate `r fe_fv_uc1` of its forecast variance in the first
-month and `r fe_fv_uc12` by month twelve. Most of that share comes
+68% to 91%. For *Cryptomonas*, the unicellular
+algae generate 18% of its forecast variance in the first
+month and 22% by month twelve. Most of that share comes
 from the correlation of the two taxa's shocks. The ordering assigns
 it to the unicellular algae because they come first. The coupling of
 the two taxa appears in the *Daphnia* panel, where *Cryptomonas* shocks generate
-`r fe_fv_cd12` of the twelve-month forecast variance. Reordering the
+16% of the twelve-month forecast variance. Reordering the
 levels of `series` and refitting would move the shared part of each
 correlated pair to the other taxon. The generalised impulse responses
 above are the same in any order.
@@ -510,31 +519,24 @@ dominates, the distance from the means shrinks by about this factor
 each month. The variance return rate is its square. It describes how
 fast the forecast variance settles.
 
-```{r stability, fig.width = 8, fig.asp = 0.4, fig.cap = "Posterior distributions of reactivity and of the mean and variance return rates. The dashed line marks zero reactivity."}
+
+``` r
 stab <- stability(fit)
 plot(stab)
 ```
 
-```{r stability-numbers, include = FALSE}
-st <- function(m) {
-  r <- stab[stab$metric == m, ]
-  ci(r$Estimate, r$Q2.5, r$Q97.5)
-}
-fe_react <- st("reactivity")
-fe_react_neg <- sprintf(
-  "%.0f%%",
-  100 * mean(stability(fit, summary = FALSE)$reactivity < 0)
-)
-fe_mrr <- st("mean_return_rate")
-mrr <- stab$Estimate[stab$metric == "mean_return_rate"]
-fe_half <- sprintf("%.1f", log(0.5) / log(mrr))
-```
+<div class="figure" style="text-align: center">
+<img src="figures/var-stability-1.png" alt="Posterior distributions of reactivity and of the mean and variance return rates. The dashed line marks zero reactivity." width="85%" />
+<p class="caption">Posterior distributions of reactivity and of the mean and variance return rates. The dashed line marks zero reactivity.</p>
+</div>
 
-Reactivity is `r fe_react`, with `r fe_react_neg` of the posterior
+
+
+Reactivity is -0.16 [-0.38, 0.33], with 86% of the posterior
 below zero. The data favour a community that damps every
 perturbation from the first month. They do not exclude one that
 briefly amplifies some perturbations. The mean return rate is
-`r fe_mrr`. At the median, a deviation halves in about `r fe_half`
+0.65 [0.54, 0.78]. At the median, a deviation halves in about 1.6
 months. The plankton community returns to its seasonal and
 nutrient-driven means within a season.
 
@@ -544,10 +546,16 @@ Passing `newdata` at fitting stored 1994 on the model. `forecast()`
 projects the fitted states forward through those twelve months and
 adds observation error:
 
-```{r forecast, fig.width = 8, fig.asp = 0.6, fig.cap = "Fitted values to the end of 1993 and forecasts for 1994 (right of the dashed line), with observations as points."}
+
+``` r
 fc <- forecast(fit)
 plot(fc)
 ```
+
+<div class="figure" style="text-align: center">
+<img src="figures/var-forecast-1.png" alt="Fitted values to the end of 1993 and forecasts for 1994 (right of the dashed line), with observations as points." width="85%" />
+<p class="caption">Fitted values to the end of 1993 and forecasts for 1994 (right of the dashed line), with observations as points.</p>
+</div>
 
 `score()` compares the forecast distributions with the 1994
 observations. The continuous ranked probability score (CRPS) measures
@@ -556,19 +564,27 @@ the units of the data. Lower is better. Printing the scores gives each
 taxon's mean CRPS and the share of its observations inside the 90%
 forecast interval:
 
-```{r score}
+
+``` r
 sc <- score(fc, score = "crps")
 sc
+#> CRPS of 5 forecast series, lower is better
+#> 
+#>  series      mean_score coverage times
+#>  Diatoms     0.38       0.92     12   
+#>  Greens      0.47       1.00     12   
+#>  Unicells    0.31       1.00     12   
+#>  Cryptomonas 0.33       0.92     12   
+#>  Daphnia     0.24       1.00     12   
+#>  all_series  1.70                12   
+#> 
+#> 'all_series' sums the series at each time.
+#> 'coverage' is the share inside the 90% interval.
 ```
 
-```{r score-numbers, include = FALSE}
-inside <- sum(vapply(taxa, function(t) sum(sc[[t]]$in_interval,
-                                           na.rm = TRUE), numeric(1)))
-scored <- sum(vapply(taxa, function(t) sum(!is.na(sc[[t]]$score)),
-                     numeric(1)))
-```
 
-Of the `r scored` observations in 1994, `r inside` fell inside their
+
+Of the 60 observations in 1994, 58 fell inside their
 90% intervals, close to the coverage the intervals claim. The CRPS
 compares models scored on the same data, such as this VAR against an
 independent autoregression for each taxon. The
@@ -577,7 +593,7 @@ works through that comparison with leave-future-out
 cross-validation.
 
 The plankton of Lake Washington rise and fall mostly with the seasons
-and with phosphorus. In this fit, `r n_clear` of the 20 lagged
+and with phosphorus. In this fit, 1 of the 20 lagged
 interactions among the taxa separate from zero. The community damps a perturbation within a season. The
 forecasts for the held-out year keep close to their stated
 coverage.
