@@ -2,6 +2,12 @@
 
 ## mvgam (development version)
 
+- `dpar` returns a distributional parameter, such as `sigma` in
+  `bf(y ~ x, sigma ~ z)`, from `posterior_epred()`,
+  [`fitted()`](https://rdrr.io/r/stats/fitted.values.html) and
+  [`conditional_effects()`](https://paulbuerkner.com/brms/reference/conditional_effects.brmsfit.html).
+  The marginaleffects functions take it too
+
 ## mvgam 2.0.0
 
 CRAN release: 2026-11-27

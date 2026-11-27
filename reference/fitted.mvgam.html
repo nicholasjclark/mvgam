@@ -90,6 +90,7 @@ default. The interface follows
 <span>  components <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"response"</span>, <span class="st">"latent_state"</span>, <span class="st">"detection"</span><span class="op">)</span>,</span>
 <span>  unit_level <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  resp <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  dpar <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  ndraws <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  draw_ids <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  summary <span class="op">=</span> <span class="cn">TRUE</span>,</span>
@@ -158,6 +159,14 @@ that do not aggregate visits.</p></dd>
 <dd><p>Character specifying which response variable for
 multivariate models. NULL (default) returns predictions for all
 responses.</p></dd>
+
+
+<dt id="arg-dpar">dpar<a class="anchor" aria-label="anchor" href="#arg-dpar"></a></dt>
+<dd><p>Character naming a distributional parameter, such as
+<code>"sigma"</code> or <code>"phi"</code>. The default <code>NULL</code> returns the fitted values
+of the response. A named parameter is returned on its own scale
+under <code>scale = "response"</code> and on its link scale under
+<code>scale = "linear"</code>. It applies to <code>components = "response"</code> only.</p></dd>
 
 
 <dt id="arg-ndraws">ndraws<a class="anchor" aria-label="anchor" href="#arg-ndraws"></a></dt>
@@ -255,9 +264,8 @@ state. With <code>newdata</code>, or under <code>incl_autocor = FALSE</code>, th
 values describe the covariate part of the model. <code>process_error</code> then
 sets the trend's part. <code>FALSE</code> keeps the trend's covariate effects.
 <code>TRUE</code> also samples a state per draw from the trend's dynamics.</p>
-<p>The brms arguments <code>dpar</code>, <code>nlpar</code> and <code>sort</code> are refused.
-<code><a href="posterior_linpred.mvgam.html">posterior_linpred.mvgam()</a></code> returns a distributional parameter
-through its own <code>dpar</code>. Rows come back in the order of the frame.</p>
+<p>The brms arguments <code>nlpar</code> and <code>sort</code> are refused. Rows come back in
+the order of the frame.</p>
     </div>
     <div class="section level2">
     <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>

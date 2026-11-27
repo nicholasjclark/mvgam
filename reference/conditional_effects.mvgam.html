@@ -121,6 +121,7 @@ interval, named as in brms and <code><a href="conditional_smooths.mvgam.html">co
 <span>  process_error <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  series <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  resp <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  dpar <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  <span class="va">...</span></span>
 <span><span class="op">)</span></span>
 <span></span>
@@ -197,6 +198,16 @@ the prediction grid to its observations.</p></dd>
 <dd><p>Character specifying which response variable for
 multivariate models. NULL (default) returns predictions for all
 responses.</p></dd>
+
+
+<dt id="arg-dpar">dpar<a class="anchor" aria-label="anchor" href="#arg-dpar"></a></dt>
+<dd><p>Character naming a distributional parameter with a
+formula of its own, such as <code>sigma</code> in <code>bf(y ~ x, sigma ~ z)</code>. The
+panels then draw that parameter in place of the response, as
+<code><a href="posterior_epred.mvgam.html">posterior_epred.mvgam()</a></code> returns it. <code>type = "expected"</code> (the
+default) and <code>"response"</code> draw it on its own scale, <code>"link"</code> on its
+link scale. The parameter is off the observations' scale. <code>points</code>
+and <code>rug</code> then draw nothing.</p></dd>
 
 
 <dt id="arg--">...<a class="anchor" aria-label="anchor" href="#arg--"></a></dt>
@@ -283,6 +294,21 @@ effects in both formulas.</p>
 <span class="r-in"><span><span class="co"># The same effect on the log link scale</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://paulbuerkner.com/brms/reference/conditional_effects.brmsfit.html" class="external-link">conditional_effects</a></span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">"link"</span><span class="op">)</span></span></span>
 <span class="r-plt img"><img src="conditional_effects.mvgam-2.png" alt="" width="700" height="433"></span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># A covariate of the observation SD, drawn as the SD itself</span></span></span>
+<span class="r-in"><span><span class="va">gaus</span> <span class="op">&lt;-</span> <span class="fu"><a href="sim_mvgam.html">sim_mvgam</a></span><span class="op">(</span>family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">gaussian</a></span><span class="op">(</span><span class="op">)</span>, n_series <span class="op">=</span> <span class="fl">1L</span>,</span></span>
+<span class="r-in"><span>                  n_timepoints <span class="op">=</span> <span class="fl">120L</span>, trend_model <span class="op">=</span> <span class="fu"><a href="trend_constructors.html">AR</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span><span class="op">$</span><span class="va">data_train</span></span></span>
+<span class="r-in"><span><span class="va">gaus</span><span class="op">$</span><span class="va">weather</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">rnorm</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">nrow</a></span><span class="op">(</span><span class="va">gaus</span><span class="op">)</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">mod_sigma</span> <span class="op">&lt;-</span> <span class="fu"><a href="mvgam.html">mvgam</a></span><span class="op">(</span><span class="fu"><a href="https://paulbuerkner.com/brms/reference/brmsformula.html" class="external-link">bf</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="fu">s</span><span class="op">(</span><span class="va">x</span>, k <span class="op">=</span> <span class="fl">5</span><span class="op">)</span>, <span class="va">sigma</span> <span class="op">~</span> <span class="va">weather</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>                   trend_formula <span class="op">=</span> <span class="op">~</span> <span class="fu"><a href="trend_constructors.html">AR</a></span><span class="op">(</span>p <span class="op">=</span> <span class="fl">1</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>                   data <span class="op">=</span> <span class="va">gaus</span>, family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">gaussian</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>                   chains <span class="op">=</span> <span class="fl">2</span>, silent <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 446 of 2000 (22.0%) transitions ended with a divergence.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> See https://mc-stan.org/misc/warnings for details.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 2 of 2 chains had an E-BFMI less than 0.3.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> See https://mc-stan.org/misc/warnings for details.</span>
+<span class="r-in"><span><span class="fu"><a href="https://paulbuerkner.com/brms/reference/conditional_effects.brmsfit.html" class="external-link">conditional_effects</a></span><span class="op">(</span><span class="va">mod_sigma</span>, effects <span class="op">=</span> <span class="st">"weather"</span>, dpar <span class="op">=</span> <span class="st">"sigma"</span><span class="op">)</span></span></span>
+<span class="r-plt img"><img src="conditional_effects.mvgam-3.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># The average slope of the expected count with respect to x</span></span></span>
 <span class="r-in"><span><span class="fu">marginaleffects</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/marginaleffects/man/slopes.html" class="external-link">avg_slopes</a></span><span class="op">(</span><span class="va">mod</span>, variables <span class="op">=</span> <span class="st">"x"</span>, type <span class="op">=</span> <span class="st">"expected"</span><span class="op">)</span></span></span>

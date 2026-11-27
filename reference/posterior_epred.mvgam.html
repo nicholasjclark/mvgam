@@ -96,6 +96,7 @@ noise around these means.</p>
 <span>  allow_new_levels <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  sample_new_levels <span class="op">=</span> <span class="st">"uncertainty"</span>,</span>
 <span>  resp <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  dpar <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  <span class="va">...</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
@@ -193,6 +194,15 @@ distribution. Each distributional parameter draws its own.</p></dd>
 <dd><p>Character specifying which response variable for
 multivariate models. NULL (default) returns predictions for all
 responses.</p></dd>
+
+
+<dt id="arg-dpar">dpar<a class="anchor" aria-label="anchor" href="#arg-dpar"></a></dt>
+<dd><p>Character naming a distributional parameter, such as
+<code>"sigma"</code> or <code>"phi"</code>. The default <code>NULL</code> returns the expected value
+of the response. A named parameter is returned on its own scale,
+as <code><a href="posterior_linpred.mvgam.html">posterior_linpred.mvgam()</a></code> returns it with <code>transform = TRUE</code>.
+Because mvgam allows no trend term in a distributional formula,
+<code>process_error</code> and <code>incl_autocor</code> leave it unchanged.</p></dd>
 
 
 <dt id="arg--">...<a class="anchor" aria-label="anchor" href="#arg--"></a></dt>

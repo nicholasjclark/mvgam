@@ -115,6 +115,16 @@ that state as <code>"latent_N"</code>. Each row of a grid from
 <code><a href="https://rdrr.io/pkg/marginaleffects/man/datagrid.html" class="external-link">marginaleffects::datagrid()</a></code> becomes its own closure unit.</p>
     </div>
     <div class="section level2">
+    <h2 id="distributional-parameters">Distributional parameters<a class="anchor" aria-label="anchor" href="#distributional-parameters"></a></h2>
+
+
+<p><code>dpar</code> names a distributional parameter with a formula of its own,
+such as <code>sigma</code> in <code>bf(y ~ x, sigma ~ z)</code>. <code>type = "expected"</code> gives
+it on its own scale and <code>type = "link"</code> on its link scale. A
+parameter has no observation noise. Its <code>"response"</code> is its
+expectation. The closure-unit types are refused with <code>dpar</code>.</p>
+    </div>
+    <div class="section level2">
     <h2 id="the-latent-trend">The latent trend<a class="anchor" aria-label="anchor" href="#the-latent-trend"></a></h2>
 
 

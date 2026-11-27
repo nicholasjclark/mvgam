@@ -17,6 +17,7 @@ fitted(
   components = c("response", "latent_state", "detection"),
   unit_level = NULL,
   resp = NULL,
+  dpar = NULL,
   ndraws = NULL,
   draw_ids = NULL,
   summary = TRUE,
@@ -99,6 +100,14 @@ fitted(
 
   Character specifying which response variable for multivariate models.
   NULL (default) returns predictions for all responses.
+
+- dpar:
+
+  Character naming a distributional parameter, such as `"sigma"` or
+  `"phi"`. The default `NULL` returns the fitted values of the response.
+  A named parameter is returned on its own scale under
+  `scale = "response"` and on its link scale under `scale = "linear"`.
+  It applies to `components = "response"` only.
 
 - ndraws:
 
@@ -206,10 +215,8 @@ the fitted values describe the covariate part of the model.
 covariate effects. `TRUE` also samples a state per draw from the trend's
 dynamics.
 
-The brms arguments `dpar`, `nlpar` and `sort` are refused.
-[`posterior_linpred.mvgam()`](https://nicholasjclark.github.io/mvgam/reference/posterior_linpred.mvgam.md)
-returns a distributional parameter through its own `dpar`. Rows come
-back in the order of the frame.
+The brms arguments `nlpar` and `sort` are refused. Rows come back in the
+order of the frame.
 
 ## See also
 

@@ -34,6 +34,7 @@ conditional_effects(
   process_error = FALSE,
   series = NULL,
   resp = NULL,
+  dpar = NULL,
   ...
 )
 
@@ -115,6 +116,16 @@ as.data.frame(x, row.names = NULL, optional = FALSE, ...)
 
   Character specifying which response variable for multivariate models.
   NULL (default) returns predictions for all responses.
+
+- dpar:
+
+  Character naming a distributional parameter with a formula of its own,
+  such as `sigma` in `bf(y ~ x, sigma ~ z)`. The panels then draw that
+  parameter in place of the response, as
+  [`posterior_epred.mvgam()`](https://nicholasjclark.github.io/mvgam/reference/posterior_epred.mvgam.md)
+  returns it. `type = "expected"` (the default) and `"response"` draw it
+  on its own scale, `"link"` on its link scale. The parameter is off the
+  observations' scale. `points` and `rug` then draw nothing.
 
 - ...:
 
@@ -210,6 +221,21 @@ conditional_effects(mod, points = TRUE)
 
 # The same effect on the log link scale
 conditional_effects(mod, type = "link")
+
+
+# A covariate of the observation SD, drawn as the SD itself
+gaus <- sim_mvgam(family = gaussian(), n_series = 1L,
+                  n_timepoints = 120L, trend_model = AR())$data_train
+gaus$weather <- rnorm(nrow(gaus))
+mod_sigma <- mvgam(bf(y ~ s(x, k = 5), sigma ~ weather),
+                   trend_formula = ~ AR(p = 1),
+                   data = gaus, family = gaussian(),
+                   chains = 2, silent = 2)
+#> Warning: 446 of 2000 (22.0%) transitions ended with a divergence.
+#> See https://mc-stan.org/misc/warnings for details.
+#> Warning: 2 of 2 chains had an E-BFMI less than 0.3.
+#> See https://mc-stan.org/misc/warnings for details.
+conditional_effects(mod_sigma, effects = "weather", dpar = "sigma")
 
 
 # The average slope of the expected count with respect to x

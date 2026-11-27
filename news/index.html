@@ -67,7 +67,9 @@
 
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="development version" id="mvgam-development-version">mvgam (development version)<a class="anchor" aria-label="anchor" href="#mvgam-development-version"></a></h2>
-</div>
+<ul><li>
+<code>dpar</code> returns a distributional parameter, such as <code>sigma</code> in <code>bf(y ~ x, sigma ~ z)</code>, from <code>posterior_epred()</code>, <code><a href="https://rdrr.io/r/stats/fitted.values.html" class="external-link">fitted()</a></code> and <code><a href="https://paulbuerkner.com/brms/reference/conditional_effects.brmsfit.html" class="external-link">conditional_effects()</a></code>. The marginaleffects functions take it too</li>
+</ul></div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="2.0.0" id="mvgam-200">mvgam 2.0.0<a class="anchor" aria-label="anchor" href="#mvgam-200"></a></h2><p class="text-muted">CRAN release: 2026-11-27</p>
 <p>mvgam now builds its models through ‘brms’. The observation model takes the full ‘brms’ formula syntax. <code>trend_formula</code> specifies the latent process. Most 1.1.x code needs rewriting. Start with <code><a href="../articles/mvgam_overview.html">vignette("mvgam_overview")</a></code> and <code><a href="../articles/data.html">vignette("data")</a></code>. The <a href="https://nicholasjclark.github.io/mvgam/articles/">articles</a> work through each model class.</p>

@@ -45,6 +45,14 @@ list, which records that state as `"latent_N"`. Each row of a grid from
 [`marginaleffects::datagrid()`](https://rdrr.io/pkg/marginaleffects/man/datagrid.html)
 becomes its own closure unit.
 
+## Distributional parameters
+
+`dpar` names a distributional parameter with a formula of its own, such
+as `sigma` in `bf(y ~ x, sigma ~ z)`. `type = "expected"` gives it on
+its own scale and `type = "link"` on its link scale. A parameter has no
+observation noise. Its `"response"` is its expectation. The closure-unit
+types are refused with `dpar`.
+
 ## The latent trend
 
 By default (`process_error = FALSE`) each prediction takes the covariate

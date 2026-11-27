@@ -22,6 +22,7 @@ posterior_epred(
   allow_new_levels = FALSE,
   sample_new_levels = "uncertainty",
   resp = NULL,
+  dpar = NULL,
   ...
 )
 ```
@@ -132,6 +133,16 @@ posterior_epred(
 
   Character specifying which response variable for multivariate models.
   NULL (default) returns predictions for all responses.
+
+- dpar:
+
+  Character naming a distributional parameter, such as `"sigma"` or
+  `"phi"`. The default `NULL` returns the expected value of the
+  response. A named parameter is returned on its own scale, as
+  [`posterior_linpred.mvgam()`](https://nicholasjclark.github.io/mvgam/reference/posterior_linpred.mvgam.md)
+  returns it with `transform = TRUE`. Because mvgam allows no trend term
+  in a distributional formula, `process_error` and `incl_autocor` leave
+  it unchanged.
 
 - ...:
 
