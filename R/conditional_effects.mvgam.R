@@ -40,6 +40,13 @@
 #'   panel per series. `"all"` draws a panel per series for any model.
 #'   A single integer or character value picks one series and filters
 #'   the prediction grid to its observations.
+#' @param dpar Character naming a distributional parameter with a
+#'   formula of its own, such as `sigma` in `bf(y ~ x, sigma ~ z)`. The
+#'   panels then draw that parameter in place of the response, as
+#'   [posterior_epred.mvgam()] returns it. `type = "expected"` (the
+#'   default) and `"response"` draw it on its own scale, `"link"` on its
+#'   link scale. The parameter is off the observations' scale. `points`
+#'   and `rug` then draw nothing.
 #' @inheritParams forecast.mvgam
 #' @param ... For `conditional_effects()`, further arguments of
 #'   [marginaleffects::plot_predictions()]. A name that function does
@@ -80,6 +87,16 @@
 #' # The same effect on the log link scale
 #' conditional_effects(mod, type = "link")
 #'
+#' # A covariate of the observation SD, drawn as the SD itself
+#' gaus <- sim_mvgam(family = gaussian(), n_series = 1L,
+#'                   n_timepoints = 120L, trend_model = AR())$data_train
+#' gaus$weather <- rnorm(nrow(gaus))
+#' mod_sigma <- mvgam(bf(y ~ s(x, k = 5), sigma ~ weather),
+#'                    trend_formula = ~ AR(p = 1),
+#'                    data = gaus, family = gaussian(),
+#'                    chains = 2, silent = 2)
+#' conditional_effects(mod_sigma, effects = "weather", dpar = "sigma")
+#'
 #' # The average slope of the expected count with respect to x
 #' marginaleffects::avg_slopes(mod, variables = "x", type = "expected")
 #'
@@ -100,6 +117,7 @@ conditional_effects.mvgam <- function(x,
                                       process_error = FALSE,
                                       series = NULL,
                                       resp = NULL,
+                                      dpar = NULL,
                                       ...) {
   checkmate::assert_class(x, "mvgam")
   require_fitted_model(x, "conditional_effects")
@@ -108,6 +126,7 @@ conditional_effects.mvgam <- function(x,
   # `resp` selects one response of a multivariate fit. Univariate fits
   # ignore it.
   checkmate::assert_string(resp, null.ok = TRUE)
+  checkmate::assert_string(dpar, null.ok = TRUE)
 
   # `resp = NULL` on a multivariate fit returns a named list with one
   # `mvgam_conditional_effects` per response, as residuals.mvgam and
@@ -136,6 +155,7 @@ conditional_effects.mvgam <- function(x,
     c("response", "link", "expected",
       "variance", "latent_state", "detection")
   )
+  type <- dpar_prediction_type(type, dpar)
   # Family-specific types are valid only for the families that
   # register them on `attr(family, "mvgam_predict_types")`.
   # predict.mvgam lists a family's types when it refuses one. A family
@@ -153,7 +173,7 @@ conditional_effects.mvgam <- function(x,
   # quantity shares the observations' scale. The fan-out above leaves
   # one response in scope on a multivariate fit, which supplies the
   # column the points come from.
-  obs_scale <- on_observation_scale(type)
+  obs_scale <- on_observation_scale(type) && is.null(dpar)
   points_alpha <- 0
   if (obs_scale) {
     if (isTRUE(points)) {
@@ -246,13 +266,13 @@ conditional_effects.mvgam <- function(x,
   # wire token so the upstream check passes. get_predict.mvgam maps
   # `latent_N` back to predict(type = "latent_state").
   wire_type <- if (identical(type, "latent_state")) "latent_N" else type
-  # marginaleffects warns on each argument its per-class list omits,
-  # and the list has no entry for mvgam. The response and the trend
-  # setting go to get_predict.mvgam on this copy of the model. The
-  # response makes the multivariate draws a single matrix.
+  # marginaleffects warns on each argument its per-class list omits.
+  # The response, the trend setting and the distributional parameter
+  # go to get_predict.mvgam on this copy of the model. The response
+  # makes the multivariate draws a single matrix.
   model <- x
   attr(model, "mvgam_predict_args") <- list(
-    resp = resp, process_error = process_error
+    resp = resp, process_error = process_error, dpar = dpar
   )
   # With `lv_axis()` in a factor model the loadings give each series
   # its own effect of every trend term. The panels facet by series
@@ -332,6 +352,10 @@ conditional_effects.mvgam <- function(x,
           inherit.aes = FALSE
         )
       }
+    }
+    # As in brms, the axis names the distributional parameter drawn
+    if (!is.null(dpar)) {
+      p <- p + ggplot2::labs(y = dpar)
     }
     p
   })

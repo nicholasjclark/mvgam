@@ -33,6 +33,11 @@
 #'   that do not aggregate visits.
 #' @inheritParams posterior_epred.mvgam
 #' @inheritParams predict.mvgam
+#' @param dpar Character naming a distributional parameter, such as
+#'   `"sigma"` or `"phi"`. The default `NULL` returns the fitted values
+#'   of the response. A named parameter is returned on its own scale
+#'   under `scale = "response"` and on its link scale under
+#'   `scale = "linear"`. It applies to `components = "response"` only.
 #' @param incl_autocor Logical; whether the fitted values include the
 #'   latent trend state the model inferred at each time. Defaults to
 #'   `TRUE` for the training data, as in
@@ -55,9 +60,8 @@
 #' sets the trend's part. `FALSE` keeps the trend's covariate effects.
 #' `TRUE` also samples a state per draw from the trend's dynamics.
 #'
-#' The brms arguments `dpar`, `nlpar` and `sort` are refused.
-#' [posterior_linpred.mvgam()] returns a distributional parameter
-#' through its own `dpar`. Rows come back in the order of the frame.
+#' The brms arguments `nlpar` and `sort` are refused. Rows come back in
+#' the order of the frame.
 #'
 #' @seealso [residuals.mvgam()] compares the fitted values with the
 #'   data. [hindcast.mvgam()] returns the fitted latent states.
@@ -97,6 +101,7 @@ fitted.mvgam <- function(object,
                                          "detection"),
                          unit_level = NULL,
                          resp = NULL,
+                         dpar = NULL,
                          ndraws = NULL,
                          draw_ids = NULL,
                          summary = TRUE,
@@ -117,6 +122,7 @@ fitted.mvgam <- function(object,
   validate_draw_selectors(ndraws, draw_ids)
   validate_group_level_args(re_formula, allow_new_levels, sample_new_levels)
   checkmate::assert_string(resp, null.ok = TRUE)
+  checkmate::assert_string(dpar, null.ok = TRUE)
   checkmate::assert_logical(summary, len = 1, any.missing = FALSE)
   checkmate::assert_logical(robust, len = 1, any.missing = FALSE)
   checkmate::assert_logical(unit_level, len = 1, null.ok = TRUE,
@@ -125,6 +131,23 @@ fitted.mvgam <- function(object,
     probs, lower = 0, upper = 1, min.len = 1, any.missing = FALSE
   )
   rlang::check_dots_empty()
+
+  # A distributional parameter belongs to the observation model of each
+  # row. A closure unit's state or detection has none. A sum of the
+  # parameter over a unit's visits has no meaning either.
+  if (!is.null(dpar) && components != "response") {
+    stop(insight::format_error(c(
+      paste0("'dpar' is not supported with components = '",
+             components, "'."),
+      i = "Use components = 'response' to return a distributional parameter."
+    )), call. = FALSE)
+  }
+  if (!is.null(dpar) && isTRUE(unit_level)) {
+    stop(insight::format_error(c(
+      "'dpar' is not supported with 'unit_level = TRUE'.",
+      i = "Leave 'unit_level' unset to return the parameter for each row."
+    )), call. = FALSE)
+  }
 
   # `latent_state` / `detection` components delegate to predict()
   # which already runs the family-availability gate and dispatches
@@ -172,7 +195,8 @@ fitted.mvgam <- function(object,
     re_formula = re_formula,
     allow_new_levels = allow_new_levels,
     sample_new_levels = sample_new_levels,
-    resp = resp
+    resp = resp,
+    dpar = dpar
   )
 
   # Closure-unit per-unit aggregation. `unit_level = NULL` keeps the

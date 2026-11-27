@@ -16,6 +16,7 @@
   process_error = FALSE,
   series = NULL,
   resp = NULL,
+  dpar = NULL,
   ...
 )
 
@@ -70,6 +71,14 @@ the prediction grid to its observations.}
 \item{resp}{Character specifying which response variable for
 multivariate models. NULL (default) returns predictions for all
 responses.}
+
+\item{dpar}{Character naming a distributional parameter with a
+formula of its own, such as \code{sigma} in \code{bf(y ~ x, sigma ~ z)}. The
+panels then draw that parameter in place of the response, as
+\code{\link[=posterior_epred.mvgam]{posterior_epred.mvgam()}} returns it. \code{type = "expected"} (the
+default) and \code{"response"} draw it on its own scale, \code{"link"} on its
+link scale. The parameter is off the observations' scale. \code{points}
+and \code{rug} then draw nothing.}
 
 \item{...}{For \code{conditional_effects()}, further arguments of
 \code{\link[marginaleffects:plot_predictions]{marginaleffects::plot_predictions()}}. A name that function does
@@ -127,6 +136,16 @@ conditional_effects(mod, points = TRUE)
 
 # The same effect on the log link scale
 conditional_effects(mod, type = "link")
+
+# A covariate of the observation SD, drawn as the SD itself
+gaus <- sim_mvgam(family = gaussian(), n_series = 1L,
+                  n_timepoints = 120L, trend_model = AR())$data_train
+gaus$weather <- rnorm(nrow(gaus))
+mod_sigma <- mvgam(bf(y ~ s(x, k = 5), sigma ~ weather),
+                   trend_formula = ~ AR(p = 1),
+                   data = gaus, family = gaussian(),
+                   chains = 2, silent = 2)
+conditional_effects(mod_sigma, effects = "weather", dpar = "sigma")
 
 # The average slope of the expected count with respect to x
 marginaleffects::avg_slopes(mod, variables = "x", type = "expected")

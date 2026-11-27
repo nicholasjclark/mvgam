@@ -247,6 +247,12 @@ compute_family_variance <- function(mu, family, sigma = NULL,
 #' @param resp Character specifying which response variable for
 #'   multivariate models. NULL (default) returns predictions for all
 #'   responses.
+#' @param dpar Character naming a distributional parameter, such as
+#'   `"sigma"` or `"phi"`. The default `NULL` returns the expected value
+#'   of the response. A named parameter is returned on its own scale,
+#'   as [posterior_linpred.mvgam()] returns it with `transform = TRUE`.
+#'   Because mvgam allows no trend term in a distributional formula,
+#'   `process_error` and `incl_autocor` leave it unchanged.
 #' @param ... Unused. Anything passed here is refused.
 #'
 #' @return An `[ndraws, nobs]` matrix of expected values on the response
@@ -332,13 +338,26 @@ posterior_epred.mvgam <- function(object, newdata = NULL,
                                   allow_new_levels = FALSE,
                                   sample_new_levels = "uncertainty",
                                   resp = NULL,
+                                  dpar = NULL,
                                   ...) {
   checkmate::assert_class(object, "mvgam")
   require_fitted_model(object, "posterior_epred")
   checkmate::assert_flag(process_error)
   trend_state <- autocor_to_trend_state(incl_autocor)
+  checkmate::assert_string(dpar, null.ok = TRUE)
   validate_draw_selectors(ndraws, draw_ids)
   rlang::check_dots_empty()
+
+  # A distributional parameter's expectation is the parameter itself,
+  # on its own scale, as brms returns it
+  if (!is.null(dpar)) {
+    return(posterior_linpred(
+      object, transform = TRUE, newdata = newdata, ndraws = ndraws,
+      draw_ids = draw_ids, re_formula = re_formula,
+      allow_new_levels = allow_new_levels,
+      sample_new_levels = sample_new_levels, resp = resp, dpar = dpar
+    ))
+  }
 
   newdata <- prediction_frame(object, newdata)
 

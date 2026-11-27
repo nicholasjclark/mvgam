@@ -718,7 +718,7 @@ test_that("loo_epred and loo_linpred part at a non-identity link", {
 })
 
 
-test_that("a variance reads a scale written with its own formula", {
+test_that("a scale written with its own formula reaches each reader", {
   # `sigma ~ z` is computed per observation rather than sampled under
   # that name, so a reader that matched names in the stanfit found
   # nothing and the method refused a gaussian fit for want of a
@@ -742,6 +742,44 @@ test_that("a variance reads a scale written with its own formula", {
   # A gaussian variance is that draw's own sigma squared, cell for
   # cell, so this is an identity rather than a tolerance.
   expect_equal(v, sigma^2, tolerance = 1e-12)
+
+  # `fitted(dpar = )` returns the same draws on either scale
+  expect_equal(unname(fitted(fit_dpar, dpar = "sigma", summary = FALSE,
+                             draw_ids = ids)),
+               unname(sigma), tolerance = 1e-12)
+  expect_equal(unname(fitted(fit_dpar, dpar = "sigma", scale = "linear",
+                             summary = FALSE, draw_ids = ids)),
+               unname(log(sigma)), tolerance = 1e-12)
+
+  # marginaleffects summarises each row by its posterior median. The
+  # default `type = "response"` gives the parameter itself, which has no
+  # observation noise.
+  median_sigma <- apply(posterior_epred(fit_dpar, dpar = "sigma"), 2,
+                        stats::median)
+  me_sigma <- marginaleffects::get_predict(fit_dpar, newdata = d,
+                                           dpar = "sigma")
+  expect_equal(me_sigma$estimate, unname(median_sigma), tolerance = 1e-12)
+
+  # The panel of `conditional_effects()` draws the same quantity on its
+  # own grid. The axis names the parameter.
+  panel <- conditional_effects(fit_dpar, effects = "z",
+                               dpar = "sigma")[["z"]]
+  grid_sigma <- posterior_epred(fit_dpar,
+                                newdata = as.data.frame(panel$data),
+                                dpar = "sigma")
+  expect_equal(as.numeric(panel$data$estimate),
+               unname(apply(grid_sigma, 2, stats::median)),
+               tolerance = 1e-12)
+  expect_identical(panel$labels$y, "sigma")
+
+  # A closure unit's state and a sum over visits have no scale
+  expect_error(
+    marginaleffects::get_predict(fit_dpar, newdata = d,
+                                 type = "detection", dpar = "sigma"),
+    "not supported with type = 'detection'"
+  )
+  expect_error(fitted(fit_dpar, dpar = "sigma", unit_level = TRUE),
+               "not supported with 'unit_level = TRUE'")
 })
 
 

@@ -15,6 +15,18 @@ test_that("get_predict, get_coef and set_coef check their inputs", {
                                  type = "bogus"),
     "Must be element of set"
   )
+  # A distributional parameter takes its expectation or its link. Its
+  # `"response"` is its expectation.
+  expect_error(
+    marginaleffects::get_predict(stub, newdata = data.frame(x = 1),
+                                 type = "detection", dpar = "sigma"),
+    "not supported with type = 'detection'"
+  )
+  expect_identical(mvgam:::dpar_prediction_type("response", "sigma"),
+                   "expected")
+  expect_identical(mvgam:::dpar_prediction_type("link", "sigma"), "link")
+  expect_identical(mvgam:::dpar_prediction_type("response", NULL),
+                   "response")
   expect_error(
     marginaleffects::get_coef(stub, trend_effects = TRUE),
     "needs a model fitted with a 'trend_formula'"

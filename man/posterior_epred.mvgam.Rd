@@ -15,6 +15,7 @@
   allow_new_levels = FALSE,
   sample_new_levels = "uncertainty",
   resp = NULL,
+  dpar = NULL,
   ...
 )
 }
@@ -92,6 +93,13 @@ distribution. Each distributional parameter draws its own.}
 \item{resp}{Character specifying which response variable for
 multivariate models. NULL (default) returns predictions for all
 responses.}
+
+\item{dpar}{Character naming a distributional parameter, such as
+\code{"sigma"} or \code{"phi"}. The default \code{NULL} returns the expected value
+of the response. A named parameter is returned on its own scale,
+as \code{\link[=posterior_linpred.mvgam]{posterior_linpred.mvgam()}} returns it with \code{transform = TRUE}.
+Because mvgam allows no trend term in a distributional formula,
+\code{process_error} and \code{incl_autocor} leave it unchanged.}
 
 \item{...}{Unused. Anything passed here is refused.}
 }

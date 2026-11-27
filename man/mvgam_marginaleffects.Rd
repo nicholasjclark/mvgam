@@ -40,6 +40,15 @@ that state as \code{"latent_N"}. Each row of a grid from
 \code{\link[marginaleffects:datagrid]{marginaleffects::datagrid()}} becomes its own closure unit.
 }
 
+\section{Distributional parameters}{
+
+\code{dpar} names a distributional parameter with a formula of its own,
+such as \code{sigma} in \code{bf(y ~ x, sigma ~ z)}. \code{type = "expected"} gives
+it on its own scale and \code{type = "link"} on its link scale. A
+parameter has no observation noise. Its \code{"response"} is its
+expectation. The closure-unit types are refused with \code{dpar}.
+}
+
 \section{The latent trend}{
 
 By default (\code{process_error = FALSE}) each prediction takes the

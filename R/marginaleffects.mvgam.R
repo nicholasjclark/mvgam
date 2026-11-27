@@ -34,6 +34,13 @@
 #' that state as `"latent_N"`. Each row of a grid from
 #' [marginaleffects::datagrid()] becomes its own closure unit.
 #'
+#' @section Distributional parameters:
+#' `dpar` names a distributional parameter with a formula of its own,
+#' such as `sigma` in `bf(y ~ x, sigma ~ z)`. `type = "expected"` gives
+#' it on its own scale and `type = "link"` on its link scale. A
+#' parameter has no observation noise. Its `"response"` is its
+#' expectation. The closure-unit types are refused with `dpar`.
+#'
 #' @section The latent trend:
 #' By default (`process_error = FALSE`) each prediction takes the
 #' covariate part of the trend: the effects in its formula, without
@@ -103,17 +110,20 @@ get_predict.mvgam <- function(model,
                               sample_new_levels = "uncertainty",
                               incl_autocor = FALSE,
                               resp = NULL,
-                              process_error = FALSE) {
+                              process_error = FALSE,
+                              dpar = NULL) {
   checkmate::assert_class(model, "mvgam")
   checkmate::assert_data_frame(newdata, min.rows = 1L)
   # conditional_effects() and species_effects() set the response, the
-  # trend setting and the draws as an attribute of their copy of the
-  # model. marginaleffects would warn on each as an argument.
+  # trend setting, the draws and the distributional parameter as an
+  # attribute of their copy of the model. marginaleffects would warn on
+  # each as an argument.
   preset <- attr(model, "mvgam_predict_args", exact = TRUE)
   if (!is.null(preset)) {
     resp <- resp %||% preset$resp
     process_error <- preset$process_error
     draw_ids <- draw_ids %||% preset$draw_ids
+    dpar <- dpar %||% preset$dpar
   }
   checkmate::assert_logical(process_error, len = 1L)
   # `marginaleffects::datagrid()` drops every column the formula does
@@ -143,6 +153,7 @@ get_predict.mvgam <- function(model,
     c("response", "link", "expected", "detection",
       "latent_N", "latent_state")
   )
+  type <- dpar_prediction_type(type, dpar)
   # The contrast or slope of the response is that of its expectation.
   # The observation noise of each prediction would only widen it.
   if (identical(type, "response") && called_from_comparisons()) {
@@ -164,6 +175,9 @@ get_predict.mvgam <- function(model,
     resp = resp,
     process_error = process_error
   )
+  # `dpar_prediction_type()` has left only the types whose prediction
+  # methods take `dpar`
+  if (!is.null(dpar)) shared$dpar <- dpar
   draws <- switch(type,
     link         = do.call(posterior_linpred, shared),
     expected     = do.call(posterior_epred, shared),
@@ -250,6 +264,35 @@ get_predict.mvgam <- function(model,
     "Posterior draws must be a matrix or a three-dimensional array.",
     paste0("Got ", length(dim(draws)), " dimension(s).")
   )
+}
+
+
+#' The prediction type of a distributional parameter
+#'
+#' A distributional parameter has no observation noise. Its
+#' `"response"` is its expectation. `"expected"` and `"link"` keep
+#' their scales. The other types describe the response's noise or a
+#' closure unit's state. They are refused. `get_predict.mvgam()` and
+#' `conditional_effects.mvgam()` both resolve `type` here.
+#'
+#' @param type Character prediction type
+#' @param dpar Name of the distributional parameter, or `NULL`
+#' @return `type`, with `"expected"` in place of `"response"` when
+#'   `dpar` is set
+#' @noRd
+dpar_prediction_type <- function(type, dpar) {
+  checkmate::assert_string(type)
+  checkmate::assert_string(dpar, null.ok = TRUE)
+  if (is.null(dpar) || type %in% c("expected", "link")) {
+    return(type)
+  }
+  if (identical(type, "response")) {
+    return("expected")
+  }
+  stop(insight::format_error(c(
+    paste0("'dpar' is not supported with type = '", type, "'."),
+    i = "Use type = 'expected' or type = 'link'."
+  )), call. = FALSE)
 }
 
 

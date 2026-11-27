@@ -488,8 +488,7 @@ dpar_posterior_linpred <- function(object, dpar, transform = FALSE,
                                    sample_new_levels = "uncertainty") {
   # A distributional parameter belongs to one response's family. Its
   # link is that family's.
-  resolve_resp(object, resp, required = TRUE,
-               caller = "posterior_linpred(dpar = )")
+  resolve_resp(object, resp, required = TRUE, caller = "dpar")
   family <- model_families(object, resp)
   family_name <- resolve_family_name(family)
   valid <- get_family_dpars(family_name)

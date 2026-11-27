@@ -299,6 +299,30 @@ test_that("the mean and the likelihood follow the predictors", {
       tolerance = 1e-8
     )
   }
+  # `posterior_epred(dpar = )` returns a parameter on its own scale.
+  # Each case takes its own route: a log link with a smooth, a random
+  # effect or a monotonic term, the logit link of `hu`, one response's
+  # parameter of an `mvbf()` fit, and a parameter with no formula,
+  # whose draws fill every row.
+  cases <- list(
+    list(fit = "uni", dpar = "sigma", resp = NULL),
+    list(fit = "smooths", dpar = "sigma", resp = NULL),
+    list(fit = "hurdle", dpar = "hu", resp = NULL),
+    list(fit = "mv", dpar = "sigma", resp = "y1"),
+    list(fit = "mv", dpar = "sigma", resp = "y2"),
+    list(fit = "trend", dpar = "sigma", resp = NULL)
+  )
+  for (case in cases) {
+    fit <- fits[[case$fit]]
+    expect_equal(
+      unname(posterior_epred(fit, dpar = case$dpar, resp = case$resp,
+                             draw_ids = ids)),
+      unname(brms::posterior_epred(as_brms(fit), dpar = case$dpar,
+                                   resp = case$resp, newdata = fit$data,
+                                   draw_ids = ids)),
+      tolerance = 1e-8
+    )
+  }
 })
 
 test_that("the predictor's parts sum to it: trend formula terms and state", {

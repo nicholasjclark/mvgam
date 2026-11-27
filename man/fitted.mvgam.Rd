@@ -12,6 +12,7 @@
   components = c("response", "latent_state", "detection"),
   unit_level = NULL,
   resp = NULL,
+  dpar = NULL,
   ndraws = NULL,
   draw_ids = NULL,
   summary = TRUE,
@@ -67,6 +68,12 @@ that do not aggregate visits.}
 \item{resp}{Character specifying which response variable for
 multivariate models. NULL (default) returns predictions for all
 responses.}
+
+\item{dpar}{Character naming a distributional parameter, such as
+\code{"sigma"} or \code{"phi"}. The default \code{NULL} returns the fitted values
+of the response. A named parameter is returned on its own scale
+under \code{scale = "response"} and on its link scale under
+\code{scale = "linear"}. It applies to \code{components = "response"} only.}
 
 \item{ndraws}{Positive integer specifying number of posterior draws to
 use. NULL (default) uses all available draws.}
@@ -153,9 +160,8 @@ values describe the covariate part of the model. \code{process_error} then
 sets the trend's part. \code{FALSE} keeps the trend's covariate effects.
 \code{TRUE} also samples a state per draw from the trend's dynamics.
 
-The brms arguments \code{dpar}, \code{nlpar} and \code{sort} are refused.
-\code{\link[=posterior_linpred.mvgam]{posterior_linpred.mvgam()}} returns a distributional parameter
-through its own \code{dpar}. Rows come back in the order of the frame.
+The brms arguments \code{nlpar} and \code{sort} are refused. Rows come back in
+the order of the frame.
 }
 \examples{
 \dontrun{
