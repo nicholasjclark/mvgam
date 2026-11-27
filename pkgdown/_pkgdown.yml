@@ -13,9 +13,12 @@ template:
 
 navbar:
   structure:
-    left: [intro, articles, reference, cheatsheets, news]
+    left: [intro, articles, reference, cheatsheets, blog, news]
     right: [search, github]
   components:
+    blog:
+      text: Blog
+      href: https://ecogambler.netlify.app/tags/mvgam/
     cheatsheets:
       text: Cheatsheets
       menu:
